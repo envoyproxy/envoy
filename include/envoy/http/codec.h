@@ -155,11 +155,18 @@ struct Http2Settings {
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
 
-  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4096; // from nghttp2
+  static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
+  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4 * 1024; // from nghttp2
+  static const uint32_t MAX_HPACK_TABLE_SIZE = 16 * 1024 * 1024;
+
+  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = 1024;
-  // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if
-  // needed.
+  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = 1 << 29; // from MAX_STREAMS
+
+  static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1; // from HTTP/2 spec
   static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = 256 * 1024 * 1024;
+  // ( 1 << 31 ) - 1 cause overflow warning, so hard-code the value
+  static const uint32_t MAX_INITIAL_WINDOW_SIZE = 2147483647; // from HTTP/2 spec
 };
 
 /**
