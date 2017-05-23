@@ -14,5 +14,8 @@ filegroup(
         "front-proxy/service-envoy.json",
         "grpc-bridge/config/s2s-grpc-envoy.json",
         "grpc-bridge/config/s2s-python-envoy.json",
+        "zipkin-tracing/front-envoy-zipkin.json",
+        "zipkin-tracing/service1-envoy-zipkin.json",
+        "zipkin-tracing/service2-envoy-zipkin.json",
     ],
 )
