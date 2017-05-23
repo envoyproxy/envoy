@@ -14,8 +14,8 @@ namespace Grpc {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  GrpcWebFilter();
-  virtual ~GrpcWebFilter();
+  GrpcWebFilter(){};
+  virtual ~GrpcWebFilter(){};
 
   void onDestroy() override{};
 
@@ -25,9 +25,7 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
-  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
 
   // Implements StreamEncoderFilter.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
@@ -39,10 +37,9 @@ public:
 
 private:
   static const uint8_t GRPC_WEB_TRAILER;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  bool is_text_request_;
-  bool is_text_response_;
+  bool is_text_request_{};
+  bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Decoder decoder_;
 };

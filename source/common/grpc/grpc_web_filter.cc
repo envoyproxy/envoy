@@ -11,10 +11,6 @@ namespace Grpc {
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
-GrpcWebFilter::GrpcWebFilter() : is_text_request_(false), is_text_response_(false) {}
-
-GrpcWebFilter::~GrpcWebFilter() {}
-
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type, like +proto, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
