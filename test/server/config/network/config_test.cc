@@ -1,5 +1,7 @@
 #include <string>
 
+#include "common/dynamo/dynamo_filter.h"
+
 #include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
@@ -322,6 +324,66 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
   NiceMock<MockInstance> server;
   EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
+}
+
+/**
+ * Deprecated version of config registration for http dynamodb filter.
+ */
+class TestDeprecatedDynamoFilterConfig : public HttpFilterConfigFactory {
+public:
+  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
+                                             const Json::Object&, const std::string& stat_prefix,
+                                             Server::Instance& server) override {
+    if (type != HttpFilterType::Both || name != "http_dynamo_filter_deprecated") {
+      return nullptr;
+    }
+
+    return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+          new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
+    };
+  }
+};
+
+TEST(NetworkFilterConfigTest, DeprecatedHttpFilterConfigFactoryTest) {
+  // Test just ensures that the deprecated http filter registration still works without error.
+
+  // Register the config factory
+  RegisterHttpFilterConfigFactory<TestDeprecatedDynamoFilterConfig> registered;
+
+  std::string json = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter_deprecated",
+        "config" : {}
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<Server::MockInstance> server;
+  factory.createFilterFactory(NetworkFilterType::Read, *loader, server);
 }
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {

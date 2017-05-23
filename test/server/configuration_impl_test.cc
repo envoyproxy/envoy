@@ -2,6 +2,8 @@
 #include <list>
 #include <string>
 
+#include "common/filter/echo.h"
+
 #include "server/configuration_impl.h"
 
 #include "test/mocks/common.h"
@@ -431,6 +433,55 @@ TEST(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
                             "No HttpTracerFactory found for type: invalid");
 }
 
+/**
+ * Config registration for the echo filter using the deprecated registration class.
+ */
+class TestDeprecatedEchoConfigFactory : public NetworkFilterConfigFactory {
+public:
+  // NetworkFilterConfigFactory
+  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
+                                                const Json::Object&, Server::Instance&) override {
+    if (type != NetworkFilterType::Read || name != "echo_deprecated") {
+      return nullptr;
+    }
+
+    return [](Network::FilterManager& filter_manager)
+        -> void { filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()}); };
+  }
+};
+
+TEST(NetworkFilterConfigTest, DeprecatedFilterConfigFactoryRegistrationTest) {
+  // Test ensures that the deprecated network filter registration still works without error.
+
+  // Register the config factory
+  RegisterNetworkFilterConfigFactory<TestDeprecatedEchoConfigFactory> registered;
+
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": [
+          {
+            "type" : "read",
+            "name" : "echo_deprecated",
+            "config" : {}
+          }
+        ]
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+}
 } // Configuration
 } // Server
 } // Envoy

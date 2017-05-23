@@ -235,7 +235,7 @@ public:
    */
   RegisterHttpFilterConfigFactory() {
     static T* instance = new T;
-    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(instance);
+    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(*instance);
   }
 };
 
