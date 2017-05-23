@@ -105,6 +105,19 @@ HotRestartImpl::HotRestartImpl(Options& options)
   UNREFERENCED_PARAMETER(rc);
 }
 
+HotRestartImpl::~HotRestartImpl() {
+  if (clear_initialized_on_exit_) {
+    // In this case, we are exiting before we cleared initializing ourself. This can happen if for
+    // example we try to load an invalid config. We can't universally clear initializing in shared
+    // memory since we might be gracefully shutting down during normal hot restart processing. Also,
+    // it should be noted that the general recommendation is to us something like restarter.py which
+    // tears everything down in the case of any abnormal exit. However this is a basic safeguard
+    // tha can work if a new process has a config error when starting up before it actually begins
+    // real initialization.
+    shmem_.flags_ &= ~SharedMemory::Flags::INITIALIZING;
+  }
+}
+
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
@@ -172,6 +185,7 @@ void HotRestartImpl::drainParentListeners() {
 
   // At this point we are initialized and a new Envoy can startup if needed.
   shmem_.flags_ &= ~SharedMemory::Flags::INITIALIZING;
+  clear_initialized_on_exit_ = false;
 }
 
 int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
