@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Grpc {
 
+// Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
 GrpcWebFilter::GrpcWebFilter() : is_text_request_(false), is_text_response_(false) {}
@@ -15,6 +16,7 @@ GrpcWebFilter::GrpcWebFilter() : is_text_request_(false), is_text_response_(fals
 GrpcWebFilter::~GrpcWebFilter() {}
 
 // Implements StreamDecoderFilter.
+// TODO(fengli): Implements the subtypes of gRPC-Web content-type, like +proto, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr &&
@@ -48,7 +50,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   // Parse application/grpc-web-text format.
   if (data.length() + decoding_buffer_.length() < 4) {
     decoding_buffer_.move(data);
-    return Http::FilterDataStatus::Continue;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   const uint64_t needed =
@@ -89,7 +91,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  // Encodes the decoded frames with base64.
+  // Encodes the decoded gRPC frames with base64.
   for (auto& frame : frames) {
     Buffer::OwnedImpl temp;
     temp.add(&frame.flags_, 1);

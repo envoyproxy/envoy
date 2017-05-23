@@ -20,13 +20,13 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 const char MESSAGE[] = "\x00\x00\x00\x00\x11grpc-web-bin-data";
-const size_t MESSAGE_SIZE = 22;
+const size_t MESSAGE_SIZE = sizeof(MESSAGE) - 1;
 const char TEXT_MESSAGE[] = "\x00\x00\x00\x00\x12grpc-web-text-data";
-const size_t TEXT_MESSAGE_SIZE = 23;
+const size_t TEXT_MESSAGE_SIZE = sizeof(TEXT_MESSAGE) - 1;
 const char B64_MESSAGE[] = "AAAAABJncnBjLXdlYi10ZXh0LWRhdGE=";
-const size_t B64_MESSAGE_SIZE = 32;
-const char TRAILERS[] = "\x80\x00\x00\x00\x0fgrpc-status:0\r\n";
-const size_t TRAILERS_SIZE = 20;
+const size_t B64_MESSAGE_SIZE = sizeof(B64_MESSAGE) - 1;
+const char TRAILERS[] = "\x80\x00\x00\x00\x20grpc-status:0\r\ngrpc-message:ok\r\n";
+const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 } // namespace
 
 class GrpcWebFilterTest : public testing::Test {
@@ -47,11 +47,22 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
             request_headers.ContentType()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.TE()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
+            request_headers.GrpcAcceptEncoding()->value().c_str());
 
   // Tests request data.
   Buffer::OwnedImpl request_buffer(MESSAGE, MESSAGE_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
-  EXPECT_EQ(0, memcmp(MESSAGE, TestUtility::bufferToString(request_buffer).c_str(), MESSAGE_SIZE));
+  EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(request_buffer));
+
+  // Tests request trailers, they are passed through.
+  Http::TestHeaderMapImpl request_trailers;
+  request_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
+  request_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+  EXPECT_STREQ("0", request_trailers.GrpcStatus()->value().c_str());
+  EXPECT_STREQ("ok", request_trailers.GrpcMessage()->value().c_str());
 
   // Tests response headers.
   Http::TestHeaderMapImpl response_headers;
@@ -64,7 +75,7 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
   // Tests response data.
   Buffer::OwnedImpl response_buffer(MESSAGE, MESSAGE_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
-  EXPECT_EQ(0, memcmp(MESSAGE, TestUtility::bufferToString(response_buffer).c_str(), MESSAGE_SIZE));
+  EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(response_buffer));
   response_buffer.drain(response_buffer.length());
 
   // Tests response trailers.
@@ -73,9 +84,9 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
       .WillOnce(Invoke([&](Buffer::Instance& data) { trailers_buffer.move(data); }));
   Http::TestHeaderMapImpl response_trailers;
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
+  response_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(0,
-            memcmp(TRAILERS, TestUtility::bufferToString(trailers_buffer).c_str(), TRAILERS_SIZE));
+  EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), TestUtility::bufferToString(trailers_buffer));
 }
 
 TEST_F(GrpcWebFilterTest, TextUnary) {
@@ -88,12 +99,23 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
             request_headers.ContentType()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.TE()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
+            request_headers.GrpcAcceptEncoding()->value().c_str());
 
   // Tests request data.
   Buffer::OwnedImpl request_buffer(B64_MESSAGE, B64_MESSAGE_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
-  EXPECT_EQ(0, memcmp(TEXT_MESSAGE, TestUtility::bufferToString(request_buffer).c_str(),
-                      TEXT_MESSAGE_SIZE));
+  EXPECT_EQ(std::string(TEXT_MESSAGE, TEXT_MESSAGE_SIZE),
+            TestUtility::bufferToString(request_buffer));
+
+  // Tests request trailers, they are passed through.
+  Http::TestHeaderMapImpl request_trailers;
+  request_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
+  request_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+  EXPECT_STREQ("0", request_trailers.GrpcStatus()->value().c_str());
+  EXPECT_STREQ("ok", request_trailers.GrpcMessage()->value().c_str());
 
   // Tests response headers.
   Http::TestHeaderMapImpl response_headers;
@@ -108,8 +130,8 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
   // Tests response data.
   Buffer::OwnedImpl response_buffer(TEXT_MESSAGE, TEXT_MESSAGE_SIZE);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
-  EXPECT_EQ(0, memcmp(B64_MESSAGE, TestUtility::bufferToString(response_buffer).c_str(),
-                      B64_MESSAGE_SIZE));
+  EXPECT_EQ(std::string(B64_MESSAGE, B64_MESSAGE_SIZE),
+            TestUtility::bufferToString(response_buffer));
   response_buffer.drain(response_buffer.length());
 
   // Tests response trailers.
@@ -118,9 +140,9 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
       .WillOnce(Invoke([&](Buffer::Instance& data) { trailers_buffer.move(data); }));
   Http::TestHeaderMapImpl response_trailers;
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
+  response_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(0,
-            memcmp(TRAILERS, TestUtility::bufferToString(trailers_buffer).c_str(), TRAILERS_SIZE));
+  EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), TestUtility::bufferToString(trailers_buffer));
 }
 } // namespace Grpc
 } // namespace Envoy
