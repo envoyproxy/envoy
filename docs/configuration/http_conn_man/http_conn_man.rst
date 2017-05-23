@@ -110,8 +110,8 @@ http2_settings
 
   initial_window_size
     *(optional, integer)* `Initial flow-control window`_ size. Valid values range from 65535
-    (HTTP/2 default window size, also minimum) to 2147483647 (2^31 - 1), so only increases to the
-    default initial window size are supported. Default is 268435456 (256 * 1024 * 1024).
+    (HTTP/2 default window size, also minimum) to 2147483647 (2^31 - 1, also HTTP/2 maximum), so only
+    increases to the default initial window size are supported. Default is 268435456 (256 * 1024 * 1024).
 
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
