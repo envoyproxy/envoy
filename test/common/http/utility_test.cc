@@ -118,7 +118,8 @@ TEST(HttpUtility, parseHttp2Settings) {
 
   {
     Json::ObjectSharedPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
-    EXPECT_THROW(Utility::parseHttp2Settings(*json), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(Utility::parseHttp2Settings(*json), EnvoyException,
+                              "unknown http codec option 'foo'");
   }
 }
 

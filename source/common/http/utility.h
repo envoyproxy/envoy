@@ -64,8 +64,8 @@ public:
   static bool isInternalRequest(const HeaderMap& headers);
 
   /**
-   * @return Http2Settings parse "http_codec_options" and "http2_settings" JSON fields and return
-   *         a Http2Settings.
+   * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
+   *         "http2_settings" JSON fields.
    */
   static Http2Settings parseHttp2Settings(const Json::Object& config);
 
