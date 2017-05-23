@@ -20,7 +20,7 @@ Cluster
     "features": "...",
     "http_codec_options": "...",
     "dns_refresh_rate_ms": "...",
-    "outlier_detection": "..."
+    "outlier_detection": "{...}"
   }
 
 .. _config_cluster_manager_cluster_name:
