@@ -17,19 +17,23 @@ namespace Statsd {
 /**
  * This is a simple UDP localhost writer for statsd messages.
  */
-class Writer {
+class Writer : public ThreadLocal::ThreadLocalObject {
 public:
-  Writer(uint32_t port);
+  Writer(Network::Address::InstanceConstSharedPtr address);
   ~Writer();
 
   void writeCounter(const std::string& name, uint64_t increment);
   void writeGauge(const std::string& name, uint64_t value);
   void writeTimer(const std::string& name, const std::chrono::milliseconds& ms);
+  void shutdown() override;
+  // Called in unit test to validate address.
+  int getFdForTests() { return fd_; };
 
 private:
   void send(const std::string& message);
 
   int fd_;
+  bool shutdown_ = false;
 };
 
 /**
@@ -37,7 +41,9 @@ private:
  */
 class UdpStatsdSink : public Sink {
 public:
-  UdpStatsdSink(uint32_t port) : port_(port) {}
+  // TODO(hennna): Deprecate in release 1.4.0.
+  UdpStatsdSink(ThreadLocal::Instance& tls, const uint32_t port);
+  UdpStatsdSink(ThreadLocal::Instance& tls, const std::string& ip_address);
 
   // Stats::Sink
   void flushCounter(const std::string& name, uint64_t delta) override;
@@ -47,14 +53,13 @@ public:
     onTimespanComplete(name, std::chrono::milliseconds(value));
   }
   void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) override;
+  // Called in unit test to validate writer construction and address.
+  int getFdForTests() { return tls_.getTyped<Writer>(tls_slot_).getFdForTests(); }
 
 private:
-  Writer& writer() {
-    static thread_local Statsd::Writer writer_(port_);
-    return writer_;
-  }
-
-  uint32_t port_;
+  ThreadLocal::Instance& tls_;
+  uint32_t tls_slot_;
+  Network::Address::InstanceConstSharedPtr server_address_;
 };
 
 /**

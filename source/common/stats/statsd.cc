@@ -19,8 +19,7 @@ namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
-Writer::Writer(uint32_t port) {
-  Network::Address::InstanceConstSharedPtr address(new Network::Address::Ipv4Instance(port));
+Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
@@ -29,7 +28,14 @@ Writer::Writer(uint32_t port) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-Writer::~Writer() { close(fd_); }
+Writer::~Writer() { ASSERT(shutdown_); }
+
+void Writer::shutdown() {
+  shutdown_ = true;
+  if (fd_ != -1) {
+    ASSERT(close(fd_) == 0);
+  }
+}
 
 void Writer::writeCounter(const std::string& name, uint64_t increment) {
   std::string message(fmt::format("envoy.{}:{}|c", name, increment));
@@ -47,19 +53,39 @@ void Writer::writeTimer(const std::string& name, const std::chrono::milliseconds
 }
 
 void Writer::send(const std::string& message) {
+  if (shutdown_) {
+    return;
+  }
   ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
+// TODO(hennna): Deprecate in release 1.4.0.
+UdpStatsdSink::UdpStatsdSink(ThreadLocal::Instance& tls, const uint32_t port)
+    : tls_(tls), tls_slot_(tls.allocateSlot()) {
+  server_address_.reset(new Network::Address::Ipv4Instance(port));
+  tls.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<Writer>(this->server_address_);
+  });
+}
+
+UdpStatsdSink::UdpStatsdSink(ThreadLocal::Instance& tls, const std::string& ip_address)
+    : tls_(tls), tls_slot_(tls.allocateSlot()) {
+  server_address_ = Network::Utility::parseInternetAddressAndPort(ip_address);
+  tls.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<Writer>(this->server_address_);
+  });
+}
+
 void UdpStatsdSink::flushCounter(const std::string& name, uint64_t delta) {
-  writer().writeCounter(name, delta);
+  tls_.getTyped<Writer>(tls_slot_).writeCounter(name, delta);
 }
 
 void UdpStatsdSink::flushGauge(const std::string& name, uint64_t value) {
-  writer().writeGauge(name, value);
+  tls_.getTyped<Writer>(tls_slot_).writeGauge(name, value);
 }
 
 void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) {
-  writer().writeTimer(name, ms);
+  tls_.getTyped<Writer>(tls_slot_).writeTimer(name, ms);
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,

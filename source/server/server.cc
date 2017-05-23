@@ -317,9 +317,18 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 }
 
 void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpPort().valid()) {
+  // TODO(hennna): Deprecate statsdUdpPort in release 1.4.0.
+  if (config_->statsdUdpIpAddress().valid()) {
+    log().info("statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
+    stat_sinks_.emplace_back(
+        new Stats::Statsd::UdpStatsdSink(thread_local_, config_->statsdUdpIpAddress().value()));
+    stats_store_.addSink(*stat_sinks_.back());
+  } else if (config_->statsdUdpPort().valid()) {
+    log().warn("statsd_local_udp_port has been DEPRECATED. Consider setting statsd_udp_ip_address "
+               "instead.");
     log().info("statsd UDP port: {}", config_->statsdUdpPort().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(config_->statsdUdpPort().value()));
+    stat_sinks_.emplace_back(
+        new Stats::Statsd::UdpStatsdSink(thread_local_, config_->statsdUdpPort().value()));
     stats_store_.addSink(*stat_sinks_.back());
   }
 

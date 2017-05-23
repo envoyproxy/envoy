@@ -232,7 +232,7 @@
 
   "admin": { "access_log_path": "/dev/null", "profile_path": "{{ test_tmpdir }}/envoy.prof", "address": "tcp://127.0.0.1:0" },
   "flags_path": "/invalid_flags",
-  "statsd_local_udp_port": 8125,
+  "statsd_udp_ip_address": "127.0.0.1:0",
   "statsd_tcp_cluster_name": "statsd",
   "tracing": {
     "http": {
