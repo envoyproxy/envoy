@@ -27,6 +27,23 @@ struct Decision {
   bool is_tracing;
 };
 
+/**
+ * Finalizer for Spans covering standard request ingress.
+ */
+class DefaultIngressFinalizer : SpanFinalizer {
+public:
+  DefaultIngressFinalizer(const Http::HeaderMap& request_headers,
+                          const Http::AccessLog::RequestInfo& request_info,
+                          const Config& tracing_config);
+
+  finalizeSpan(Span& span);
+
+private:
+  Http::HeaderMap& request_headers_;
+  Http::AccessLog::RequestInfo& request_info;
+
+}
+
 class HttpTracerUtility {
 public:
   /**
@@ -66,7 +83,7 @@ class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
-    return nullptr;
+    return SpanPtr{new NullSpan()};
   }
 };
 
@@ -87,7 +104,7 @@ class NullSpan : public Tracing::Span {
 public:
   // Tracing::Span
   void setTag(const std::string&, const std::string&) override {}
-  void finishSpan() override {}
+  void finishSpan(SpanFinalizer&) override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
 };
