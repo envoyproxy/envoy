@@ -302,7 +302,7 @@ TEST(ConfigurationImplTest, BadFilterName) {
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
   EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader), EnvoyException,
-               "unable to create filter factory for 'invalid'/'read'");
+                            "unable to create filter factory for 'invalid'/'read'");
 }
 
 TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
