@@ -299,8 +299,8 @@ Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   return any;
 }
 
-Address::InstanceConstSharedPtr Utility::getAddressUpdatePort(const Address::Instance& address,
-                                                              uint32_t port) {
+Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
+                                                            uint32_t port) {
   switch (address.ip()->version()) {
   case Network::Address::IpVersion::v4:
     return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);

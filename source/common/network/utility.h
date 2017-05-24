@@ -151,8 +151,8 @@ public:
    * @param port to update.
    * @return Address::InstanceConstSharedPtr a new address instance with updated port.
    */
-  static Address::InstanceConstSharedPtr getAddressUpdatePort(const Address::Instance& address,
-                                                              uint32_t port);
+  static Address::InstanceConstSharedPtr getAddressWithPort(const Address::Instance& address,
+                                                            uint32_t port);
 
   /**
    * Retrieve the original destination address from an accepted fd.

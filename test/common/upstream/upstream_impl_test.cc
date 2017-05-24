@@ -49,7 +49,7 @@ struct ResolverData {
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _, _))
-        .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
+        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
           return &active_dns_query_;
@@ -118,7 +118,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   )EOF";
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;

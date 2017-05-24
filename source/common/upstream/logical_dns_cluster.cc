@@ -70,8 +70,8 @@ void LogicalDnsCluster::startResolve() {
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(address_list.front() != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressUpdatePort(*address_list.front(),
-                                                     Network::Utility::portFromTcpUrl(dns_url_));
+              Network::Utility::getAddressWithPort(*address_list.front(),
+                                                   Network::Utility::portFromTcpUrl(dns_url_));
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
