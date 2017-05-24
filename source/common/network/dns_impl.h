@@ -45,12 +45,14 @@ private:
       cancelled_ = true;
     }
 
-    /* c-ares ares_gethostbyname() query callback.
+    /**
+     * c-ares ares_gethostbyname() query callback.
      * @param status return status of call to ares_gethostbyname.
      * @param hostent structure that stores information about a given host.
      */
     void onAresHostCallback(int status, hostent* hostent);
-    /* wrapper function of call to ares_gethostbyname.
+    /**
+     * wrapper function of call to ares_gethostbyname.
      * @param family currently AF_INET and AF_INET6 are supported.
      */
     void getHostByName(int family);
