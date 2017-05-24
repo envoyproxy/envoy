@@ -62,9 +62,10 @@ struct ResolverData {
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>> DnsConfigTuple;
-std::vector<DnsConfigTuple> generateParamVector() {
-  std::vector<DnsConfigTuple> dns_config;
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
+    StrictDnsConfigTuple;
+std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
+  std::vector<StrictDnsConfigTuple> dns_config;
   {
     std::string family_json("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
@@ -92,9 +93,9 @@ std::vector<DnsConfigTuple> generateParamVector() {
   return dns_config;
 }
 
-class StrictDnsParamTest : public testing::TestWithParam<DnsConfigTuple> {};
+class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple> {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateParamVector()));
+INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateStrictDnsParams()));
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;

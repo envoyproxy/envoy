@@ -60,9 +60,10 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>> DnsConfigTuple;
-std::vector<DnsConfigTuple> generateParamVector() {
-  std::vector<DnsConfigTuple> dns_config;
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
+    LogicalDnsConfigTuple;
+std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
+  std::vector<LogicalDnsConfigTuple> dns_config;
   {
     std::string family_json("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
@@ -91,9 +92,10 @@ std::vector<DnsConfigTuple> generateParamVector() {
 }
 
 class LogicalDnsParamTest : public LogicalDnsClusterTest,
-                            public testing::WithParamInterface<DnsConfigTuple> {};
+                            public testing::WithParamInterface<LogicalDnsConfigTuple> {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest, testing::ValuesIn(generateParamVector()));
+INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
+                        testing::ValuesIn(generateLogicalDnsParams()));
 
 // Validate that if the DNS resolves immediately, during the LogicalDnsCluster
 // constructor, we have the expected host state and initialization callback
