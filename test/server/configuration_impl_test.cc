@@ -40,7 +40,17 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }
 
-TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {
+class ConfigurationImplTest : public testing::Test {
+protected:
+  ConfigurationImplTest() : cluster_manager_factory_(
+      server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(), server_.dnsResolver(),
+      server_.sslContextManager(), server_.dispatcher(), server_.localInfo()) {}
+
+  NiceMock<Server::MockInstance> server_;
+  Upstream::ProdClusterManagerFactory cluster_manager_factory_;
+};
+
+TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   std::string json = R"EOF(
   {
     "listeners": [],
@@ -53,17 +63,13 @@ TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
 }
 
-TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
+TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   std::string json = R"EOF(
   {
     "listeners": [],
@@ -78,17 +84,13 @@ TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
 }
 
-TEST(ConfigurationImplTest, EmptyFilter) {
+TEST_F(ConfigurationImplTest, EmptyFilter) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -105,17 +107,13 @@ TEST(ConfigurationImplTest, EmptyFilter) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_EQ(1U, config.listeners().size());
 }
 
-TEST(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
+TEST_F(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -132,17 +130,13 @@ TEST(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_EQ(1024 * 1024U, config.listeners().back()->perConnectionBufferLimitBytes());
 }
 
-TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
+TEST_F(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -160,17 +154,13 @@ TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_EQ(8192U, config.listeners().back()->perConnectionBufferLimitBytes());
 }
 
-TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
+TEST_F(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -195,17 +185,13 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_TRUE(config.listeners().back()->sslContext() != nullptr);
 }
 
-TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
+TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   std::string json = R"EOF(
   {
     "listeners" : [],
@@ -228,11 +214,7 @@ TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   ASSERT_EQ(1U, config.clusterManager().clusters().count("test_cluster"));
@@ -242,10 +224,10 @@ TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
                        ->second.get()
                        .info()
                        ->perConnectionBufferLimitBytes());
-  server.thread_local_.shutdownThread();
+  server_.thread_local_.shutdownThread();
 }
 
-TEST(ConfigurationImplTest, BadListenerConfig) {
+TEST_F(ConfigurationImplTest, BadListenerConfig) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -263,15 +245,11 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
-TEST(ConfigurationImplTest, BadFilterConfig) {
+TEST_F(ConfigurationImplTest, BadFilterConfig) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -294,15 +272,11 @@ TEST(ConfigurationImplTest, BadFilterConfig) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  MainImpl config(server_, cluster_manager_factory_);
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
-TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
+TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -329,16 +303,12 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  server.local_info_.cluster_name_ = "";
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  server_.local_info_.cluster_name_ = "";
+  MainImpl config(server_, cluster_manager_factory_);
   EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
-TEST(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
+TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -355,18 +325,14 @@ TEST(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  server.local_info_.cluster_name_ = "";
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  server_.local_info_.cluster_name_ = "";
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
 }
 
-TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
+TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -393,12 +359,8 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-  NiceMock<Server::MockInstance> server;
-  server.local_info_.cluster_name_ = "";
-  Upstream::ProdClusterManagerFactory cluster_manager_factory(
-      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
-      server.sslContextManager(), server.dispatcher(), server.localInfo());
-  MainImpl config(server, cluster_manager_factory);
+  server_.local_info_.cluster_name_ = "";
+  MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
