@@ -10,6 +10,7 @@ TARGET_RECIPES = {
     # that is external to Bazel.
     "gcovr": "gcovr",
     "googletest": "googletest",
+    "glog" : "glog",
     "tcmalloc_and_profiler": "gperftools",
     "http_parser": "http-parser",
     "lightstep": "lightstep",
