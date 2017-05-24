@@ -57,6 +57,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_web_filter_lib",
+    srcs = ["grpc_web_filter.cc"],
+    hdrs = ["grpc_web_filter.h"],
+    deps = [
+        ":codec_lib",
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "rpc_channel_lib",
     srcs = ["rpc_channel_impl.cc"],
     hdrs = ["rpc_channel_impl.h"],

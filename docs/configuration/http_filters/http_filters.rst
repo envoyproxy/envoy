@@ -10,6 +10,7 @@ HTTP filters
   fault_filter
   dynamodb_filter
   grpc_http1_bridge_filter
+  grpc_web_filter
   health_check_filter
   rate_limit_filter
   router_filter
