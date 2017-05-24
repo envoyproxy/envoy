@@ -68,25 +68,25 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   std::vector<StrictDnsConfigTuple> dns_config;
   {
     std::string family_json("");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
     dns_config.push_back(std::make_tuple(family_json, family, dns_response));
   }
   {
     std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
     dns_config.push_back(std::make_tuple(family_json, family, dns_response));
   }
   {
     std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6_ONLY);
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
     dns_config.push_back(std::make_tuple(family_json, family, dns_response));
   }
   {
     std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::AUTO);
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
     dns_config.push_back(std::make_tuple(family_json, family, dns_response));
   }

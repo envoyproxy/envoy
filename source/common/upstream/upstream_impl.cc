@@ -372,12 +372,12 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
   std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
   if (dns_lookup_family == "v6_only") {
-    dns_lookup_family_ = Network::DnsLookupFamily::V6_ONLY;
+    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
   } else if (dns_lookup_family == "auto") {
-    dns_lookup_family_ = Network::DnsLookupFamily::AUTO;
+    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
   } else {
     ASSERT(dns_lookup_family == "v4_only");
-    dns_lookup_family_ = Network::DnsLookupFamily::V4_ONLY;
+    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
   }
 
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {

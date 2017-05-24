@@ -24,7 +24,7 @@ public:
   virtual void cancel() PURE;
 };
 
-enum class DnsLookupFamily { V4_ONLY, V6_ONLY, AUTO };
+enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
 /**
  * An asynchronous DNS resolver.

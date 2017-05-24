@@ -17,7 +17,7 @@
   includes both const and non-const references.
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
-* Enum values using all CAPS (e.g., `EXTERNAL_ONLY`).
+* Enum values using PascalCase (e.g., `RoundRobin`).
 * 100 columns is the line limit.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:

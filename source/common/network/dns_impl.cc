@@ -147,11 +147,11 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   // resolution.
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(callback, channel_, dns_name));
-  if (dns_lookup_family == DnsLookupFamily::AUTO) {
+  if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4_ONLY) {
+  if (dns_lookup_family == DnsLookupFamily::V4Only) {
     pending_resolution->getHostByName(AF_INET);
   } else {
     pending_resolution->getHostByName(AF_INET6);
