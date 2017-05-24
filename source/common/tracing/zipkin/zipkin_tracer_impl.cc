@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Zipkin {
 
-ZipkinSpan::ZipkinSpan(Zipkin::Span& span) : span_(span) {}
+ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
@@ -20,6 +20,29 @@ void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
   if (this->hasCSAnnotation()) {
     span_.setTag(name, value);
   }
+}
+
+void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
+  // Set the trace-id and span-id headers properly, based on the newly-created span structure.
+  request_headers.insertXB3TraceId().value(span_.traceIdAsHexString());
+  request_headers.insertXB3SpanId().value(span_.idAsHexString());
+
+  // Set the parent-span header properly, based on the newly-created span structure.
+  if (span_.isSetParentId()) {
+    request_headers.insertXB3ParentSpanId().value(span_.parentIdAsHexString());
+  }
+
+  // Set the sampled header.
+  request_headers.insertXB3Sampled().value(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
+
+  // Set the ot-span-context header with the new context.
+  SpanContext context(span_);
+  request_headers.insertOtSpanContext().value(context.serializeToString());
+}
+
+Tracing::SpanPtr ZipkinSpan::spawnChild(const std::string& name, SystemTime start_time) {
+  SpanContext context(span_);
+  return Tracing::SpanPtr{new ZipkinSpan(*tracer_.startSpan(name, start_time, context), tracer_)};
 }
 
 bool ZipkinSpan::hasCSAnnotation() {
@@ -94,25 +117,7 @@ Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(), start_time);
   }
 
-  // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  request_headers.insertXB3TraceId().value(new_zipkin_span->traceIdAsHexString());
-  request_headers.insertXB3SpanId().value(new_zipkin_span->idAsHexString());
-
-  // Set the parent-span header properly, based on the newly-created span structure.
-  if (new_zipkin_span->isSetParentId()) {
-    request_headers.insertXB3ParentSpanId().value(new_zipkin_span->parentIdAsHexString());
-  }
-
-  // Set the sampled header.
-  request_headers.insertXB3Sampled().value(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
-
-  // Set the ot-span-context header with the new context.
-  SpanContext new_span_context(*new_zipkin_span);
-  request_headers.insertOtSpanContext().value(new_span_context.serializeToString());
-
-  ZipkinSpanPtr active_span;
-  active_span.reset(new ZipkinSpan(*new_zipkin_span));
-
+  ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
   return std::move(active_span);
 }
 

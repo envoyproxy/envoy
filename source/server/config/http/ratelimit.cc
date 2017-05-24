@@ -9,13 +9,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb RateLimitFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                  const std::string& name,
-                                                                  const Json::Object& config,
-                                                                  const std::string&,
-                                                                  Server::Instance& server) {
-  if (type != HttpFilterType::Decoder || name != "rate_limit") {
-    return nullptr;
+HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(HttpFilterType type,
+                                                               const Json::Object& config,
+                                                               const std::string&,
+                                                               Server::Instance& server) {
+  if (type != HttpFilterType::Decoder) {
+    throw EnvoyException(
+        fmt::format("{} http filter must be configured as a decoder filter.", name()));
   }
 
   Http::RateLimit::FilterConfigSharedPtr filter_config(new Http::RateLimit::FilterConfig(
@@ -26,10 +26,12 @@ HttpFilterFactoryCb RateLimitFilterConfig::tryCreateFilterFactory(HttpFilterType
   };
 }
 
+std::string RateLimitFilterConfig::name() { return "rate_limit"; }
+
 /**
- * Static registration for the rate limit filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<RateLimitFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<RateLimitFilterConfig> register_;
 
 } // Configuration
 } // Server

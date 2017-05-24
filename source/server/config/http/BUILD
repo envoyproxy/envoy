@@ -65,6 +65,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lightstep_lib",
+    srcs = ["lightstep_http_tracer.cc"],
+    hdrs = ["lightstep_http_tracer.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/server:configuration_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
@@ -86,5 +97,16 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/server/config/network:http_connection_manager_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "zipkin_lib",
+    srcs = ["zipkin_http_tracer.cc"],
+    hdrs = ["zipkin_http_tracer.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+        "//source/common/tracing/zipkin:zipkin_lib",
+        "//source/server:configuration_lib",
     ],
 )

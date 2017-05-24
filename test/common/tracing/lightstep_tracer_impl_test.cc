@@ -276,6 +276,9 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   request_headers_.removeOtSpanContext();
   SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
+  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  span->injectContext(request_headers_);
+
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
 
@@ -286,8 +289,32 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
   // Supply parent context, request_headers has properly populated x-ot-span-context.
   SpanPtr span_with_parent = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  request_headers_.removeOtSpanContext();
+  span_with_parent->injectContext(request_headers_);
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
+}
+
+TEST_F(LightStepDriverTest, SpawnChild) {
+  setupValidDriver();
+
+  SpanPtr parent = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  parent->injectContext(request_headers_);
+
+  SpanPtr childViaHeaders = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  SpanPtr childViaSpawn = parent->spawnChild(operation_name_, start_time_);
+
+  Http::TestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  Http::TestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+
+  childViaHeaders->injectContext(base1);
+  childViaSpawn->injectContext(base2);
+
+  std::string base1_context = Base64::decode(base1.OtSpanContext()->value().c_str());
+  std::string base2_context = Base64::decode(base2.OtSpanContext()->value().c_str());
+
+  EXPECT_FALSE(base1_context.empty());
+  EXPECT_FALSE(base2_context.empty());
 }
 
 } // Tracing

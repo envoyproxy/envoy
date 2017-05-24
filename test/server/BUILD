@@ -21,11 +21,13 @@ envoy_cc_test(
     data = ["//test/common/ssl/test_data:certs"],
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/filter:echo_lib",
         "//source/server:configuration_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

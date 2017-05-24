@@ -11,12 +11,12 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb TcpProxyConfigFactory::tryCreateFilterFactory(NetworkFilterType type,
-                                                                     const std::string& name,
-                                                                     const Json::Object& config,
-                                                                     Server::Instance& server) {
-  if (type != NetworkFilterType::Read || name != "tcp_proxy") {
-    return nullptr;
+NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(NetworkFilterType type,
+                                                                  const Json::Object& config,
+                                                                  Server::Instance& server) {
+  if (type != NetworkFilterType::Read) {
+    throw EnvoyException(
+        fmt::format("{} network filter must be configured as a read filter.", name()));
   }
 
   Filter::TcpProxyConfigSharedPtr filter_config(
@@ -27,10 +27,12 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::tryCreateFilterFactory(NetworkFilt
   };
 }
 
+std::string TcpProxyConfigFactory::name() { return "tcp_proxy"; }
+
 /**
- * Static registration for the tcp_proxy filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the tcp_proxy filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
 
 } // Configuration
 } // Server
