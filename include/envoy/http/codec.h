@@ -165,8 +165,7 @@ struct Http2Settings {
 
   static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1; // from HTTP/2 spec
   static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = 256 * 1024 * 1024;
-  // ( 1 << 31 ) - 1 cause overflow warning, so hard-code the value
-  static const uint32_t MAX_INITIAL_WINDOW_SIZE = 2147483647; // from HTTP/2 spec
+  static const uint32_t MAX_INITIAL_WINDOW_SIZE = (1U << 31) - 1; // from HTTP/2 spec
 };
 
 /**
