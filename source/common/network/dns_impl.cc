@@ -52,7 +52,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     delete this;
     return;
   }
-  if (status == ARES_SUCCESS || !fallback_if_failed) {
+  if (status == ARES_SUCCESS || !fallback_if_failed_) {
     completed_ = true;
   }
 
@@ -91,11 +91,12 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     }
   }
 
-  if (status != ARES_SUCCESS && fallback_if_failed) {
-    fallback_if_failed = false;
+  if (status != ARES_SUCCESS && fallback_if_failed_) {
+    fallback_if_failed_ = false;
     getHostByName(AF_INET);
     // Note: Nothing can follow this call to getHostByName due to deletion of this
     // object upon synchronous resolution.
+    return;
   }
 }
 
@@ -147,7 +148,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(callback, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::AUTO) {
-    pending_resolution->fallback_if_failed = true;
+    pending_resolution->fallback_if_failed_ = true;
   }
 
   if (dns_lookup_family == DnsLookupFamily::V4_ONLY) {

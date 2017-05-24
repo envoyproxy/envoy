@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -61,7 +62,41 @@ struct ResolverData {
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
-TEST(StrictDnsClusterImplTest, ImmediateResolve) {
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>> DnsConfigTuple;
+std::vector<DnsConfigTuple> generateParamVector() {
+  std::vector<DnsConfigTuple> dns_config;
+  {
+    std::string family_json("");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4_ONLY);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6_ONLY);
+    std::list<std::string> dns_response{"::1", "::2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::AUTO);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  return dns_config;
+}
+
+class StrictDnsParamTest : public testing::TestWithParam<DnsConfigTuple> {};
+
+INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateParamVector()));
+
+TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Network::MockDnsResolver> dns_resolver;
@@ -74,84 +109,18 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "strict_dns",
+  )EOF";
+  json += std::get<0>(GetParam());
+  json += R"EOF(
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
   )EOF";
-
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::V4_ONLY, _))
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-        return nullptr;
-      }));
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher);
-  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(2UL, cluster.hosts().size());
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
-}
-
-TEST(StrictDnsClusterImplTest, ImmediateResolveV6Only) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockLoader> runtime;
-  ReadyWatcher initialized;
-
-  std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_family" : "v6_only"
-  }
-  )EOF";
-
-  EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::V6_ONLY, _))
-      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse({"::1", "::2"}));
-        return nullptr;
-      }));
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher);
-  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(2UL, cluster.hosts().size());
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
-}
-
-TEST(StrictDnsClusterImplTest, ImmediateResolveFallback) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockLoader> runtime;
-  ReadyWatcher initialized;
-
-  std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_family" : "auto"
-  }
-  )EOF";
-
-  EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::AUTO, _))
-      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+        cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
@@ -541,7 +510,7 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
-TEST(ClusterDefinitionTest, BadDnsIpVersionClusterConfig) {
+TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
   std::string json = R"EOF(
   {
     "name": "cluster_1",

@@ -434,22 +434,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
-          switch (address->ip()->version()) {
-          case Network::Address::IpVersion::v4:
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, dns_address_,
-                Network::Address::InstanceConstSharedPtr{
-                    new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
-                false, 1, ""));
-            break;
-          case Network::Address::IpVersion::v6:
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, dns_address_,
-                Network::Address::InstanceConstSharedPtr{
-                    new Network::Address::Ipv6Instance(address->ip()->addressAsString(), port_)},
-                false, 1, ""));
-            break;
-          }
+          ASSERT(address != nullptr);
+          new_hosts.emplace_back(
+              new HostImpl(parent_.info_, dns_address_,
+                           Network::Utility::getAddressUpdatePort(*address, port_), false, 1, ""));
         }
 
         std::vector<HostSharedPtr> hosts_added;

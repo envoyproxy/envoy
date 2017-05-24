@@ -299,6 +299,17 @@ Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   return any;
 }
 
+Address::InstanceConstSharedPtr Utility::getAddressUpdatePort(const Address::Instance& address,
+                                                              uint32_t port) {
+  switch (address.ip()->version()) {
+  case Network::Address::IpVersion::v4:
+    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
+  case Network::Address::IpVersion::v6:
+    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+  }
+  NOT_REACHED;
+}
+
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);

@@ -68,20 +68,10 @@ void LogicalDnsCluster::startResolve() {
 
         if (!address_list.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
-          Network::Address::IpVersion version = address_list.front()->ip()->version();
-          Network::Address::InstanceConstSharedPtr new_address;
-          switch (version) {
-          case Network::Address::IpVersion::v4:
-            new_address.reset(
-                new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
-                                                   Network::Utility::portFromTcpUrl(dns_url_)));
-            break;
-          case Network::Address::IpVersion::v6:
-            new_address.reset(
-                new Network::Address::Ipv6Instance(address_list.front()->ip()->addressAsString(),
-                                                   Network::Utility::portFromTcpUrl(dns_url_)));
-            break;
-          }
+          ASSERT(address_list.front() != nullptr);
+          Network::Address::InstanceConstSharedPtr new_address =
+              Network::Utility::getAddressUpdatePort(*address_list.front(),
+                                                     Network::Utility::portFromTcpUrl(dns_url_));
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
@@ -96,7 +86,7 @@ void LogicalDnsCluster::startResolve() {
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            switch (version) {
+            switch (address_list.front()->ip()->version()) {
             case Network::Address::IpVersion::v4:
               logical_host_.reset(
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));

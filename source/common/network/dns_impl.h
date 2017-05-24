@@ -66,7 +66,7 @@ private:
     bool cancelled_ = false;
     // If dns_lookup_family is "fallback", fallback to v4 address if v6
     // resolution failed.
-    bool fallback_if_failed = false;
+    bool fallback_if_failed_ = false;
     const ares_channel channel_;
     const std::string dns_name_;
   };

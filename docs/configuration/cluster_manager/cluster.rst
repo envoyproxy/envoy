@@ -21,7 +21,7 @@ Cluster
     "http_codec_options": "...",
     "dns_refresh_rate_ms": "...",
     "dns_lookup_family": "...",
-    "outlier_detection": "..."
+    "outlier_detection": "{...}"
   }
 
 .. _config_cluster_manager_cluster_name:
