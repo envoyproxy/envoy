@@ -22,15 +22,15 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the health check filter. @see HttpFilterConfigFactory.
+ * Config registration for the health check filter. @see NamedHttpFilterConfigFactory.
  */
-HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                    const std::string& name,
-                                                                    const Json::Object& config,
-                                                                    const std::string&,
-                                                                    Server::Instance& server) {
-  if (type != HttpFilterType::Both || name != "health_check") {
-    return nullptr;
+HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(HttpFilterType type,
+                                                                 const Json::Object& config,
+                                                                 const std::string&,
+                                                                 Server::Instance& server) {
+  if (type != HttpFilterType::Both) {
+    throw EnvoyException(fmt::format(
+        "{} network filter must be configured as both a read and write filter.", name()));
   }
 
   config.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
@@ -56,10 +56,12 @@ HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterTy
   };
 }
 
+std::string HealthCheckFilterConfig::name() { return "health_check"; }
+
 /**
- * Static registration for the health check filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the health check filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<HealthCheckFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<HealthCheckFilterConfig> register_;
 
 } // Configuration
 } // Server

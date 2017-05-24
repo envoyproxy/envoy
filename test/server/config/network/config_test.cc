@@ -1,5 +1,7 @@
 #include <string>
 
+#include "common/dynamo/dynamo_filter.h"
+
 #include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
@@ -8,6 +10,7 @@
 #include "server/config/network/tcp_proxy.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -34,7 +37,7 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   NiceMock<MockInstance> server;
   RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "redis_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -52,7 +55,7 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Both, "mongo_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Both, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -70,9 +73,8 @@ TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
-  EXPECT_THROW(
-      factory.tryCreateFilterFactory(NetworkFilterType::Both, "mongo_proxy", *json_config, server),
-      Json::Exception);
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
+               Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, TcpProxy) {
@@ -107,13 +109,13 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   NiceMock<MockInstance> server;
   TcpProxyConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "tcp_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 
-  EXPECT_EQ(nullptr, factory.tryCreateFilterFactory(NetworkFilterType::Both, "tcp_proxy",
-                                                    *json_config, server));
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
+               EnvoyException);
 }
 
 TEST(NetworkFilterConfigTest, ClientSslAuth) {
@@ -128,8 +130,8 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   ClientSslAuthConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.tryCreateFilterFactory(
-      NetworkFilterType::Read, "client_ssl_auth", *json_config, server);
+  NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -148,7 +150,7 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   NiceMock<MockInstance> server;
   RateLimitConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "ratelimit", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -180,8 +182,7 @@ TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -223,8 +224,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -268,8 +268,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogType) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -323,9 +322,75 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
+}
+
+/**
+ * Deprecated version of config registration for http dynamodb filter.
+ */
+class TestDeprecatedDynamoFilterConfig : public HttpFilterConfigFactory {
+public:
+  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
+                                             const Json::Object&, const std::string& stat_prefix,
+                                             Server::Instance& server) override {
+    if (type != HttpFilterType::Both || name != "http_dynamo_filter_deprecated") {
+      return nullptr;
+    }
+
+    return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+          new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
+    };
+  }
+};
+
+TEST(NetworkFilterConfigTest, DeprecatedHttpFilterConfigFactoryTest) {
+  // Test just ensures that the deprecated http filter registration still works without error.
+
+  // Register the config factory
+  RegisterHttpFilterConfigFactory<TestDeprecatedDynamoFilterConfig> registered;
+
+  std::string json = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter_deprecated",
+        "config" : {}
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<Server::MockInstance> server;
+  factory.createFilterFactory(NetworkFilterType::Read, *loader, server);
+}
+
+TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
+  EXPECT_THROW_WITH_MESSAGE(RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory>(),
+                            EnvoyException, "Attempted to register multiple "
+                                            "NamedNetworkFilterConfigFactory objects with name: "
+                                            "'client_ssl_auth'");
 }
 
 } // Configuration
