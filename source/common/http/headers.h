@@ -22,11 +22,13 @@ public:
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
+  const LowerCaseString EnvoyCluster{"x-envoy-cluster"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
+  const LowerCaseString EnvoyNode{"x-envoy-node"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
@@ -39,6 +41,7 @@ public:
   const LowerCaseString EnvoyExpectedRequestTimeoutMs{"x-envoy-expected-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
+  const LowerCaseString EnvoyZone{"x-envoy-zone"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
