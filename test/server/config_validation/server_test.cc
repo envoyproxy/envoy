@@ -30,7 +30,7 @@ protected:
 std::string ValidationServerTest::directory_ = "";
 
 TEST_P(ValidationServerTest, Validate) {
-  EXPECT_EQ(0, validateConfig(options_, component_factory_, local_info_));
+  EXPECT_TRUE(validateConfig(options_, component_factory_, local_info_));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against

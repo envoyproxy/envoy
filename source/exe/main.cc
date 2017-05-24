@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   case Envoy::Server::Mode::Validate:
     Envoy::Thread::MutexBasicLockable log_lock;
     Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
-    return Envoy::Server::validateConfig(options, component_factory, local_info);
+    return Envoy::Server::validateConfig(options, component_factory, local_info) ? 0 : 1;
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
