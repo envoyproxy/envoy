@@ -12,9 +12,9 @@ Input
 
 Output
   The tool will output envoy logs as it initializes the server configuration with the config it is currently testing.
-  If the json file is malformed or is does not conform to the envoy json schema, the configuration will fail and the
+  If there are configuration files where the json file is malformed or is does not conform to the envoy json schema, the
   tool will exit with status EXIT_FAILURE. If the tool successfully loads all configuration files found it will
-  report the number of files it tested at the end of the output and exit with status EXIT_SUCCESS.
+  exit with status EXIT_SUCCESS.
 
 Building
   The tool can be built locally using Bazel. ::
