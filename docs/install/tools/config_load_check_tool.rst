@@ -8,7 +8,8 @@ initialization with it.
 
 Input
   The tool expects a PATH to the root of a directory that holds json envoy configuration files. The tool
-  will recursively go through the filesystem tree and run a configuration test for each configuration file found.
+  will recursively go through the filesystem tree and run a configuration test for each file found. Keep in mind that
+  the tool will try to load all files found in the path.
 
 Output
   The tool will output envoy logs as it initializes the server configuration with the config it is currently testing.
