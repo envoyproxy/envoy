@@ -208,10 +208,10 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
-  EXPECT_THROW(healthCheckFilterConfig.tryCreateFilterFactory(
-                   Server::Configuration::HttpFilterType::Both, "health_check", *config,
-                   "dummy_stats_prefix", serverMock),
-               EnvoyException);
+  EXPECT_THROW(
+      healthCheckFilterConfig.createFilterFactory(Server::Configuration::HttpFilterType::Both,
+                                                  *config, "dummy_stats_prefix", serverMock),
+      EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
@@ -220,8 +220,7 @@ TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
       Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
-  healthCheckFilterConfig.tryCreateFilterFactory(Server::Configuration::HttpFilterType::Both,
-                                                 "health_check", *config, "dummy_stats_prefix",
-                                                 serverMock);
+  healthCheckFilterConfig.createFilterFactory(Server::Configuration::HttpFilterType::Both, *config,
+                                              "dummy_stats_prefix", serverMock);
 }
 } // Envoy

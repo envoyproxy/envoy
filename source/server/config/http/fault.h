@@ -11,14 +11,14 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the fault injection filter. @see HttpFilterConfigFactory.
+ * Config registration for the fault injection filter. @see NamedHttpFilterConfigFactory.
  */
-class FaultFilterConfig : public HttpFilterConfigFactory {
+class FaultFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object& json_config,
-                                             const std::string& stats_prefix,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& json_config,
+                                          const std::string& stats_prefix,
+                                          Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration

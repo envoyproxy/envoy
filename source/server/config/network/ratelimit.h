@@ -9,14 +9,16 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the rate limit filter. @see NetworkFilterConfigFactory.
+ * Config registration for the rate limit filter. @see NamedNetworkFilterConfigFactory.
  */
-class RateLimitConfigFactory : public NetworkFilterConfigFactory {
+class RateLimitConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& json_config,
-                                                Server::Instance& server);
+  // NamedNetworkFilterConfigFactory
+  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type,
+                                             const Json::Object& json_config,
+                                             Server::Instance& server) override;
+
+  std::string name() override;
 };
 
 } // Configuration
