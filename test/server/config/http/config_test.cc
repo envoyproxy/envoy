@@ -120,8 +120,8 @@ TEST(HttpFilterConfigTest, GrpcWebFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   GrpcWebFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Both, "grpc_web",
-                                                          *json_config, "stats", server);
+  HttpFilterFactoryCb cb =
+      factory.createFilterFactory(HttpFilterType::Both, *json_config, "stats", server);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

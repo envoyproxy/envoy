@@ -6,24 +6,26 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb GrpcWebFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                const std::string& name,
-                                                                const Json::Object&,
-                                                                const std::string&,
-                                                                Server::Instance&) {
-  if (type != HttpFilterType::Both || name != "grpc_web") {
-    return nullptr;
+HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactory(HttpFilterType type,
+                                                             const Json::Object&,
+                                                             const std::string&,
+                                                             Server::Instance& server) {
+  if (type != HttpFilterType::Both) {
+    throw EnvoyException(fmt::format(
+        "{} gRPC-Web filter must be configured as both a decoder and encoder filter.", name()));
   }
 
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter()});
   };
 }
 
+std::string GrpcWebFilterConfig::name() { return "grpc_web"; }
+
 /**
- * Static registration for the gRpc-Web filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the gRPC-Web filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<GrpcWebFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<GrpcWebFilterConfig> register_;
 
 } // namespace Configuration
 } // namespace Server

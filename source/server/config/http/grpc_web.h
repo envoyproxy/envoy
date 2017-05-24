@@ -6,11 +6,12 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class GrpcWebFilterConfig : public HttpFilterConfigFactory {
+class GrpcWebFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string&,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object&,
+                                          const std::string&, Server::Instance& server) override;
+
+  std::string name() override;
 };
 
 } // namespace Configuration
