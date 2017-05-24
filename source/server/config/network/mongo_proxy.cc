@@ -12,11 +12,11 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
-    NetworkFilterType type, const std::string& name, const Json::Object& config,
-    Server::Instance& server) {
-  if (type != NetworkFilterType::Both || name != "mongo_proxy") {
-    return nullptr;
+NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactory(
+    NetworkFilterType type, const Json::Object& config, Server::Instance& server) {
+  if (type != NetworkFilterType::Both) {
+    throw EnvoyException(fmt::format(
+        "{} network filter must be configured as both a read and write filter.", name()));
   }
 
   config.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
@@ -34,10 +34,12 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
   };
 }
 
+std::string MongoProxyFilterConfigFactory::name() { return "mongo_proxy"; }
+
 /**
- * Static registration for the mongo filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the mongo filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
 
 } // Configuration
 } // Server
