@@ -12,7 +12,7 @@ the route returned by a :ref:`router <config_http_conn_man_route_table>` matches
 The tool can be used to check cluster name, virtual cluster name,
 virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
-and sample tool input/output can be found at :ref:`installation <install_tools>`.
+and sample tool input/output can be found at :ref:`installation <install_tools_route_table_check_tool>`.
 
 The route table check tool config is composed of an array of json test objects. Each test object is composed of
 three parts.

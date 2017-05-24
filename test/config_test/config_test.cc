@@ -58,7 +58,6 @@ uint32_t run(const std::string& directory) {
     ConfigTest config(filename);
     num_tested++;
   }
-
   return num_tested;
 }
 
