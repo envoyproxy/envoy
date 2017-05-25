@@ -76,7 +76,9 @@ public:
     const std::string Text{"text/plain"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
+    const std::string GrpcWeb_Proto{"application/grpc-web+proto"};
     const std::string GrpcWebText{"application/grpc-web-text"};
+    const std::string GrpcWebText_Proto{"application/grpc-web-text+proto"};
   } ContentTypeValues;
 
   struct {

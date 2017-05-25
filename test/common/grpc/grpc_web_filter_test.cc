@@ -39,6 +39,37 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
+TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
+  Http::TestHeaderMapImpl request_headers;
+  // Check "content-type:application/grpc-web" is supported.
+  request_headers.addViaCopy(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.GrpcWeb);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            request_headers.ContentType()->value().c_str());
+
+  // Check "content-type:application/grpc-web+proto" is supported.
+  request_headers.addViaCopy(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.GrpcWeb_Proto);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            request_headers.ContentType()->value().c_str());
+
+  // Check "content-type:application/grpc-web-text" is supported.
+  request_headers.addViaCopy(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.GrpcWebText);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            request_headers.ContentType()->value().c_str());
+
+  // Check "content-type:application/grpc-web-text+proto" is supported.
+  request_headers.addViaCopy(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.GrpcWebText_Proto);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            request_headers.ContentType()->value().c_str());
+}
+
 TEST_F(GrpcWebFilterTest, BinaryUnary) {
   // Tests request headers.
   Http::TestHeaderMapImpl request_headers;
@@ -69,7 +100,7 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
   response_headers.addViaCopy(Http::Headers::get().Status, "200");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWeb,
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWeb_Proto,
             response_headers.ContentType()->value().c_str());
 
   // Tests response data.
@@ -124,7 +155,7 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
                               Http::Headers::get().ContentTypeValues.Grpc);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebText,
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebText_Proto,
             response_headers.ContentType()->value().c_str());
 
   // Tests response data.
