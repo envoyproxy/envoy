@@ -8,6 +8,7 @@
 #include "common/runtime/uuid_util.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
@@ -42,6 +43,9 @@ public:
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  std::string canary_node_{"canary"};
+  std::string non_canary_node_{"regular"};
 };
 
 TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
@@ -63,7 +67,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
   EXPECT_EQ(not_local_host_remote_address.ip()->addressAsString(),
@@ -80,7 +84,7 @@ TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) 
 
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
@@ -94,10 +98,11 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 
   TestHeaderMapImpl headers{{"user-agent", "foo"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
@@ -109,11 +114,13 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(canary_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
+  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
@@ -129,7 +136,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
 
     EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get_(Headers::get().RequestId));
   }
@@ -141,7 +148,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
     EXPECT_EQ(uuid, headers.get_(Headers::get().RequestId));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyForceTrace));
   }
@@ -163,9 +170,10 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
+    EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
     // No changes to generated_uuid as x-client-trace-id is missing.
     EXPECT_EQ(generated_uuid, headers.get_(Headers::get().RequestId));
   }
@@ -180,7 +188,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
         .WillOnce(Return(false));
 
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_EQ("f4dca0a9-12c7-4307-8002-969403baf480", headers.get_(Headers::get().RequestId));
@@ -197,7 +205,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
         .WillOnce(Return(true));
 
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_EQ("f4dca0a9-12c7-b307-8002-969403baf480", headers.get_(Headers::get().RequestId));
@@ -211,10 +219,12 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
                             {"x-request-id", "id"},
                             {"x-forwarded-for", "34.0.0.1"}};
 
+  EXPECT_CALL(local_info_, nodeName()).Times(0);
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_EQ("foo", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("id", headers.get_(Headers::get().RequestId));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyInternalRequest));
 }
@@ -227,11 +237,13 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(canary_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
+  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
@@ -244,7 +256,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   user_agent_.value("bar");
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
 
   EXPECT_TRUE(headers.has(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
@@ -258,7 +270,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_uuid"));
 
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
     EXPECT_EQ("generated_uuid", headers.get_("x-request-id"));
   }
 
@@ -270,7 +282,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     EXPECT_CALL(random_, uuid()).WillOnce(Return(uuid));
 
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                   random_, runtime_);
+                                                   random_, runtime_, local_info_);
     // x-request-id should not be set to be traceable as it's not edge request
     EXPECT_EQ(uuid, headers.get_("x-request-id"));
   }
@@ -285,7 +297,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
   EXPECT_CALL(random_, uuid()).Times(0);
 
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
   EXPECT_EQ("original_request_id", headers.get_("x-request-id"));
 }
 
@@ -298,7 +310,7 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
   EXPECT_EQ("override", headers.get_("x-request-id"));
 }
 
@@ -317,7 +329,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"custom_header", "foo"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-internal"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
@@ -337,7 +349,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-forwarded-for", "60.0.0.1"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("60.0.0.1", headers.get_("x-forwarded-for"));
   EXPECT_FALSE(headers.has("x-envoy-internal"));
@@ -351,7 +363,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-envoy-expected-rq-timeout-ms", "10"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
+                                                 random_, runtime_, local_info_);
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));

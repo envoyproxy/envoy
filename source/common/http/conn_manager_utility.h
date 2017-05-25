@@ -22,13 +22,16 @@ public:
   static void mutateRequestHeaders(Http::HeaderMap& request_headers,
                                    Network::Connection& connection, ConnectionManagerConfig& config,
                                    const Router::Config& route_config,
-                                   Runtime::RandomGenerator& random, Runtime::Loader& runtime);
+                                   Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+                                   const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
                                     const Http::HeaderMap& request_headers,
                                     const Router::Config& route_config);
 
 private:
+  static const std::string CANARY_NODE_NAME;
+
   // NOTE: This is used for stable randomness in the case where the route table does not use any
   //       runtime rules. If runtime rules are used, we use true randomness which is slower but
   //       provides behavior that most consumers would expect.
