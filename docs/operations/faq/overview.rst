@@ -9,3 +9,4 @@ The purpose of this document is to link examples of commonly used deployment sce
   :maxdepth: 1
 
   zone_aware_routing
+  zipkin_tracing

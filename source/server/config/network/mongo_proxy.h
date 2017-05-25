@@ -9,14 +9,15 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the mongo proxy filter. @see NetworkFilterConfigFactory.
+ * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class MongoProxyFilterConfigFactory : public NetworkFilterConfigFactory {
+class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
-                                                Server::Instance& server);
+  // NamedNetworkFilterConfigFactory
+  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
+                                             Server::Instance& server) override;
+
+  std::string name() override;
 };
 
 } // Configuration

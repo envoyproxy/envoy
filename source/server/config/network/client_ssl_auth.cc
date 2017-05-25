@@ -11,12 +11,11 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb
-ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                   const Json::Object& json_config,
-                                                   Server::Instance& server) {
-  if (type != NetworkFilterType::Read || name != "client_ssl_auth") {
-    return nullptr;
+NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilterFactory(
+    NetworkFilterType type, const Json::Object& json_config, Server::Instance& server) {
+  if (type != NetworkFilterType::Read) {
+    throw EnvoyException(
+        fmt::format("{} network filter must be configured as a read filter.", name()));
   }
 
   Filter::Auth::ClientSsl::ConfigSharedPtr config(Filter::Auth::ClientSsl::Config::create(
@@ -28,10 +27,12 @@ ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const
   };
 }
 
+std::string ClientSslAuthConfigFactory::name() { return "client_ssl_auth"; }
+
 /**
- * Static registration for the client SSL auth filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the client SSL auth filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered_;
 
 } // Configuration
 } // Server

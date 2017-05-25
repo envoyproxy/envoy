@@ -11,11 +11,12 @@ namespace Configuration {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig : public HttpFilterConfigFactory {
+class DynamoFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string& stat_prefix,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object&,
+                                          const std::string& stat_prefix,
+                                          Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration

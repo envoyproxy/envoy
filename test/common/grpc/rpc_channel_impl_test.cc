@@ -212,6 +212,28 @@ TEST_F(GrpcRequestImplTest, ShortBodyInResponse) {
   http_callbacks_->onSuccess(std::move(response_http_message));
 }
 
+TEST_F(GrpcRequestImplTest, EmptyBodyInResponse) {
+  expectNormalRequest();
+
+  helloworld::HelloRequest request;
+  request.set_name("a name");
+  helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
+  service_.SayHello(nullptr, &request, &response, nullptr);
+
+  Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  helloworld::HelloReply empty_response;
+  response_http_message->body() = Common::serializeBody(empty_response);
+  EXPECT_EQ(response_http_message->body()->length(), 5);
+  response_http_message->trailers(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+
+  EXPECT_CALL(grpc_callbacks_, onSuccess());
+  http_callbacks_->onSuccess(std::move(response_http_message));
+  EXPECT_EQ(response.SerializeAsString(), empty_response.SerializeAsString());
+}
+
 TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
   expectNormalRequest();
 

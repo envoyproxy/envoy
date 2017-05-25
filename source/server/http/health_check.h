@@ -14,11 +14,11 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class HealthCheckFilterConfig : public HttpFilterConfigFactory {
+class HealthCheckFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object& config, const std::string&,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& config,
+                                          const std::string&, Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration
