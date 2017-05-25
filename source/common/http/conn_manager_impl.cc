@@ -338,7 +338,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   if (request_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
   } else {
-    active_span_->finishSpan(DefaultIngressFinalizer(*request_headers_, request_info_, *this));
+    Tracing::DefaultIngressFinalizer&& finalizer{*request_headers_, request_info_, *this};
+    active_span_->finishSpan(finalizer);
   }
 
   ASSERT(state_.filter_call_state_ == 0);

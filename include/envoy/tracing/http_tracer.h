@@ -77,12 +77,15 @@ public:
  * Interface to perform context-specific tasks when completing a Span.
  */
 class SpanFinalizer {
+public:
+  virtual ~SpanFinalizer() {}
+
   /**
    * Finalize the Span.
    * @param span the Span to be finalized
    */
   virtual void finalize(Span& span) PURE;
-}
+};
 
 /**
  * Tracing driver is responsible for span creation.
