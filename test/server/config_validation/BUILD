@@ -47,6 +47,21 @@ envoy_cc_test(
         "//source/server/config_validation:connection_handler_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "dispatcher_test",
+    srcs = ["dispatcher_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/server/config_validation:dispatcher_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -55,6 +70,7 @@ envoy_cc_test(
     srcs = ["server_test.cc"],
     data = [
         "//configs:example_configs",
+        "//configs:google_com_proxy.json",
         "//test/config_test:example_configs_test_setup.sh",
     ],
     deps = [

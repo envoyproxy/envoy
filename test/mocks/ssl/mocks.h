@@ -52,5 +52,15 @@ public:
   MOCK_METHOD0(getCertChainInformation, std::string());
 };
 
+class MockServerContext : public ServerContext {
+public:
+  MockServerContext();
+  ~MockServerContext();
+
+  MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
+  MOCK_METHOD0(getCaCertInformation, std::string());
+  MOCK_METHOD0(getCertChainInformation, std::string());
+};
+
 } // Ssl
 } // Envoy

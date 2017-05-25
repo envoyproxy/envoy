@@ -12,5 +12,8 @@ MockConnection::~MockConnection() {}
 MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}
 
+MockServerContext::MockServerContext() {}
+MockServerContext::~MockServerContext() {}
+
 } // Ssl
 } // Envoy
