@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -47,12 +48,12 @@ struct ResolverData {
   }
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
-    EXPECT_CALL(dns_resolver, resolve(_, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery* {
-                               dns_callback_ = cb;
-                               return &active_dns_query_;
-                             }))
+    EXPECT_CALL(dns_resolver, resolve(_, _, _))
+        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+          dns_callback_ = cb;
+          return &active_dns_query_;
+        }))
         .RetiresOnSaturation();
   }
 
@@ -61,7 +62,42 @@ struct ResolverData {
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
-TEST(StrictDnsClusterImplTest, ImmediateResolve) {
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
+    StrictDnsConfigTuple;
+std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
+  std::vector<StrictDnsConfigTuple> dns_config;
+  {
+    std::string family_json("");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
+    std::list<std::string> dns_response{"::1", "::2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  return dns_config;
+}
+
+class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple> {};
+
+INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generateStrictDnsParams()));
+
+TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Network::MockDnsResolver> dns_resolver;
@@ -74,18 +110,20 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "strict_dns",
+  )EOF";
+  json += std::get<0>(GetParam());
+  json += R"EOF(
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
   )EOF";
-
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                           -> Network::ActiveDnsQuery* {
-                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-                             return nullptr;
-                           }));
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
+        return nullptr;
+      }));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
                                dispatcher);
@@ -466,6 +504,22 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
     "lb_type": "round_robin",
     "fake_type" : "expected_failure",
     "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
+}
+
+TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "cluster_1",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://127.0.0.1:11001"}],
+    "dns_lookup_family" : "foo"
   }
   )EOF";
 

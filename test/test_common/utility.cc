@@ -14,6 +14,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 
 #include "test/test_common/printers.h"
 
@@ -65,7 +66,7 @@ std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;
   for (auto address : addresses) {
-    ret.emplace_back(new Network::Address::Ipv4Instance(address));
+    ret.emplace_back(Network::Utility::parseInternetAddress(address));
   }
   return ret;
 }
