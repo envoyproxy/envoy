@@ -142,7 +142,8 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), TestUtility::bufferToString(trailers_buffer));
+  EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE),
+            Base64::decode(TestUtility::bufferToString(trailers_buffer)));
 }
 } // namespace Grpc
 } // namespace Envoy
