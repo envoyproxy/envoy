@@ -612,7 +612,7 @@ ConnectionImpl::Http2Options::Http2Options() {
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
   // calculations. This saves a tremendous amount of memory in cases where there are a large number
-  // of kept alive http/2 connections.
+  // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
 }
 

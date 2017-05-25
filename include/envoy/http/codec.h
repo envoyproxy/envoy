@@ -148,7 +148,7 @@ public:
 };
 
 /**
- * http/2 codec settings
+ * HTTP/2 codec settings
  */
 struct Http2Settings {
   uint32_t hpack_table_size_{DEFAULT_HPACK_TABLE_SIZE};

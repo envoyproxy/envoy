@@ -32,7 +32,7 @@ const std::string ALPN_STRING = "h2";
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
 /**
- * All stats for the http/2 codec. @see stats_macros.h
+ * All stats for the HTTP/2 codec. @see stats_macros.h
  */
 // clang-format off
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
@@ -44,7 +44,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 // clang-format on
 
 /**
- * Wrapper struct for the http/2 codec stats. @see stats_macros.h
+ * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
 struct CodecStats {
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
