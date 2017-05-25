@@ -527,8 +527,7 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
   UNREFERENCED_PARAMETER(rc);
 
   // Increase connection window size up to our default size.
-  ASSERT(http2_settings.initial_window_size_ >= NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
-  if (http2_settings.initial_window_size_ > NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
+  if (http2_settings.initial_window_size_ != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
     rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
                                       http2_settings.initial_window_size_ -
                                           NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
