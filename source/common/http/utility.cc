@@ -150,8 +150,8 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   // http_codec_options config is DEPRECATED
   std::string options = config.getString("http_codec_options", "");
   if (options != "") {
-    // TODO: figure out how to get a loggger here
-    // log().warn("'http_codec_options' is DEPRECATED, please use 'http2_settings' instead");
+    spdlog::logger& logger = Logger::Registry::getLog(Logger::Id::config);
+    logger.warn("'http_codec_options' is DEPRECATED, please use 'http2_settings' instead");
   }
 
   for (const std::string& option : StringUtil::split(options, ',')) {
