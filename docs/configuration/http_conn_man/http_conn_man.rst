@@ -87,6 +87,8 @@ add_user_agent
 .. _config_http_conn_man_http_codec_options:
 
 http_codec_options
+  **DEPRECATED**, use :ref:`http2_settings <config_http_conn_man_http2_settings>` instead.
+
   *(optional, string)* Additional options that are passed directly to the codec. Not all options
   are applicable to all codecs. Possible values are:
 
