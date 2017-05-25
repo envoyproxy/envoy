@@ -147,6 +147,7 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   ret.initial_window_size_ = http2_settings->getInteger(
       "initial_window_size", Http::Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE);
 
+  // http_codec_options config is DEPRECATED
   std::string options = config.getString("http_codec_options", "");
   if (options != "") {
     // TODO: figure out how to get a loggger here

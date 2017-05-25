@@ -155,17 +155,25 @@ struct Http2Settings {
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
 
+  // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
-  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4 * 1024; // from nghttp2
+  // initial value from HTTP/2 spec, same as NGHTTP2_DEFAULT_HEADER_TABLE_SIZE from nghttp2
+  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4 * 1024;
+  // a 16MiB maximum, hope it's more than enough
   static const uint32_t MAX_HPACK_TABLE_SIZE = 16 * 1024 * 1024;
 
   static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = 1024;
-  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = 1 << 29; // from MAX_STREAMS
+  // All streams are 2^31. Client/Server streams are half that. Just to be on the safe
+  // side we do 2^29. Same as MAX_STREAMS in source/common/http/http2/conn_pool.h.
+  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = 1 << 29;
 
-  static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1; // from HTTP/2 spec
+  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE.
+  // We only support increasing window size now, so this is also the minimum.
+  static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
   static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = 256 * 1024 * 1024;
-  static const uint32_t MAX_INITIAL_WINDOW_SIZE = (1U << 31) - 1; // from HTTP/2 spec
+  // maximum from HTTP/2 spec
+  static const uint32_t MAX_INITIAL_WINDOW_SIZE = (1U << 31) - 1;
 };
 
 /**
