@@ -237,13 +237,13 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(canary_node_));
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(non_canary_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
 
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyDownstreamCanary));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
