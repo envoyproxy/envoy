@@ -104,6 +104,11 @@ http2_settings
   *(optional, object)* Additional HTTP/2 codec options that are passed directly to the HTTP/2 codec. 
   Currently supported settings are:
 
+  hpack_table_size
+    *(optional, integer)* `Maximum Table Size`_ (in octets) that the encoder is permitted to use for
+    the dynamic HPACK table. Valid values range from 0 to 16777216 (2^24) and defaults to 4096,
+    with 0 effectively disables header compression.
+
   max_concurrent_streams
     *(optional, integer)* `Maximum concurrent streams`_ allowed on one HTTP/2 connection. Valid values
     range from 1 to 536870912 (2^29) and defaults to 1024.
@@ -116,6 +121,7 @@ http2_settings
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
 
+  .. _Maximum Table Size: http://httpwg.org/specs/rfc7541.html#maximum.table.size
   .. _Maximum concurrent streams: http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2
   .. _Initial flow-control window: http://httpwg.org/specs/rfc7540.html#InitialWindowSize
 
