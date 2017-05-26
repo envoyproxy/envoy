@@ -56,7 +56,7 @@ void MainImpl::initialize(const Json::Object& json) {
         Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
   }
 
-  // TODO(hennna): Deprecate statsd_local_udp_port in release 1.4.0.
+  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
   if (json.hasObject("statsd_local_udp_port")) {
     statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
   }

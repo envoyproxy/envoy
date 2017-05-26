@@ -37,13 +37,11 @@ private:
 };
 
 /**
- * Implementation of Sink that writes to a local UDP statsd port.
+ * Implementation of Sink that writes to a UDP statsd address.
  */
 class UdpStatsdSink : public Sink {
 public:
-  // TODO(hennna): Deprecate in release 1.4.0.
-  UdpStatsdSink(ThreadLocal::Instance& tls, const uint32_t port);
-  UdpStatsdSink(ThreadLocal::Instance& tls, const std::string& ip_address);
+  UdpStatsdSink(ThreadLocal::Instance& tls, Network::Address::InstanceConstSharedPtr address);
 
   // Stats::Sink
   void flushCounter(const std::string& name, uint64_t delta) override;

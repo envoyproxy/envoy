@@ -177,7 +177,7 @@ public:
   const std::list<ListenerPtr>& listeners() override;
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
-  // TODO(hennna): Deprecate statsdUdpPort in release 1.4.0
+  // TODO(hennna): DEPRECATED - statsdUdpPort() will be removed in 1.4.0
   Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
   Optional<std::string> statsdUdpIpAddress() override { return statsd_udp_ip_address_; }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }

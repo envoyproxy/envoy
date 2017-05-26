@@ -25,8 +25,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_,
-                     fmt::format("{}:0", Network::Test::getLoopbackAddressUrlString(GetParam())));
+  UdpStatsdSink sink(tls_, Network::Test::getCanonicalLoopbackAddress(GetParam()));
   // Creates and connects to socket.
   sink.flushCounter("test_counter", 1);
   int fd = sink.getFdForTests();
@@ -51,26 +50,6 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
                          ->addressAsString());
   }
   tls_.shutdownThread();
-}
-
-// Regression Test
-TEST(UdpStatsdSinkTest, InitWithPort) {
-  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    NiceMock<ThreadLocal::MockInstance> tls_;
-    UdpStatsdSink sink(tls_, 0);
-    // Creates and connects to socket.
-    sink.flushCounter("test_counter", 1);
-    int fd = sink.getFdForTests();
-    EXPECT_NE(fd, -1);
-    struct sockaddr_storage sockaddress;
-    socklen_t sock_len = sizeof(sockaddress);
-
-    EXPECT_EQ(0, getsockname(fd, reinterpret_cast<struct sockaddr*>(&sockaddress), &sock_len));
-    EXPECT_EQ("127.0.0.1", Network::Address::addressFromSockAddr(sockaddress, sizeof(sockaddr_in))
-                               ->ip()
-                               ->addressAsString());
-    tls_.shutdownThread();
-  }
 }
 
 } // Statsd

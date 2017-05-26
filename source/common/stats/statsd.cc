@@ -33,7 +33,7 @@ Writer::~Writer() { ASSERT(shutdown_); }
 void Writer::shutdown() {
   shutdown_ = true;
   if (fd_ != -1) {
-    ASSERT(close(fd_) == 0);
+    RELEASE_ASSERT(close(fd_) == 0);
   }
 }
 
@@ -59,18 +59,9 @@ void Writer::send(const std::string& message) {
   ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
-// TODO(hennna): Deprecate in release 1.4.0.
-UdpStatsdSink::UdpStatsdSink(ThreadLocal::Instance& tls, const uint32_t port)
-    : tls_(tls), tls_slot_(tls.allocateSlot()) {
-  server_address_.reset(new Network::Address::Ipv4Instance(port));
-  tls.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<Writer>(this->server_address_);
-  });
-}
-
-UdpStatsdSink::UdpStatsdSink(ThreadLocal::Instance& tls, const std::string& ip_address)
-    : tls_(tls), tls_slot_(tls.allocateSlot()) {
-  server_address_ = Network::Utility::parseInternetAddressAndPort(ip_address);
+UdpStatsdSink::UdpStatsdSink(ThreadLocal::Instance& tls,
+                             Network::Address::InstanceConstSharedPtr address)
+    : tls_(tls), tls_slot_(tls.allocateSlot()), server_address_(address) {
   tls.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
