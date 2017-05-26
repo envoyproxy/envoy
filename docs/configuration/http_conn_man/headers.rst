@@ -57,7 +57,7 @@ x-envoy-downstream-service-node
 -------------------------------
 
 Internal services may want to know the downstream node request comes from. This header
-is quite similar to :ref:`x-envoy-dowstream-service-cluster`, except the value is taken from
+is quite similar to :ref:`config_http_conn_man_headers_downstream-service-cluster`, except the value is taken from
 the  :option:`--service-node` option.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:
