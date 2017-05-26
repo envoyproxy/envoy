@@ -26,9 +26,11 @@ using testing::NiceMock;
 namespace Http {
 namespace Http2 {
 
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t> http2SettingsTuple;
+typedef ::testing::tuple<http2SettingsTuple, http2SettingsTuple> http2SettingsTupleTuple;
+
 struct Http2SettingsTestParam : public Http2Settings {
-  static Http2SettingsTestParam
-  fromTuple(const ::testing::tuple<uint32_t, uint32_t, uint32_t>& tp) {
+  static Http2SettingsTestParam fromTuple(const http2SettingsTuple& tp) {
     return Http2SettingsTestParam(::testing::get<0>(tp), ::testing::get<1>(tp),
                                   ::testing::get<2>(tp));
   }
@@ -42,8 +44,7 @@ private:
   }
 };
 
-class Http2CodecImplTest
-    : public testing::TestWithParam<::testing::tuple<uint32_t, uint32_t, uint32_t>> {
+class Http2CodecImplTest : public testing::TestWithParam<http2SettingsTupleTuple> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
@@ -63,9 +64,9 @@ public:
 
   Http2CodecImplTest()
       : client_(client_connection_, client_callbacks_, stats_store_,
-                Http2SettingsTestParam::fromTuple(GetParam())),
+                Http2SettingsTestParam::fromTuple(::testing::get<0>(GetParam()))),
         server_(server_connection_, server_callbacks_, stats_store_,
-                Http2SettingsTestParam::fromTuple(GetParam())),
+                Http2SettingsTestParam::fromTuple(::testing::get<1>(GetParam()))),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
 
@@ -258,15 +259,27 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
 
 INSTANTIATE_TEST_CASE_P(
     Http2CodecImplTest, Http2CodecImplTest,
-    ::testing::Combine(::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE,
-                                         Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                                         Http2Settings::MAX_HPACK_TABLE_SIZE),
-                       ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,
-                                         Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                                         Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
-                       ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
-                                         Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
-                                         Http2Settings::MAX_INITIAL_WINDOW_SIZE)));
+    ::testing::Combine(
+        ::testing::Combine(::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE,
+                                             Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
+                                             Http2Settings::MAX_HPACK_TABLE_SIZE),
+                           ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,
+                                             Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+                                             Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
+                           ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
+                                             Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
+                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE)),
+        ::testing::Combine(::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE,
+                                             Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
+                                             Http2Settings::MAX_HPACK_TABLE_SIZE),
+                           ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,
+                                             Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+                                             Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
+                           ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
+                                             Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
+                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE))
+
+            ));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
