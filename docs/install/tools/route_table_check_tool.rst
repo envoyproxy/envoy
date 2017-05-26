@@ -1,6 +1,6 @@
-.. _install_tools:
+.. _install_tools_route_table_check_tool:
 
-Route Table Check Tool
+Route table check tool
 =======================
 
 The route table check tool checks whether the route parameters returned by a router match what is expected.

@@ -684,8 +684,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
-  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _))
-      .WillRepeatedly(DoAll(SaveArg<1>(&dns_callback), Return(&active_dns_query)));
+  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 
   // Test for no hosts returning the correct values before we have hosts.
