@@ -108,7 +108,7 @@ public:
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::GaugeSharedPtr gauge : cluster_->stats_store_.gauges()) {
+    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }

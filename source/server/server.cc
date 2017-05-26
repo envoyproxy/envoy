@@ -123,7 +123,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::CounterSharedPtr counter : stats_store_.counters()) {
+  for (const Stats::CounterSharedPtr& counter : stats_store_.counters()) {
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
@@ -132,7 +132,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
         sink->flushGauge(gauge->name(), gauge->value());
