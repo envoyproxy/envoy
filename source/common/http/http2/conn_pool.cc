@@ -58,7 +58,7 @@ void ConnPoolImpl::checkForDrained() {
 
   if (drained) {
     log_debug("invoking drained callbacks");
-    for (DrainedCb cb : drained_callbacks_) {
+    for (const DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }

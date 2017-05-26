@@ -155,7 +155,7 @@ public:
    * Integration tests are composed of a sequence of actions which are run via this routine.
    */
   void executeActions(std::list<std::function<void()>> actions) {
-    for (std::function<void()> action : actions) {
+    for (const std::function<void()>& action : actions) {
       action();
     }
   }

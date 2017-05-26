@@ -270,7 +270,7 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
     : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
-  for (Json::ObjectSharedPtr host : hosts_json) {
+  for (const Json::ObjectSharedPtr& host : hosts_json) {
     new_hosts->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
@@ -293,7 +293,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
   // SDS implementation could do the same thing.
   std::unordered_set<std::string> host_addresses;
   std::vector<HostSharedPtr> final_hosts;
-  for (HostSharedPtr host : new_hosts) {
+  for (const HostSharedPtr& host : new_hosts) {
     if (host_addresses.count(host->address()->asString())) {
       continue;
     }
@@ -380,7 +380,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
   }
 
-  for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
+  for (const Json::ObjectSharedPtr& host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
   // We have to first construct resolve_targets_ before invoking startResolve(),
@@ -430,7 +430,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostSharedPtr> new_hosts;
-        for (Network::Address::InstanceConstSharedPtr address : address_list) {
+        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.

@@ -47,7 +47,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
     : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
   config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
-  for (const Json::ObjectSharedPtr route_desc :
+  for (const Json::ObjectSharedPtr& route_desc :
        config.getObject("route_config")->getObjectArray("routes")) {
     routes_.emplace_back(Route(*route_desc));
 
