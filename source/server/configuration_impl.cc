@@ -56,6 +56,11 @@ void MainImpl::initialize(const Json::Object& json) {
         Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
   }
 
+  if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
+    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
+                         "are mutually exclusive.");
+  }
+
   // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
   if (json.hasObject("statsd_local_udp_port")) {
     statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));

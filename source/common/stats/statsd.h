@@ -27,13 +27,13 @@ public:
   void writeTimer(const std::string& name, const std::chrono::milliseconds& ms);
   void shutdown() override;
   // Called in unit test to validate address.
-  int getFdForTests() { return fd_; };
+  int getFdForTests() const { return fd_; };
 
 private:
   void send(const std::string& message);
 
   int fd_;
-  bool shutdown_ = false;
+  bool shutdown_{};
 };
 
 /**
@@ -56,7 +56,7 @@ public:
 
 private:
   ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  const uint32_t tls_slot_;
   Network::Address::InstanceConstSharedPtr server_address_;
 };
 

@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/statsd.h"
 
 #include "test/mocks/thread_local/mocks.h"
@@ -23,7 +24,11 @@ INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  // UDP statsd server address.
+  Network::Address::InstanceConstSharedPtr server_address =
+      Network::Utility::parseInternetAddressAndPort(
+          fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
+  UdpStatsdSink sink(tls_, server_address);
   int fd = sink.getFdForTests();
   EXPECT_NE(fd, -1);
 
@@ -34,9 +39,9 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   EXPECT_EQ(fd, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1", Network::Address::addressFromFd(fd)->ip()->addressAsString());
+    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(fd)->asString());
   } else {
-    EXPECT_EQ("::1", Network::Address::addressFromFd(fd)->ip()->addressAsString());
+    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(fd)->asString());
   }
   tls_.shutdownThread();
 }
