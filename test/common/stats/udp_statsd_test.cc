@@ -24,9 +24,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, Network::Test::getCanonicalLoopbackAddress(GetParam()));
-  // Creates and connects to socket.
-  sink.flushCounter("test_counter", 1);
   int fd = sink.getFdForTests();
+  sink.flushCounter("test_counter", 1);
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
