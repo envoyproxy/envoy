@@ -15,7 +15,7 @@ namespace Network {
 class ValidationDnsResolver : public DnsResolver {
 public:
   // Network::DnsResolver
-  ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) override;
+  ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback) override;
 };
 
 } // Network
