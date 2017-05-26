@@ -24,6 +24,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -89,7 +90,8 @@ public:
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
-    conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_));
+    conn_manager_.reset(
+        new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_, local_info_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -177,6 +179,7 @@ public:
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   RouteConfigProvider route_config_provider_;
   TracingConnectionManagerConfigPtr tracing_config_;

@@ -50,11 +50,12 @@ ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
-                                             Tracing::HttpTracer& tracer, Runtime::Loader& runtime)
+                                             Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
+                                             const LocalInfo::LocalInfo& local_info)
     : config_(config), stats_(config_.stats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
-      runtime_(runtime) {}
+      runtime_(runtime), local_info_(local_info) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -465,7 +466,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-      connection_manager_.runtime_);
+      connection_manager_.runtime_, connection_manager_.local_info_);
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
