@@ -3,7 +3,8 @@
 namespace Envoy {
 namespace Network {
 
-ActiveDnsQuery* ValidationDnsResolver::resolve(const std::string&, DnsLookupFamily, ResolveCb callback) {
+ActiveDnsQuery* ValidationDnsResolver::resolve(const std::string&, DnsLookupFamily,
+                                               ResolveCb callback) {
   callback({});
   return nullptr;
 }
