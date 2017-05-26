@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
@@ -26,6 +27,13 @@ namespace Http {
 namespace Http2 {
 
 struct Http2SettingsTestParam : public Http2Settings {
+  static Http2SettingsTestParam
+  fromTuple(const ::testing::tuple<uint32_t, uint32_t, uint32_t>& tp) {
+    return Http2SettingsTestParam(::testing::get<0>(tp), ::testing::get<1>(tp),
+                                  ::testing::get<2>(tp));
+  }
+
+private:
   Http2SettingsTestParam(uint32_t hpack_table_size, uint32_t max_concurrent_streams,
                          uint32_t initial_window_size) {
     hpack_table_size_ = hpack_table_size;
@@ -34,7 +42,8 @@ struct Http2SettingsTestParam : public Http2Settings {
   }
 };
 
-class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
+class Http2CodecImplTest
+    : public testing::TestWithParam<::testing::tuple<uint32_t, uint32_t, uint32_t>> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
@@ -53,8 +62,10 @@ public:
   };
 
   Http2CodecImplTest()
-      : client_(client_connection_, client_callbacks_, stats_store_, GetParam()),
-        server_(server_connection_, server_callbacks_, stats_store_, GetParam()),
+      : client_(client_connection_, client_callbacks_, stats_store_,
+                Http2SettingsTestParam::fromTuple(GetParam())),
+        server_(server_connection_, server_callbacks_, stats_store_,
+                Http2SettingsTestParam::fromTuple(GetParam())),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
 
@@ -247,24 +258,15 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
 
 INSTANTIATE_TEST_CASE_P(
     Http2CodecImplTest, Http2CodecImplTest,
-    testing::Values(Http2SettingsTestParam(Http2Settings::MIN_HPACK_TABLE_SIZE,
-                                           Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::MAX_HPACK_TABLE_SIZE,
-                                           Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                                           Http2Settings::MIN_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                                           Http2Settings::MAX_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                                           Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::MIN_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                                           Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                                           Http2Settings::MAX_INITIAL_WINDOW_SIZE)));
+    ::testing::Combine(::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE,
+                                         Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
+                                         Http2Settings::MAX_HPACK_TABLE_SIZE),
+                       ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,
+                                         Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+                                         Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
+                       ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
+                                         Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
+                                         Http2Settings::MAX_INITIAL_WINDOW_SIZE)));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
