@@ -29,20 +29,13 @@ namespace Http2 {
 typedef ::testing::tuple<uint32_t, uint32_t, uint32_t> http2SettingsTuple;
 typedef ::testing::tuple<http2SettingsTuple, http2SettingsTuple> http2SettingsTupleTuple;
 
-struct Http2SettingsTestParam : public Http2Settings {
-  static Http2SettingsTestParam fromTuple(const http2SettingsTuple& tp) {
-    return Http2SettingsTestParam(::testing::get<0>(tp), ::testing::get<1>(tp),
-                                  ::testing::get<2>(tp));
-  }
-
-private:
-  Http2SettingsTestParam(uint32_t hpack_table_size, uint32_t max_concurrent_streams,
-                         uint32_t initial_window_size) {
-    hpack_table_size_ = hpack_table_size;
-    max_concurrent_streams_ = max_concurrent_streams;
-    initial_window_size_ = initial_window_size;
-  }
-};
+Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
+  Http2Settings ret;
+  ret.hpack_table_size_ = ::testing::get<0>(tp);
+  ret.max_concurrent_streams_ = ::testing::get<1>(tp);
+  ret.initial_window_size_ = ::testing::get<2>(tp);
+  return ret;
+}
 
 class Http2CodecImplTest : public testing::TestWithParam<http2SettingsTupleTuple> {
 public:
@@ -63,10 +56,10 @@ public:
   };
 
   Http2CodecImplTest()
-      : client_(client_connection_, client_callbacks_, stats_store_,
-                Http2SettingsTestParam::fromTuple(::testing::get<0>(GetParam()))),
-        server_(server_connection_, server_callbacks_, stats_store_,
-                Http2SettingsTestParam::fromTuple(::testing::get<1>(GetParam()))),
+      : client_http2settings_(http2SettingsFromTuple(::testing::get<0>(GetParam()))),
+        client_(client_connection_, client_callbacks_, stats_store_, client_http2settings_),
+        server_http2settings_(http2SettingsFromTuple(::testing::get<1>(GetParam()))),
+        server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
 
@@ -88,10 +81,12 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  const Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
   ClientConnectionImpl client_;
   ConnectionWrapper client_wrapper_;
+  const Http2Settings server_http2settings_;
   NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
   ServerConnectionImpl server_;
