@@ -18,8 +18,7 @@ HttpFilterFactoryCb IpTaggingFilterConfig::tryCreateFilterFactory(HttpFilterType
     return nullptr;
   }
 
-  Http::IpTaggingFilterConfigSharedPtr config(
-      new Http::IpTaggingFilterConfig(json_config));
+  Http::IpTaggingFilterConfigSharedPtr config(new Http::IpTaggingFilterConfig(json_config));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new Http::IpTaggingFilter(config)});

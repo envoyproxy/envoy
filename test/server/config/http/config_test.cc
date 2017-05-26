@@ -177,7 +177,7 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 }
 
 TEST(HttpFilterConfigTest, IpTaggingFilter) {
-std::string json_string = R"EOF(
+  std::string json_string = R"EOF(
   {
     "request_type" : "internal",
     "ip_tags" : [
@@ -188,18 +188,18 @@ std::string json_string = R"EOF(
   }
   )EOF";
 
-Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-NiceMock<MockInstance> server;
-IpTaggingFilterConfig factory;
-HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging",
-                                                        *json_config, "stats", server);
-Http::MockFilterChainFactoryCallbacks filter_callback;
-EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-cb(filter_callback);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockInstance> server;
+  IpTaggingFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging",
+                                                          *json_config, "stats", server);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
-std::string json_string = R"EOF(
+  std::string json_string = R"EOF(
   {
     "ip_tags" : [
       {
@@ -210,12 +210,12 @@ std::string json_string = R"EOF(
   }
   )EOF";
 
-Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-NiceMock<MockInstance> server;
-IpTaggingFilterConfig factory;
-EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging", *json_config,
-"stats", server),
-Json::Exception);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockInstance> server;
+  IpTaggingFilterConfig factory;
+  EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging", *json_config,
+                                              "stats", server),
+               Json::Exception);
 }
 
 } // Configuration
