@@ -44,15 +44,12 @@ enum class FilterRequestType {
  */
 class IpTaggingFilterConfig : Json::Validator {
 public:
-  IpTaggingFilterConfig(const Json::Object& json_config,
-                        const std::string& stat_prefix, Stats::Store& stats)
+  IpTaggingFilterConfig(const Json::Object& json_config)
     : Json::Validator(json_config, Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA),
-      stats_(generateStats(stat_prefix, stats)),
       request_type_(stringToType(json_config.getString("request_type", "both"))) {}
 
   FilterRequestType requestType() const { return request_type_; }
   //const Trie& ipTags() { return ip_tags_; }
-  IpTaggingFilterStats &stats() { return stats_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -69,7 +66,6 @@ private:
   static IpTaggingFilterStats generateStats(const std::string& prefix, Stats::Store& store);
 
   //Trie ip_tags_;
-  IpTaggingFilterStats stats_;
   const FilterRequestType request_type_;
 };
 
@@ -80,8 +76,7 @@ typedef std::shared_ptr<IpTaggingFilterConfig> IpTaggingFilterConfigSharedPtr;
  */
 class IpTaggingFilter : public StreamDecoderFilter {
 public:
-  IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
-
+  IpTaggingFilter(IpTaggingFilterConfigSharedPtr config);
   ~IpTaggingFilter();
 
   // Http::StreamFilterBase

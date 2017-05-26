@@ -4,6 +4,7 @@
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
+#include "server/config/http/ip_tagging.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/http/health_check.h"
@@ -173,6 +174,48 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "router", *json_config,
                                               "stats", server),
                Json::Exception);
+}
+
+TEST(HttpFilterConfigTest, IpTaggingFilter) {
+std::string json_string = R"EOF(
+  {
+    "request_type" : "internal",
+    "ip_tags" : [
+      { "ip_tag_name" : "example_tag",
+        "ip_list" : ["10.98.103.4", "3.67.89.9/4"]
+      }
+    ]
+  }
+  )EOF";
+
+Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+NiceMock<MockInstance> server;
+IpTaggingFilterConfig factory;
+HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging",
+                                                        *json_config, "stats", server);
+Http::MockFilterChainFactoryCallbacks filter_callback;
+EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
+std::string json_string = R"EOF(
+  {
+    "ip_tags" : [
+      {
+        "ip_tag_name" : "example",
+        "ip_list" : []
+      }
+    ]
+  }
+  )EOF";
+
+Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+NiceMock<MockInstance> server;
+IpTaggingFilterConfig factory;
+EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging", *json_config,
+"stats", server),
+Json::Exception);
 }
 
 } // Configuration

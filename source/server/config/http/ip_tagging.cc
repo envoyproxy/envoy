@@ -12,14 +12,14 @@ namespace Configuration {
 HttpFilterFactoryCb IpTaggingFilterConfig::tryCreateFilterFactory(HttpFilterType type,
                                                                   const std::string& name,
                                                                   const Json::Object& json_config,
-                                                                  const std::string& stats_prefix,
-                                                                  Server::Instance& server) {
+                                                                  const std::string&,
+                                                                  Server::Instance&) {
   if (type != HttpFilterType::Decoder || name != "ip_tagging") {
     return nullptr;
   }
 
   Http::IpTaggingFilterConfigSharedPtr config(
-      new Http::IpTaggingFilterConfig(json_config, stats_prefix, server.stats()));
+      new Http::IpTaggingFilterConfig(json_config));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new Http::IpTaggingFilter(config)});

@@ -9,6 +9,10 @@ IpTaggingFilterStats IpTaggingFilterConfig::generateStats(const std::string& pre
   return {ALL_IP_TAGGING_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
 
+IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
+
+IpTaggingFilter::~IpTaggingFilter() {}
+
 void IpTaggingFilter::onDestroy() {}
 
 FilterHeadersStatus IpTaggingFilter::decodeHeaders(HeaderMap&, bool) {

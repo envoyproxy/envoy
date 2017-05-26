@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
+        "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
         "//source/server/http:health_check_lib",

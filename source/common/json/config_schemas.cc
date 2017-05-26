@@ -856,12 +856,13 @@ const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
               "uniqueItems": true,
               "items" : {
                 "type": "string",
-                "oneOf": [
+                "anyOf": [
                   { "format" : "ipv4" },
                   { "format": "ipv6" }
                 ]
               }
-            }
+            },
+          "required" : ["ip_tag_name", "ip_list"]
           }
         }
       }
