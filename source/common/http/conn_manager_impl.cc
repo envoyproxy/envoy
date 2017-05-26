@@ -328,7 +328,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  for (AccessLog::InstanceSharedPtr access_log : connection_manager_.config_.accessLogs()) {
+  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {

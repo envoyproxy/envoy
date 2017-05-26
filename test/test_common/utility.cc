@@ -65,7 +65,7 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
 std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;
-  for (auto address : addresses) {
+  for (const auto& address : addresses) {
     ret.emplace_back(Network::Utility::parseInternetAddress(address));
   }
   return ret;

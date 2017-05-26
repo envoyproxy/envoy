@@ -124,7 +124,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("access_log")) {
-    for (Json::ObjectSharedPtr access_log : config.getObjectArray("access_log")) {
+    for (const Json::ObjectSharedPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstanceSharedPtr current_access_log =
           Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
                                                   server.accessLogManager());
