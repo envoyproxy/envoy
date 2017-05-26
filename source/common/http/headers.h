@@ -23,7 +23,7 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
-  const LowerCaseString EnvoyDownstreamCanary{"x-envoy-downstream-canary"};
+  const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
@@ -120,10 +120,6 @@ public:
   struct {
     const std::string Trailers{"trailers"};
   } TEValues;
-    
-  struct {
-    const std::string True{"true"};
-  } EnvoyDownstreamCanaryValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;

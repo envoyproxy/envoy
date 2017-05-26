@@ -51,15 +51,14 @@ authentication TLS mesh which will make this header fully secure. Like *user-age
 is determined by the :option:`--service-cluster` command line option. In order to enable this
 feature you need to set the :ref:`user_agent <config_http_conn_man_add_user_agent>` option to true.
 
-.. _config_http_conn_man_headers_downstream-canary:
+.. _config_http_conn_man_headers_downstream-service-node:
 
-x-envoy-downstream-canary
--------------------------
+x-envoy-downstream-service-node
+-------------------------------
 
-Internal services may want to know if request comes from the canary downstream host. This header
-is quite similar to :ref:`x-envoy-dowstream-service-cluster`, except value is determined based on
-the  :option:`--service-node` option. The header value is set to "true" if :option:`--service-node`
-is equal to "canary".
+Internal services may want to know the downstream node request comes from. This header
+is quite similar to :ref:`x-envoy-dowstream-service-cluster`, except the value is taken from
+the  :option:`--service-node` option.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:
 

@@ -45,7 +45,7 @@ public:
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::string canary_node_{"canary"};
-  std::string non_canary_node_{"regular"};
+  std::string empty_node_{""};
 };
 
 TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
@@ -102,7 +102,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
@@ -114,13 +114,13 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(canary_node_));
+  EXPECT_CALL(local_info_, nodeName()).Times(2).WillRepeatedly(ReturnRef(canary_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
 
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyDownstreamCanary));
+  EXPECT_EQ("canary", headers.get_(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
@@ -173,7 +173,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
+    EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
     // No changes to generated_uuid as x-client-trace-id is missing.
     EXPECT_EQ(generated_uuid, headers.get_(Headers::get().RequestId));
   }
@@ -224,7 +224,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
                                                  random_, runtime_, local_info_);
 
   EXPECT_EQ("foo", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("id", headers.get_(Headers::get().RequestId));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyInternalRequest));
 }
@@ -237,11 +237,11 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(non_canary_node_));
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
 
-  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamCanary));
+  EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));

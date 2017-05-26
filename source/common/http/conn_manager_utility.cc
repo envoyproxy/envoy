@@ -15,7 +15,6 @@
 namespace Envoy {
 namespace Http {
 
-const std::string ConnectionManagerUtility::CANARY_NODE_NAME = "canary";
 std::atomic<uint64_t> ConnectionManagerUtility::next_stream_id_(0);
 
 uint64_t ConnectionManagerUtility::generateStreamId(const Router::Config& route_table,
@@ -78,7 +77,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   } else {
     if (edge_request) {
       request_headers.removeEnvoyDownstreamServiceCluster();
-      request_headers.removeEnvoyDownstreamCanary();
+      request_headers.removeEnvoyDownstreamServiceNode();
     }
 
     request_headers.removeEnvoyRetryOn();
@@ -101,9 +100,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
       user_agent_header.value(config.userAgent().value());
     }
 
-    if (local_info.nodeName() == CANARY_NODE_NAME) {
-      request_headers.insertEnvoyDownstreamCanary().value(
-          Headers::get().EnvoyDownstreamCanaryValues.True);
+    if (!local_info.nodeName().empty()) {
+      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
     }
   }
 
