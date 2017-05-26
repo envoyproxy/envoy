@@ -1014,6 +1014,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "cluster_manager" : {"type" : "object"},
       "flags_path" : {"type" : "string"},
       "statsd_local_udp_port" : {"type" : "integer"},
+      "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
       "tracing" : {

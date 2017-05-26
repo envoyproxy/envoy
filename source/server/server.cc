@@ -18,6 +18,7 @@
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/memory/stats.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
@@ -320,9 +321,20 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 }
 
 void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpPort().valid()) {
+  if (config_->statsdUdpIpAddress().valid()) {
+    log().info("statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
+    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(
+        thread_local_,
+        Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
+    stats_store_.addSink(*stat_sinks_.back());
+  } else if (config_->statsdUdpPort().valid()) {
+    // TODO(hennna): DEPRECATED - statsdUdpPort will be removed in 1.4.0.
+    log().warn("statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0. "
+               "Consider setting statsd_udp_ip_address instead.");
     log().info("statsd UDP port: {}", config_->statsdUdpPort().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(config_->statsdUdpPort().value()));
+    Network::Address::InstanceConstSharedPtr address(
+        new Network::Address::Ipv4Instance(config_->statsdUdpPort().value()));
+    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(thread_local_, address));
     stats_store_.addSink(*stat_sinks_.back());
   }
 

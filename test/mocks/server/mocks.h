@@ -170,6 +170,7 @@ public:
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
   MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
+  MOCK_METHOD0(statsdUdpIpAddress, Optional<std::string>());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());

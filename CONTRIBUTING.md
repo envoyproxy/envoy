@@ -32,6 +32,7 @@ maximize the chances of your PR being merged.
   deprecation window. We make no guarantees about code or deployments that rely on undocumented
   behavior.
 * All deprecations/breaking changes will be clearly listed in the release notes.
+* See [DEPRECATED.md](DEPRECATED.md)
 
 # Release cadence
 
