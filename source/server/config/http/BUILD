@@ -72,6 +72,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//source/common/http/filter:ip_tagging_filter_lib",
         "//source/common/json:config_schemas_lib",
+        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 

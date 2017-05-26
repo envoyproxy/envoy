@@ -4,12 +4,9 @@
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
-<<<<<<< HEAD
-#include "server/config/http/ip_tagging.h"
-=======
 #include "server/config/http/grpc_web.h"
+#include "server/config/http/ip_tagging.h"
 #include "server/config/http/lightstep_http_tracer.h"
->>>>>>> master
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/config/http/zipkin_http_tracer.h"
@@ -197,7 +194,6 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
                Json::Exception);
 }
 
-<<<<<<< HEAD
 TEST(HttpFilterConfigTest, IpTaggingFilter) {
   std::string json_string = R"EOF(
   {
@@ -238,6 +234,7 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
   EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "ip_tagging", *json_config,
                                               "stats", server),
                Json::Exception);
+}
 
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
