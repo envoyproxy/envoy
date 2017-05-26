@@ -36,17 +36,14 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
+MainImpl::MainImpl(Server::Instance& server,
+                   Upstream::ClusterManagerFactory& cluster_manager_factory)
+    : server_(server), cluster_manager_factory_(cluster_manager_factory) {}
 
 void MainImpl::initialize(const Json::Object& json) {
-  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
-      server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
-      server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
-      server_.localInfo()));
-  cluster_manager_.reset(new Upstream::ClusterManagerImpl(
-      *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(),
-      server_.threadLocal(), server_.runtime(), server_.random(), server_.localInfo(),
-      server_.accessLogManager()));
+  cluster_manager_ = cluster_manager_factory_.clusterManagerFromJson(
+      *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(), server_.runtime(),
+      server_.random(), server_.localInfo(), server_.accessLogManager());
 
   std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());
@@ -116,32 +113,14 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
 
-  Envoy::Runtime::RandomGenerator& rand = server_.random();
+  Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
-  if (type == "lightstep") {
-    Json::ObjectSharedPtr lightstep_config = driver->getObject("config");
-
-    std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
-    opts->access_token =
-        server_.api().fileReadToEnd(lightstep_config->getString("access_token_file"));
-    StringUtil::rtrim(opts->access_token);
-
-    opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
-    opts->guid_generator = [&rand]() { return rand.random(); };
-
-    Tracing::DriverPtr lightstep_driver(
-        new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
-                                     server_.threadLocal(), server_.runtime(), std::move(opts)));
-    http_tracer_.reset(
-        new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
+  // Now see if there is a factory that will accept the config.
+  auto search_it = httpTracerFactories().find(type);
+  if (search_it != httpTracerFactories().end()) {
+    http_tracer_ = search_it->second->createHttpTracer(*driver_config, server_, *cluster_manager_);
   } else {
-    ASSERT(type == "zipkin");
-
-    Tracing::DriverPtr zipkin_driver(
-        new Zipkin::Driver(*driver->getObject("config"), *cluster_manager_, server_.stats(),
-                           server_.threadLocal(), server_.runtime(), server_.localInfo(), rand));
-
-    http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
+    throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
   }
 }
 
@@ -193,20 +172,29 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
     }
 
     // Now see if there is a factory that will accept the config.
-    bool found_filter = false;
-    for (NetworkFilterConfigFactory* config_factory : filterConfigFactories()) {
+    auto search_it = namedFilterConfigFactories().find(string_name);
+    if (search_it != namedFilterConfigFactories().end()) {
       NetworkFilterFactoryCb callback =
-          config_factory->tryCreateFilterFactory(type, string_name, *config, parent_.server_);
-      if (callback) {
-        filter_factories_.push_back(callback);
-        found_filter = true;
-        break;
+          search_it->second->createFilterFactory(type, *config, parent_.server_);
+      filter_factories_.push_back(callback);
+    } else {
+      // DEPRECATED
+      // This name wasn't found in the named map, so search in the deprecated list registry.
+      bool found_filter = false;
+      for (NetworkFilterConfigFactory* config_factory : filterConfigFactories()) {
+        NetworkFilterFactoryCb callback =
+            config_factory->tryCreateFilterFactory(type, string_name, *config, parent_.server_);
+        if (callback) {
+          filter_factories_.push_back(callback);
+          found_filter = true;
+          break;
+        }
       }
-    }
 
-    if (!found_filter) {
-      throw EnvoyException(
-          fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
+      if (!found_filter) {
+        throw EnvoyException(
+            fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
+      }
     }
   }
 }
@@ -216,6 +204,7 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 }
 
 InitialImpl::InitialImpl(const Json::Object& json) {
+  json.validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Json::ObjectSharedPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
   admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");

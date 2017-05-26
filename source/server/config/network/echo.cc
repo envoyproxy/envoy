@@ -11,26 +11,29 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the echo filter. @see NetworkFilterConfigFactory.
+ * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class EchoConfigFactory : public NetworkFilterConfigFactory {
+class EchoConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object&, Server::Instance&) {
-    if (type != NetworkFilterType::Read || name != "echo") {
-      return nullptr;
+  // NamedNetworkFilterConfigFactory
+  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object&,
+                                             Server::Instance&) override {
+    if (type != NetworkFilterType::Read) {
+      throw EnvoyException(
+          fmt::format("{} network filter must be configured as a read filter.", name()));
     }
 
     return [](Network::FilterManager& filter_manager)
         -> void { filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()}); };
   }
+
+  std::string name() override { return "echo"; }
 };
 
 /**
- * Static registration for the echo filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the echo filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<EchoConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<EchoConfigFactory> registered_;
 
 } // Configuration
 } // Server

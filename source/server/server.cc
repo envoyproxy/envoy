@@ -17,7 +17,6 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/json/config_schemas.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -177,7 +176,6 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
 
@@ -214,9 +212,14 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
 
+  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo()));
+
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
-  Configuration::MainImpl* main_config = new Configuration::MainImpl(*this);
+  Configuration::MainImpl* main_config =
+      new Configuration::MainImpl(*this, *cluster_manager_factory_);
   config_.reset(main_config);
   main_config->initialize(*config_json);
 

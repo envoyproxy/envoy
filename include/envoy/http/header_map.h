@@ -214,6 +214,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \
+  HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
   HEADER_FUNC(GrpcMessage)                                                                         \
   HEADER_FUNC(GrpcStatus)                                                                          \
   HEADER_FUNC(Host)                                                                                \
@@ -226,6 +227,7 @@ private:
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(Server)                                                                              \
   HEADER_FUNC(Status)                                                                              \
+  HEADER_FUNC(TE)                                                                                  \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \

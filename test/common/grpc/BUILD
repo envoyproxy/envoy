@@ -43,6 +43,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_web_filter_test",
+    srcs = ["grpc_web_filter_test.cc"],
+    deps = [
+        "//source/common/grpc:grpc_web_filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "rpc_channel_impl_test",
     srcs = ["rpc_channel_impl_test.cc"],
     deps = [

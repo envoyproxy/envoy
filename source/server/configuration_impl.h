@@ -6,11 +6,14 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/instance.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -30,8 +33,8 @@ enum class NetworkFilterType { Read, Write, Both };
 typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
 
 /**
- * Implemented by each network filter and registered via registerNetworkFilterConfigFactory() or
- * the convenience class RegisterNetworkFilterConfigFactory.
+ * DEPRECATED - Implemented by each network filter and registered via
+ * registerNetworkFilterConfigFactory() or the convenience class RegisterNetworkFilterConfigFactory.
  */
 class NetworkFilterConfigFactory {
 public:
@@ -41,6 +44,62 @@ public:
                                                         const std::string& name,
                                                         const Json::Object& config,
                                                         Server::Instance& server) PURE;
+};
+
+/**
+ * Implemented by each network filter and registered via registerNamedNetworkFilterConfigFactory()
+ * or the convenience class RegisterNamedNetworkFilterConfigFactory.
+ */
+class NamedNetworkFilterConfigFactory {
+public:
+  virtual ~NamedNetworkFilterConfigFactory() {}
+
+  /**
+   * Create a particular network filter factory implementation.  If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
+   * of general error or a Json::Exception if the json configuration is erroneous.  The returned
+   * callback should always be initialized.
+   * @param type supplies type of filter to initialize (read, write, or both)
+   * @param config supplies the general json configuration for the filter
+   * @param server supplies the server instance
+   */
+  virtual NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type,
+                                                     const Json::Object& config,
+                                                     Server::Instance& server) PURE;
+
+  /**
+  * Returns the identifying name for a particular implementation of a network filter produced by
+  * the factory.
+  */
+  virtual std::string name() PURE;
+};
+
+/**
+ * Implemented by each HttpTracer and registered via registerHttpTracerFactory() or
+ * the convenience class RegisterHttpTracerFactory.
+ */
+class HttpTracerFactory {
+public:
+  virtual ~HttpTracerFactory() {}
+
+  /**
+  * Create a particular HttpTracer implementation.  If the implementation is unable to produce an
+  * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
+  * general error or a Json::Exception if the json configuration is erroneous.  The returned pointer
+  * should always be valid.
+  * @param json_config supplies the general json configuration for the HttpTracer
+  * @param server supplies the server instance
+  * @param cluster_manager supplies the cluster_manager instance
+  */
+  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                                  Server::Instance& server,
+                                                  Upstream::ClusterManager& cluster_manager) PURE;
+
+  /**
+  * Returns the identifying name for a particular implementation of HttpTracer produced by the
+  * factory.
+  */
+  virtual std::string name() PURE;
 };
 
 /**
@@ -61,10 +120,48 @@ public:
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
-  MainImpl(Server::Instance& server);
+  MainImpl(Server::Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory_);
 
+  /**
+   * DEPRECATED - Register an NetworkFilterConfigFactory implementation as an option to create
+   * instances of NetworkFilterFactoryCb.
+   * @param factory the NetworkFilterConfigFactory implementation
+   */
   static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
     filterConfigFactories().push_back(&factory);
+  }
+
+  /**
+   * Register an NamedNetworkFilterConfigFactory implementation as an option to create instances of
+   * NetworkFilterFactoryCb.
+   * @param factory the NamedNetworkFilterConfigFactory implementation
+   */
+  static void registerNamedNetworkFilterConfigFactory(NamedNetworkFilterConfigFactory& factory) {
+    auto result = namedFilterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
+
+    // result is a pair whose second member is a boolean indicating, if false, that the key exists
+    // and that the value was not inserted.
+    if (!result.second) {
+      throw EnvoyException(fmt::format(
+          "Attempted to register multiple NamedNetworkFilterConfigFactory objects with name: '{}'",
+          factory.name()));
+    }
+  }
+
+  /**
+   * Register an HttpTracerFactory as an option to create instances of HttpTracers.
+   * @param factory the HttpTracerFactory implementation
+   */
+  static void registerHttpTracerFactory(HttpTracerFactory& factory) {
+    auto result = httpTracerFactories().emplace(std::make_pair(factory.name(), &factory));
+
+    // result is a pair whose second member is a boolean indicating, if false, that the key exists
+    // and that the value was not inserted.
+    if (!result.second) {
+      throw EnvoyException(
+          fmt::format("Attempted to register multiple HttpTracerFactory objects with name: '{}'",
+                      factory.name()));
+    }
   }
 
   /**
@@ -130,13 +227,37 @@ private:
     std::list<NetworkFilterFactoryCb> filter_factories_;
   };
 
+  /**
+   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
+   */
   static std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<NetworkFilterConfigFactory*> filter_config_factories;
-    return filter_config_factories;
+    static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
+        new std::list<NetworkFilterConfigFactory*>;
+    return *filter_config_factories;
+  }
+
+  /**
+   * Returns a map of the currently registered NamedNetworkConfigFactories.
+   */
+  static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>&
+  namedFilterConfigFactories() {
+    static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>*
+        named_filter_config_factories =
+            new std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>;
+    return *named_filter_config_factories;
+  }
+
+  /**
+   * Returns a map of the currently registered HttpTracerFactories.
+   */
+  static std::unordered_map<std::string, HttpTracerFactory*>& httpTracerFactories() {
+    static std::unordered_map<std::string, HttpTracerFactory*>* http_tracer_factories =
+        new std::unordered_map<std::string, HttpTracerFactory*>;
+    return *http_tracer_factories;
   }
 
   Server::Instance& server_;
-  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
+  Upstream::ClusterManagerFactory& cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Server::Configuration::ListenerPtr> listeners_;
@@ -151,13 +272,49 @@ private:
 };
 
 /**
- * @see NetworkFilterConfigFactory.
+ * DEPRECATED - @see NetworkFilterConfigFactory.  An instantiation of this class registers a
+ * NetworkFilterConfigFactory implementation (T) so it can be used to create instances of
+ * NetworkFilterFactoryCb.
  */
 template <class T> class RegisterNetworkFilterConfigFactory {
 public:
+  /**
+   * Registers the implementation.
+   */
   RegisterNetworkFilterConfigFactory() {
-    static T instance;
-    MainImpl::registerNetworkFilterConfigFactory(instance);
+    static T* instance = new T;
+    MainImpl::registerNetworkFilterConfigFactory(*instance);
+  }
+};
+
+/**
+ * @see NamedNetworkFilterConfigFactory.  An instantiation of this class registers a
+ * NamedNetworkFilterConfigFactory implementation (T) so it can be used to create instances of
+ * NetworkFilterFactoryCb.
+ */
+template <class T> class RegisterNamedNetworkFilterConfigFactory {
+public:
+  /**
+   * Registers the implementation.
+   */
+  RegisterNamedNetworkFilterConfigFactory() {
+    static T* instance = new T;
+    MainImpl::registerNamedNetworkFilterConfigFactory(*instance);
+  }
+};
+
+/**
+ * @see HttpTracerFactory.  An instantiation of this class registers an HttpTracerFactory
+ * implementation (T) so it can be used to create instances of HttpTracer.
+ */
+template <class T> class RegisterHttpTracerFactory {
+public:
+  /**
+   * Registers the implementation.
+   */
+  RegisterHttpTracerFactory() {
+    static T* instance = new T;
+    MainImpl::registerHttpTracerFactory(*instance);
   }
 };
 

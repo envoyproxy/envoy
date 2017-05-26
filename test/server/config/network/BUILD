@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/dynamo:dynamo_filter_lib",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:mongo_proxy_lib",
@@ -19,6 +20,7 @@ envoy_cc_test(
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

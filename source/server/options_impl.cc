@@ -53,6 +53,10 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   TCLAP::ValueArg<uint64_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint64_t", cmd);
+  TCLAP::ValueArg<std::string> mode("", "mode",
+                                    "One of 'serve' (default; validate configs and then serve "
+                                    "traffic normally) or 'validate' (validate configs and exit).",
+                                    false, "serve", "string", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -71,6 +75,15 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
     if (log_level.getValue() == spdlog::level::level_names[i]) {
       log_level_ = static_cast<spdlog::level::level_enum>(i);
     }
+  }
+
+  if (mode.getValue() == "serve") {
+    mode_ = Server::Mode::Serve;
+  } else if (mode.getValue() == "validate") {
+    mode_ = Server::Mode::Validate;
+  } else {
+    std::cerr << "error: unknown mode '" << mode.getValue() << "'" << std::endl;
+    exit(1);
   }
 
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.

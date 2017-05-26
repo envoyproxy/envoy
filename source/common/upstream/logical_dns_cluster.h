@@ -88,6 +88,7 @@ private:
 
   Network::DnsResolver& dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  Network::DnsLookupFamily dns_lookup_family_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
   std::function<void()> initialize_callback_;

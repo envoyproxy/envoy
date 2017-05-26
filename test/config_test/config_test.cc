@@ -23,7 +23,11 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path) : options_(file_path) {
+  ConfigTest(const std::string& file_path)
+      : options_(file_path),
+        cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
+                                 server_.random(), server_.dnsResolver(), ssl_context_manager_,
+                                 server_.dispatcher(), server_.localInfo()) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
@@ -31,7 +35,7 @@ public:
 
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
-    Server::Configuration::MainImpl main_config(server_);
+    Server::Configuration::MainImpl main_config(server_, cluster_manager_factory_);
 
     ON_CALL(server_, clusterManager())
         .WillByDefault(
@@ -49,6 +53,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Server::TestOptionsImpl options_;
+  Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
 
 uint32_t run(const std::string& directory) {
@@ -58,7 +63,6 @@ uint32_t run(const std::string& directory) {
     ConfigTest config(filename);
     num_tested++;
   }
-
   return num_tested;
 }
 
