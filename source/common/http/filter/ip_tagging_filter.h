@@ -18,9 +18,7 @@ namespace Http {
 /**
  * Type of requests the filter should apply to.
  */
-enum class FilterRequestType {
-  Internal, External, Both
-};
+enum class FilterRequestType { Internal, External, Both };
 
 /**
  * Configuration for the ip tagging filter.
@@ -28,8 +26,8 @@ enum class FilterRequestType {
 class IpTaggingFilterConfig : Json::Validator {
 public:
   IpTaggingFilterConfig(const Json::Object& json_config)
-    : Json::Validator(json_config, Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA),
-      request_type_(stringToType(json_config.getString("request_type", "both"))) {}
+      : Json::Validator(json_config, Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA),
+        request_type_(stringToType(json_config.getString("request_type", "both"))) {}
 
   FilterRequestType requestType() const { return request_type_; }
 
@@ -51,7 +49,8 @@ private:
 typedef std::shared_ptr<IpTaggingFilterConfig> IpTaggingFilterConfigSharedPtr;
 
 /**
- * A filter that tags requests via the x-envoy-ip-tags header based on the request's trusted XFF address.
+ * A filter that tags requests via the x-envoy-ip-tags header based on the request's trusted XFF
+ * address.
  */
 class IpTaggingFilter : public StreamDecoderFilter {
 public:
