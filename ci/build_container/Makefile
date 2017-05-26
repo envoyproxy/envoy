@@ -44,7 +44,7 @@ build-recipe = cd $(THIRDPARTY_SRC) && \
 	   CXXFLAGS=$(CXXFLAGS) \
 	   CPPFLAGS=$(CPPFLAGS) \
 	   $(1) \
-	   time bash $(CURDIR)/recipe_wrapper.sh $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
+	   bash -c "time $(CURDIR)/recipe_wrapper.sh $(realpath $<)" 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
 
 $(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh
