@@ -56,9 +56,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/json:json_object_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",

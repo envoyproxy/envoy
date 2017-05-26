@@ -7,8 +7,6 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/json/json_object.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
@@ -49,7 +47,6 @@ public:
       request_type_(stringToType(json_config.getString("request_type", "both"))) {}
 
   FilterRequestType requestType() const { return request_type_; }
-  //const Trie& ipTags() { return ip_tags_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -63,9 +60,6 @@ private:
     }
   }
 
-  static IpTaggingFilterStats generateStats(const std::string& prefix, Stats::Store& store);
-
-  //Trie ip_tags_;
   const FilterRequestType request_type_;
 };
 

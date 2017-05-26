@@ -3,12 +3,6 @@
 namespace Envoy {
 namespace Http {
 
-IpTaggingFilterStats IpTaggingFilterConfig::generateStats(const std::string& prefix,
-                                                          Stats::Store& store) {
-  std::string final_prefix = prefix + "ip_tagging.";
-  return {ALL_IP_TAGGING_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
-}
-
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
 IpTaggingFilter::~IpTaggingFilter() {}
