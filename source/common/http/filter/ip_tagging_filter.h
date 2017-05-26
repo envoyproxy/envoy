@@ -16,21 +16,6 @@ namespace Envoy {
 namespace Http {
 
 /**
- * All stats for the ip tagging filter. @see stats_macros.h
- */
-// clang-format off
-#define ALL_IP_TAGGING_FILTER_STATS(COUNTER)                                                            \
-  COUNTER(placeholder)                                                                         \
-// clang-format on
-
-/**
- * Wrapper struct for connection manager stats. @see stats_macros.h
- */
-struct IpTaggingFilterStats {
-  ALL_IP_TAGGING_FILTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-/**
  * Type of requests the filter should apply to.
  */
 enum class FilterRequestType {
