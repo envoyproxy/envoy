@@ -15,7 +15,7 @@ specify miscellaneous configuration.
     "admin": "{...}",
     "cluster_manager": "{...}",
     "flags_path": "...",
-    "statsd_local_udp_port": "...",
+    "statsd_udp_ip_address": "...",
     "statsd_tcp_cluster_name": "...",
     "stats_flush_interval_ms": "...",
     "watchdog_miss_timeout_ms": "...",
@@ -45,9 +45,11 @@ flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.
 
-statsd_local_udp_port
-  *(optional, integer)* The UDP port of a locally running statsd compliant listener. If specified,
-  :ref:`statistics <arch_overview_statistics>` will be flushed to this port.
+statsd_udp_ip_address
+  *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
+  :ref:`statistics <arch_overview_statistics>` will be flushed to this address. IPv4 addresses should
+  have format host:port (ex: 127.0.0.1:855). IPv6 addresses should have URL format [host]:port
+  (ex: [::1]:855). Note: statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0.
 
 statsd_tcp_cluster_name
   *(optional, string)* The name of a cluster manager cluster that is running a TCP statsd compliant
