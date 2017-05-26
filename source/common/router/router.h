@@ -140,7 +140,7 @@ private:
     void setupPerTryTimeout();
     void onPerTryTimeout();
 
-    void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+    void onUpstreamHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) {
       upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }

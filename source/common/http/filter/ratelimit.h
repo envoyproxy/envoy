@@ -77,7 +77,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 class Filter : public StreamDecoderFilter, public Envoy::RateLimit::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, Envoy::RateLimit::ClientPtr&& client)
-      : config_(config), client_(std::move(client)) {}
+      : config_(std::move(config)), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;

@@ -73,7 +73,7 @@ public:
     }
   }
 
-  void loadRq(HostSharedPtr host, int num_rq, int http_code) {
+  void loadRq(const HostSharedPtr& host, int num_rq, int http_code) {
     for (int i = 0; i < num_rq; i++) {
       host->outlierDetector().putHttpResponseCode(http_code);
     }

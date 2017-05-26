@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Http {
 
-BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
+BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 

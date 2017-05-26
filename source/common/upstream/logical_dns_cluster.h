@@ -49,7 +49,8 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, false, 1, ""), parent_(parent) {}
+        : HostImpl(std::move(cluster), hostname, std::move(address), false, 1, ""),
+          parent_(parent) {}
 
     // Upstream::Host
     CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
@@ -60,7 +61,7 @@ private:
   struct RealHostDescription : public HostDescription {
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
                         HostConstSharedPtr logical_host)
-        : address_(address), logical_host_(logical_host) {}
+        : address_(std::move(address)), logical_host_(std::move(logical_host)) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }

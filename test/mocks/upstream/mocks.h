@@ -29,8 +29,8 @@ public:
   MockCluster();
   ~MockCluster();
 
-  void runCallbacks(const std::vector<HostSharedPtr> added,
-                    const std::vector<HostSharedPtr> removed) {
+  void runCallbacks(const std::vector<HostSharedPtr>& added,
+                    const std::vector<HostSharedPtr>& removed) {
     for (MemberUpdateCb cb : callbacks_) {
       cb(added, removed);
     }
@@ -121,7 +121,7 @@ public:
   MOCK_METHOD1(addHostCheckCompleteCb, void(HostStatusCb callback));
   MOCK_METHOD0(start, void());
 
-  void runCallbacks(Upstream::HostSharedPtr host, bool changed_state) {
+  void runCallbacks(const Upstream::HostSharedPtr& host, bool changed_state) {
     for (auto callback : callbacks_) {
       callback(host, changed_state);
     }

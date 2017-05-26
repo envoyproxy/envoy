@@ -53,13 +53,13 @@ public:
     return FieldSharedPtr{new Field(value)};
   }
 
-  void append(FieldSharedPtr field_ptr) {
+  void append(const FieldSharedPtr& field_ptr) {
     checkType(Type::Array);
     value_.array_value_.push_back(field_ptr);
   }
   void insert(const std::string& key, FieldSharedPtr field_ptr) {
     checkType(Type::Object);
-    value_.object_value_[key] = field_ptr;
+    value_.object_value_[key] = std::move(field_ptr);
   }
 
   uint64_t hash() const override;
@@ -215,7 +215,7 @@ public:
   ObjectSharedPtr getRoot() { return root_; }
 
 private:
-  bool handleValueEvent(FieldSharedPtr ptr);
+  bool handleValueEvent(const FieldSharedPtr& ptr);
 
   enum State {
     expectRoot,
@@ -638,7 +638,7 @@ bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   NOT_REACHED;
 }
 
-bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
+bool ObjectHandler::handleValueEvent(const FieldSharedPtr& ptr) {
   ptr->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {

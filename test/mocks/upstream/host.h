@@ -46,7 +46,7 @@ public:
   MockDetector();
   ~MockDetector();
 
-  void runCallbacks(HostSharedPtr host) {
+  void runCallbacks(const HostSharedPtr& host) {
     for (ChangeStateCb cb : callbacks_) {
       cb(host);
     }

@@ -21,7 +21,8 @@ namespace Envoy {
  */
 class BufferingStreamDecoder : public Http::StreamDecoder, public Http::StreamCallbacks {
 public:
-  BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
+  BufferingStreamDecoder(std::function<void()> on_complete_cb)
+      : on_complete_cb_(std::move(on_complete_cb)) {}
 
   bool complete() { return complete_; }
   const Http::HeaderMap& headers() { return *headers_; }
@@ -64,7 +65,7 @@ public:
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
     ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
-        : parent_(parent), data_callback_(cb) {}
+        : parent_(parent), data_callback_(std::move(cb)) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {

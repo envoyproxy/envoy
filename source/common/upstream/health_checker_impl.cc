@@ -235,7 +235,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster, const Json:
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, HostSharedPtr host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, std::move(host)), parent_(parent) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   if (client_) {
@@ -462,7 +462,7 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster, const Jso
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
     RedisHealthCheckerImpl& parent, HostSharedPtr host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, std::move(host)), parent_(parent) {}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   if (current_request_) {

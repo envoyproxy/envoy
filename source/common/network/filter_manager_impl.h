@@ -47,7 +47,7 @@ public:
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
     ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter)
-        : parent_(parent), filter_(filter) {}
+        : parent_(parent), filter_(std::move(filter)) {}
 
     Connection& connection() override { return parent_.connection_; }
     void continueReading() override { parent_.onContinueReading(this); }

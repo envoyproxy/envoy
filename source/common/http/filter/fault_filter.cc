@@ -60,7 +60,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 }
 
-FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
+FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 

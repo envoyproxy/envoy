@@ -38,7 +38,7 @@ void AccessLog::logMessage(const Message& message, bool full,
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Store& store,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log)
     : stat_prefix_(stat_prefix), stat_store_(store), stats_(generateStats(stat_prefix, store)),
-      runtime_(runtime), access_log_(access_log) {
+      runtime_(runtime), access_log_(std::move(access_log)) {
 
   if (!runtime_.snapshot().featureEnabled("mongo.connection_logging_enabled", 100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we

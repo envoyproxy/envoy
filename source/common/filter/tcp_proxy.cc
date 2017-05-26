@@ -89,7 +89,7 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
 }
 
 TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
-    : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+    : config_(std::move(config)), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
 TcpProxy::~TcpProxy() {

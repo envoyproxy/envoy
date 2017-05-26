@@ -60,8 +60,8 @@ class HealthCheckFilter : public Http::StreamFilter {
 public:
   HealthCheckFilter(Server::Instance& server, bool pass_through_mode,
                     HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint)
-      : server_(server), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
-        endpoint_(endpoint) {}
+      : server_(server), pass_through_mode_(pass_through_mode),
+        cache_manager_(std::move(cache_manager)), endpoint_(endpoint) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}

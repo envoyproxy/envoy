@@ -14,7 +14,7 @@ namespace Event {
 
 class TestDeferredDeletable : public DeferredDeletable {
 public:
-  TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(std::move(on_destroy)) {}
   ~TestDeferredDeletable() { on_destroy_(); }
 
 private:

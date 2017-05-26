@@ -16,7 +16,7 @@ namespace Http2 {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority)
-    : dispatcher_(dispatcher), host_(host), priority_(priority) {}
+    : dispatcher_(dispatcher), host_(std::move(host)), priority_(priority) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   if (primary_client_) {
