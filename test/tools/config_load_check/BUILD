@@ -9,14 +9,14 @@ load(
 
 envoy_package()
 
-envoy_cc_binary(
-    name = "config_load_check_tool",
-    testonly = 1,
-    deps = [":config_load_check_lib"],
-)
-
 envoy_cc_test_library(
     name = "config_load_check_lib",
     srcs = ["config_load_check.cc"],
     deps = ["//test/config_test:config_test_lib"],
+)
+
+envoy_cc_binary(
+    name = "config_load_check_tool",
+    testonly = 1,
+    deps = [":config_load_check_lib"],
 )
