@@ -1,5 +1,3 @@
-#include <sys/socket.h>
-
 #include <chrono>
 
 #include "common/network/address_impl.h"
@@ -36,18 +34,10 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   sink.onTimespanComplete("test_counter", std::chrono::milliseconds(5));
   EXPECT_EQ(fd, sink.getFdForTests());
 
-  struct sockaddr_storage sockaddress;
-  socklen_t sock_len = sizeof(sockaddress);
-  EXPECT_EQ(0, getsockname(fd, reinterpret_cast<struct sockaddr*>(&sockaddress), &sock_len));
-
   if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1", Network::Address::addressFromSockAddr(sockaddress, sizeof(sockaddr_in))
-                               ->ip()
-                               ->addressAsString());
+    EXPECT_EQ("127.0.0.1", Network::Address::addressFromFd(fd)->ip()->addressAsString());
   } else {
-    EXPECT_EQ("::1", Network::Address::addressFromSockAddr(sockaddress, sizeof(sockaddr_in6))
-                         ->ip()
-                         ->addressAsString());
+    EXPECT_EQ("::1", Network::Address::addressFromFd(fd)->ip()->addressAsString());
   }
   tls_.shutdownThread();
 }
