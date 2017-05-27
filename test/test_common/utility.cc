@@ -124,6 +124,7 @@ namespace Http {
 const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
 const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
 const uint32_t Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 
 TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
 

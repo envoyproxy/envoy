@@ -146,6 +146,9 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
       "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
   ret.initial_window_size_ = http2_settings->getInteger(
       "initial_window_size", Http::Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE);
+  ret.initial_connection_window_size_ =
+      http2_settings->getInteger("initial_connection_window_size",
+                                 Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
 
   // http_codec_options config is DEPRECATED
   std::string options = config.getString("http_codec_options", "");

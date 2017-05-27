@@ -94,19 +94,23 @@ TEST(HttpUtility, parseHttp2Settings) {
     EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_settings.max_concurrent_streams_);
     EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_settings.initial_connection_window_size_);
   }
 
   {
     auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
                                           "http2_settings" : {
-                                            "hpack_table_size": 1234,
-                                            "max_concurrent_streams": 1234,
-                                            "initial_window_size": 5678
+                                            "hpack_table_size": 1,
+                                            "max_concurrent_streams": 2,
+                                            "initial_window_size": 3,
+                                            "initial_connection_window_size": 4
                                           }
                                         })raw"));
-    EXPECT_EQ(1234U, http2_settings.hpack_table_size_);
-    EXPECT_EQ(1234U, http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(5678U, http2_settings.initial_window_size_);
+    EXPECT_EQ(1U, http2_settings.hpack_table_size_);
+    EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(3U, http2_settings.initial_window_size_);
+    EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
   }
 
   {
