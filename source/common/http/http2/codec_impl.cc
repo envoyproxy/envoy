@@ -516,27 +516,43 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
          http2_settings.initial_connection_window_size_ <=
              Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE);
 
-  std::vector<nghttp2_settings_entry> iv = {
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_}};
+  std::vector<nghttp2_settings_entry> iv;
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
     conn_log_debug("setting HPACK table size to {}", connection_, http2_settings.hpack_table_size_);
   }
 
-  if (http2_settings.initial_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
-    iv.push_back({NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_});
+  if (http2_settings.max_concurrent_streams_ != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
+    iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
+    conn_log_debug("setting max concurrent streams to {}", connection_,
+                   http2_settings.max_concurrent_streams_);
   }
 
-  int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
-  ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
+  if (http2_settings.initial_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
+    iv.push_back({NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_});
+    conn_log_debug("setting stream-level initial window size to {}", connection_,
+                   http2_settings.initial_window_size_);
+  }
+
+  if (!iv.empty()) {
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
+    ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
+  } else {
+    // nghttp2_submit_settings need to be called at least once
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
+    ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
+  }
 
   // Increase connection window size up to our default size.
   if (http2_settings.initial_connection_window_size_ != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
-    rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
-                                      http2_settings.initial_connection_window_size_ -
-                                          NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
+    conn_log_debug("updating connection-level initial window size to {}", connection_,
+                   http2_settings.initial_connection_window_size_);
+    int rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
+                                          http2_settings.initial_connection_window_size_ -
+                                              NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
   }
 }
