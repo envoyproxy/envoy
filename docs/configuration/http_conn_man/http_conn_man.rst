@@ -125,6 +125,9 @@ http2_settings
     NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increase the default window
     size now, so it's also the minimum.
 
+  initial_connection_window_size
+    *(optional, integer)* Similar to initial_window_size, but for connection-level flow-control window.
+
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
 

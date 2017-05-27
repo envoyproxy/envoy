@@ -26,7 +26,7 @@ using testing::NiceMock;
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t> http2SettingsTuple;
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> http2SettingsTuple;
 typedef ::testing::tuple<http2SettingsTuple, http2SettingsTuple> http2SettingsTupleTuple;
 
 Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
@@ -34,6 +34,7 @@ Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
   ret.hpack_table_size_ = ::testing::get<0>(tp);
   ret.max_concurrent_streams_ = ::testing::get<1>(tp);
   ret.initial_window_size_ = ::testing::get<2>(tp);
+  ret.initial_connection_window_size_ = ::testing::get<3>(tp);
   return ret;
 }
 
@@ -263,7 +264,10 @@ INSTANTIATE_TEST_CASE_P(
                                              Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
                            ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
                                              Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
-                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE)),
+                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE),
+                           ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,
+                                             Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+                                             Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE)),
         ::testing::Combine(::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE,
                                              Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
                                              Http2Settings::MAX_HPACK_TABLE_SIZE),
@@ -272,7 +276,10 @@ INSTANTIATE_TEST_CASE_P(
                                              Http2Settings::MAX_MAX_CONCURRENT_STREAMS),
                            ::testing::Values(Http2Settings::MIN_INITIAL_WINDOW_SIZE,
                                              Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
-                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE))
+                                             Http2Settings::MAX_INITIAL_WINDOW_SIZE),
+                           ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,
+                                             Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+                                             Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
             ));
 
