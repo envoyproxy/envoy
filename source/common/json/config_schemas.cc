@@ -268,12 +268,12 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "hpack_table_size" : {
             "type": "integer",
             "minimum": 0,
-            "maximum" : 16777216
+            "maximum" : 4294967295
           },
           "max_concurrent_streams" : {
             "type": "integer",
             "minimum": 1,
-            "maximum" : 536870912
+            "maximum" : 2147483647
           },
           "initial_window_size" : {
             "type": "integer",
@@ -1234,12 +1234,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "hpack_table_size" : {
             "type": "integer",
             "minimum": 0,
-            "maximum" : 16777216
+            "maximum" : 4294967295
           },
           "max_concurrent_streams" : {
             "type": "integer",
             "minimum": 1,
-            "maximum" : 536870912
+            "maximum" : 2147483647
           },
           "initial_window_size" : {
             "type": "integer",

@@ -151,6 +151,7 @@ public:
  * HTTP/2 codec settings
  */
 struct Http2Settings {
+  // TODO(jwfang): support other HTTP/2 settings
   uint32_t hpack_table_size_{DEFAULT_HPACK_TABLE_SIZE};
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
@@ -158,21 +159,27 @@ struct Http2Settings {
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
   // initial value from HTTP/2 spec, same as NGHTTP2_DEFAULT_HEADER_TABLE_SIZE from nghttp2
-  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4 * 1024;
-  // a 16MiB maximum, hope it's more than enough
-  static const uint32_t MAX_HPACK_TABLE_SIZE = 16 * 1024 * 1024;
+  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = (1 << 12);
+  // no maximum from HTTP/2 spec, use unsigned 32-bit maximum
+  static const uint32_t MAX_HPACK_TABLE_SIZE = (1UL << 32) - 1;
 
-  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
+  // prevent creation of new streams from peer
+  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 0;
+  // nghttp2 defaults to 100, but we want more
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = 1024;
-  // All streams are 2^31. Client/Server streams are half that. Just to be on the safe
-  // side we do 2^29. Same as MAX_STREAMS in source/common/http/http2/conn_pool.h.
-  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = 1 << 29;
+  // no maximum from HTTP/2 spec, total streams is unsigned 32-bit maximum
+  // one-side (client/server) is half that, and we need to exclude stream 0
+  // same as NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS from nghttp2
+  // NOTE: Http2::ProdConnPoolImpl::maxTotalStreams still return 2^29
+  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
 
-  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE.
-  // We only support increasing window size now, so this is also the minimum.
+  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
+  // NOTE: we only support increase window size now, so this is also the minimum
+  // TODO(jwfang): make this 0 to support decrease window size
   static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
-  static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = 256 * 1024 * 1024;
-  // maximum from HTTP/2 spec
+  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
+  static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
+  // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
   static const uint32_t MAX_INITIAL_WINDOW_SIZE = (1U << 31) - 1;
 };
 
