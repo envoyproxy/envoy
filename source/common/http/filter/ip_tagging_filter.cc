@@ -21,7 +21,9 @@ FilterTrailersStatus IpTaggingFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-void IpTaggingFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks&) {}
+void IpTaggingFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+}
 
 } // Http
 } // Envoy
