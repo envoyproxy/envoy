@@ -554,6 +554,7 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
                                           http2_settings.initial_connection_window_size_ -
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
   }
 }
 
