@@ -272,7 +272,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           },
           "max_concurrent_streams" : {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "maximum" : 2147483647
           },
           "initial_window_size" : {
@@ -1243,7 +1243,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           },
           "max_concurrent_streams" : {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "maximum" : 2147483647
           },
           "initial_window_size" : {
