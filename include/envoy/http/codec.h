@@ -165,7 +165,7 @@ struct Http2Settings {
   static const uint32_t MAX_HPACK_TABLE_SIZE = (1UL << 32) - 1;
 
   // prevent creation of new streams from peer
-  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
+  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 0;
   // defaults to no limit, same as nghttp2
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
   // no maximum from HTTP/2 spec, total streams is unsigned 32-bit maximum
