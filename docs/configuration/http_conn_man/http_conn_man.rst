@@ -112,10 +112,10 @@ http2_settings
     with 0 effectively disables header compression.
 
   max_concurrent_streams
-    *(optional, integer)* `Maximum concurrent streams`_ allowed on one HTTP/2 connection. Valid values
-    range from 0 to 2147483647 (2^31 - 1) and defaults to 1024.
+    *(optional, integer)* `Maximum concurrent streams`_ allowed for peer on one HTTP/2 connection.
+    Valid values range from 0 to 2147483647 (2^31 - 1) and defaults to 2147483647.
 
-    NOTE: total streams is 32-bit unsigned, one-side (client/server) is half that, and we also need to
+    NOTE: Total streams is 32-bit unsigned, one-side (client/server) is half that, and we also need to
     exclude stream 0.
 
 .. _config_http_conn_man_http2_settings_initial_window_size:
