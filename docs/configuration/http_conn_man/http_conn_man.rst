@@ -119,14 +119,17 @@ http2_settings
 
   initial_stream_window_size
     *(optional, integer)* `Initial stream-level flow-control window`_ size. Valid values range from 65535
-    (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 65535 (2^16 - 1).
+    (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
+    (256 * 1024 * 1024).
 
     NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increase the default window
     size now, so it's also the minimum.
 
   initial_connection_window_size
     *(optional, integer)* Similar to :ref:`initial_stream_window_size 
-    <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control window.
+    <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control
+    window. Currently , this has the same minimum/maximum/default as :ref:`initial_stream_window_size 
+    <config_http_conn_man_http2_settings_initial_stream_window_size>`.
 
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
