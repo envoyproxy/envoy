@@ -38,10 +38,10 @@ public:
     client_.reset();
 
     // Make sure all gauges are 0.
-    for (Stats::GaugeSharedPtr gauge : host_->cluster_.stats_store_.gauges()) {
+    for (const Stats::GaugeSharedPtr& gauge : host_->cluster_.stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
-    for (Stats::GaugeSharedPtr gauge : host_->stats_store_.gauges()) {
+    for (const Stats::GaugeSharedPtr& gauge : host_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }

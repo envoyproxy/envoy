@@ -117,7 +117,8 @@ public:
   ~MockDnsResolver();
 
   // Network::DnsResolver
-  MOCK_METHOD2(resolve, ActiveDnsQuery*(const std::string& dns_name, ResolveCb callback));
+  MOCK_METHOD3(resolve, ActiveDnsQuery*(const std::string& dns_name,
+                                        DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };

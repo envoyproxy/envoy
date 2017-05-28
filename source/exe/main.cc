@@ -5,6 +5,7 @@
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "exe/hot_restart.h"
@@ -13,6 +14,7 @@
 #include "exe/signal_action.h"
 #endif
 
+#include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -45,10 +47,24 @@ int main(int argc, char** argv) {
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;
 #endif
-  ares_library_init(ARES_LIB_INIT_ALL);
   Envoy::Event::Libevent::Global::initialize();
   Envoy::OptionsImpl options(argc, argv, Envoy::Server::SharedMemory::version(),
                              spdlog::level::warn);
+  Envoy::Server::ProdComponentFactory component_factory;
+  Envoy::LocalInfo::LocalInfoImpl local_info(
+      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+
+  switch (options.mode()) {
+  case Envoy::Server::Mode::Serve:
+    break;
+  case Envoy::Server::Mode::Validate:
+    Envoy::Thread::MutexBasicLockable log_lock;
+    Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
+    return Envoy::Server::validateConfig(options, component_factory, local_info) ? 0 : 1;
+  }
+
+  ares_library_init(ARES_LIB_INIT_ALL);
 
   std::unique_ptr<Envoy::Server::HotRestartImpl> restarter;
   try {
@@ -61,11 +77,7 @@ int main(int argc, char** argv) {
   Envoy::Logger::Registry::initialize(options.logLevel(), restarter->logLock());
   Envoy::DefaultTestHooks default_test_hooks;
   Envoy::Stats::ThreadLocalStoreImpl stats_store(*restarter);
-  Envoy::Server::ProdComponentFactory component_factory;
   // TODO(henna): Add CLI option for local address IP version.
-  Envoy::LocalInfo::LocalInfoImpl local_info(
-      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
   Envoy::Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
                                      restarter->accessLogLock(), component_factory, local_info);
   server.run();

@@ -1039,6 +1039,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "cluster_manager" : {"type" : "object"},
       "flags_path" : {"type" : "string"},
       "statsd_local_udp_port" : {"type" : "integer"},
+      "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
       "tracing" : {
@@ -1262,6 +1263,10 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
+      },
+      "dns_lookup_family" : {
+        "type" : "string",
+        "enum" : ["v4_only", "v6_only", "auto"]
       },
       "outlier_detection" : {
         "type" : "object",

@@ -17,8 +17,8 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/json/config_schemas.h"
 #include "common/memory/stats.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
@@ -124,7 +124,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::CounterSharedPtr counter : stats_store_.counters()) {
+  for (const Stats::CounterSharedPtr& counter : stats_store_.counters()) {
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
@@ -133,7 +133,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
         sink->flushGauge(gauge->name(), gauge->value());
@@ -177,7 +177,6 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
 
@@ -214,9 +213,14 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
 
+  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+      runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo()));
+
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
-  Configuration::MainImpl* main_config = new Configuration::MainImpl(*this);
+  Configuration::MainImpl* main_config =
+      new Configuration::MainImpl(*this, *cluster_manager_factory_);
   config_.reset(main_config);
   main_config->initialize(*config_json);
 
@@ -317,9 +321,20 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 }
 
 void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpPort().valid()) {
+  if (config_->statsdUdpIpAddress().valid()) {
+    log().info("statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
+    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(
+        thread_local_,
+        Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
+    stats_store_.addSink(*stat_sinks_.back());
+  } else if (config_->statsdUdpPort().valid()) {
+    // TODO(hennna): DEPRECATED - statsdUdpPort will be removed in 1.4.0.
+    log().warn("statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0. "
+               "Consider setting statsd_udp_ip_address instead.");
     log().info("statsd UDP port: {}", config_->statsdUdpPort().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(config_->statsdUdpPort().value()));
+    Network::Address::InstanceConstSharedPtr address(
+        new Network::Address::Ipv4Instance(config_->statsdUdpPort().value()));
+    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(thread_local_, address));
     stats_store_.addSink(*stat_sinks_.back());
   }
 

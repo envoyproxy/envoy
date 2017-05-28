@@ -37,17 +37,6 @@ TEST(InitManagerImplTest, Targets) {
   target.callback_();
 }
 
-class TestComponentFactory : public ComponentFactory {
-public:
-  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
-    return Server::DrainManagerPtr{new Server::TestDrainManager()};
-  }
-  Runtime::LoaderPtr createRuntime(Server::Instance& server,
-                                   Server::Configuration::Initial& config) override {
-    return Server::InstanceUtil::createRuntime(server, config);
-  }
-};
-
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::Test {
 protected:

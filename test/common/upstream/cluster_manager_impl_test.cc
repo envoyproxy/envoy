@@ -64,6 +64,21 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
+  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
+                                           ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                           Runtime::RandomGenerator& random,
+                                           const LocalInfo::LocalInfo& local_info,
+                                           AccessLog::AccessLogManager& log_manager) override {
+    return ClusterManagerPtr{
+        clusterManagerFromJson_(config, stats, tls, runtime, random, local_info, log_manager)};
+  }
+
+  MOCK_METHOD7(clusterManagerFromJson_,
+               ClusterManager*(const Json::Object& config, Stats::Store& stats,
+                               ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                               Runtime::RandomGenerator& random,
+                               const LocalInfo::LocalInfo& local_info,
+                               AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromJson_, Cluster*(const Json::Object& cluster, ClusterManager& cm,
                                           const Optional<SdsConfig>& sds_config,
@@ -669,8 +684,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
-  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _))
-      .WillRepeatedly(DoAll(SaveArg<1>(&dns_callback), Return(&active_dns_query)));
+  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 
   // Test for no hosts returning the correct values before we have hosts.

@@ -21,6 +21,7 @@ Cluster
     "http_codec_options": "...",
     "http2_settings": "{...}",
     "dns_refresh_rate_ms": "...",
+    "dns_lookup_family": "...",
     "outlier_detection": "{...}"
   }
 
@@ -151,6 +152,17 @@ dns_refresh_rate_ms
   or *logical_dns*, this value is used as the cluster's dns refresh rate. If this setting is not specified,
   the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
+
+.. _config_cluster_manager_cluster_dns_lookup_family:
+
+dns_lookup_family
+  *(optional, string)* The DNS IP address resolution policy. The options are *v4_only*, *v6_only*,
+  and *auto*. If this setting is not specified, the value defaults to *v4_only*. When *v4_only* is selected,
+  the DNS resolver will only perform a lookup for addresses in the IPv4 family. If *v6_only* is selected,
+  the DNS resolver will only perform a lookup for addresses in the IPv6 family. If *auto* is specified,
+  the DNS resolver will first perform a lookup for addresses in the IPv6 family and fallback to a lookup for
+  addresses in the IPv4 family. For cluster types other than *strict_dns* and *logical_dns*, this setting
+  is ignored.
 
 .. _config_cluster_manager_cluster_outlier_detection:
 

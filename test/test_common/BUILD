@@ -64,5 +64,6 @@ envoy_cc_test_library(
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
     ],
 )

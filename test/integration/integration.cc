@@ -277,7 +277,7 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
   int index = 0;
-  for (auto it : port_names) {
+  for (const auto& it : port_names) {
     Network::ListenSocket* listen_socket = test_server_->server().getListenSocketByIndex(index++);
     RELEASE_ASSERT(listen_socket != nullptr);
     registerPort(it, listen_socket->localAddress()->ip()->port());

@@ -103,7 +103,7 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
 
   log_trace("ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
   ring_.reserve(hosts.size() * hashes_per_host);
-  for (auto host : hosts) {
+  for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
       std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
       uint64_t hash = std::hash<std::string>()(hash_key);

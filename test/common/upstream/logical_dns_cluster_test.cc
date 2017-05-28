@@ -1,6 +1,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "common/network/utility.h"
@@ -36,13 +37,13 @@ public:
     cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
   }
 
-  void expectResolve() {
-    EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery* {
-                               dns_callback_ = cb;
-                               return &active_dns_query_;
-                             }));
+  void expectResolve(Network::DnsLookupFamily dns_lookup_family) {
+    EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", dns_lookup_family, _))
+        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+          dns_callback_ = cb;
+          return &active_dns_query_;
+        }));
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -59,6 +60,75 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
+    LogicalDnsConfigTuple;
+std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
+  std::vector<LogicalDnsConfigTuple> dns_config;
+  {
+    std::string family_json("");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
+    std::list<std::string> dns_response{"::1", "::2"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  {
+    std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
+    std::list<std::string> dns_response{"::1"};
+    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+  }
+  return dns_config;
+}
+
+class LogicalDnsParamTest : public LogicalDnsClusterTest,
+                            public testing::WithParamInterface<LogicalDnsConfigTuple> {};
+
+INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
+                        testing::ValuesIn(generateLogicalDnsParams()));
+
+// Validate that if the DNS resolves immediately, during the LogicalDnsCluster
+// constructor, we have the expected host state and initialization callback
+// invocation.
+TEST_P(LogicalDnsParamTest, ImmediateResolve) {
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "logical_dns",
+    "lb_type": "round_robin",
+  )EOF";
+  json += std::get<0>(GetParam());
+  json += R"EOF(
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        EXPECT_CALL(*resolve_timer_, enableTimer(_));
+        cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
+        return nullptr;
+      }));
+  setup(json);
+  EXPECT_EQ(1UL, cluster_->hosts().size());
+  EXPECT_EQ(1UL, cluster_->healthyHosts().size());
+  EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
+  tls_.shutdownThread();
+}
+
 TEST_F(LogicalDnsClusterTest, BadConfig) {
   std::string json = R"EOF(
   {
@@ -73,35 +143,6 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_THROW(setup(json), EnvoyException);
 }
 
-// Validate that if the DNS resolves immediately, during the LogicalDnsCluster
-// constructor, we have the expected host state and initialization callback
-// invocation.
-TEST_F(LogicalDnsClusterTest, ImmediateResolve) {
-  std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "logical_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}]
-  }
-  )EOF";
-
-  EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                           -> Network::ActiveDnsQuery* {
-                             EXPECT_CALL(*resolve_timer_, enableTimer(_));
-                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-                             return nullptr;
-                           }));
-  setup(json);
-  EXPECT_EQ(1UL, cluster_->hosts().size());
-  EXPECT_EQ(1UL, cluster_->healthyHosts().size());
-  EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
-  tls_.shutdownThread();
-}
-
 TEST_F(LogicalDnsClusterTest, Basic) {
   std::string json = R"EOF(
   {
@@ -114,7 +155,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   }
   )EOF";
 
-  expectResolve();
+  expectResolve(Network::DnsLookupFamily::V4Only);
   setup(json);
 
   EXPECT_CALL(membership_updated_, ready());
@@ -135,7 +176,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   logical_host->createConnection(dispatcher_);
   logical_host->outlierDetector().putHttpResponseCode(200);
 
-  expectResolve();
+  expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
 
   // Should not cause any changes.
@@ -155,7 +196,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
 
-  expectResolve();
+  expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
 
   // Should cause a change.
@@ -168,7 +209,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
 
-  expectResolve();
+  expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
 
   // Empty should not cause any change.
@@ -183,7 +224,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   // Make sure we cancel.
   EXPECT_CALL(active_dns_query_, cancel());
-  expectResolve();
+  expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
 
   tls_.shutdownThread();

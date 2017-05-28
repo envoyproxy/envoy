@@ -119,7 +119,12 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   const uint32_t length = htonl(temp.length());
   buffer.add(&length, 4);
   buffer.move(temp);
-  encoder_callbacks_->addEncodedData(buffer);
+  if (is_text_response_) {
+    Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
+    encoder_callbacks_->addEncodedData(encoded);
+  } else {
+    encoder_callbacks_->addEncodedData(buffer);
+  }
   return Http::FilterTrailersStatus::Continue;
 }
 

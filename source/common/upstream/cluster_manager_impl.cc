@@ -189,7 +189,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   cds_api_ = factory_.createCds(config, *this);
   init_helper_.setCds(cds_api_.get());
 
-  for (const Json::ObjectSharedPtr cluster : config.getObjectArray("clusters")) {
+  for (const Json::ObjectSharedPtr& cluster : config.getObjectArray("clusters")) {
     loadCluster(*cluster, false);
   }
 
@@ -550,6 +550,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   return container.pools_[enumToInt(priority)].get();
+}
+
+ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromJson(
+    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
+  return ClusterManagerPtr{
+      new ClusterManagerImpl(config, *this, stats, tls, runtime, random, local_info, log_manager)};
 }
 
 Http::ConnectionPool::InstancePtr

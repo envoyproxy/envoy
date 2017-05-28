@@ -270,7 +270,7 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
     : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
-  for (Json::ObjectSharedPtr host : hosts_json) {
+  for (const Json::ObjectSharedPtr& host : hosts_json) {
     new_hosts->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
@@ -293,7 +293,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
   // SDS implementation could do the same thing.
   std::unordered_set<std::string> host_addresses;
   std::vector<HostSharedPtr> final_hosts;
-  for (HostSharedPtr host : new_hosts) {
+  for (const HostSharedPtr& host : new_hosts) {
     if (host_addresses.count(host->address()->asString())) {
       continue;
     }
@@ -370,7 +370,17 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
-  for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
+  std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
+  if (dns_lookup_family == "v6_only") {
+    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
+  } else if (dns_lookup_family == "auto") {
+    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
+  } else {
+    ASSERT(dns_lookup_family == "v4_only");
+    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
+  }
+
+  for (const Json::ObjectSharedPtr& host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
   // We have to first construct resolve_targets_ before invoking startResolve(),
@@ -413,22 +423,21 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_.resolve(
-      dns_address_,
+      dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostSharedPtr> new_hosts;
-        for (Network::Address::InstanceConstSharedPtr address : address_list) {
+        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
-          new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_,
-              Network::Address::InstanceConstSharedPtr{
-                  new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
-              false, 1, ""));
+          ASSERT(address != nullptr);
+          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
+                                              Network::Utility::getAddressWithPort(*address, port_),
+                                              false, 1, ""));
         }
 
         std::vector<HostSharedPtr> hosts_added;

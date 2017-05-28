@@ -38,6 +38,11 @@ public:
         local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
+  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
+                                           ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                           Runtime::RandomGenerator& random,
+                                           const LocalInfo::LocalInfo& local_info,
+                                           AccessLog::AccessLogManager& log_manager) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
