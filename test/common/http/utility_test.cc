@@ -121,6 +121,8 @@ TEST(HttpUtility, parseHttp2Settings) {
     EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_settings.max_concurrent_streams_);
     EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_settings.initial_connection_window_size_);
   }
 
   {

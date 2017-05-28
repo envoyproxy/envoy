@@ -103,7 +103,7 @@ http_codec_options
 .. _config_http_conn_man_http2_settings:
 
 http2_settings
-  *(optional, object)* Additional HTTP/2 codec options that are passed directly to the HTTP/2 codec. 
+  *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
   Currently supported settings are:
 
   hpack_table_size
