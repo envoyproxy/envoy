@@ -255,6 +255,8 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
   server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
+// we seperate default/edge cases here to avoid combinatorial explosion
+
 #define HTTP2SETTINGS_DEFAULT_COMBIME                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
