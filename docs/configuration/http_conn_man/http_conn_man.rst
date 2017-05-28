@@ -118,9 +118,9 @@ http2_settings
     NOTE: Total streams is 32-bit unsigned, one-side (client/server) is half that, and we also need to
     exclude stream 0.
 
-.. _config_http_conn_man_http2_settings_initial_window_size:
+.. _config_http_conn_man_http2_settings_initial_stream_window_size:
 
-  initial_window_size
+  initial_stream_window_size
     *(optional, integer)* `Initial stream-level flow-control window`_ size. Valid values range from 65535
     (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 65535 (2^16 - 1).
 
@@ -128,8 +128,8 @@ http2_settings
     size now, so it's also the minimum.
 
   initial_connection_window_size
-    *(optional, integer)* Similar to :ref:`initial_window_size 
-    <config_http_conn_man_http2_settings_initial_window_size>`, but for connection-level flow-control window.
+    *(optional, integer)* Similar to :ref:`initial_stream_window_size 
+    <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control window.
 
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.

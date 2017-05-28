@@ -144,8 +144,8 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
       http2_settings->getInteger("hpack_table_size", Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
   ret.max_concurrent_streams_ = http2_settings->getInteger(
       "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
-  ret.initial_window_size_ = http2_settings->getInteger(
-      "initial_window_size", Http::Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE);
+  ret.initial_stream_window_size_ = http2_settings->getInteger(
+      "initial_stream_window_size", Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   ret.initial_connection_window_size_ =
       http2_settings->getInteger("initial_connection_window_size",
                                  Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);

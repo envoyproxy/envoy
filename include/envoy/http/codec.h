@@ -154,7 +154,7 @@ struct Http2Settings {
   // TODO(jwfang): support other HTTP/2 settings
   uint32_t hpack_table_size_{DEFAULT_HPACK_TABLE_SIZE};
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
-  uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
+  uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
 
   // disable HPACK compression
@@ -176,13 +176,13 @@ struct Http2Settings {
   // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
   // NOTE: we only support increase window size now, so this is also the minimum
   // TODO(jwfang): make this 0 to support decrease window size
-  static const uint32_t MIN_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
-  // initial stream-level value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
-  static const uint32_t DEFAULT_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
+  static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
+  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
+  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
   // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
-  static const uint32_t MAX_INITIAL_WINDOW_SIZE = (1U << 31) - 1;
+  static const uint32_t MAX_INITIAL_STREAM_WINDOW_SIZE = (1U << 31) - 1;
 
-  // CONNECTION_WINDOW_SIZE is similar to WINDOW_SIZE, but for connection-level window
+  // CONNECTION_WINDOW_SIZE is similar to STREAM_WINDOW_SIZE, but for connection-level window
   static const uint32_t MIN_INITIAL_CONNECTION_WINDOW_SIZE = (1 << 16) - 1;
   // nghttp2's default connection-level window equals to its stream-level, but we want more
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
