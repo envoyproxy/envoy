@@ -38,12 +38,6 @@ static Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
   return ret;
 }
 
-// skip test if server-side max concurrent streams is 0
-#define SKIP_TEST_IF_NOT_SUITABLE                                                                  \
-  if (server_http2settings_.max_concurrent_streams_ == 0) {                                        \
-    return;                                                                                        \
-  }
-
 class Http2CodecImplTest : public testing::TestWithParam<http2SettingsTupleTuple> {
 public:
   struct ConnectionWrapper {
@@ -69,8 +63,6 @@ public:
         server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
-
-    SKIP_TEST_IF_NOT_SUITABLE;
 
     EXPECT_CALL(server_callbacks_, newStream(_))
         .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
@@ -108,8 +100,6 @@ public:
 };
 
 TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   TestHeaderMapImpl request_headers;
   request_headers.addViaCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -131,8 +121,6 @@ TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
 }
 
 TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   TestHeaderMapImpl request_headers;
   request_headers.addViaCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -156,8 +144,6 @@ TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
 }
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
@@ -173,8 +159,6 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
 }
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
@@ -196,8 +180,6 @@ TEST_P(Http2CodecImplTest, InvalidFrame) {
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
@@ -219,8 +201,6 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   // Buffer server data so we can make sure we don't get any window updates.
   ON_CALL(client_connection_, write(_))
       .WillByDefault(
@@ -251,8 +231,6 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
 }
 
 TEST_P(Http2CodecImplTest, DeferredReset) {
-  SKIP_TEST_IF_NOT_SUITABLE;
-
   InSequence s;
 
   // Buffer server data so we can make sure we don't get any window updates.
