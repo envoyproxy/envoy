@@ -509,8 +509,9 @@ void ConnectionImpl::sendPendingFrames() {
 void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
   ASSERT(http2_settings.hpack_table_size_ <= Http2Settings::MAX_HPACK_TABLE_SIZE);
   ASSERT(http2_settings.max_concurrent_streams_ <= Http2Settings::MAX_MAX_CONCURRENT_STREAMS);
-  ASSERT(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE <= http2_settings.initial_stream_window_size_ &&
-         http2_settings.initial_stream_window_size_ <= Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE);
+  ASSERT(
+      Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE <= http2_settings.initial_stream_window_size_ &&
+      http2_settings.initial_stream_window_size_ <= Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE);
   ASSERT(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE <=
              http2_settings.initial_connection_window_size_ &&
          http2_settings.initial_connection_window_size_ <=
@@ -530,7 +531,8 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
   }
 
   if (http2_settings.initial_stream_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
-    iv.push_back({NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
+    iv.push_back(
+        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
     conn_log_debug("setting stream-level initial window size to {}", connection_,
                    http2_settings.initial_stream_window_size_);
   }

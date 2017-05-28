@@ -26,10 +26,11 @@ using testing::NiceMock;
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> http2SettingsTuple;
-typedef ::testing::tuple<http2SettingsTuple, http2SettingsTuple> http2SettingsTupleTuple;
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
+typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
 
-static Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
+namespace {
+Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
   Http2Settings ret;
   ret.hpack_table_size_ = ::testing::get<0>(tp);
   ret.max_concurrent_streams_ = ::testing::get<1>(tp);
@@ -37,8 +38,9 @@ static Http2Settings http2SettingsFromTuple(const http2SettingsTuple& tp) {
   ret.initial_connection_window_size_ = ::testing::get<3>(tp);
   return ret;
 }
+}
 
-class Http2CodecImplTest : public testing::TestWithParam<http2SettingsTupleTuple> {
+class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
@@ -57,9 +59,9 @@ public:
   };
 
   Http2CodecImplTest()
-      : client_http2settings_(http2SettingsFromTuple(::testing::get<0>(GetParam()))),
+      : client_http2settings_(Http2SettingsFromTuple(::testing::get<0>(GetParam()))),
         client_(client_connection_, client_callbacks_, stats_store_, client_http2settings_),
-        server_http2settings_(http2SettingsFromTuple(::testing::get<1>(GetParam()))),
+        server_http2settings_(Http2SettingsFromTuple(::testing::get<1>(GetParam()))),
         server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
@@ -256,7 +258,7 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
 #define HTTP2SETTINGS_DEFAULT_COMBIME                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
-                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),                \
+                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
@@ -268,8 +270,8 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE), \
       ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                                 \
                         Http2Settings::MAX_MAX_CONCURRENT_STREAMS),                                \
-      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                                    \
-                        Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                                   \
+      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
+                        Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 

@@ -115,9 +115,6 @@ http2_settings
     *(optional, integer)* `Maximum concurrent streams`_ allowed for peer on one HTTP/2 connection.
     Valid values range from 1 to 2147483647 (2^31 - 1) and defaults to 2147483647.
 
-    NOTE: Total streams is 32-bit unsigned, one-side (client/server) is half that, and we also need to
-    exclude stream 0.
-
 .. _config_http_conn_man_http2_settings_initial_stream_window_size:
 
   initial_stream_window_size
