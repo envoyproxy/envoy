@@ -7,7 +7,7 @@ This is a filter which enables Envoy to tag requests with extra information such
 extra data. This is useful to prevent against DDoS.
 
 **Note**: this filter is under active development, and currently does not perform any tagging on requests. In other
-words, installing this filter is a nop in the filter chain.
+words, installing this filter is a no-op in the filter chain.
 
 .. code-block:: json
 
@@ -20,12 +20,16 @@ words, installing this filter is a nop in the filter chain.
     }
   }
 
-request_type:
-  (optional, string) The type of requests the filter should apply to. ``external``, ``internal``, or ``both``.
-  Defaults to ``both``.
+request_type
+  *(optional, string)* The type of requests the filter should apply to. The supported
+  types are *internal*, *external* or *both*. A request is considered internal if
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is set to true. If
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
+  request is considered external. The filter defaults to *both*, and it will apply to all request
+  types.
 
 ip_tags:
-  (optional, array) Specifies the list of ip tags to set for a request.
+  *(optional, array)* Specifies the list of ip tags to set for a request.
 
 Ip tags
 -------
@@ -37,9 +41,10 @@ Ip tags
   }
 
 ip_tag_name:
-  (required, string) Specifies the ip tag name to apply. The names will be added to the request's ``x-envoy-ip-tag``
-  header if the request's XFF address belongs to a range present in the ``ip_list``
+  *(required, string)* Specifies the ip tag name to apply. The ``ip_tag_name`` will be appended to the request's
+  :ref:`x-envoy-ip-tags<config_http_conn_man_headers_x-envoy-ip-tags>` header if the request's final XFF contents
+  belong to a range present in the ``ip_list``.
 
 ip_list:
-  (required, list of strings) A list of IP address and subnet masks that will be tagged with the ``ip_tag_name``. Both
-  IPv4, and IPv6 CIDR addresses are allowed here.
+  *(required, list of strings)* A list of IP address and subnet masks that will be tagged with the ``ip_tag_name``. Both
+  IPv4 and IPv6 CIDR addresses are allowed here.
