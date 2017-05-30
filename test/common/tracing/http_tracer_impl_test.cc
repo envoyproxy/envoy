@@ -254,7 +254,7 @@ TEST(DefaultIngressFinalizer, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
   NiceMock<MockConfig> config;
 
-  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
   //   span->finishSpan(finalizer);
   //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
@@ -291,7 +291,7 @@ TEST(DefaultIngressFinalizer, SpanOptionalHeaders) {
   //   EXPECT_CALL(*span, finishSpan(_));
   NiceMock<MockConfig> config;
 
-  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
   // span->finishSpan(finalizer);
   //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
@@ -345,7 +345,7 @@ TEST(DefaultIngressFinalizer, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
-  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
   //   span->finishSpan(finalizer);
   //   EXPECT_CALL(*span, finishSpan(_));
