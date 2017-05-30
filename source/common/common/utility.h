@@ -128,7 +128,14 @@ public:
    */
   static std::vector<std::string> split(const std::string& source, char split);
 
+  /**
+   * Join a string.
+   * @param source supplies the strings to join.
+   * @param delimiter supplies the delimiter to join them together.
+   * @return string combining elements of `source` with `delimiter` in between each element.
+   */
   static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
+
   /**
    * Split a string.
    * @param source supplies the string to split.
