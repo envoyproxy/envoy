@@ -148,11 +148,11 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
 
     for (auto& host : cluster.second.get().hosts()) {
       std::map<std::string, uint64_t> all_stats;
-      for (Stats::CounterSharedPtr counter : host->counters()) {
+      for (const Stats::CounterSharedPtr& counter : host->counters()) {
         all_stats[counter->name()] = counter->value();
       }
 
-      for (Stats::GaugeSharedPtr gauge : host->gauges()) {
+      for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
         all_stats[gauge->name()] = gauge->value();
       }
 
@@ -244,7 +244,7 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& r
 }
 
 Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance& response) {
-  for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
+  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
 
@@ -266,11 +266,11 @@ Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& respons
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   std::map<std::string, uint64_t> all_stats;
-  for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
+  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
   }
 
-  for (Stats::GaugeSharedPtr gauge : server_.stats().gauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
@@ -382,7 +382,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 
 bool AdminImpl::createFilterChain(Network::Connection& connection) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime())});
+      *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
+      server_.localInfo())});
   return true;
 }
 

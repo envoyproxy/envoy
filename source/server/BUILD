@@ -137,6 +137,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_lib",

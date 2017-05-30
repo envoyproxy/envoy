@@ -194,7 +194,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
     const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
-  for (auto host : hosts_removed) {
+  for (const auto& host : hosts_removed) {
     auto it = client_map_.find(host);
     if (it != client_map_.end()) {
       // We don't currently support any type of draining for redis connections. If a host is gone,

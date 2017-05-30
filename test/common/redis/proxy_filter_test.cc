@@ -95,7 +95,7 @@ public:
 
   ~RedisProxyFilterTest() {
     filter_.reset();
-    for (Stats::GaugeSharedPtr gauge : store_.gauges()) {
+    for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }

@@ -113,17 +113,17 @@ DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
 }
 
 void DetectorImpl::initialize(const Cluster& cluster) {
-  for (HostSharedPtr host : cluster.hosts()) {
+  for (const HostSharedPtr& host : cluster.hosts()) {
     addHostSink(host);
   }
 
   cluster.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                    const std::vector<HostSharedPtr>& hosts_removed) -> void {
-    for (HostSharedPtr host : hosts_added) {
+    for (const HostSharedPtr& host : hosts_added) {
       addHostSink(host);
     }
 
-    for (HostSharedPtr host : hosts_removed) {
+    for (const HostSharedPtr& host : hosts_removed) {
       ASSERT(host_sinks_.count(host) == 1);
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ASSERT(stats_.ejections_active_.value() > 0);
@@ -352,7 +352,7 @@ void DetectorImpl::onIntervalTimer() {
 }
 
 void DetectorImpl::runCallbacks(HostSharedPtr host) {
-  for (ChangeStateCb cb : callbacks_) {
+  for (const ChangeStateCb& cb : callbacks_) {
     cb(host);
   }
 }
