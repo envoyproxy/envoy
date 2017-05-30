@@ -153,7 +153,7 @@ private:
         write_buffer_.add(&response_size_n, sizeof(response_size_n));
         write_buffer_.add(response_base, response_base_len);
         if (ips != nullptr) {
-          for (auto it : *ips) {
+          for (const auto& it : *ips) {
             write_buffer_.add(question, name_len);
             write_buffer_.add(response_rr_fixed, RRFIXEDSZ);
             if (q_type == T_A) {
@@ -303,7 +303,7 @@ protected:
 
 static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results,
                        const std::string& address) {
-  for (auto result : results) {
+  for (const auto& result : results) {
     if (result->ip()->addressAsString() == address) {
       return true;
     }

@@ -12,6 +12,28 @@ namespace Envoy {
 namespace Server {
 
 /**
+ * Whether to run Envoy in serving mode, or in config validation mode at one of two levels (in which
+ * case we'll verify the configuration file is valid, print any errors, and exit without serving.)
+ */
+enum class Mode {
+  /**
+   * Default mode: Regular Envoy serving process. Configs are validated in the normal course of
+   * initialization, but if all is well we proceed to serve traffic.
+   */
+  Serve,
+
+  /**
+   * Validate as much as possible without opening network connections upstream or downstream.
+   */
+  Validate,
+
+  // TODO(rlazarus): Add a third option for "light validation": Mock out access to the filesystem.
+  // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
+  // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
+  // to be validated in a non-prod environment.
+};
+
+/**
  * General options for the server.
  */
 class Options {
@@ -61,6 +83,12 @@ public:
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.
    */
   virtual uint64_t restartEpoch() PURE;
+
+  /**
+   * @return whether to verify the configuration file is valid, print any errors, and exit
+   *         without serving.
+   */
+  virtual Mode mode() const PURE;
 
   /**
     * @return std::chrono::milliseconds the duration in msec between log flushes.

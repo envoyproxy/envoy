@@ -14,6 +14,8 @@
 
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
+#include "common/tracing/http_tracer_impl.h"
+#include "common/upstream/cluster_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -51,6 +53,7 @@ public:
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(mode, Mode());
 
   std::string config_path_;
   std::string admin_address_path_;
@@ -167,6 +170,7 @@ public:
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
   MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
+  MOCK_METHOD0(statsdUdpIpAddress, Optional<std::string>());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());

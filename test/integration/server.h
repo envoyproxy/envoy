@@ -43,6 +43,7 @@ public:
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
   }
+  Mode mode() const override { return Mode::Serve; }
 
 private:
   const std::string config_path_;
@@ -58,6 +59,17 @@ public:
   void startParentShutdownSequence() override {}
 
   bool draining_{};
+};
+
+class TestComponentFactory : public ComponentFactory {
+public:
+  Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
+    return Server::DrainManagerPtr{new Server::TestDrainManager()};
+  }
+  Runtime::LoaderPtr createRuntime(Server::Instance& server,
+                                   Server::Configuration::Initial& config) override {
+    return Server::InstanceUtil::createRuntime(server, config);
+  }
 };
 
 } // Server

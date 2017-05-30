@@ -32,6 +32,8 @@ maximize the chances of your PR being merged.
   deprecation window. We make no guarantees about code or deployments that rely on undocumented
   behavior.
 * All deprecations/breaking changes will be clearly listed in the release notes.
+* Commit message must mention what has been deprecated as part of the message.
+* See [DEPRECATED.md](DEPRECATED.md) for the list of deprecated features.
 
 # Release cadence
 

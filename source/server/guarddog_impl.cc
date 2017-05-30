@@ -39,7 +39,7 @@ void GuardDogImpl::threadRoutine() {
     const auto now = time_source_.currentTime();
     bool seen_one_multi_timeout(false);
     std::lock_guard<std::mutex> guard(wd_lock_);
-    for (auto watched_dog : watched_dogs_) {
+    for (const auto& watched_dog : watched_dogs_) {
       const auto delta = now - watched_dog->lastTouchTime();
       if (delta > miss_timeout_) {
         watchdog_miss_counter_.inc();
