@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <iterator>
 
 #include "spdlog/spdlog.h"
 
@@ -123,12 +124,12 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
 }
 
 std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
-  std::stringstream ret;
-  for (auto it = source.begin(); it != source.end(); ++it) {
-    ret << (*it);
-    ret << delimiter;
-  }
-  return ret.str();
+  std::ostringstream buf;
+  std::copy(source.begin(), source.end(),
+            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+  std::string ret = buf.str();
+  // copy will always end with an extra delimiter, we remove it here.
+  return ret.substr(0, ret.length() - delimiter.length());
 }
 
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
