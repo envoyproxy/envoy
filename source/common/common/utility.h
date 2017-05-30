@@ -123,6 +123,17 @@ public:
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
+   * @param keep_empty_string result contains empty strings if the string starts or
+   * ends with 'split', or if instances of 'split' are adjacent.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
+   */
+  static std::vector<std::string> splitKeep(const std::string& source, const std::string& split,
+                                            bool keep_empty_string);
+
+  /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the char to split on.
    * @return vector of strings computed after splitting `source` around all instances of `split`.
    */
   static std::vector<std::string> split(const std::string& source, char split);

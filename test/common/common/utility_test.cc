@@ -116,6 +116,37 @@ TEST(StringUtil, split) {
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello, ", ", "));
   EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ","));
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
+  {
+    std::vector<std::string> expected{"hello", "world"};
+    std::vector<std::string> result = StringUtil::split("hello world", " ");
+    for (size_t i = 0; i < expected.size(); ++i) {
+      EXPECT_EQ(expected[i], result[i]);
+    }
+  }
+  {
+    std::vector<std::string> expected{"hello", "world"};
+    std::vector<std::string> result = StringUtil::split("hello   world", " ");
+    for (size_t i = 0; i < expected.size(); ++i) {
+      EXPECT_EQ(expected[i], result[i]);
+    }
+  }
+}
+
+TEST(StringUtil, splitKeep) {
+  {
+    std::vector<std::string> expected{"hello", "world"};
+    std::vector<std::string> result = StringUtil::splitKeep("hello world", " ", true);
+    for (size_t i = 0; i < expected.size(); ++i) {
+      EXPECT_EQ(expected[i], result[i]);
+    }
+  }
+  {
+    std::vector<std::string> expected{"hello", "", "", "world"};
+    std::vector<std::string> result = StringUtil::splitKeep("hello   world", " ", true);
+    for (size_t i = 0; i < expected.size(); ++i) {
+      EXPECT_EQ(expected[i], result[i]);
+    }
+  }
 }
 
 TEST(StringUtil, endsWith) {
