@@ -35,7 +35,19 @@ class Span;
 
 typedef std::unique_ptr<Span> SpanPtr;
 
-class SpanFinalizer;
+/*
+ * Interface to perform context-specific tasks when completing a Span.
+ */
+class SpanFinalizer {
+public:
+  virtual ~SpanFinalizer() {}
+
+  /**
+   * Finalize the Span.
+   * @param span the Span to be finalized
+   */
+  virtual void finalize(Span& span) PURE;
+};
 
 /*
  * Basic abstraction for span.
@@ -54,7 +66,7 @@ public:
   /**
    * Capture the final duration for this Span and carry out any work necessary to complete it.
    * Once this method is called, the Span may be safely discarded.
-   * @param finalizer may be provided to perform context-specific work to complete the Span
+   * @param finalizer callback for context-specific work to complete the Span
    */
   virtual void finishSpan(SpanFinalizer& finalizer) PURE;
 
@@ -71,20 +83,6 @@ public:
    * @param start_time initial start time for the operation captured by the child
    */
   virtual SpanPtr spawnChild(const std::string& name, SystemTime start_time) PURE;
-};
-
-/*
- * Interface to perform context-specific tasks when completing a Span.
- */
-class SpanFinalizer {
-public:
-  virtual ~SpanFinalizer() {}
-
-  /**
-   * Finalize the Span.
-   * @param span the Span to be finalized
-   */
-  virtual void finalize(Span& span) PURE;
 };
 
 /**

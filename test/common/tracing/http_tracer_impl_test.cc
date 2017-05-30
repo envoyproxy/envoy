@@ -234,7 +234,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
-TEST(DefaultIngressFinalizer, OriginalAndLongPath) {
+TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
@@ -254,13 +254,11 @@ TEST(DefaultIngressFinalizer, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
   NiceMock<MockConfig> config;
 
-  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
-  //   span->finishSpan(finalizer);
-  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
-TEST(DefaultIngressFinalizer, SpanOptionalHeaders) {
+TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
@@ -291,13 +289,11 @@ TEST(DefaultIngressFinalizer, SpanOptionalHeaders) {
   //   EXPECT_CALL(*span, finishSpan(_));
   NiceMock<MockConfig> config;
 
-  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
-  // span->finishSpan(finalizer);
-  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
-TEST(DefaultIngressFinalizer, SpanPopulatedFailureResponse) {
+TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
@@ -345,11 +341,8 @@ TEST(DefaultIngressFinalizer, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
-  DefaultIngressFinalizer finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
   finalizer.finalize(*span);
-  //   span->finishSpan(finalizer);
-  //   EXPECT_CALL(*span, finishSpan(_));
-  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {

@@ -116,13 +116,13 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   NOT_REACHED;
 }
 
-DefaultIngressFinalizer::DefaultIngressFinalizer(Http::HeaderMap& request_headers,
-                                                 Http::AccessLog::RequestInfo& request_info,
-                                                 Config& tracing_config)
+HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap& request_headers,
+                                                   Http::AccessLog::RequestInfo& request_info,
+                                                   Config& tracing_config)
     : request_headers_(request_headers), request_info_(request_info),
       tracing_config_(tracing_config) {}
 
-void DefaultIngressFinalizer::finalize(Span& span) {
+void HttpConnManFinalizerImpl::finalize(Span& span) {
   // Pre response data.
   span.setTag("guid:x-request-id", std::string(request_headers_.RequestId()->value().c_str()));
   span.setTag("request_line", buildRequestLine(request_headers_, request_info_));

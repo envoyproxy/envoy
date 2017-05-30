@@ -80,10 +80,10 @@ public:
 /**
  * Finalizer for Spans covering standard request ingress.
  */
-class DefaultIngressFinalizer : public SpanFinalizer {
+class HttpConnManFinalizerImpl : public SpanFinalizer {
 public:
-  DefaultIngressFinalizer(Http::HeaderMap& request_headers,
-                          Http::AccessLog::RequestInfo& request_info, Config& tracing_config);
+  HttpConnManFinalizerImpl(Http::HeaderMap& request_headers,
+                           Http::AccessLog::RequestInfo& request_info, Config& tracing_config);
 
   void finalize(Span& span) override;
 
