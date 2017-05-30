@@ -28,7 +28,7 @@ HttpFilterFactoryCb IpTaggingFilterConfig::createFilterFactory(HttpFilterType ty
 std::string IpTaggingFilterConfig::name() { return "ip_tagging"; }
 
 /**
- * Static registration for the ip tagging filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the ip tagging filter. @see NamedRegisterHttpFilterConfigFactory.
  */
 static RegisterNamedHttpFilterConfigFactory<IpTaggingFilterConfig> register_;
 
