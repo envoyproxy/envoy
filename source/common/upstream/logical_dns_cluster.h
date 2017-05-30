@@ -29,7 +29,7 @@ namespace Upstream {
 class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver, Network::DnsResolverPtr custom_dns_resolver,
+                    Ssl::ContextManager& ssl_context_manager, Network::DnsResolverSharedPtr dns_resolver,
                     ThreadLocal::Instance& tls, Event::Dispatcher& dispatcher);
 
   ~LogicalDnsCluster();
@@ -86,9 +86,7 @@ private:
 
   void startResolve();
 
-  Network::DnsResolver& dns_resolver_;
-  // owning pointer in case we use a custom resolver
-  Network::DnsResolverPtr custom_dns_resolver_;
+  Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
   ThreadLocal::Instance& tls_;

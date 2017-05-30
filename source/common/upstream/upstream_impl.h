@@ -224,7 +224,7 @@ class ClusterImplBase : public Cluster,
 
 public:
   static ClusterPtr create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
-                           ThreadLocal::Instance& tls, Network::DnsResolver& dns_resolver,
+                           ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                            const Optional<SdsConfig>& sds_config,
@@ -320,8 +320,8 @@ protected:
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
-                       Network::DnsResolverPtr custom_dns_resolver, Event::Dispatcher& dispatcher);
+                       Ssl::ContextManager& ssl_context_manager,
+                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -347,9 +347,7 @@ private:
   void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
                       const std::vector<HostSharedPtr>& hosts_removed);
 
-  Network::DnsResolver& dns_resolver_;
-  // owning pointer in case we use a custom resolver
-  Network::DnsResolverPtr custom_dns_resolver_;
+  Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;

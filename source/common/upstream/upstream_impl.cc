@@ -104,7 +104,7 @@ const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
 
 ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm,
                                    Stats::Store& stats, ThreadLocal::Instance& tls,
-                                   Network::DnsResolver& dns_resolver,
+                                   Network::DnsResolverSharedPtr dns_resolver,
                                    Ssl::ContextManager& ssl_context_manager,
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                    Event::Dispatcher& dispatcher,
@@ -116,38 +116,23 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
 
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
-  if (string_type == "static") {
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
-  } else if (string_type == "strict_dns") {
-    if (cluster.hasObject("dns_resolvers")) {
-      auto resolver_addrs = cluster.getStringArray("dns_resolvers");
-      std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-      for (auto it = resolver_addrs.begin(); it != resolver_addrs.end(); ++it) {
-        resolvers.push_back(Network::Utility::parseInternetAddress(*it));
-      }
-      Network::DnsResolverPtr custom_dns_resolver{
-          new Network::DnsResolverImpl(dispatcher, resolvers)};
-      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                                 *custom_dns_resolver,
-                                                 std::move(custom_dns_resolver), dispatcher));
-    } else {
-      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                                 dns_resolver, nullptr, dispatcher));
-    }
-  } else if (string_type == "logical_dns") {
+  auto selected_dns_resolver = dns_resolver;
     if (cluster.hasObject("dns_resolvers")) {
       auto resolver_addrs = cluster.getStringArray("dns_resolvers");
       std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
       for (auto it = resolver_addrs.begin(); it != resolver_addrs.end(); ++it) {
         resolvers.push_back(Network::Utility::parseInternetAddressAndPort(*it));
       }
-      Network::DnsResolverPtr custom_dns_resolver{
-          new Network::DnsResolverImpl(dispatcher, resolvers)};
-      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, *custom_dns_resolver, std::move(custom_dns_resolver), tls, dispatcher));
-    } else {
-
-      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, dns_resolver, nullptr, tls, dispatcher));
+      selected_dns_resolver = std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers);
     }
+
+
+  if (string_type == "static") {
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
+  } else if (string_type == "strict_dns") {
+      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager, selected_dns_resolver, dispatcher));
+  } else if (string_type == "logical_dns") {
+      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, selected_dns_resolver,  tls, dispatcher));
   } else {
     ASSERT(string_type == "sds");
     if (!sds_config.valid()) {
@@ -390,11 +375,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
 StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                            Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
-                                           Network::DnsResolver& dns_resolver,
-                                           Network::DnsResolverPtr custom_dns_resolver,
+                                           Network::DnsResolverSharedPtr dns_resolver,
                                            Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
-      dns_resolver_(dns_resolver), custom_dns_resolver_(std::move(custom_dns_resolver)),
+      dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))) {
 
@@ -451,7 +435,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
-  active_query_ = parent_.dns_resolver_.resolve(
+  active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;

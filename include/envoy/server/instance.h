@@ -57,9 +57,9 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return Network::DnsResolver& the singleton DNS resolver for the server.
+   * @return Network::DnsResolverSharedPtr the singleton DNS resolver for the server.
    */
-  virtual Network::DnsResolver& dnsResolver() PURE;
+  virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
    * @return TRUE if the server is currently draining. No new connections will be received and
