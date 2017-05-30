@@ -34,9 +34,7 @@ DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std:
   if (resolvers.size() > 0) {
     std::string resolvers_csv = StringUtil::join(resolvers, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
-    if (result != ARES_SUCCESS) {
-      throw EnvoyException(fmt::format("dns: error setting resolvers: {}", result));
-    }
+    RELEASE_ASSERT(result == ARES_SUCCESS)
   }
 }
 
