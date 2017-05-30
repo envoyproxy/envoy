@@ -9,13 +9,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb IpTaggingFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                  const std::string& name,
-                                                                  const Json::Object& json_config,
-                                                                  const std::string&,
-                                                                  Server::Instance&) {
-  if (type != HttpFilterType::Decoder || name != "ip_tagging") {
-    return nullptr;
+HttpFilterFactoryCb IpTaggingFilterConfig::createFilterFactory(HttpFilterType type,
+                                                               const Json::Object& json_config,
+                                                               const std::string&,
+                                                               Server::Instance&) {
+  if (type != HttpFilterType::Decoder) {
+    throw EnvoyException(
+        fmt::format("{} ip tagging filter must be configured as a decoder filter.", name()));
   }
 
   Http::IpTaggingFilterConfigSharedPtr config(new Http::IpTaggingFilterConfig(json_config));
@@ -25,10 +25,12 @@ HttpFilterFactoryCb IpTaggingFilterConfig::tryCreateFilterFactory(HttpFilterType
   };
 }
 
+std::string IpTaggingFilterConfig::name() { return "ip_tagging"; }
+
 /**
  * Static registration for the ip tagging filter. @see RegisterHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<IpTaggingFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<IpTaggingFilterConfig> register_;
 
 } // Configuration
 } // Server
