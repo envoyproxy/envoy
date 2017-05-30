@@ -153,10 +153,16 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
       .WillOnce(Return(5000U));
 
   Tracing::SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  first_span->finishSpan();
+  // Tracing::MockFinalizer&& finalizer{};
+  Tracing::NullFinalizer&& finalizer{};
+
+  // EXPECT_CALL(finalizer, finalize(*first_span));
+  first_span->finishSpan(finalizer);
 
   Tracing::SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  second_span->finishSpan();
+
+  // EXPECT_CALL(finalizer, finalize(*second_span));
+  second_span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
@@ -198,7 +204,8 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
       .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  span->finishSpan();
+  Tracing::NullFinalizer&& finalizer{};
+  span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "404"}}}));
@@ -222,7 +229,8 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
       .WillOnce(Return(5));
 
   Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  span->finishSpan();
+  Tracing::NullFinalizer&& finalizer{};
+  span->finishSpan(finalizer);
 
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));

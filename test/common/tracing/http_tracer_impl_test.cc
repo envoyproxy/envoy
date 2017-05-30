@@ -234,7 +234,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
-TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
+TEST(DefaultIngressFinalizer, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
@@ -253,10 +253,14 @@ TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+
+  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  finalizer.finalize(*span);
+  //   span->finishSpan(finalizer);
+  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
-TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
+TEST(DefaultIngressFinalizer, SpanOptionalHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
@@ -284,12 +288,16 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
-  EXPECT_CALL(*span, finishSpan());
+  //   EXPECT_CALL(*span, finishSpan(_));
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+
+  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  finalizer.finalize(*span);
+  // span->finishSpan(finalizer);
+  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
-TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
+TEST(DefaultIngressFinalizer, SpanPopulatedFailureResponse) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
@@ -337,8 +345,11 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
-  EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+  DefaultIngressFinalizer&& finalizer{request_headers, request_info, config};
+  finalizer.finalize(*span);
+  //   span->finishSpan(finalizer);
+  //   EXPECT_CALL(*span, finishSpan(_));
+  //   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {
@@ -352,7 +363,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::AccessLog::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_EQ(nullptr, null_tracer.startSpan(config, request_headers, request_info));
+  EXPECT_TRUE(null_tracer.startSpan(config, request_headers, request_info) != nullptr);
+  //   EXPECT_THAT(null_tracer.startSpan(config, request_headers, request_info), A<SpanPtr>());
 }
 
 class HttpTracerImplTest : public Test {

@@ -43,6 +43,14 @@ public:
   MOCK_METHOD2(spawnChild_, Span*(const std::string& name, SystemTime start_time));
 };
 
+class MockFinalizer : public SpanFinalizer {
+public:
+  MockFinalizer();
+  ~MockFinalizer();
+
+  MOCK_METHOD1(finalize, void(Span& span));
+};
+
 class MockHttpTracer : public HttpTracer {
 public:
   MockHttpTracer();
