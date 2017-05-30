@@ -1207,7 +1207,9 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "http_codec_options" : {"type" : "string"},
       "dns_resolvers": {
         "type" : "array",
-        "items" : {"type" : "string"}
+        "items" : {"type" : "string"},
+        "minItems" : 1,
+        "uniqueItems" : true
       },
       "dns_refresh_rate_ms" : {
         "type" : "integer",
