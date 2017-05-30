@@ -15,7 +15,6 @@ Outlier detection
     "success_rate_minimum_hosts" : "...",
     "success_rate_request_volume" : "...",
     "success_rate_stdev_factor" : "..."
-
   }
 
 .. _config_cluster_manager_cluster_outlier_detection_consecutive_5xx:
@@ -38,20 +37,22 @@ base_ejection_time_ms
 .. _config_cluster_manager_cluster_outlier_detection_max_ejection_percent:
 
 max_ejection_percent
-  *(optional, integer)* The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to 10%.
+  *(optional, integer)* The maximum % of hosts in an upstream cluster that can be ejected due to outlier detection.
+  Defaults to 10%.
 
 .. _config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx:
 
 enforcing_consecutive_5xx
   *(optional, integer)* The % chance that a host will be actually ejected when an outlier status is detected through
-  consecutive 5xx. This setting can be used to disable ejection or to ramp it up slowly. Defaults to 100.
+  consecutive 5xx. This setting can be used to disable ejection or to ramp it up slowly.
+  Defaults to 100 with 1% granularity.
 
 .. _config_cluster_manager_cluster_outlier_detection_enforcing_success_rate:
 
 enforcing_success_rate
   *(optional, integer)* The % chance that a host will be actually ejected when an outlier status is detected through
   success rate statistics. This setting can be used to disable ejection or to ramp it up slowly.
-  Defaults to 100.
+  Defaults to 100 with 1% granularity.
 
 .. _config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts:
 
@@ -72,6 +73,8 @@ success_rate_request_volume
 
 success_rate_stdev_factor
   *(optional, integer)* This factor is used to determine the ejection threshold for success rate outlier ejection.
+  The ejection threshold is used as a measure to determine when a particular host has fallen below an acceptable
+  success rate.
   The ejection threshold is the difference between the mean success rate, and the product of
   this factor and the standard deviation of the mean success rate:
   ``mean - (stdev * success_rate_stdev_factor)``. This factor is divided by a thousand to
