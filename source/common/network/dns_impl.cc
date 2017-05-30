@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std::string> resolvers)
+DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is
@@ -32,7 +32,11 @@ DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std:
   initializeChannel(&options, 0);
 
   if (resolvers.size() > 0) {
-    std::string resolvers_csv = StringUtil::join(resolvers, ",");
+    std::vector<std::string> resolver_addrs;
+    for (auto it = resolvers.begin(); it != resolvers.end(); ++it) {
+      resolver_addrs.push_back((*it)->asString());
+    }
+    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS)
   }

@@ -74,7 +74,7 @@ DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
-Network::DnsResolverPtr DispatcherImpl::createDnsResolver(std::vector<std::string> resolvers) {
+Network::DnsResolverPtr DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
   return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this, resolvers)};
 }
 

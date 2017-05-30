@@ -120,7 +120,11 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
   } else if (string_type == "strict_dns") {
     if (cluster.hasObject("dns_resolvers")) {
-      auto resolvers = cluster.getStringArray("dns_resolvers");
+      auto resolver_addrs = cluster.getStringArray("dns_resolvers");
+      std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+      for (auto it = resolver_addrs.begin(); it != resolver_addrs.end(); ++it) {
+        resolvers.push_back(Network::Utility::parseInternetAddress(*it));
+      }
       Network::DnsResolverPtr custom_dns_resolver{
           new Network::DnsResolverImpl(dispatcher, resolvers)};
       new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
@@ -132,7 +136,11 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     }
   } else if (string_type == "logical_dns") {
     if (cluster.hasObject("dns_resolvers")) {
-      auto resolvers = cluster.getStringArray("dns_resolvers");
+      auto resolver_addrs = cluster.getStringArray("dns_resolvers");
+      std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+      for (auto it = resolver_addrs.begin(); it != resolver_addrs.end(); ++it) {
+        resolvers.push_back(Network::Utility::parseInternetAddressAndPort(*it));
+      }
       Network::DnsResolverPtr custom_dns_resolver{
           new Network::DnsResolverImpl(dispatcher, resolvers)};
       new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, *custom_dns_resolver, std::move(custom_dns_resolver), tls, dispatcher));

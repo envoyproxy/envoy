@@ -242,15 +242,23 @@ private:
 
 TEST(DnsImplConstructor, SupportsCustomResolvers) {
   Event::DispatcherImpl dispatcher;
-  auto resolver = dispatcher.createDnsResolver({"127.0.0.1:53"});
+  char addr4str[INET_ADDRSTRLEN];
+  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:53");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:53");
+  auto resolver = dispatcher.createDnsResolver({addr4, addr6});
   auto peer = new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
   EXPECT_EQ(resolvers->udp_port, 53);
-  EXPECT_STREQ(inet_ntoa(resolvers->addr.addr4), "127.0.0.1");
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 53);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN), "::1");
   ares_free_data(resolvers);
+  delete peer;
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {

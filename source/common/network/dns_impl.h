@@ -26,7 +26,7 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std::string> resolvers);
+  DnsResolverImpl(Event::Dispatcher& dispatcher, const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver

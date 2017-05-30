@@ -67,7 +67,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
-      dns_resolver_(handler_.dispatcher().createDnsResolver(std::vector<std::string>{})), local_info_(local_info),
+      dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
   failHealthcheck(false);

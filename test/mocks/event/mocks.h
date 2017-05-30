@@ -37,7 +37,7 @@ public:
     return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, address)};
   }
 
-  Network::DnsResolverPtr createDnsResolver(std::vector<std::string> resolvers) override {
+  Network::DnsResolverPtr createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override {
     return Network::DnsResolverPtr{createDnsResolver_(resolvers)};
   }
 
@@ -86,7 +86,7 @@ public:
   MOCK_METHOD2(createSslClientConnection_,
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
                                           Network::Address::InstanceConstSharedPtr address));
-  MOCK_METHOD1(createDnsResolver_, Network::DnsResolver*(std::vector<std::string> resolvers));
+  MOCK_METHOD1(createDnsResolver_, Network::DnsResolver*(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());

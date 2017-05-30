@@ -61,7 +61,7 @@ public:
    * should only be used on the thread that runs this dispatcher.
    * @return Network::DnsResolverPtr that is owned by the caller.
    */
-  virtual Network::DnsResolverPtr createDnsResolver(std::vector<std::string> resolvers) PURE;
+  virtual Network::DnsResolverPtr createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
 
   /**
    * Create a file event that will signal when a file is readable or writable. On UNIX systems this
