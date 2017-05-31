@@ -59,6 +59,7 @@ public:
   /**
    * Create an async DNS resolver. Only a single resolver can exist in the process at a time and it
    * should only be used on the thread that runs this dispatcher.
+   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use.
    * @return Network::DnsResolverPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
