@@ -104,10 +104,7 @@ This is a convenience to avoid having to parse and understand XFF.
 x-envoy-ip-tags
 ---------------
 
-This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`.
-The header contains a comma delimited list of Ip Tags as
-defined by the ``ip_tag_name`` property of an Ip Tag. If a request's final XFF contents belong to a range specified
-by an Ip Tag's ``ip_list``, then ``ip_tag_name`` will be appended to the ``x-envoy-ip-tags`` header.
+This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
 
 .. _config_http_conn_man_headers_x-forwarded-for:
 

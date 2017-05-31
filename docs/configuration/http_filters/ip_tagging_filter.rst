@@ -41,9 +41,7 @@ Ip tags
   }
 
 ip_tag_name:
-  *(required, string)* Specifies the ip tag name to apply. The ``ip_tag_name`` will be appended to the request's
-  :ref:`x-envoy-ip-tags<config_http_conn_man_headers_x-envoy-ip-tags>` header if the request's final XFF contents
-  belong to a range present in the ``ip_list``.
+  *(required, string)* Specifies the ip tag name to apply.
 
 ip_list:
   *(required, list of strings)* A list of IP address and subnet masks that will be tagged with the ``ip_tag_name``. Both
