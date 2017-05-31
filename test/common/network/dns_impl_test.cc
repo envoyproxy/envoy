@@ -256,7 +256,8 @@ TEST(DnsImplConstructor, SupportsCustomResolvers) {
   EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
   EXPECT_EQ(resolvers->next->family, AF_INET6);
   EXPECT_EQ(resolvers->next->udp_port, 53);
-  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN), "::1");
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
   ares_free_data(resolvers);
   delete peer;
 }
@@ -298,7 +299,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
   Event::DispatcherImpl dispatcher_;
-  DnsResolverPtr resolver_;
+  DnsResolverSharedPtr resolver_;
 };
 
 static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results,

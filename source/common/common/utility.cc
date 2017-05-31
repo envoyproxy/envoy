@@ -3,9 +3,9 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
-#include <iterator>
 
 #include "spdlog/spdlog.h"
 

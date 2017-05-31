@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
@@ -61,7 +61,8 @@ public:
    * should only be used on the thread that runs this dispatcher.
    * @return Network::DnsResolverPtr that is owned by the caller.
    */
-  virtual Network::DnsResolverPtr createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
+  virtual Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
 
   /**
    * Create a file event that will signal when a file is readable or writable. On UNIX systems this

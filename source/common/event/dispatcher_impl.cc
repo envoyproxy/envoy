@@ -74,8 +74,9 @@ DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
-Network::DnsResolverPtr DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
-  return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this, resolvers)};
+Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,

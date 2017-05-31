@@ -116,23 +116,25 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
 
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
-  auto selected_dns_resolver = dns_resolver;
-    if (cluster.hasObject("dns_resolvers")) {
-      auto resolver_addrs = cluster.getStringArray("dns_resolvers");
-      std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-      for (auto it = resolver_addrs.begin(); it != resolver_addrs.end(); ++it) {
-        resolvers.push_back(Network::Utility::parseInternetAddressAndPort(*it));
-      }
-      selected_dns_resolver = std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers);
-    }
 
+  auto selected_dns_resolver = dns_resolver;
+  if (cluster.hasObject("dns_resolvers")) {
+    auto resolver_addrs = cluster.getStringArray("dns_resolvers");
+    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+    for (const auto& resolver_addr : resolver_addrs) {
+      resolvers.push_back(Network::Utility::parseInternetAddressAndPort(resolver_addr));
+    }
+    selected_dns_resolver = std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers);
+  }
 
   if (string_type == "static") {
     new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
   } else if (string_type == "strict_dns") {
-      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager, selected_dns_resolver, dispatcher));
+    new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                               selected_dns_resolver, dispatcher));
   } else if (string_type == "logical_dns") {
-      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, selected_dns_resolver,  tls, dispatcher));
+    new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
+                                            selected_dns_resolver, tls, dispatcher));
   } else {
     ASSERT(string_type == "sds");
     if (!sds_config.valid()) {
@@ -378,9 +380,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
-      dns_resolver_(dns_resolver),
-      dns_refresh_rate_ms_(
-          std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))) {
+      dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
+                                       config.getInteger("dns_refresh_rate_ms", 5000))) {
 
   std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
   if (dns_lookup_family == "v6_only") {

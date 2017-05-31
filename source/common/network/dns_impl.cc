@@ -19,7 +19,9 @@
 namespace Envoy {
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
+DnsResolverImpl::DnsResolverImpl(
+    Event::Dispatcher& dispatcher,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is

@@ -87,7 +87,8 @@ public:
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{new NiceMock<Network::MockDnsResolver>};
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
