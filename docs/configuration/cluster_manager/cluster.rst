@@ -21,7 +21,7 @@ Cluster
     "http_codec_options": "...",
     "dns_refresh_rate_ms": "...",
     "dns_lookup_family": "...",
-    "dns_resolvers": "[]",
+    "dns_resolvers": [],
     "outlier_detection": "{...}"
   }
 
