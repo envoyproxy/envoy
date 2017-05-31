@@ -37,16 +37,16 @@ public:
 
   ~GrpcWebFilterTest() override {}
 
-  const std::string& request_content_type() { return std::get<0>(GetParam()); }
+  const std::string& request_content_type() const { return std::get<0>(GetParam()); }
 
-  const std::string& request_accept() { return std::get<1>(GetParam()); }
+  const std::string& request_accept() const { return std::get<1>(GetParam()); }
 
-  bool is_text_request() {
+  bool isTextRequest() const {
     return request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
            request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
   }
 
-  bool is_binary_request() {
+  bool isBinaryRequest() const {
     return request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
            request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
