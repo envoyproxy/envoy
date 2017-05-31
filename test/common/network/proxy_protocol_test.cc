@@ -166,14 +166,28 @@ TEST_P(ProxyProtocolTest, NotEnoughFields) {
 }
 
 TEST_P(ProxyProtocolTest, BadPort) {
-  write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 abc\r\nmore data\r\n");
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 abc\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, NegativePort) {
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 -66776 1234\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, PortOutOfRange) {
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1000000000000000000000 1234\r\nmore data");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
 TEST_P(ProxyProtocolTest, BadAddress) {
-  write("PROXY TCP6 1::2:3::4 5:6::7:8 66776 1234\r\nmore data\r\n");
+  write("PROXY TCP6 1::2:3::4 5:6::7:8 66776 1234\r\nmore data");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);

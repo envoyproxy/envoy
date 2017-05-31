@@ -91,13 +91,17 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   uint64_t remote_port, destination_port;
   try {
-    remote_port = std::stol(line_parts[4], nullptr);
-    destination_port = std::stol(line_parts[5], nullptr);
+    remote_port = std::stol(line_parts[4]);
+    destination_port = std::stol(line_parts[5]);
   } catch (const std::invalid_argument& ia) {
     throw EnvoyException(ia.what());
+  } catch (const std::out_of_range& ex) {
+    throw EnvoyException(ex.what());
   }
-  UNREFERENCED_PARAMETER(remote_port);
-  UNREFERENCED_PARAMETER(destination_port);
+  if (long(remote_port) < 0 || long(destination_port) < 0) {
+    // Negative port input value.
+    throw EnvoyException("failed to read proxy protocol");
+  }
 
   ListenerImpl& listener = listener_;
   int fd = fd_;
