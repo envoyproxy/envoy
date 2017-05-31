@@ -96,8 +96,8 @@ std::vector<std::string> StringUtil::split(const std::string& source, char split
   return StringUtil::split(source, std::string{split});
 }
 
-std::vector<std::string> StringUtil::splitKeep(const std::string& source, const std::string& split,
-                                               bool keep_empty_string) {
+std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split,
+                                           bool keep_empty_string) {
   std::vector<std::string> ret;
   size_t last_index = 0;
   size_t next_index;
@@ -121,10 +121,6 @@ std::vector<std::string> StringUtil::splitKeep(const std::string& source, const 
   } while (next_index != source.size());
 
   return ret;
-}
-
-std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split) {
-  return splitKeep(source, split, false);
 }
 
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {

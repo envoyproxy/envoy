@@ -62,7 +62,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
   // SOURCE_PORT DESTINATION_PORT.
-  auto line_parts = StringUtil::splitKeep(proxy_line, " ", true);
+  auto line_parts = StringUtil::split(proxy_line, " ", true);
 
   if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
     throw EnvoyException("failed to read proxy protocol");
@@ -84,8 +84,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
       Utility::parseInternetAddress(line_parts[3]);
   auto remote_version = remote_address->ip()->version();
   auto destination_version = destination_address->ip()->version();
-  if (remote_version != protocol_version || destination_version != protocol_version ||
-      remote_version != destination_version) {
+  if (remote_version != protocol_version || destination_version != protocol_version) {
     throw EnvoyException("failed to read proxy protocol");
   }
 
