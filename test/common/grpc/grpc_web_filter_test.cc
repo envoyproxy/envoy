@@ -51,12 +51,12 @@ public:
            request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
-  bool accept_text_response() {
+  bool accept_text_response() const {
     return request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
            request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
   }
 
-  bool accept_binary_response() {
+  bool accept_binary_response() const {
     return request_accept() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
            request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
