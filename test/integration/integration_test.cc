@@ -11,25 +11,34 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-TEST_F(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP1); }
 
-TEST_F(IntegrationTest, RouterNotFoundBodyNoBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(IntegrationTest, RouterNotFound) {
+  testRouterNotFound(Http::CodecClient::Type::HTTP1, GetParam());
 }
 
-TEST_F(IntegrationTest, RouterNotFoundBodyBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) {
+  testRouterNotFoundWithBody(lookupPort("http"), Http::CodecClient::Type::HTTP1, GetParam());
 }
 
-TEST_F(IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
+  testRouterNotFoundWithBody(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP1, GetParam());
+}
 
-TEST_F(IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, RouterRedirect) {
+  testRouterRedirect(Http::CodecClient::Type::HTTP1, GetParam());
+}
 
-TEST_F(IntegrationTest, ConnectionClose) {
+TEST_P(IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP1, GetParam()); }
+
+TEST_P(IntegrationTest, ConnectionClose) {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions({[&]() -> void {
-    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+    codec_client =
+        makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1, GetParam());
   },
                   [&]() -> void {
                     codec_client->makeHeaderOnlyRequest(
@@ -46,81 +55,91 @@ TEST_F(IntegrationTest, ConnectionClose) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-TEST_F(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http"), GetParam()),
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false,
+                                       GetParam());
 }
 
-TEST_F(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
+TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer"), GetParam()),
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false,
+                                       GetParam());
 }
 
-TEST_F(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
+TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer"), GetParam()),
                                        Http::CodecClient::Type::HTTP1, 4 * 1024 * 1024,
-                                       4 * 1024 * 1024, false);
+                                       4 * 1024 * 1024, false, GetParam());
 }
 
-TEST_F(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, true);
+TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http"), GetParam()),
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, true, GetParam());
 }
 
-TEST_F(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http"), GetParam()),
+                                         Http::CodecClient::Type::HTTP1, GetParam());
 }
 
-TEST_F(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
+  testRouterHeaderOnlyRequestAndResponse(
+      makeClientConnection(lookupPort("http_buffer"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                    Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+  testRouterUpstreamDisconnectBeforeRequestComplete(
+      makeClientConnection(lookupPort("http"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
-                                                     Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+  testRouterUpstreamDisconnectBeforeResponseComplete(
+      makeClientConnection(lookupPort("http"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                      Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+  testRouterDownstreamDisconnectBeforeRequestComplete(
+      makeClientConnection(lookupPort("http"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
-                                                       Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+  testRouterDownstreamDisconnectBeforeResponseComplete(
+      makeClientConnection(lookupPort("http"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                  Http::CodecClient::Type::HTTP1);
+TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(
+      makeClientConnection(lookupPort("http"), GetParam()), Http::CodecClient::Type::HTTP1,
+      GetParam());
 }
 
-TEST_F(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1, GetParam()); }
 
-TEST_F(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, TwoRequests) {
+  testTwoRequests(Http::CodecClient::Type::HTTP1, GetParam());
+}
 
-TEST_F(IntegrationTest, BadHttpRequest) { testBadHttpRequest(); }
+TEST_P(IntegrationTest, BadHttpRequest) { testBadHttpRequest(GetParam()); }
 
-TEST_F(IntegrationTest, Http10Request) { testHttp10Request(); }
+TEST_P(IntegrationTest, Http10Request) { testHttp10Request(GetParam()); }
 
-TEST_F(IntegrationTest, NoHost) { testNoHost(); }
+TEST_P(IntegrationTest, NoHost) { testNoHost(GetParam()); }
 
-TEST_F(IntegrationTest, BadPath) { testBadPath(); }
+TEST_P(IntegrationTest, BadPath) { testBadPath(GetParam()); }
 
-TEST_F(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
+TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(GetParam()); }
 
-TEST_F(IntegrationTest, TcpProxyUpstreamDisconnect) {
+TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
   executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
+      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy"), GetParam()); },
        [&]() -> void { tcp_client->write("hello"); },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
        [&]() -> void { fake_upstream_connection->waitForData(5); },
@@ -132,11 +151,11 @@ TEST_F(IntegrationTest, TcpProxyUpstreamDisconnect) {
   EXPECT_EQ("world", tcp_client->data());
 }
 
-TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
+TEST_P(IntegrationTest, TcpProxyDownstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
   executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
+      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy"), GetParam()); },
        [&]() -> void { tcp_client->write("hello"); },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
        [&]() -> void { fake_upstream_connection->waitForData(5); },

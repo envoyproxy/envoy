@@ -51,19 +51,10 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
-// TODO(hennna): Deprecate when Ipv6 test support is finished.
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
-                                   const std::string& host) {
-  return makeSingleRequest(Network::Address::IpVersion::v4, port, method, url, body, type, host);
-}
-
-BufferingStreamDecoderPtr
-IntegrationUtil::makeSingleRequest(const Network::Address::IpVersion version, uint32_t port,
-                                   const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
-                                   const std::string& host) {
+                                   Network::Address::IpVersion version, const std::string& host) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
@@ -94,9 +85,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::IpVersion version, ui
   return response;
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t port, const Network::Address::IpVersion version,
-                                         Buffer::Instance& initial_data,
-                                         ReadCallback data_callback) {
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
+                                         ReadCallback data_callback,
+                                         Network::Address::IpVersion version) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
   client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
@@ -105,11 +96,6 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, const Network::Address::
   client_->write(initial_data);
   client_->connect();
 }
-
-// TODO(hennna): Deprecate when IPv6 test support is finished.
-RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
-                                         ReadCallback data_callback)
-    : RawConnectionDriver(port, Network::Address::IpVersion::v4, initial_data, data_callback) {}
 
 RawConnectionDriver::~RawConnectionDriver() {}
 

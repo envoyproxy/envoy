@@ -21,6 +21,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -174,10 +175,11 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port)
+IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+                                           Network::Address::IpVersion version)
     : callbacks_(new ConnectionCallbacks(*this)) {
-  connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+  connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(callbacks_);
   connection_->connect();
@@ -239,28 +241,34 @@ BaseIntegrationTest::BaseIntegrationTest()
 
 BaseIntegrationTest::~BaseIntegrationTest() {}
 
-Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+Network::ClientConnectionPtr
+BaseIntegrationTest::makeClientConnection(uint32_t port, Network::Address::IpVersion version) {
+  return dispatcher_->createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
 }
 
-IntegrationCodecClientPtr BaseIntegrationTest::makeHttpConnection(uint32_t port,
-                                                                  Http::CodecClient::Type type) {
-  return makeHttpConnection(makeClientConnection(port), type);
+IntegrationCodecClientPtr
+BaseIntegrationTest::makeHttpConnection(uint32_t port, Http::CodecClient::Type type,
+                                        Network::Address::IpVersion version) {
+  return makeHttpConnection(makeClientConnection(port, version), type, version);
 }
 
 IntegrationCodecClientPtr
 BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
-                                        Http::CodecClient::Type type) {
+                                        Http::CodecClient::Type type,
+                                        Network::Address::IpVersion version) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+      cluster, "", Network::Utility::resolveUrl(fmt::format(
+                       "tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
+      false, "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }
 
-IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port)};
+IntegrationTcpClientPtr
+BaseIntegrationTest::makeTcpConnection(uint32_t port, Network::Address::IpVersion version) {
+  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port, version)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -286,57 +294,49 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const Network::Address::IpVersion version,
-                                           const std::vector<std::string>& port_names) {
+                                           const std::vector<std::string>& port_names,
+                                           Network::Address::IpVersion version) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, version, port_map_), version);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version), version);
   registerTestServerPorts(port_names);
 }
 
-// TODO(hennna): Deprecate when IPv6 test support is finished.
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  BaseIntegrationTest::createTestServer(json_path, Network::Address::IpVersion::v4, port_names);
-}
-
-void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
-                                                               Http::CodecClient::Type type,
-                                                               uint64_t request_size,
-                                                               uint64_t response_size,
-                                                               bool big_header) {
+void BaseIntegrationTest::testRouterRequestAndResponseWithBody(
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, uint64_t request_size,
+    uint64_t response_size, bool big_header, Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
-                  [&]() -> void {
-                    Http::TestHeaderMapImpl headers{{":method", "POST"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"x-lyft-user-id", "123"},
-                                                    {"x-forwarded-for", "10.0.0.1"}};
-                    if (big_header) {
-                      headers.addViaCopy("big", std::string(4096, 'a'));
-                    }
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
+       [&]() -> void {
+         Http::TestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"x-lyft-user-id", "123"},
+                                         {"x-forwarded-for", "10.0.0.1"}};
+         if (big_header) {
+           headers.addViaCopy("big", std::string(4096, 'a'));
+         }
 
-                    codec_client->makeRequestWithBody(headers, request_size, *response);
-                  },
-                  [&]() -> void {
-                    fake_upstream_connection =
-                        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-                  },
-                  [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-                  [&]() -> void { request->waitForEndStream(*dispatcher_); },
-                  [&]() -> void {
-                    request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-                    request->encodeData(response_size, true);
-                  },
-                  [&]() -> void { response->waitForEndStream(); },
-                  // Cleanup both downstream and upstream
-                  [&]() -> void { codec_client->close(); },
-                  [&]() -> void { fake_upstream_connection->close(); },
-                  [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+         codec_client->makeRequestWithBody(headers, request_size, *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void {
+         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         request->encodeData(response_size, true);
+       },
+       [&]() -> void { response->waitForEndStream(); },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 
   EXPECT_TRUE(request->complete());
   EXPECT_EQ(request_size, request->bodyLength());
@@ -347,14 +347,15 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
 }
 
 void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
 
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
        [&]() -> void {
          codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                      {":path", "/test/long/url"},
@@ -385,45 +386,49 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   EXPECT_EQ(0U, response->body().size());
 }
 
-void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type,
+                                             Network::Address::IpVersion version) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "", type);
+      IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "", type, version);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type) {
+void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type,
+                                                     Network::Address::IpVersion version) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type);
+      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type, version);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type,
+                                             Network::Address::IpVersion version) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/foo", "", type, "www.redirect.com");
+      lookupPort("http"), "GET", "/foo", "", type, version, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
                response->headers().get(Http::Headers::get().Location)->value().c_str());
 }
 
-void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type,
+                                         Network::Address::IpVersion version) {
   test_server_->drainManager().draining_ = true;
 
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
-                  [&]() -> void {
-                    codec_client->makeHeaderOnlyRequest(
-                        Http::TestHeaderMapImpl{{":method", "GET"},
-                                                {":path", "/healthcheck"},
-                                                {":scheme", "http"},
-                                                {":authority", "host"}},
-                        *response);
-                  },
-                  [&]() -> void { response->waitForEndStream(); },
-                  [&]() -> void { codec_client->waitForDisconnect(); }});
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type, version); },
+       [&]() -> void {
+         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                     {":path", "/healthcheck"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"}},
+                                             *response);
+       },
+       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { codec_client->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -435,13 +440,14 @@ void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
 }
 
 void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
       [&]() -> void {
         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -475,13 +481,14 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
 }
 
 void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
       [&]() -> void {
         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                     {":path", "/test/long/url"},
@@ -518,13 +525,14 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
 }
 
 void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
       [&]() -> void {
         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -556,13 +564,14 @@ void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
 }
 
 void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
       [&]() -> void {
         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                     {":path", "/test/long/url"},
@@ -600,13 +609,14 @@ void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
 }
 
 void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
+    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type, version); },
       [&]() -> void {
         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
@@ -649,13 +659,14 @@ void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
   EXPECT_EQ(512U, response->body().size());
 }
 
-void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testRetry(Http::CodecClient::Type type,
+                                    Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type, version); },
        [&]() -> void {
          codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                    {":path", "/test/long/url"},
@@ -702,13 +713,14 @@ void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
 
-void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type,
+                                          Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type, version); },
        // Request 1.
        [&]() -> void {
          codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -765,81 +777,83 @@ void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
 
-void BaseIntegrationTest::testBadHttpRequest() {
+void BaseIntegrationTest::testBadHttpRequest(Network::Address::IpVersion version) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data)
-          -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+      }, version);
 
   connection.run();
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testHttp10Request() {
+void BaseIntegrationTest::testHttp10Request(Network::Address::IpVersion version) {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
-void BaseIntegrationTest::testNoHost() {
+void BaseIntegrationTest::testNoHost(Network::Address::IpVersion version) {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
-void BaseIntegrationTest::testBadPath() {
+void BaseIntegrationTest::testBadPath(Network::Address::IpVersion version) {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testUpstreamProtocolError() {
+void BaseIntegrationTest::testUpstreamProtocolError(Network::Address::IpVersion version) {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeRawConnectionPtr fake_upstream_connection;
-  executeActions(
-      {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-      },
-       [&]() -> void {
-         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                            {":path", "/test/long/url"},
-                                                            {":authority", "host"}},
-                                    *response);
-       },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
-       // be fixed.
-       [&]() -> void { fake_upstream_connection->waitForData(187); },
-       [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-       [&]() -> void { codec_client->waitForDisconnect(); }});
+  executeActions({[&]() -> void {
+    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1, version);
+  },
+                  [&]() -> void {
+                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                       {":path", "/test/long/url"},
+                                                                       {":authority", "host"}},
+                                               *response);
+                  },
+                  [&]() -> void {
+                    fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+                  },
+                  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
+                  // be fixed.
+                  [&]() -> void { fake_upstream_connection->waitForData(187); },
+                  [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
+                  [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+                  [&]() -> void { codec_client->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
