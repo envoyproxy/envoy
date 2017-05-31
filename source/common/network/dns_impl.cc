@@ -35,8 +35,8 @@ DnsResolverImpl::DnsResolverImpl(
 
   if (resolvers.size() > 0) {
     std::vector<std::string> resolver_addrs;
-    for (auto it = resolvers.begin(); it != resolvers.end(); ++it) {
-      resolver_addrs.push_back((*it)->asString());
+    for (const auto& resolver : resolvers) {
+      resolver_addrs.push_back(resolver->asString());
     }
     const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());

@@ -96,7 +96,7 @@ private:
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_;
+  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{new Network::ValidationDnsResolver};
   const LocalInfo::LocalInfo& local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
