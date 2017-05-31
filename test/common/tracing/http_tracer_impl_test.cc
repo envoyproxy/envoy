@@ -356,8 +356,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::AccessLog::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_TRUE(null_tracer.startSpan(config, request_headers, request_info) != nullptr);
-  //   EXPECT_THAT(null_tracer.startSpan(config, request_headers, request_info), A<SpanPtr>());
+  SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
+  EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
 }
 
 class HttpTracerImplTest : public Test {
