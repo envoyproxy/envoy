@@ -286,7 +286,6 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
-  //   EXPECT_CALL(*span, finishSpan(_));
   NiceMock<MockConfig> config;
 
   HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
