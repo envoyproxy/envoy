@@ -93,11 +93,11 @@ TEST_P(GrpcWebFilterTest, Unary) {
             request_headers.GrpcAcceptEncoding()->value().c_str());
 
   // Tests request data.
-  if (is_binary_request()) {
+  if (isBinaryRequest()) {
     Buffer::OwnedImpl request_buffer(MESSAGE, MESSAGE_SIZE);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
     EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(request_buffer));
-  } else if (is_text_request()) {
+  } else if (isTextRequest()) {
     Buffer::OwnedImpl request_buffer(B64_MESSAGE, B64_MESSAGE_SIZE);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
     EXPECT_EQ(std::string(TEXT_MESSAGE, TEXT_MESSAGE_SIZE),
