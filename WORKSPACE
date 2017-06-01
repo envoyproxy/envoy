@@ -5,3 +5,6 @@ load("//bazel:cc_configure.bzl", "cc_configure")
 
 envoy_dependencies()
 cc_configure()
+
+load("@envoy_api_git//bazel:repositories.bzl", "api_dependencies")
+api_dependencies()

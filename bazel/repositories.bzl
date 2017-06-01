@@ -80,10 +80,21 @@ def python_deps(skip_targets):
             actual = "@jinja2_git//:jinja2",
         )
 
+def envoy_api_deps(skip_targets):
+  if 'envoy_api' not in skip_targets:
+    native.git_repository(
+        name = "envoy_api_git",
+        remote = "https://github.com/lyft/envoy-api.git",
+        commit = "959278cc35a89a4d2f1895f66a59c6b3de98d5e1",
+    )
+    native.bind(
+        name = "envoy_cc_api",
+        actual = "@envoy_api_git//api:api_cc",
+    )
+
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
-    # Used only for protobuf.bzl.
     if not skip_protobuf_bzl:
-        native.new_git_repository(
+        native.git_repository(
             name = "protobuf_bzl",
             # Using a non-canonical repository/branch here. This is a workaround to the lack of
             # merge on https://github.com/google/protobuf/pull/2508, which is needed for supporting
@@ -92,9 +103,15 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
             # release with the above mentioned PR cherry picked.
             commit = "d490587268931da78c942a6372ef57bb53db80da",
             remote = "https://github.com/htuch/protobuf.git",
-            # We only want protobuf.bzl, so don't support building out of this repo.
-            build_file_content = "",
         )
+    native.bind(
+        name = "cc_wkt_protos",
+        actual = "@protobuf_bzl//:cc_wkt_protos",
+    )
+    native.bind(
+        name = "cc_wkt_protos_genproto",
+        actual = "@protobuf_bzl//:cc_wkt_protos_genproto",
+    )
 
     envoy_repository = repository_rule(
         implementation = _repository_impl,
@@ -131,3 +148,4 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
             )
 
     python_deps(skip_targets)
+    envoy_api_deps(skip_targets)
