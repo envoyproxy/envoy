@@ -174,7 +174,7 @@ struct Http2Settings {
   static const uint32_t MAX_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
 
   // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
-  // NOTE: we only support increase window size now, so this is also the minimum
+  // NOTE: we only support increasing window size now, so this is also the minimum
   // TODO(jwfang): make this 0 to support decrease window size
   static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
   // initial value from HTTP/2 spec is 65535, but we want more (256MiB)

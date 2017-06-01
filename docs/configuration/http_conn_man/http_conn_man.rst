@@ -107,22 +107,26 @@ http2_settings
   Currently supported settings are:
 
   hpack_table_size
-    *(optional, integer)* `Maximum Table Size`_ (in octets) that the encoder is permitted to use for
-    the dynamic HPACK table. Valid values range from 0 to 4294967295 (2^32 - 1) and defaults to 4096,
-    with 0 effectively disables header compression.
+    *(optional, integer)* `Maximum Table Size <http://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
+    (in octets) that the encoder is permitted to use for
+    the dynamic HPACK table. Valid values range from 0 to 4294967295 (2^32 - 1) and defaults to 4096.
+    0 effectively disables header compression.
 
   max_concurrent_streams
-    *(optional, integer)* `Maximum concurrent streams`_ allowed for peer on one HTTP/2 connection.
+    *(optional, integer)* `Maximum concurrent streams 
+    <http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
+    allowed for peer on one HTTP/2 connection.
     Valid values range from 1 to 2147483647 (2^31 - 1) and defaults to 2147483647.
 
 .. _config_http_conn_man_http2_settings_initial_stream_window_size:
 
   initial_stream_window_size
-    *(optional, integer)* `Initial stream-level flow-control window`_ size. Valid values range from 65535
+    *(optional, integer)* `Initial stream-level flow-control window 
+    <http://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
     (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
     (256 * 1024 * 1024).
 
-    NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increase the default window
+    NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increasing the default window
     size now, so it's also the minimum.
 
   initial_connection_window_size
@@ -133,10 +137,6 @@ http2_settings
 
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
-
-  .. _Maximum Table Size: http://httpwg.org/specs/rfc7541.html#rfc.section.4.2
-  .. _Maximum concurrent streams: http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2
-  .. _Initial stream-level flow-control window: http://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2
 
 .. _config_http_conn_man_server_name:
 
