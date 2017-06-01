@@ -200,7 +200,7 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
     "request_type" : "internal",
     "ip_tags" : [
       { "ip_tag_name" : "example_tag",
-        "ip_list" : ["10.98.103.4", "3.67.89.9/4"]
+        "ip_list" : ["0.0.0.0"]
       }
     ]
   }
@@ -219,10 +219,9 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
 TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
   std::string json_string = R"EOF(
   {
+    "request_type" : "internal",
     "ip_tags" : [
-      {
-        "ip_tag_name" : "example",
-        "ip_list" : []
+      { "ip_tag_name" : "example_tag"
       }
     ]
   }

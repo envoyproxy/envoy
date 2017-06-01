@@ -844,26 +844,20 @@ const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
       "ip_tags" : {
         "type" : "array",
         "minItems" : 1,
+        "uniqueItems" : true,
         "items" : {
           "type" : "object",
           "properties" : {
-            "ip_tag_name" : {
-              "type" : "string"
-            },
+            "ip_tag_name" : { "type" : "string" },
             "ip_list" : {
               "type" : "array",
               "minItems" : 1,
-              "uniqueItems": true,
-              "items" : {
-                "type": "string",
-                "anyOf": [
-                  { "format" : "ipv4" },
-                  { "format": "ipv6" }
-                ]
-              }
-            },
-          "required" : ["ip_tag_name", "ip_list"]
-          }
+              "uniqueItems" : true,
+              "items" : { "type" : "string" }
+            }
+          },
+          "required" : ["ip_tag_name", "ip_list"],
+          "additionalProperties" : false
         }
       }
     },
