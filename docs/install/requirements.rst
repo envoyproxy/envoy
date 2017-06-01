@@ -21,6 +21,7 @@ Envoy has the following requirements:
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.12.0)
 * `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
+* `glog <https://github.com/google/glog>`_ (last tested with 0.3.5)
 
 In order to compile and run the tests the following is required:
 

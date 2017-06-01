@@ -36,6 +36,17 @@ cc_library(
 )
 
 cc_library(
+    name = "glog",
+    srcs = [
+        "thirdparty_build/lib/libglog.a",
+    ],
+    hdrs = glob([
+        "thirdparty_build/include/glog/**/*.h",
+    ]),
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "googletest",
     srcs = [
         "thirdparty_build/lib/libgmock.a",
