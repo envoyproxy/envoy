@@ -3,7 +3,7 @@
 Ip tagging filter
 ====================
 
-This is a filter which enables Envoy to tag requests with extra information such as location, cloud source and any
+This is an HTTP filter which enables Envoy to tag requests with extra information such as location, cloud source, and any
 extra data. This is useful to prevent against DDoS.
 
 **Note**: this filter is under active development, and currently does not perform any tagging on requests. In other
