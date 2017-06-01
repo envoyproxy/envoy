@@ -62,7 +62,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
   // SOURCE_PORT DESTINATION_PORT.
-  auto line_parts = StringUtil::split(proxy_line, " ", true);
+  const auto line_parts = StringUtil::split(proxy_line, " ", true);
 
   if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
     throw EnvoyException("failed to read proxy protocol");
@@ -82,25 +82,26 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   Address::InstanceConstSharedPtr remote_address = Utility::parseInternetAddress(line_parts[2]);
   Address::InstanceConstSharedPtr destination_address =
       Utility::parseInternetAddress(line_parts[3]);
-  auto remote_version = remote_address->ip()->version();
-  auto destination_version = destination_address->ip()->version();
+  const auto remote_version = remote_address->ip()->version();
+  const auto destination_version = destination_address->ip()->version();
   if (remote_version != protocol_version || destination_version != protocol_version) {
     throw EnvoyException("failed to read proxy protocol");
   }
 
   uint64_t remote_port, destination_port;
   try {
-    remote_port = std::stol(line_parts[4]);
-    destination_port = std::stol(line_parts[5]);
+    remote_port = std::stoull(line_parts[4]);
+    destination_port = std::stoull(line_parts[5]);
+    if (remote_port > 65535 || destination_port > 65535) {
+      throw std::out_of_range("failed to read proxy protocol");
+    }
   } catch (const std::invalid_argument& ia) {
     throw EnvoyException(ia.what());
   } catch (const std::out_of_range& ex) {
     throw EnvoyException(ex.what());
   }
-  if (long(remote_port) < 0 || long(destination_port) < 0) {
-    // Negative port input value.
-    throw EnvoyException("failed to read proxy protocol");
-  }
+  UNREFERENCED_PARAMETER(remote_port);
+  UNREFERENCED_PARAMETER(destination_port);
 
   ListenerImpl& listener = listener_;
   int fd = fd_;
