@@ -88,10 +88,11 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  uint64_t remote_port, destination_port;
+  uint32_t remote_port, destination_port;
   try {
-    remote_port = std::stoull(line_parts[4]);
-    destination_port = std::stoull(line_parts[5]);
+    remote_port = std::stoul(line_parts[4]);
+    destination_port = std::stoul(line_parts[5]);
+    // Check that TCP port value is in range [0, 65535].
     if (remote_port > 65535 || destination_port > 65535) {
       throw std::out_of_range("failed to read proxy protocol");
     }

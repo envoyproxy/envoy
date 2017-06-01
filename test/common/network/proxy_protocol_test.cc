@@ -180,13 +180,6 @@ TEST_P(ProxyProtocolTest, NegativePort) {
 }
 
 TEST_P(ProxyProtocolTest, PortOutOfRange) {
-  write("PROXY TCP6 1:2:3::4 5:6::7:8 1000000000000000000000 1234\r\nmore data");
-  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
-  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-}
-
-TEST_P(ProxyProtocolTest, PortTooLarge) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
