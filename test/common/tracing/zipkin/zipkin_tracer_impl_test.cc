@@ -153,15 +153,14 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
       .WillOnce(Return(5000U));
 
   Tracing::SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  // Tracing::MockFinalizer finalizer;
-  Tracing::NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
 
-  // EXPECT_CALL(finalizer, finalize(*first_span));
+  EXPECT_CALL(finalizer, finalize(_));
   first_span->finishSpan(finalizer);
 
   Tracing::SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
-  // EXPECT_CALL(finalizer, finalize(*second_span));
+  EXPECT_CALL(finalizer, finalize(_));
   second_span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -204,7 +203,9 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
       .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  Tracing::NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
+
+  EXPECT_CALL(finalizer, finalize(_));
   span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -229,7 +230,9 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
       .WillOnce(Return(5));
 
   Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  Tracing::NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
+
+  EXPECT_CALL(finalizer, finalize(_));
   span->finishSpan(finalizer);
 
   // Timer should be re-enabled.

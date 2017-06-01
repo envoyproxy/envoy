@@ -166,15 +166,14 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
       .WillOnce(Return(5000U));
 
   SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  // MockFinalizer finalizer;
-  NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
 
-  // EXPECT_CALL(finalizer, finalize(*first_span));
+  EXPECT_CALL(finalizer, finalize(_));
   first_span->finishSpan(finalizer);
 
   SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
-  // EXPECT_CALL(finalizer, finalize(*second_span));
+  EXPECT_CALL(finalizer, finalize(_));
   second_span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -209,7 +208,9 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
       .WillOnce(Return(5));
 
   SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
+
+  EXPECT_CALL(finalizer, finalize(_));
   span->finishSpan(finalizer);
 
   // Timer should be re-enabled.
@@ -251,7 +252,9 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
       .WillOnce(Return(5000U));
 
   SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  NullFinalizer finalizer;
+  Tracing::MockFinalizer finalizer;
+
+  EXPECT_CALL(finalizer, finalize(_));
   span->finishSpan(finalizer);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
