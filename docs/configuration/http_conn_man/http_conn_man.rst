@@ -107,7 +107,7 @@ http2_settings
   Currently supported settings are:
 
   hpack_table_size
-    *(optional, integer)* `Maximum Table Size <http://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
+    *(optional, integer)* `Maximum table size <http://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
     (in octets) that the encoder is permitted to use for
     the dynamic HPACK table. Valid values range from 0 to 4294967295 (2^32 - 1) and defaults to 4096.
     0 effectively disables header compression.
