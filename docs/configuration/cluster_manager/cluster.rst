@@ -19,6 +19,7 @@ Cluster
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",
+    "http2_settings": "{...}",
     "dns_refresh_rate_ms": "...",
     "dns_lookup_family": "...",
     "outlier_detection": "{...}"
@@ -136,6 +137,13 @@ http_codec_options
   manager :ref:`http_codec_options <config_http_conn_man_http_codec_options>` option. When building
   an HTTP/2 mesh, if it's desired to disable HTTP/2 header compression the *no_compression*
   option should be specified both here as well as in the HTTP connection manager.
+
+.. _config_cluster_manager_cluster_http2_settings:
+
+http2_settings
+  *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec when
+  initiating HTTP connection pool connections. These are the same options supported in the HTTP connection
+  manager :ref:`http2_settings <config_http_conn_man_http2_settings>` option.
 
 .. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 

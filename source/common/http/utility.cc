@@ -136,12 +136,34 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
   return Network::Utility::isInternalAddress(forwarded_for->value().c_str());
 }
 
-uint64_t Utility::parseCodecOptions(const Json::Object& config) {
-  uint64_t ret = 0;
+Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
+  Http2Settings ret;
+
+  Json::ObjectSharedPtr http2_settings = config.getObject("http2_settings", true);
+  ret.hpack_table_size_ =
+      http2_settings->getInteger("hpack_table_size", Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
+  ret.max_concurrent_streams_ = http2_settings->getInteger(
+      "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+  ret.initial_stream_window_size_ = http2_settings->getInteger(
+      "initial_stream_window_size", Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  ret.initial_connection_window_size_ =
+      http2_settings->getInteger("initial_connection_window_size",
+                                 Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+
+  // http_codec_options config is DEPRECATED
   std::string options = config.getString("http_codec_options", "");
+  if (options != "") {
+    spdlog::logger& logger = Logger::Registry::getLog(Logger::Id::config);
+    logger.warn("'http_codec_options' is DEPRECATED, please use 'http2_settings' instead");
+  }
+
   for (const std::string& option : StringUtil::split(options, ',')) {
     if (option == "no_compression") {
-      ret |= CodecOptions::NoCompression;
+      if (http2_settings->hasObject("hpack_table_size") && ret.hpack_table_size_ != 0) {
+        throw EnvoyException(
+            "'http_codec_options.no_compression' conflicts with 'http2_settings.hpack_table_size'");
+      }
+      ret.hpack_table_size_ = 0;
     } else {
       throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
     }

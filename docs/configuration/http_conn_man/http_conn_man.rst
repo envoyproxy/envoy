@@ -20,6 +20,7 @@ HTTP connection manager
       "add_user_agent": "...",
       "tracing": "{...}",
       "http_codec_options": "...",
+      "http2_settings": "{...}",
       "server_name": "...",
       "idle_timeout_s": "...",
       "drain_timeout_ms": "...",
@@ -85,7 +86,9 @@ add_user_agent
 
 .. _config_http_conn_man_http_codec_options:
 
-http_codec_options
+http_codec_options (Warning: DEPRECATED and will be removed in 1.4.0)
+  **DEPRECATED**, use :ref:`http2_settings <config_http_conn_man_http2_settings>` instead.
+
   *(optional, string)* Additional options that are passed directly to the codec. Not all options
   are applicable to all codecs. Possible values are:
 
@@ -96,6 +99,44 @@ http_codec_options
   These are the same options available in the upstream cluster :ref:`http_codec_options
   <config_cluster_manager_cluster_http_codec_options>` option. See the comment there about
   disabling HTTP/2 header compression.
+
+.. _config_http_conn_man_http2_settings:
+
+http2_settings
+  *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
+  Currently supported settings are:
+
+  hpack_table_size
+    *(optional, integer)* `Maximum table size <http://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
+    (in octets) that the encoder is permitted to use for
+    the dynamic HPACK table. Valid values range from 0 to 4294967295 (2^32 - 1) and defaults to 4096.
+    0 effectively disables header compression.
+
+  max_concurrent_streams
+    *(optional, integer)* `Maximum concurrent streams 
+    <http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
+    allowed for peer on one HTTP/2 connection.
+    Valid values range from 1 to 2147483647 (2^31 - 1) and defaults to 2147483647.
+
+.. _config_http_conn_man_http2_settings_initial_stream_window_size:
+
+  initial_stream_window_size
+    *(optional, integer)* `Initial stream-level flow-control window 
+    <http://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
+    (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
+    (256 * 1024 * 1024).
+
+    NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increasing the default window
+    size now, so it's also the minimum.
+
+  initial_connection_window_size
+    *(optional, integer)* Similar to :ref:`initial_stream_window_size 
+    <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control
+    window. Currently , this has the same minimum/maximum/default as :ref:`initial_stream_window_size 
+    <config_http_conn_man_http2_settings_initial_stream_window_size>`.
+
+  These are the same options available in the upstream cluster :ref:`http2_settings
+  <config_cluster_manager_cluster_http2_settings>` option.
 
 .. _config_http_conn_man_server_name:
 

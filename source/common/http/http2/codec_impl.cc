@@ -506,24 +506,59 @@ void ConnectionImpl::sendPendingFrames() {
   }
 }
 
-void ConnectionImpl::sendSettings(uint64_t codec_options) {
-  std::vector<nghttp2_settings_entry> iv = {
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, MAX_CONCURRENT_STREAMS},
-      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, DEFAULT_WINDOW_SIZE}};
+void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
+  ASSERT(http2_settings.hpack_table_size_ <= Http2Settings::MAX_HPACK_TABLE_SIZE);
+  ASSERT(Http2Settings::MIN_MAX_CONCURRENT_STREAMS <= http2_settings.max_concurrent_streams_ &&
+         http2_settings.max_concurrent_streams_ <= Http2Settings::MAX_MAX_CONCURRENT_STREAMS);
+  ASSERT(
+      Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE <= http2_settings.initial_stream_window_size_ &&
+      http2_settings.initial_stream_window_size_ <= Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE);
+  ASSERT(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE <=
+             http2_settings.initial_connection_window_size_ &&
+         http2_settings.initial_connection_window_size_ <=
+             Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE);
 
-  if (codec_options & CodecOptions::NoCompression) {
-    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, 0});
-    conn_log_debug("disabling header compression", connection_);
+  std::vector<nghttp2_settings_entry> iv;
+
+  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
+    conn_log_debug("setting HPACK table size to {}", connection_, http2_settings.hpack_table_size_);
   }
 
-  int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
-  ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
+  if (http2_settings.max_concurrent_streams_ != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
+    iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
+    conn_log_debug("setting max concurrent streams to {}", connection_,
+                   http2_settings.max_concurrent_streams_);
+  }
+
+  if (http2_settings.initial_stream_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
+    iv.push_back(
+        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
+    conn_log_debug("setting stream-level initial window size to {}", connection_,
+                   http2_settings.initial_stream_window_size_);
+  }
+
+  if (!iv.empty()) {
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
+    ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
+  } else {
+    // nghttp2_submit_settings need to be called at least once
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
+    ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
+  }
 
   // Increase connection window size up to our default size.
-  rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
-                                    DEFAULT_WINDOW_SIZE - NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
-  ASSERT(rc == 0);
+  if (http2_settings.initial_connection_window_size_ != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
+    conn_log_debug("updating connection-level initial window size to {}", connection_,
+                   http2_settings.initial_connection_window_size_);
+    int rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
+                                          http2_settings.initial_connection_window_size_ -
+                                              NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
+    ASSERT(rc == 0);
+    UNREFERENCED_PARAMETER(rc);
+  }
 }
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
@@ -602,7 +637,7 @@ ConnectionImpl::Http2Options::Http2Options() {
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
   // calculations. This saves a tremendous amount of memory in cases where there are a large number
-  // of kept alive http/2 connections.
+  // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
 }
 
@@ -610,11 +645,11 @@ ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            ConnectionCallbacks& callbacks, Stats::Scope& stats,
-                                           uint64_t codec_options)
+                                           const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(codec_options);
+  sendSettings(http2_settings);
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
@@ -648,11 +683,11 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Store& stats, uint64_t codec_options)
+                                           Stats::Store& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(codec_options);
+  sendSettings(http2_settings);
 }
 
 int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {

@@ -262,6 +262,31 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["no_compression"]
       },
+      "http2_settings" : {
+        "type" : "object",
+        "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 4294967295
+          },
+          "max_concurrent_streams" : {
+            "type": "integer",
+            "minimum": 1,
+            "maximum" : 2147483647
+          },
+          "initial_stream_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          },
+          "initial_connection_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          }
+        }
+      },
       "server_name" : {"type" : "string"},
       "idle_timeout_s" : {"type" : "integer"},
       "drain_timeout_ms" : {"type" : "integer"},
@@ -1205,7 +1230,35 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["http2"]
       },
-      "http_codec_options" : {"type" : "string"},
+      "http_codec_options" : {
+        "type" : "string",
+        "enum" : ["no_compression"]
+      },
+      "http2_settings" : {
+        "type" : "object",
+        "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 4294967295
+          },
+          "max_concurrent_streams" : {
+            "type": "integer",
+            "minimum": 1,
+            "maximum" : 2147483647
+          },
+          "initial_stream_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          },
+          "initial_connection_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          }
+        }
+      },
       "dns_refresh_rate_ms" : {
         "type" : "integer",
         "minimum" : 0,

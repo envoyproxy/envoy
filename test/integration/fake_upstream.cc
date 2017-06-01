@@ -131,7 +131,8 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
   if (type == Type::HTTP1) {
     codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
   } else {
-    codec_.reset(new Http::Http2::ServerConnectionImpl(connection_, *this, store, 0));
+    codec_.reset(
+        new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));
     ASSERT(type == Type::HTTP2);
   }
 

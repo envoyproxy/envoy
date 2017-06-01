@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
@@ -25,7 +26,21 @@ using testing::NiceMock;
 namespace Http {
 namespace Http2 {
 
-class Http2CodecImplTest : public testing::TestWithParam<uint64_t> {
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
+typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
+
+namespace {
+Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
+  Http2Settings ret;
+  ret.hpack_table_size_ = ::testing::get<0>(tp);
+  ret.max_concurrent_streams_ = ::testing::get<1>(tp);
+  ret.initial_stream_window_size_ = ::testing::get<2>(tp);
+  ret.initial_connection_window_size_ = ::testing::get<3>(tp);
+  return ret;
+}
+}
+
+class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
@@ -44,8 +59,10 @@ public:
   };
 
   Http2CodecImplTest()
-      : client_(client_connection_, client_callbacks_, stats_store_, GetParam()),
-        server_(server_connection_, server_callbacks_, stats_store_, GetParam()),
+      : client_http2settings_(Http2SettingsFromTuple(::testing::get<0>(GetParam()))),
+        client_(client_connection_, client_callbacks_, stats_store_, client_http2settings_),
+        server_http2settings_(Http2SettingsFromTuple(::testing::get<1>(GetParam()))),
+        server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
 
@@ -67,10 +84,12 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  const Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
   ClientConnectionImpl client_;
   ConnectionWrapper client_wrapper_;
+  const Http2Settings server_http2settings_;
   NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
   ServerConnectionImpl server_;
@@ -236,8 +255,30 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
   server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
-INSTANTIATE_TEST_CASE_P(Http2CodecImplTest, Http2CodecImplTest,
-                        testing::Values(0, CodecOptions::NoCompression));
+// we seperate default/edge cases here to avoid combinatorial explosion
+
+#define HTTP2SETTINGS_DEFAULT_COMBIME                                                              \
+  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
+                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
+                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
+                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
+
+INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
+                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBIME,
+                                           HTTP2SETTINGS_DEFAULT_COMBIME));
+
+#define HTTP2SETTINGS_EDGE_COMBIME                                                                 \
+  ::testing::Combine(                                                                              \
+      ::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE), \
+      ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                                 \
+                        Http2Settings::MAX_MAX_CONCURRENT_STREAMS),                                \
+      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
+                        Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
+      ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
+                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
+
+INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
+                        ::testing::Combine(HTTP2SETTINGS_EDGE_COMBIME, HTTP2SETTINGS_EDGE_COMBIME));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

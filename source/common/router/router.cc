@@ -722,7 +722,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   calling_encode_headers_ = false;
 
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for example
-  // in the http/2 codec if the frame cannot be encoded for some reason. This should never happen
+  // in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never happen
   // but it's unclear if we have covered all cases so protect against it and test for it. One
   // specific example of a case where this happens is if we try to encode a total header size that
   // is too big in HTTP/2 (64K currently).
