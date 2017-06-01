@@ -208,7 +208,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
       "connect_timeout_ms": 250,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}, {}]
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     },
     {
       "name": "cluster_2",
