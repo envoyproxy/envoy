@@ -42,8 +42,7 @@ public:
     ~ActiveConnection();
 
   private:
-    static const size_t MAX_PROXY_PROTO_LEN = 56;
-    static const std::string PROXY_TCP4;
+    static const size_t MAX_PROXY_PROTO_LEN = 108;
 
     void onRead();
     void onReadWorker();

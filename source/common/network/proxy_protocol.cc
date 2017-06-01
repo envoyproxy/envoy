@@ -12,14 +12,13 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
-
-const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
 
 ProxyProtocol::ProxyProtocol(Stats::Scope& scope)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
@@ -61,17 +60,49 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
-  if (proxy_line.find(PROXY_TCP4) != 0) {
+  // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
+  // SOURCE_PORT DESTINATION_PORT.
+  const auto line_parts = StringUtil::split(proxy_line, " ", true);
+
+  if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  size_t index = proxy_line.find(" ", PROXY_TCP4.size());
-  if (index == std::string::npos) {
+  Address::IpVersion protocol_version;
+  if (line_parts[1] == "TCP4") {
+    protocol_version = Address::IpVersion::v4;
+  } else if (line_parts[1] == "TCP6") {
+    protocol_version = Address::IpVersion::v6;
+  } else {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  size_t addr_len = index - PROXY_TCP4.size();
-  std::string remote_address = proxy_line.substr(PROXY_TCP4.size(), addr_len);
+  // Error check the source and destination fields. Currently the source port, destination address,
+  // and destination port fields are ignored. Remote address refers to the source address.
+  Address::InstanceConstSharedPtr remote_address = Utility::parseInternetAddress(line_parts[2]);
+  Address::InstanceConstSharedPtr destination_address =
+      Utility::parseInternetAddress(line_parts[3]);
+  const auto remote_version = remote_address->ip()->version();
+  const auto destination_version = destination_address->ip()->version();
+  if (remote_version != protocol_version || destination_version != protocol_version) {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+  uint32_t remote_port, destination_port;
+  try {
+    remote_port = std::stoul(line_parts[4]);
+    destination_port = std::stoul(line_parts[5]);
+    // Check that TCP port value is in range [0, 65535].
+    if (remote_port > 65535 || destination_port > 65535) {
+      throw std::out_of_range("failed to read proxy protocol");
+    }
+  } catch (const std::invalid_argument& ia) {
+    throw EnvoyException(ia.what());
+  } catch (const std::out_of_range& ex) {
+    throw EnvoyException(ex.what());
+  }
+  UNREFERENCED_PARAMETER(remote_port);
+  UNREFERENCED_PARAMETER(destination_port);
 
   ListenerImpl& listener = listener_;
   int fd = fd_;
@@ -80,11 +111,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   removeFromList(parent_.connections_);
 
   // TODO(mattklein123): Parse the remote port instead of passing zero.
-  // TODO(mattklein123): IPv6 support.
-  listener.newConnection(fd,
-                         Network::Address::InstanceConstSharedPtr{
-                             new Network::Address::Ipv4Instance(remote_address, 0)},
-                         listener.socket().localAddress());
+  listener.newConnection(fd, remote_address, listener.socket().localAddress());
 }
 
 void ProxyProtocol::ActiveConnection::close() {
