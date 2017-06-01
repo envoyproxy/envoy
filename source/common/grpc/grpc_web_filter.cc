@@ -16,7 +16,8 @@ const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr &&
-      Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str()) {
+      (Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str() ||
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto == content_type->value().c_str())) {
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
@@ -24,7 +25,8 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
 
   const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
   if (accept != nullptr &&
-      Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str()) {
+      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str() ||
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto == accept->value().c_str())) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }
@@ -64,9 +66,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (is_text_response_) {
-    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebText);
+    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
-    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWeb);
+    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
   return Http::FilterHeadersStatus::Continue;
 }
