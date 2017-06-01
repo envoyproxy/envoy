@@ -209,8 +209,8 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   IpTaggingFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(HttpFilterType::Decoder,
-                                                          *json_config, "stats", server);
+  HttpFilterFactoryCb cb =
+      factory.createFilterFactory(HttpFilterType::Decoder, *json_config, "stats", server);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -230,8 +230,7 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   IpTaggingFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(HttpFilterType::Decoder, *json_config,
-                                              "stats", server),
+  EXPECT_THROW(factory.createFilterFactory(HttpFilterType::Decoder, *json_config, "stats", server),
                Json::Exception);
 }
 
