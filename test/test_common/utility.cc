@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
@@ -22,6 +23,7 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
     return false;
@@ -118,6 +120,12 @@ ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
 namespace Http {
+
+// Satisfy linker
+const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
+const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
+const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 
 TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
 

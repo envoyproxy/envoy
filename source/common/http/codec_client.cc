@@ -128,7 +128,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   }
   case Type::HTTP2: {
     codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, host->cluster().statsScope(),
-                                                 host->cluster().httpCodecOptions()));
+                                                 host->cluster().http2Settings()));
     break;
   }
   }

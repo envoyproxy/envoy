@@ -15,9 +15,6 @@
 namespace Envoy {
 namespace Http {
 
-// Satisfy linker
-const uint64_t CodecOptions::NoCompression;
-
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
@@ -90,21 +87,62 @@ TEST(HttpUtility, createSslRedirectPath) {
   }
 }
 
-TEST(HttpUtility, parseCodecOptions) {
+TEST(HttpUtility, parseHttp2Settings) {
   {
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString("{}");
-    EXPECT_EQ(0UL, Utility::parseCodecOptions(*json));
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString("{}"));
+    EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+              http2_settings.initial_stream_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_settings.initial_connection_window_size_);
   }
 
   {
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
-    EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(*json));
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
+                                          "http2_settings" : {
+                                            "hpack_table_size": 1,
+                                            "max_concurrent_streams": 2,
+                                            "initial_stream_window_size": 3,
+                                            "initial_connection_window_size": 4
+                                          }
+                                        })raw"));
+    EXPECT_EQ(1U, http2_settings.hpack_table_size_);
+    EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(3U, http2_settings.initial_stream_window_size_);
+    EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
   }
 
   {
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
-    EXPECT_THROW(Utility::parseCodecOptions(*json), EnvoyException);
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
+                                          "http_codec_options": "no_compression"
+                                        })raw"));
+    EXPECT_EQ(0, http2_settings.hpack_table_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+              http2_settings.initial_stream_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+              http2_settings.initial_connection_window_size_);
+  }
+
+  {
+    auto json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
+    EXPECT_THROW_WITH_MESSAGE(Utility::parseHttp2Settings(*json), EnvoyException,
+                              "unknown http codec option 'foo'");
+  }
+
+  {
+    auto json = Json::Factory::loadFromString(R"raw({
+                                          "http_codec_options": "no_compression",
+                                          "http2_settings" : {
+                                            "hpack_table_size": 1
+                                          }
+                                        })raw");
+    EXPECT_THROW_WITH_MESSAGE(
+        Utility::parseHttp2Settings(*json), EnvoyException,
+        "'http_codec_options.no_compression' conflicts with 'http2_settings.hpack_table_size'");
   }
 }
 

@@ -75,7 +75,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
           config.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
       stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
       stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
-      http_codec_options_(Http::Utility::parseCodecOptions(config)),
+      http2_settings_(Http::Utility::parseHttp2Settings(config)),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
 

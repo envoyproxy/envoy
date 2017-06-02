@@ -9,3 +9,4 @@ The following features have been DEPRECATED and will be removed in the specified
   * Config option `statsd_local_udp_port` has been deprecated and has been replaced with
   `statsd_udp_ip_address`.
   * `HttpFilterConfigFactory` filter API has been deprecated in favor of `NamedHttpFilterConfigFactory`.
+  * Config option `http_codec_options` has been deprecated and has been replaced with `http2_settings`.

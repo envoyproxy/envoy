@@ -64,10 +64,10 @@ public:
   static bool isInternalRequest(const HeaderMap& headers);
 
   /**
-   * @return uint64_t parse a "http_codec_options" JSON field and turn it into a bitmask of
-   *         CodecOption values.
+   * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
+   *         "http2_settings" JSON fields.
    */
-  static uint64_t parseCodecOptions(const Json::Object& config);
+  static Http2Settings parseHttp2Settings(const Json::Object& config);
 
   /**
    * Create a locally generated response using filter callbacks.

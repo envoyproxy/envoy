@@ -122,6 +122,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
+        "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:libevent_lib",
         "//source/common/ssl:connection_lib",
