@@ -88,8 +88,8 @@ def envoy_api_deps(skip_targets):
         commit = "959278cc35a89a4d2f1895f66a59c6b3de98d5e1",
     )
     native.bind(
-        name = "envoy_cc_api",
-        actual = "@envoy_api_git//api:api_cc",
+        name = "envoy_eds",
+        actual = "@envoy_api_git//api:eds",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
