@@ -50,6 +50,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_tagging_filter_lib",
+    srcs = ["ip_tagging_filter.cc"],
+    hdrs = ["ip_tagging_filter.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_validator_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     deps = [

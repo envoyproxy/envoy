@@ -99,6 +99,13 @@ the header value to *true*.
 
 This is a convenience to avoid having to parse and understand XFF.
 
+.. _config_http_conn_man_headers_x-envoy-ip-tags:
+
+x-envoy-ip-tags
+---------------
+
+This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
+
 .. _config_http_conn_man_headers_x-forwarded-for:
 
 x-forwarded-for
