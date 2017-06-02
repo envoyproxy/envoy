@@ -332,6 +332,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
   EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+
+  // Uncomment either of these lines and the test fails
+  //   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(span));
+  //   delete span;
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
