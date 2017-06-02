@@ -52,7 +52,6 @@ public:
                                   ResolveCb callback) PURE;
 };
 
-typedef std::unique_ptr<DnsResolver> DnsResolverPtr;
 typedef std::shared_ptr<DnsResolver> DnsResolverSharedPtr;
 
 } // Network
