@@ -249,7 +249,8 @@ TEST(DnsImplConstructor, SupportsCustomResolvers) {
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
   auto resolver = dispatcher.createDnsResolver({addr4, addr6});
-  auto peer = std::unique_ptr<DnsResolverImplPeer>{new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
+  auto peer = std::unique_ptr<DnsResolverImplPeer>{
+      new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
