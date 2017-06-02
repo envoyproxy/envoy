@@ -117,6 +117,12 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
 
+  // We make this a shared pointer to deal with the distinct ownership
+  // scenarios that can exist: in one case, we pass in the "default"
+  // DNS resolver that is owned by the Server::Instance. In the case
+  // where 'dns_resolvers' is specified, we have per-cluster DNS
+  // resolvers that are created here but ownership resides with
+  // StrictDnsClusterImpl/LogicalDnsCluster.
   auto selected_dns_resolver = dns_resolver;
   if (cluster.hasObject("dns_resolvers")) {
     auto resolver_addrs = cluster.getStringArray("dns_resolvers");
