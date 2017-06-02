@@ -119,9 +119,17 @@ TEST(StringUtil, split) {
 }
 
 TEST(StringUtil, join) {
-  EXPECT_EQ("hello,world", StringUtil::join(std::vector<std::string>{"hello", "world"}, ","));
-  EXPECT_EQ("hello", StringUtil::join(std::vector<std::string>{"hello"}, ","));
-  EXPECT_EQ("", StringUtil::join(std::vector<std::string>{}, ","));
+  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
+  EXPECT_EQ("", StringUtil::join({}, ","));
+
+  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
+  EXPECT_EQ("", StringUtil::join({}, ""));
+
+  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
+  EXPECT_EQ("", StringUtil::join({}, ",,"));
 }
 
 TEST(StringUtil, endsWith) {
