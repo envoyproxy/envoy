@@ -157,6 +157,12 @@ envoy_cc_library(
     ],
 )
 
+# Placeholder that just links API protos for now.
+envoy_cc_library(
+    name = "eds_lib",
+    external_deps = ["envoy_eds"],
+)
+
 envoy_cc_library(
     name = "sds_lib",
     srcs = ["sds.cc"],
