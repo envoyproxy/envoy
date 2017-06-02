@@ -123,6 +123,7 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
   return ret;
 }
 
+// TODO: templatize this, no reason it needs to always be strings
 std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
   std::ostringstream buf;
   std::copy(source.begin(), source.end(),
