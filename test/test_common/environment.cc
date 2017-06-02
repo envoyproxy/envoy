@@ -155,7 +155,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   case Network::Address::IpVersion::v6:
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
   }
-  // std::cout << out_json_string << std::endl;
+
   // Substitute paths.
   out_json_string = substitute(out_json_string);
   const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
