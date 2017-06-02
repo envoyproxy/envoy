@@ -5,6 +5,7 @@ namespace Envoy {
 class EchoIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  EchoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**
     * Initializer for an individual test.
     */
@@ -13,7 +14,7 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, GetParam()));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/echo_server.json", {"echo"}, GetParam());
+    createTestServer("test/config/integration/echo_server.json", {"echo"});
   }
 
   /**

@@ -9,6 +9,7 @@ namespace Envoy {
 class IntegrationAdminTest : public BaseIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  IntegrationAdminTest() : BaseIntegrationTest(GetParam()) {}
   /**
    * Initializer for an individual test.
    */
@@ -18,7 +19,7 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, GetParam()));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server.json",
-                     {"http", "http_buffer", "tcp_proxy", "rds"}, GetParam());
+                     {"http", "http_buffer", "tcp_proxy", "rds"});
   }
 
   /**

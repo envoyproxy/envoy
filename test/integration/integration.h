@@ -151,7 +151,7 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   BaseIntegrationTest();
   ~BaseIntegrationTest();
-
+  BaseIntegrationTest(Network::Address::IpVersion version);
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
    */
@@ -161,73 +161,50 @@ public:
     }
   }
 
-  Network::ClientConnectionPtr
-  makeClientConnection(uint32_t port,
-                       Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
-  IntegrationCodecClientPtr
-  makeHttpConnection(uint32_t port, Http::CodecClient::Type type,
-                     Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  IntegrationCodecClientPtr
-  makeHttpConnection(Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-                     Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  IntegrationTcpClientPtr
-  makeTcpConnection(uint32_t port,
-                    Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+  IntegrationCodecClientPtr makeHttpConnection(uint32_t port, Http::CodecClient::Type type);
+  IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn,
+                                               Http::CodecClient::Type type);
+  IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
-  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names,
-                        Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
 
 protected:
-  void testRouterRedirect(Http::CodecClient::Type type,
-                          Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterNotFound(Http::CodecClient::Type type,
-                          Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void
-  testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type,
-                             Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterRequestAndResponseWithBody(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, uint64_t request_size,
-      uint64_t response_size, bool big_header,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterHeaderOnlyRequestAndResponse(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterUpstreamDisconnectBeforeRequestComplete(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterUpstreamDisconnectBeforeResponseComplete(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterDownstreamDisconnectBeforeRequestComplete(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterDownstreamDisconnectBeforeResponseComplete(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRouterUpstreamResponseBeforeRequestComplete(
-      Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type,
-      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testTwoRequests(Http::CodecClient::Type type,
-                       Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testBadHttpRequest(Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testHttp10Request(Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testNoHost(Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void
-  testUpstreamProtocolError(Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testBadPath(Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testDrainClose(Http::CodecClient::Type type,
-                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  void testRetry(Http::CodecClient::Type type,
-                 Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+  void testRouterRedirect(Http::CodecClient::Type type);
+  void testRouterNotFound(Http::CodecClient::Type type);
+  void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
+  void testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
+                                            Http::CodecClient::Type type, uint64_t request_size,
+                                            uint64_t response_size, bool big_header);
+  void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
+                                              Http::CodecClient::Type type);
+  void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
+                                                         Http::CodecClient::Type type);
+  void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
+                                                          Http::CodecClient::Type type);
+  void testRouterDownstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
+                                                           Http::CodecClient::Type type);
+  void testRouterDownstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
+                                                            Http::CodecClient::Type type);
+  void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
+                                                       Http::CodecClient::Type type);
+  void testTwoRequests(Http::CodecClient::Type type);
+  void testBadHttpRequest();
+  void testHttp10Request();
+  void testNoHost();
+  void testUpstreamProtocolError();
+  void testBadPath();
+  void testDrainClose(Http::CodecClient::Type type);
+  void testRetry(Http::CodecClient::Type type);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
@@ -237,5 +214,6 @@ protected:
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
+  Network::Address::IpVersion version_;
 };
 } // Envoy
