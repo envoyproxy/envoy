@@ -68,6 +68,8 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  Http::ForwardClientCertType forwardClientCert() override { return Http::ForwardClientCertType::Sanitize; }
+  const std::list<Http::ClientCertDetailsType> setClientCertDetails() override { return set_client_cert_details_; }
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
@@ -133,6 +135,7 @@ private:
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
+  std::list<Http::ClientCertDetailsType> set_client_cert_details_;
 };
 
 /**

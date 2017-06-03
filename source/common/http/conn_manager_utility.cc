@@ -131,6 +131,41 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   if (config.tracingConfig()) {
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
+
+
+  if (connection.ssl() || config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
+    std::string clientCertDetails = "";
+    if (config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly ||
+        config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
+      clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
+      for (auto detail : config.setClientCertDetails()) {
+        if (detail == Http::ClientCertDetailsType::Subject) {
+          // TODO. Get Cert Subject.
+        } else if (detail == Http::ClientCertDetailsType::SAN) {
+          clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
+        }
+      }
+    }
+    switch (config.forwardClientCert()) {
+      case Http::ForwardClientCertType::ForwardOnly:
+      case Http::ForwardClientCertType::AlwaysForwardOnly:
+        break;
+      case Http::ForwardClientCertType::AppendForward:
+        // Get the Cert info.
+        request_headers.ForwardedClientCert()->value().append(
+            clientCertDetails.c_str(), clientCertDetails.length());
+        break;
+      case Http::ForwardClientCertType::Sanitize:
+        request_headers.removeForwardedClientCert();
+        break;
+      case Http::ForwardClientCertType::SanitizeSet:
+        request_headers.removeForwardedClientCert();
+        request_headers.insertForwardedClientCert().value(
+            clientCertDetails.c_str(), clientCertDetails.length());
+    }
+  } else {
+    request_headers.removeForwardedClientCert();
+  }
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
