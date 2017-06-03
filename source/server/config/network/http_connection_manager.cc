@@ -91,6 +91,36 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     use_remote_address_ = config.getBoolean("use_remote_address");
   }
 
+  if (config.hasObject("forward_client_cert")) {
+    // TODO: Checki mTLS.
+    const std::string forward_client_cert = config.getString("forward_client_Cert");
+    if (forward_client_cert == "forward_only") {
+      forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
+    } else if (forward_client_cert == "append_forward") {
+      forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
+    } else if (forward_client_cert == "sanitize_set") {
+      forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
+    } else if (forward_client_cert == "sanitize") {
+      forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
+    } else {
+      ASSERT(forward_client_cert == "always_forward_only");
+      forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
+    }
+  } else {
+    forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
+  }
+
+  if (config.hasObject("set_client_cert_details")) {
+    for (const std::string detail : config.getStringArray("set_client_cert_details")) {
+      if (detail == "Subject") {
+        set_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
+      } else {
+        ASSERT(detail == "SAN");
+        set_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
+      }
+    }
+  }
+
   if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
     user_agent_.value(server.localInfo().clusterName());
   }
