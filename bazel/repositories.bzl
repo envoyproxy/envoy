@@ -83,13 +83,13 @@ def python_deps(skip_targets):
 def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
-        name = "envoy_api_git",
+        name = "envoy_api",
         remote = "https://github.com/lyft/envoy-api.git",
-        commit = "959278cc35a89a4d2f1895f66a59c6b3de98d5e1",
+        commit = "7506a93e2cbe4a987af5b9ff489462959697c121",
     )
     native.bind(
         name = "envoy_eds",
-        actual = "@envoy_api_git//api:eds",
+        actual = "@envoy_api//api:eds",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
