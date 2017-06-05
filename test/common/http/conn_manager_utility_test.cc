@@ -395,7 +395,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
-TEST_F(ConnectionManagerUtilityTest, SanitizeClientCertWhenSet) {
+TEST_F(ConnectionManagerUtilityTest, SanitizeClientCert) {
   ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
   ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
@@ -405,7 +405,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeClientCertWhenSet) {
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
-TEST_F(ConnectionManagerUtilityTest, SanitizeClientCertForwardWithoutSSL) {
+TEST_F(ConnectionManagerUtilityTest, SanitizeClientCertWhenForwardWithoutSSL) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
   ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
@@ -422,27 +422,66 @@ TEST_F(ConnectionManagerUtilityTest, ForwardClientCert) {
   ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=test://identity;BY=tester"}};
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("SAN=test://identity;BY=tester", headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, AlwaysForwardClientCertWithoutSSL) {
+  ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
+  ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
+  ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
+
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, AppendForwardClientCert) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client also sends the XFCC
+  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
   Ssl::MockConnection ssl;
-  ON_CALL(ssl, uriSanPeerCertificate()).WillByDefault(Return("test://foo.com/backend"));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
   std::list<Http::ClientCertDetailsType> details = std::list<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(details));
 
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=test://foo.com/frontend;BY=tester"}};
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("SAN=test://foo.com/frontend;BY=tester,SAN=test://foo.com/backend", headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be,BY=test://foo.com/be;Hash=abcdefg;SAN=test://foo.com/fe",
+      headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeSetClientCert) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client also sends the XFCC
+  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
+  Ssl::MockConnection ssl;
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert()).WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::list<Http::ClientCertDetailsType> details = std::list<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(details));
+
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("BY=test://foo.com/be;Hash=abcdefg;SAN=test://foo.com/fe", headers.get_("x-forwarded-client-cert"));
 }
 
 } // Http

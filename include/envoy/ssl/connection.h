@@ -15,6 +15,12 @@ public:
   virtual ~Connection() {}
 
   /**
+   * @return the uri in the SAN feld of the local certificate. Returns "" if there is no local
+   *         certificate, or no SAN field, or no uri.
+   **/
+  virtual std::string uriSanLocalCertificate() PURE;
+
+  /**
    * @return the SHA256 digest of the peer certificate. Returns "" if there is no peer certificate
    *         which can happen in the case of server side connections.
    */

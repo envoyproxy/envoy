@@ -135,14 +135,21 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
   if (connection.ssl() || config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
     std::string clientCertDetails = "";
-    if (config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly ||
+    if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||
         config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
-      clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
+      // In these cases, the client cert in the current hop should be set into the XFCC header.
+      if (!connection.ssl()->uriSanLocalCertificate().empty()) {
+        clientCertDetails += "BY=" + connection.ssl()->uriSanLocalCertificate();
+      }
+      if (!connection.ssl()->sha256PeerCertificateDigest().empty()) {
+        clientCertDetails += ";Hash=" + connection.ssl()->sha256PeerCertificateDigest();
+      }
       for (auto detail : config.setClientCertDetails()) {
         if (detail == Http::ClientCertDetailsType::Subject) {
           // TODO. Get Cert Subject.
         } else if (detail == Http::ClientCertDetailsType::SAN) {
-          clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
+          // Currently, we only support a single SAN field.
+          clientCertDetails += ";SAN=" + connection.ssl()->uriSanPeerCertificate();
         }
       }
     }
@@ -152,6 +159,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
         break;
       case Http::ForwardClientCertType::AppendForward:
         // Get the Cert info.
+        if (!request_headers.ForwardedClientCert()->value().empty()) {
+            request_headers.ForwardedClientCert()->value().append(",", 1);
+        }
         request_headers.ForwardedClientCert()->value().append(
             clientCertDetails.c_str(), clientCertDetails.length());
         break;
