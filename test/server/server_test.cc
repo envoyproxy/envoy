@@ -38,11 +38,12 @@ TEST(InitManagerImplTest, Targets) {
 }
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public testing::Test {
+class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest()
       : options_(TestEnvironment::temporaryFileSubstitute("test/config/integration/server.json",
-                                                          {{"upstream_0", 0}, {"upstream_1", 0}})),
+                                                          {{"upstream_0", 0}, {"upstream_1", 0}},
+                                                          GetParam())),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
                 local_info_) {}
   void TearDown() override {
@@ -60,8 +61,15 @@ protected:
   InstanceImpl server_;
 };
 
-TEST_F(ServerInstanceImplTest, NoListenSocketFds) {
-  EXPECT_EQ(server_.getListenSocketFd("tcp://255.255.255.255:80"), -1);
+INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ServerInstanceImplTest, NoListenSocketFds) {
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    EXPECT_EQ(server_.getListenSocketFd("tcp://255.255.255.255:80"), -1);
+  } else {
+    EXPECT_EQ(server_.getListenSocketFd("tcp://[ff00::]:80"), -1);
+  }
 }
 
 } // Server

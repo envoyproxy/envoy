@@ -54,7 +54,7 @@ public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+                      Network::Address::IpVersion version);
   ~RawConnectionDriver();
   void run();
   void close();
@@ -100,7 +100,6 @@ public:
   static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
-                    Network::Address::IpVersion version = Network::Address::IpVersion::v4,
-                    const std::string& host = "host");
+                    Network::Address::IpVersion version, const std::string& host = "host");
 };
 } // Envoy

@@ -200,9 +200,9 @@ typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
 class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::FilterChainFactory {
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
-               Network::Address::IpVersion version = Network::Address::IpVersion::v4);
-  FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type);
+  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version);
+  FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type,
+               Network::Address::IpVersion version);
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }

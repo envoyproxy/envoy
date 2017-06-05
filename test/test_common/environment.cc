@@ -54,7 +54,7 @@ void TestEnvironment::initializeOptions(int argc, char** argv) {
   argv_ = argv;
 }
 
-bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersion& type) {
+bool TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion type) {
   const char* value = ::getenv("ENVOY_IP_TEST_VERSIONS");
   std::string option(value ? value : "");
   if (option.empty()) {

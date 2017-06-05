@@ -8,6 +8,8 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "test/test_common/network_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
@@ -23,16 +25,16 @@ void SslIntegrationTest::SetUp() {
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, GetParam()));
   registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
   fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, GetParam()));
   registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
   // TODO(hennna): Add IPv6 support.
   test_server_ = MockRuntimeIntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute("test/config/integration/server_ssl.json",
-                                               port_map_),
-      Network::Address::IpVersion::v4);
+      TestEnvironment::temporaryFileSubstitute("test/config/integration/server_ssl.json", port_map_,
+                                               GetParam()),
+      GetParam());
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslContext(false, false);
   client_ssl_ctx_alpn_ = createClientSslContext(true, false);
@@ -116,87 +118,98 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
+                                   ":" + std::to_string(lookupPort("http")));
   if (alpn) {
     return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_,
-        Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http"))));
+        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_, address);
   } else {
     return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_,
-        Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http"))));
+        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_, address);
   }
 }
 
 void SslIntegrationTest::checkStats() {
-  Stats::Counter& counter = test_server_->store().counter("listener.127.0.0.1_0.ssl.handshake");
-  EXPECT_EQ(1U, counter.value());
-  counter.reset();
+  if (version_ == Network::Address::IpVersion::v4) {
+    Stats::Counter& counter = test_server_->store().counter("listener.127.0.0.1_0.ssl.handshake");
+    EXPECT_EQ(1U, counter.value());
+    counter.reset();
+  } else {
+    // ':' is a reserved char in statsd.
+    Stats::Counter& counter = test_server_->store().counter("listener.[__1]_0.ssl.handshake");
+    EXPECT_EQ(1U, counter.value());
+    counter.reset();
+  }
 }
 
-TEST_F(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false),
                                        Http::CodecClient::Type::HTTP1, 16 * 1024 * 1024,
                                        16 * 1024 * 1024, false);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(true, false),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVierfySAN) {
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVierfySAN) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false, true),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
+TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(true, true),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
+TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   testRouterHeaderOnlyRequestAndResponse(makeSslClientConnection(false, false),
                                          Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+TEST_P(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false),
                                                      Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete(makeSslClientConnection(false, false),
                                                       Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false),
                                                        Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
-TEST_F(SslIntegrationTest, AdminCertEndpoint) {
+TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
+      lookupPort("admin"), "GET", "/certs", "", Http::CodecClient::Type::HTTP1, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-TEST_F(SslIntegrationTest, AltAlpn) {
+TEST_P(SslIntegrationTest, AltAlpn) {
   // Connect with ALPN, but we should end up using HTTP/1.
   MockRuntimeIntegrationTestServer* server =
       dynamic_cast<MockRuntimeIntegrationTestServer*>(test_server_.get());

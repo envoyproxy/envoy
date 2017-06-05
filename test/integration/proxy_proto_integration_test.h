@@ -10,13 +10,15 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class ProxyProtoIntegrationTest : public BaseIntegrationTest, public testing::Test {
+class ProxyProtoIntegrationTest : public BaseIntegrationTest,
+                                  public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  ProxyProtoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**
    * Initializer for an individual test.
    */
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, GetParam()));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server_proxy_proto.json", {"http"});
   }
