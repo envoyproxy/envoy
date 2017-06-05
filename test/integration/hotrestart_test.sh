@@ -13,6 +13,7 @@ cat "${TEST_RUNDIR}"/test/config/integration/server.json |
   sed -e "s#{{ upstream_. }}#0#g" | \
   sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ dns_lookup_family }}#v4_only#" | \
   cat > "${HOT_RESTART_JSON}"
 
 # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart

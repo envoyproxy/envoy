@@ -5,10 +5,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class IntegrationTest : public BaseIntegrationTest,
-                        public testing::TestWithParam<Network::Address::IpVersion> {
+
+class IntegrationAdminTest : public BaseIntegrationTest,
+                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  IntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  IntegrationAdminTest() : BaseIntegrationTest(GetParam()) {}
   /**
    * Initializer for an individual test.
    */
@@ -29,4 +30,5 @@ public:
     fake_upstreams_.clear();
   }
 };
+
 } // Envoy

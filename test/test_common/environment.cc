@@ -118,15 +118,9 @@ std::string TestEnvironment::substitute(const std::string str) {
   return out_json_string;
 }
 
-// TODO(hennna): Deprecate when IPv6 test support is finished.
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
-                                                     const PortMap& port_map) {
-  return TestEnvironment::temporaryFileSubstitute(path, Network::Address::IpVersion::v4, port_map);
-}
-
-std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
-                                                     const Network::Address::IpVersion& version,
-                                                     const PortMap& port_map) {
+                                                     const PortMap& port_map,
+                                                     Network::Address::IpVersion version) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
   const std::string json_path = TestEnvironment::runfilesPath(path);
@@ -152,6 +146,16 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
                                        Network::Test::getLoopbackAddressUrlString(version));
+
+  // Substitute dns lookup family.
+  const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");
+  switch (version) {
+  case Network::Address::IpVersion::v4:
+    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v4_only");
+  case Network::Address::IpVersion::v6:
+    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
+  }
+
   // Substitute paths.
   out_json_string = substitute(out_json_string);
   const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");

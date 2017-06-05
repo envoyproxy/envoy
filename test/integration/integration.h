@@ -112,7 +112,8 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port);
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+                       Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   void close();
   const std::string& data() { return data_; }
@@ -150,7 +151,7 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   BaseIntegrationTest();
   ~BaseIntegrationTest();
-
+  BaseIntegrationTest(Network::Address::IpVersion version);
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
    */
@@ -172,10 +173,7 @@ public:
   uint32_t lookupPort(const std::string& key);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
-  // TODO(hennna): Deprecate when IPv6 test support is finished.
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
-  void createTestServer(const std::string& json_path, const Network::Address::IpVersion version,
-                        const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -216,5 +214,6 @@ protected:
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
+  Network::Address::IpVersion version_;
 };
 } // Envoy
