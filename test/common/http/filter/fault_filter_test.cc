@@ -56,7 +56,7 @@ public:
         "fixed_delay_percent" : 100,
         "fixed_duration_ms" : 5000
       },
-      "match_downstream_cluster": true
+      "downstream_cluster_specific_settings": true
     }
     )EOF";
 

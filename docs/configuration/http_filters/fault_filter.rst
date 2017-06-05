@@ -41,7 +41,7 @@ including the router filter.*
       "delay" : "{...}",
       "upstream_cluster" : "...",
       "headers" : [],
-      "match_downstream_cluster": false,
+      "downstream_cluster_specific_settings": "...",
       "downstream_nodes": []
     }
   }
@@ -68,9 +68,9 @@ upstream_cluster:
   the config are present in the request with the same values (or based on presence if the ``value``
   field is not in the config).
 
-.. _config_http_filters_fault_injection_match_downstream_cluster:
+.. _config_http_filters_fault_injection_downstream_cluster:
 
-match_downstream_cluster:
+downstream_cluster_specific_settings:
   *(optional, boolean)* Specifies whether downstream specific settings for the delays and aborts
   need to be read from the runtime.
   See details :ref:`here <config_http_filters_fault_injection_runtime_downstream_cluster>`.
@@ -158,13 +158,13 @@ http.fault.delay.fixed_duration_ms
 
 .. _config_http_filters_fault_injection_runtime_downstream_cluster:
 
-When :ref:`match downstream cluster <config_http_filters_fault_injection_match_downstream_cluster>`
+When :ref:`downstream cluster specific settings <config_http_filters_fault_injection_downstream_cluster>`
 is set to true, fault filter runtime settings are read from the cluster specific runtime directories:
 * http.fault.<downstream-cluster>.abort.abort_percent
 * http.fault.<downstream-cluster>.abort.http_status
 * http.fault.<downstream-cluster>.delay.fixed_delay_percent
 * http.fault.<downstream-cluster>.delay.fixed_duration_ms
-In case the following settings are not found in the runtime it defaults to the config settings.
+If the following settings are not found in the runtime it defaults to the config settings.
 
 Statistics
 ----------

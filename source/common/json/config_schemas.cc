@@ -852,7 +852,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
             "type": "string"
           }
         },
-        "match_downstream_cluster": {
+        "downstream_cluster_specific_settings": {
           "type": "boolean"
         },
       "headers" : {

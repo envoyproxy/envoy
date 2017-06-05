@@ -49,7 +49,7 @@ public:
   const std::string& upstreamCluster() { return upstream_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
-  bool matchDownstreamCluster() { return match_downstream_cluster_; }
+  bool downstreamClusterSpecificSettings() { return downstream_cluster_specific_settings_; }
   std::unordered_set<std::string>& downstreamNodes() { return downstream_nodes_; }
   const std::string& statsPrefix() { return stats_prefix_; }
   Stats::Store& statsStore() { return store_; }
@@ -63,7 +63,8 @@ private:
   uint64_t fixed_duration_ms_{};   // in milliseconds
   std::string upstream_cluster_;   // restrict faults to specific upstream cluster
   std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
-  bool match_downstream_cluster_{}; // By default do not match against downstream cluster.
+  bool downstream_cluster_specific_settings_{}; // By default do not use per downstream cluster
+                                                // settings.
   std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
                                                        // nodes. If not set then inject for all.
   Runtime::Loader& runtime_;

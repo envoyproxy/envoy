@@ -60,7 +60,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 
-  match_downstream_cluster_ = json_config.getBoolean("match_downstream_cluster", false);
+  downstream_cluster_specific_settings_ =
+      json_config.getBoolean("downstream_cluster_specific_settings", false);
 
   if (json_config.hasObject("downstream_nodes")) {
     std::vector<std::string> nodes = json_config.getStringArray("downstream_nodes");
@@ -90,7 +91,7 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  if (config_->matchDownstreamCluster()) {
+  if (config_->downstreamClusterSpecificSettings()) {
     if (headers.EnvoyDownstreamServiceCluster()) {
       downstream_cluster_ = headers.EnvoyDownstreamServiceCluster()->value().c_str();
 
