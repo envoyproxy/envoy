@@ -101,7 +101,8 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, const Network::Address::
   dispatcher_ = api_->allocateDispatcher();
   client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
-  client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
+  client_->addReadFilter(
+      Network::ReadFilterSharedPtr{new ForwardingFilter(*this, std::move(data_callback))});
   client_->write(initial_data);
   client_->connect();
 }
@@ -109,7 +110,8 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, const Network::Address::
 // TODO(hennna): Deprecate when IPv6 test support is finished.
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback)
-    : RawConnectionDriver(port, Network::Address::IpVersion::v4, initial_data, data_callback) {}
+    : RawConnectionDriver(port, Network::Address::IpVersion::v4, initial_data,
+                          std::move(data_callback)) {}
 
 RawConnectionDriver::~RawConnectionDriver() {}
 

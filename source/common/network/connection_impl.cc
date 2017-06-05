@@ -50,8 +50,9 @@ const Address::InstanceConstSharedPtr
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address)
-    : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
-      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
+    : filter_manager_(*this, *this), remote_address_(std::move(remote_address)),
+      local_address_(std::move(local_address)), dispatcher_(dispatcher), fd_(fd),
+      id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.

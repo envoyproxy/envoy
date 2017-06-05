@@ -55,7 +55,7 @@ public:
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Runtime::RandomGenerator& random_generator)
-      : service_name_(service_name), address_(address), reporter_(nullptr),
+      : service_name_(service_name), address_(std::move(address)), reporter_(nullptr),
         random_generator_(random_generator) {}
 
   /**

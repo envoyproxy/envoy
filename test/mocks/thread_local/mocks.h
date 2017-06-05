@@ -27,8 +27,8 @@ public:
 
   uint32_t allocateSlot_() { return current_slot_++; }
   ThreadLocalObjectSharedPtr get_(uint32_t index) { return data_[index]; }
-  void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void set_(uint32_t index, InitializeCb cb) { data_[index] = cb(dispatcher_); }
+  void runOnAllThreads_(const Event::PostCb& cb) { cb(); }
+  void set_(uint32_t index, const InitializeCb& cb) { data_[index] = cb(dispatcher_); }
   void shutdownThread_() {
     for (auto& entry : data_) {
       entry.second->shutdown();

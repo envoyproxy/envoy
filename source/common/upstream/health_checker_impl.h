@@ -289,7 +289,7 @@ private:
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
     TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, HostSharedPtr host)
-        : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+        : ActiveHealthCheckSession(parent, std::move(host)), parent_(parent) {}
     ~TcpActiveHealthCheckSession();
 
     void onData(Buffer::Instance& data);

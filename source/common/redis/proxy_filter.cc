@@ -33,7 +33,7 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 ProxyFilter::ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder,
                          CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config) {
+      config_(std::move(config)) {
   config_->stats().downstream_cx_total_.inc();
   config_->stats().downstream_cx_active_.inc();
 }

@@ -13,7 +13,7 @@ namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host)
-    : type_(type), connection_(std::move(connection)), host_(host) {
+    : type_(type), connection_(std::move(connection)), host_(std::move(host)) {
 
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});

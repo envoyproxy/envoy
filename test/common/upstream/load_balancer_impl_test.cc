@@ -22,7 +22,7 @@ namespace Upstream {
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1) {
   return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, "")};
+      new HostImpl(std::move(cluster), "", Network::Utility::resolveUrl(url), false, weight, "")};
 }
 
 class RoundRobinLoadBalancerTest : public testing::Test {

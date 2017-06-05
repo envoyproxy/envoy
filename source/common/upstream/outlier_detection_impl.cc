@@ -25,7 +25,8 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                         EventLoggerSharedPtr event_logger) {
   if (cluster_config.hasObject("outlier_detection")) {
     return DetectorImpl::create(cluster, *cluster_config.getObject("outlier_detection"), dispatcher,
-                                runtime, ProdMonotonicTimeSource::instance_, event_logger);
+                                runtime, ProdMonotonicTimeSource::instance_,
+                                std::move(event_logger));
   } else {
     return nullptr;
   }
@@ -90,8 +91,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_conf
     : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
-}
+      event_logger_(std::move(event_logger)), success_rate_average_(-1),
+      success_rate_ejection_threshold_(-1) {}
 
 DetectorImpl::~DetectorImpl() {
   for (auto host : host_sinks_) {
@@ -106,8 +107,8 @@ std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger) {
-  std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, json_config, dispatcher, runtime, time_source, event_logger));
+  std::shared_ptr<DetectorImpl> detector(new DetectorImpl(cluster, json_config, dispatcher, runtime,
+                                                          time_source, std::move(event_logger)));
   detector->initialize(cluster);
   return detector;
 }

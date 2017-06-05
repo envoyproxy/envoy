@@ -43,7 +43,7 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void SetUpTest(const std::string json) {
+  void SetUpTest(const std::string& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_, cm_));
 

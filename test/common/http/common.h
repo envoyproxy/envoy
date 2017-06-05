@@ -19,8 +19,8 @@ public:
 
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
                      DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host),
-        destroy_cb_(destroy_cb) {
+      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), std::move(host)),
+        destroy_cb_(std::move(destroy_cb)) {
     codec_.reset(codec);
   }
 

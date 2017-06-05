@@ -135,7 +135,7 @@ void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host) {
   Http::HeaderMapImpl fake_response_headers{
       {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
-  chargeUpstreamCode(fake_response_headers, upstream_host);
+  chargeUpstreamCode(fake_response_headers, std::move(upstream_host));
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
