@@ -61,7 +61,7 @@ To use the Python service and send gRPC requests::
   $ docker-compose exec python /client/client.py get foo
   baz
 
-In the running docker-compose container, you should see the gRPC service printing a record of its activity:
+In the running docker-compose container, you should see the gRPC service printing a record of its activity::
 
   grpc_1    | 2017/05/30 12:05:09 set: foo = bar
   grpc_1    | 2017/05/30 12:05:12 get: foo
