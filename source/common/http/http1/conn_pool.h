@@ -29,7 +29,7 @@ class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority)
-      : dispatcher_(dispatcher), host_(host), priority_(priority) {}
+      : dispatcher_(dispatcher), host_(std::move(host)), priority_(priority) {}
 
   ~ConnPoolImpl();
 
@@ -131,7 +131,7 @@ class ConnPoolImplProd : public ConnPoolImpl {
 public:
   ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority)
-      : ConnPoolImpl(dispatcher, host, priority) {}
+      : ConnPoolImpl(dispatcher, std::move(host), priority) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;

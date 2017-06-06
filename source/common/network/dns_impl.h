@@ -37,7 +37,7 @@ private:
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     PendingResolution(ResolveCb callback, ares_channel channel, const std::string& dns_name)
-        : callback_(callback), channel_(channel), dns_name_(dns_name) {}
+        : callback_(std::move(callback)), channel_(channel), dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the

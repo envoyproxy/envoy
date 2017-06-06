@@ -48,7 +48,7 @@ public:
 
   explicit FieldImpl(Type type, const std::string& key, DocumentSharedPtr value)
       : type_(type), key_(key) {
-    value_.document_value_ = value;
+    value_.document_value_ = std::move(value);
   }
 
   explicit FieldImpl(const std::string& key, ObjectId&& value) : type_(Type::OBJECT_ID), key_(key) {

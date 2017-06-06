@@ -12,7 +12,7 @@ namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
-    : cb_(cb), base_(&dispatcher.base()), fd_(fd), trigger_(trigger) {
+    : cb_(std::move(cb)), base_(&dispatcher.base()), fd_(fd), trigger_(trigger) {
   assignEvents(events);
   event_add(&raw_event_, nullptr);
 }

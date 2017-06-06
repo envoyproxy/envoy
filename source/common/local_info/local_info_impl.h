@@ -9,9 +9,9 @@ namespace LocalInfo {
 
 class LocalInfoImpl : public LocalInfo {
 public:
-  LocalInfoImpl(Network::Address::InstanceConstSharedPtr address, const std::string zone_name,
-                const std::string cluster_name, const std::string node_name)
-      : address_(address), zone_name_(zone_name), cluster_name_(cluster_name),
+  LocalInfoImpl(Network::Address::InstanceConstSharedPtr address, const std::string& zone_name,
+                const std::string& cluster_name, const std::string& node_name)
+      : address_(std::move(address)), zone_name_(zone_name), cluster_name_(cluster_name),
         node_name_(node_name) {}
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }

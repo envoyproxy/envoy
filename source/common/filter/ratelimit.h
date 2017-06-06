@@ -70,7 +70,7 @@ class Instance : public Network::ReadFilter,
                  public RequestCallbacks {
 public:
   Instance(ConfigSharedPtr config, ClientPtr&& client)
-      : config_(config), client_(std::move(client)) {}
+      : config_(std::move(config)), client_(std::move(client)) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;

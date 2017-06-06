@@ -107,7 +107,7 @@ private:
  */
 class Instance : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
-  Instance(ConfigSharedPtr config) : config_(config) {}
+  Instance(ConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;

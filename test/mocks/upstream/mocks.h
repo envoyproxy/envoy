@@ -29,8 +29,8 @@ public:
   MockCluster();
   ~MockCluster();
 
-  void runCallbacks(const std::vector<HostSharedPtr> added,
-                    const std::vector<HostSharedPtr> removed) {
+  void runCallbacks(const std::vector<HostSharedPtr>& added,
+                    const std::vector<HostSharedPtr>& removed) {
     for (const MemberUpdateCb& cb : callbacks_) {
       cb(added, removed);
     }

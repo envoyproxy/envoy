@@ -92,7 +92,7 @@ public:
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
+    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(std::move(initial_config)) {}
 
     // ThreadLocal::ThreadLocalObject
     void shutdown() override {}

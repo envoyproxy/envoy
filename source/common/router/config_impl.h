@@ -284,7 +284,7 @@ private:
    */
   class WeightedClusterEntry : public DynanmicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& runtime_key,
                          Runtime::Loader& loader, const std::string& name, uint64_t weight)
         : DynanmicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
           cluster_weight_(weight) {}

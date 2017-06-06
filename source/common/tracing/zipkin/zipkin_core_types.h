@@ -59,7 +59,7 @@ public:
    * @param address Pointer to an object representing the endpoint's network address
    */
   Endpoint(const std::string& service_name, Network::Address::InstanceConstSharedPtr address)
-      : service_name_(service_name), address_(address) {}
+      : service_name_(service_name), address_(std::move(address)) {}
 
   /**
    * @return the endpoint's address.
@@ -69,7 +69,9 @@ public:
   /**
    * Sets the endpoint's address
    */
-  void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
+  void setAddress(Network::Address::InstanceConstSharedPtr address) {
+    address_ = std::move(address);
+  }
 
   /**
    * @return the endpoint's service name attribute.
@@ -122,7 +124,7 @@ public:
    * appear on ZipkinCoreConstants. The most commonly used values are "cs", "cr", "ss" and "sr".
    * @param endpoint The endpoint object representing the annotation's endpoint attribute.
    */
-  Annotation(uint64_t timestamp, const std::string value, Endpoint& endpoint)
+  Annotation(uint64_t timestamp, const std::string& value, Endpoint& endpoint)
       : timestamp_(timestamp), value_(value), endpoint_(endpoint) {}
 
   /**

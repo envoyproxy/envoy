@@ -96,7 +96,7 @@ public:
     }
     )EOF";
 
-  void SetUpTest(const std::string json) {
+  void SetUpTest(const std::string& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(new FaultFilterConfig(*config, runtime_, "", stats_));
     filter_.reset(new FaultFilter(config_));

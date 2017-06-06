@@ -31,7 +31,7 @@ void ListenSocketImpl::doBind() {
 }
 
 TcpListenSocket::TcpListenSocket(Address::InstanceConstSharedPtr address, bool bind_to_port) {
-  local_address_ = address;
+  local_address_ = std::move(address);
   fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
 
@@ -46,7 +46,7 @@ TcpListenSocket::TcpListenSocket(Address::InstanceConstSharedPtr address, bool b
 
 TcpListenSocket::TcpListenSocket(int fd, Address::InstanceConstSharedPtr address) {
   fd_ = fd;
-  local_address_ = address;
+  local_address_ = std::move(address);
 }
 
 UdsListenSocket::UdsListenSocket(const std::string& uds_path) {

@@ -19,7 +19,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
                                Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
                                InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
+    : Network::ConnectionImpl(dispatcher, fd, std::move(remote_address), std::move(local_address)),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
