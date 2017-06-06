@@ -97,6 +97,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   } else {
     std::cerr << "error: unknown IP address version '" << local_address_ip_version.getValue() << "'"
               << std::endl;
+    exit(1);
   }
 
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
