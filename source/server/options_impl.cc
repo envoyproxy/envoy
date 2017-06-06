@@ -90,12 +90,20 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
     exit(1);
   }
 
+  if (local_address_ip_version.getValue() == "v4") {
+    local_address_ip_version_ = Network::Address::IpVersion::v4;
+  } else if (local_address_ip_version.getValue() == "v6") {
+    local_address_ip_version_ = Network::Address::IpVersion::v6;
+  } else {
+    std::cerr << "error: unknown IP address version '" << local_address_ip_version.getValue() << "'"
+              << std::endl;
+  }
+
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
   base_id_ = base_id.getValue() * 10;
   concurrency_ = concurrency.getValue();
   config_path_ = config_path.getValue();
   admin_address_path_ = admin_address_path.getValue();
-  local_address_ip_version_ = local_address_ip_version.getValue();
   restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();

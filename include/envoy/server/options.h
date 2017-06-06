@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"
 
@@ -69,9 +70,9 @@ public:
   virtual const std::string& adminAddressPath() PURE;
 
   /**
-   * @return const std::string& the local address IP version.
+   * @return Network::Address::IpVersion the local address IP version.
    */
-  virtual const std::string& localAddressIpVersion() PURE;
+  virtual Network::Address::IpVersion localAddressIpVersion() PURE;
 
   /**
    * @return spdlog::level::level_enum the default log level for the server.

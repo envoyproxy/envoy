@@ -130,15 +130,6 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::IpVersion Utility::getVersionFromString(const std::string& version) {
-  if (version == "v4") {
-    return Address::IpVersion::v4;
-  } else if (version == "v6") {
-    return Address::IpVersion::v6;
-  }
-  throw EnvoyException(fmt::format("unknow IP address version: {}", version));
-}
-
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {

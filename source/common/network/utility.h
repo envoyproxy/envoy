@@ -80,13 +80,6 @@ public:
   static uint32_t portFromTcpUrl(const std::string& url);
 
   /**
-  * Convert the IP address version from string to enum.
-  * @param version IP address version.
-  * @return Address::IpVersion address version enum.
-  */
-  static Address::IpVersion getVersionFromString(const std::string& version);
-
-  /**
   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
   * not include a port number. Throws EnvoyException if unable to parse the address.
   * @param ip_address string to be parsed as an internet address.

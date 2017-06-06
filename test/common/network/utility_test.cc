@@ -160,12 +160,6 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("tcp://[a:b:c:d::]:0")->asString());
 }
 
-TEST(NetworkUtility, VersionEnumFromString) {
-  EXPECT_EQ(Address::IpVersion::v4, Utility::getVersionFromString("v4"));
-  EXPECT_EQ(Address::IpVersion::v6, Utility::getVersionFromString("v6"));
-  EXPECT_THROW(Utility::getVersionFromString("foo"), EnvoyException);
-}
-
 TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_THROW(Utility::parseInternetAddress(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("1.2.3"), EnvoyException);

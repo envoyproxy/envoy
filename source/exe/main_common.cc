@@ -41,8 +41,7 @@ int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& rest
   Envoy::Event::Libevent::Global::initialize();
   Envoy::Server::ProdComponentFactory component_factory;
   Envoy::LocalInfo::LocalInfoImpl local_info(
-      Envoy::Network::Utility::getLocalAddress(
-          Envoy::Network::Utility::getVersionFromString(options.localAddressIpVersion())),
+      Envoy::Network::Utility::getLocalAddress(options.localAddressIpVersion()),
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
