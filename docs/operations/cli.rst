@@ -27,7 +27,8 @@ following are the command line options that Envoy supports.
 
 .. option:: --local-address-ip-version <string>
 
-  *(optional)* The IP address version that is used to populate the server local IP address.
+  *(optional)* The IP address version that is used to populate the server local IP address. This
+  parameter affects various headers including what is appended to the X-Forwarded-For (XFF) header.
   The options are ``v4`` or ``v6``. The default is ``v4``.
 
 .. option:: --base-id <integer>
