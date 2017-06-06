@@ -200,9 +200,8 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   log().info("starting fake server on unix domain socket {}", uds_path);
 }
 
-static Network::ListenSocketPtr
-makeTcpListenSocket(uint32_t port,
-                    Network::Address::IpVersion version = Network::Address::IpVersion::v4) {
+static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
+                                                    Network::Address::IpVersion version) {
   return Network::ListenSocketPtr{new Network::TcpListenSocket(
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
@@ -217,9 +216,10 @@ FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
-                           FakeHttpConnection::Type type)
-    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port), type) {
-  log().info("starting fake SSL server on port {}", this->localAddress()->ip()->port());
+                           FakeHttpConnection::Type type, Network::Address::IpVersion version)
+    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port, version), type) {
+  log().info("starting fake SSL server on port {}. Address version is {}",
+             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,

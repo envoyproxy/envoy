@@ -5,15 +5,17 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2IntegrationTest : public BaseIntegrationTest, public testing::Test {
+class Http2IntegrationTest : public BaseIntegrationTest,
+                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  Http2IntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**
    * Initializer for an individual test.
    */
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server_http2.json", {"echo", "http", "http_buffer"});
   }

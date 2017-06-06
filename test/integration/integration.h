@@ -113,7 +113,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
-                       Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+                       Network::Address::IpVersion version);
 
   void close();
   const std::string& data() { return data_; }
@@ -149,7 +149,6 @@ typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  BaseIntegrationTest();
   ~BaseIntegrationTest();
   BaseIntegrationTest(Network::Address::IpVersion version);
   /**

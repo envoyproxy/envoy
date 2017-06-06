@@ -28,7 +28,7 @@ public:
    * @param Network::Address::IpVersion IP address version to check.
    * @return bool if testing only with IP type addresses only.
    */
-  static bool shouldRunTestForIpVersion(const Network::Address::IpVersion& type);
+  static bool shouldRunTestForIpVersion(Network::Address::IpVersion type);
 
   /**
    * Return a vector of IP address parameters to test. Tests can be run with
@@ -112,9 +112,8 @@ public:
    * @param version IP address version to substitute.
    * @return std::string path for the generated file.
    */
-  static std::string
-  temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
-                          Network::Address::IpVersion version = Network::Address::IpVersion::v4);
+  static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
+                                             Network::Address::IpVersion version);
 
   /**
    * Build JSON object from a string subject to environment path substitution.

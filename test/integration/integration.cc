@@ -239,8 +239,6 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
-BaseIntegrationTest::BaseIntegrationTest() : BaseIntegrationTest(Network::Address::IpVersion::v4) {}
-
 BaseIntegrationTest::~BaseIntegrationTest() {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {

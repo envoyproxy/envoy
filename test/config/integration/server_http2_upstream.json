@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "address": "tcp://127.0.0.1:0",
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
       "type": "read",
@@ -82,7 +82,7 @@
     }]
   },
   {
-    "address": "tcp://127.0.0.1:0",
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
       "type": "read",
@@ -169,7 +169,7 @@
     }]
   },
   {
-    "address": "tcp://127.0.0.1:0",
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
       "type": "read",
@@ -255,7 +255,7 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:0" },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
 
   "cluster_manager": {
     "clusters": [
@@ -265,7 +265,7 @@
       "type": "static",
       "lb_type": "round_robin",
       "features": "http2",
-      "hosts": [{"url": "tcp://127.0.0.1:{{ upstream_0 }}"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}]
     },
     {
       "name": "cluster_2",
@@ -273,6 +273,7 @@
       "type": "strict_dns",
       "lb_type": "round_robin",
       "features": "http2",
+      "dns_lookup_family": "{{ dns_lookup_family }}",
       "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
     }]
   }
