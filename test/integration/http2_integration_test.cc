@@ -138,7 +138,7 @@ TEST_P(Http2IntegrationTest, BadMagic) {
       lookupPort("http"),
       buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
-      }, GetParam());
+      }, version_);
 
   connection.run();
   EXPECT_EQ("", response);
@@ -151,7 +151,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
       lookupPort("http"),
       buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
-      }, GetParam());
+      }, version_);
 
   connection.run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);

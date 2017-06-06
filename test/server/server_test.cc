@@ -41,9 +41,10 @@ TEST(InitManagerImplTest, Targets) {
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ServerInstanceImplTest()
-      : options_(TestEnvironment::temporaryFileSubstitute("test/config/integration/server.json",
+      : version_(GetParam()),
+        options_(TestEnvironment::temporaryFileSubstitute("test/config/integration/server.json",
                                                           {{"upstream_0", 0}, {"upstream_1", 0}},
-                                                          GetParam())),
+                                                          version_)),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
                 local_info_) {}
   void TearDown() override {
@@ -51,6 +52,7 @@ protected:
     server_.threadLocal().shutdownThread();
   }
 
+  Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
   DefaultTestHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
@@ -65,7 +67,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ServerInstanceImplTest, NoListenSocketFds) {
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (version_ == Network::Address::IpVersion::v4) {
     EXPECT_EQ(server_.getListenSocketFd("tcp://255.255.255.255:80"), -1);
   } else {
     EXPECT_EQ(server_.getListenSocketFd("tcp://[ff00::]:80"), -1);
