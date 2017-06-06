@@ -162,14 +162,6 @@ public:
                                                             uint32_t port);
 
   /**
-   * Returns an any address given the remote IP address. Returns the IPv4 any address by default.
-   * @param address the remote IP address.
-   * @returns the IPv6 any address if the remote address is in the IPv6 family. Otherwise, returns
-   * the IPv4 any address.
-   */
-  static Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address);
-
-  /**
    * Retrieve the original destination address from an accepted fd.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables

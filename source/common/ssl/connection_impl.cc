@@ -15,6 +15,20 @@
 namespace Envoy {
 namespace Ssl {
 
+namespace {
+// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
+// looks at this currently, but we may want to populate this later for logging purposes.
+Network::Address::InstanceConstSharedPtr
+getNullLocalAddress(const Network::Address::Instance& address) {
+  if (address.type() == Network::Address::Type::Ip &&
+      address.ip()->version() == Network::Address::IpVersion::v6) {
+    return Network::Utility::getIpv6AnyAddress();
+  }
+  // Default to IPv4 any address.
+  return Network::Utility::getIpv4AnyAddress();
+}
+} // namespace
+
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
                                Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
@@ -249,7 +263,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     Network::Utility::getNullLocalAddress(*address), ctx, InitialState::Client) {}
+                     getNullLocalAddress(*address), ctx, InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 

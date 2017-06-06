@@ -308,14 +308,6 @@ Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   return any;
 }
 
-Address::InstanceConstSharedPtr Utility::getNullLocalAddress(const Address::Instance& address) {
-  if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
-    return Utility::getIpv6AnyAddress();
-  }
-  // Default to IPv4 any address.
-  return Utility::getIpv4AnyAddress();
-}
-
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {
