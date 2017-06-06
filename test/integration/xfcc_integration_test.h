@@ -1,33 +1,39 @@
 #pragma once
 
-#include "test/integration/integration.h"
+#include <memory>
+#include <string>
 
+#include "test/integration/integration.h"
+#include "test/integration/server.h"
+#include "test/mocks/runtime/mocks.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::NiceMock;
+
+namespace Xfcc {
+
 class XfccIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
-  /**
-   * Initializer for an individual test.
-   */
-  void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
-    registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_http2_upstream.json",
-                     {"http", "http_buffer", "http1_buffer"});
-  }
+  const std::string xfcc_header_ = "BY=test://bar.com/client;Hash=123456;SAN=test://foo.com/frontend";
 
-  /**
-   * Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void SetUp() override;
+  void TearDown() override;
+
+  Network::ClientConnectionPtr makeSslClientConnection();
+  Ssl::ServerContextPtr createUpstreamSslContext();
+  Ssl::ClientContextPtr createClientSslContext();
+  void testRequestAndResponseWithXfccHeader(
+      Network::ClientConnectionPtr&& conn, std::string expected_xfcc);
 
 private:
-  const std::string xfcc_header_ = "BY=test://bar.com/client;Hash=123456;SAN=test://foo.com/frontend";
+  std::unique_ptr<Runtime::Loader> runtime_;
+  std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ServerContextPtr upstream_ssl_ctx_;
+
+  std::string replaceXfccConfigs(std::string config, std::string content);
 };
+} // Xfcc
 } // Envoy

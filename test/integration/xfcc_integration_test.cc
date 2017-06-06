@@ -1,10 +1,13 @@
 #include "xfcc_integration_test.h"
 
+#include <regex>
+
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
+#include "ssl_integration_test.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -19,12 +22,17 @@ namespace Xfcc {
 
 void XfccIntegrationTest::SetUp() {
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
-  context_manager_.reset(new ContextManagerImpl(*runtime_));
+  context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+  registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
+  std::string config = TestEnvironment::temporaryFileSubstitute(
+      "test/config/integration/server_xfcc.json", port_map_);
+  replaceXfccConfigs(config, "");
+  test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, Network::Address::IpVersion::v4);
 }
 
-void SslIntegrationTest::TearDown() {
+void XfccIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
@@ -32,7 +40,13 @@ void SslIntegrationTest::TearDown() {
   runtime_.reset();
 }
 
-ClientContextPtr XfccIntegrationTest::createClientSslContext() {
+std::string XfccIntegrationTest::replaceXfccConfigs(std::string config, std::string content) {
+  const std::regex port_regex("\\{\\{ xfcc_config \\}\\}");
+  config = std::regex_replace(config, port_regex, content);
+  return config;
+}
+
+Ssl::ClientContextPtr XfccIntegrationTest::createClientSslContext() {
   std::string json_san = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
@@ -43,12 +57,12 @@ ClientContextPtr XfccIntegrationTest::createClientSslContext() {
 )EOF";
  
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json_san);
-  ContextConfigImpl cfg(*loader);
+  Ssl::ContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager_->createSslClientContext(*client_stats_store, cfg);
 }
 
-ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
+Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   std::string json = R"EOF(
 {
@@ -58,7 +72,7 @@ ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
 )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  Ssl::ContextConfigImpl cfg(*loader);
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
@@ -76,9 +90,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
          codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                      {":path", "/test/long/url"},
                                                                      {":scheme", "http"},
-                                                                     {":authority", "host"}
+                                                                     {":authority", "host"},
                                                                      {"x-forwarded-client-cert",
-                                                                      xfcc_header_} },
+                                                                      expected_xfcc}},
                                              *response);
        },
        [&]() -> void {
@@ -89,7 +103,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
        [&]() -> void { upstream_request->waitForEndStream(*dispatcher_); },
 
        [&]() -> void {
-         EXPECT_STREQ(expected_xfcc, upstream_request->headers().ForwardedClientCert.value().c_str());
+         EXPECT_STREQ(expected_xfcc.c_str(), upstream_request->headers().ForwardedClientCert()->value().c_str());
          upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
        },
        [&]() -> void {
@@ -107,11 +121,12 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
 TEST_F(XfccIntegrationTest, ForwardOnly) {
   testRequestAndResponseWithXfccHeader(
       dispatcher_->createSslClientConnection(
-          create, Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))),
+          *createClientSslContext(),
+          Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))),
       xfcc_header_);
 }
 
-/*
+/* 
 TEST_F(Http2UpstreamIntegrationTest, RouterRedirect) {
   testRouterRedirect(Http::CodecClient::Type::HTTP2);
 }
