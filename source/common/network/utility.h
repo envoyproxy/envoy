@@ -80,6 +80,13 @@ public:
   static uint32_t portFromTcpUrl(const std::string& url);
 
   /**
+  * Convert the IP address version from string to enum.
+  * @param version IP address version.
+  * @return Address::IpVersion address version enum.
+  */
+  static Address::IpVersion getVersionFromString(const std::string& version);
+
+  /**
   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
   * not include a port number. Throws EnvoyException if unable to parse the address.
   * @param ip_address string to be parsed as an internet address.
@@ -153,6 +160,14 @@ public:
    */
   static Address::InstanceConstSharedPtr getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port);
+
+  /**
+   * Returns an any address given the remote IP address. Returns the IPv4 any address by default.
+   * @param address the remote IP address.
+   * @returns the IPv6 any address if the remote address is in the IPv6 family. Otherwise, returns
+   * the IPv4 any address.
+   */
+  static Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address);
 
   /**
    * Retrieve the original destination address from an accepted fd.

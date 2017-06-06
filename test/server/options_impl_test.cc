@@ -34,12 +34,14 @@ TEST(OptionsImplDeathTest, InvalidMode) {
 TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
-      "-l info  --service-cluster cluster --service-node node --service-zone zone "
-      "--file-flush-interval-msec 9000 --drain-time-s 60 --parent-shutdown-time-s 90");
+      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
+      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 "
+      "--parent-shutdown-time-s 90");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
   EXPECT_EQ("path", options->adminAddressPath());
+  EXPECT_EQ("v6", options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -55,6 +57,7 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
   EXPECT_EQ("", options->adminAddressPath());
+  EXPECT_EQ("v4", options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
 }
 } // Envoy

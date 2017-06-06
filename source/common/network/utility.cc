@@ -130,6 +130,15 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
+Address::IpVersion Utility::getVersionFromString(const std::string& version) {
+  if (version == "v4") {
+    return Address::IpVersion::v4;
+  } else if (version == "v6") {
+    return Address::IpVersion::v6;
+  }
+  throw EnvoyException(fmt::format("unknow IP address version: {}", version));
+}
+
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
@@ -297,6 +306,14 @@ Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   // Initialized on first call in a thread-safe manner.
   static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
   return any;
+}
+
+Address::InstanceConstSharedPtr Utility::getNullLocalAddress(const Address::Instance& address) {
+  if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
+    return Utility::getIpv6AnyAddress();
+  }
+  // Default to IPv4 any address.
+  return Utility::getIpv4AnyAddress();
 }
 
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,

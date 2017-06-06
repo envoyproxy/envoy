@@ -249,7 +249,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     null_local_address_, ctx, InitialState::Client) {}
+                     Network::Utility::getNullLocalAddress(*address), ctx, InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 
