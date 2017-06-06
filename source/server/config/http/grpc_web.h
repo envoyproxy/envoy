@@ -9,7 +9,7 @@ namespace Configuration {
 class GrpcWebFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object&,
-                                          const std::string&, Server::Instance&) override;
+                                          const std::string&, Server::Instance& server) override;
 
   std::string name() override;
 };

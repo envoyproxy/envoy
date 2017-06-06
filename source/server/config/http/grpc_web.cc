@@ -9,14 +9,15 @@ namespace Configuration {
 HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactory(HttpFilterType type,
                                                              const Json::Object&,
                                                              const std::string&,
-                                                             Server::Instance&) {
+                                                             Server::Instance& server) {
   if (type != HttpFilterType::Both) {
     throw EnvoyException(fmt::format(
         "{} gRPC-Web filter must be configured as both a decoder and encoder filter.", name()));
   }
 
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter()});
+  return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter(server.clusterManager())});
   };
 }
 

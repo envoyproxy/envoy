@@ -64,7 +64,9 @@ envoy_cc_library(
         ":codec_lib",
         ":common_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
+        "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],
 )

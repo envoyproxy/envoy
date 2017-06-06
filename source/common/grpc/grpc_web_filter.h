@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/non_copyable.h"
@@ -14,7 +15,7 @@ namespace Grpc {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  GrpcWebFilter(){};
+  GrpcWebFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
   virtual ~GrpcWebFilter(){};
 
   void onDestroy() override{};
@@ -25,7 +26,9 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // Implements StreamEncoderFilter.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
@@ -36,12 +39,24 @@ public:
   }
 
 private:
+  void chargeStat(const Http::HeaderMap& headers);
+  void setupStatTracking(const Http::HeaderMap& headers);
+  bool isGrpcWebRequest(const Http::HeaderMap& headers);
+
   static const uint8_t GRPC_WEB_TRAILER;
+  const std::vector<std::string>& GRPC_WEB_CONTENT_TYPES() const;
+
+  Upstream::ClusterManager& cm_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   bool is_text_request_{};
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Decoder decoder_;
+  std::string grpc_service_;
+  std::string grpc_method_;
+  bool do_stat_tracking_{};
 };
 
 } // namespace Grpc
