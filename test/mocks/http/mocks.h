@@ -388,6 +388,14 @@ public:
   MockAsyncClient* client_;
 };
 
+class MockAsyncClientStream : public AsyncClient::Stream {
+public:
+  MOCK_METHOD2(sendHeaders, void(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(sendData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(sendTrailers, void(HeaderMap& trailers));
+  MOCK_METHOD0(reset, void());
+};
+
 class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
 public:
   MockFilterChainFactoryCallbacks();
