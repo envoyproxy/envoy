@@ -13,8 +13,8 @@ namespace Upstream {
 
 LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                     Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls,
-                                     Event::Dispatcher& dispatcher)
+                                     Network::DnsResolverSharedPtr dns_resolver,
+                                     ThreadLocal::Instance& tls, Event::Dispatcher& dispatcher)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
@@ -58,7 +58,7 @@ void LogicalDnsCluster::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address);
   info_->stats().update_attempt_.inc();
 
-  active_dns_query_ = dns_resolver_.resolve(
+  active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
       [this, dns_address](
           std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
