@@ -168,9 +168,10 @@ dns_lookup_family
 .. _config_cluster_manager_cluster_dns_resolvers:
 
 dns_resolvers
-  *(optional, array)* If dns resolvers are specified and the cluster type is either *strict_dns*,
-  or *logical_dns*, this value is used to specify the cluster's dns resolvers. If this setting is not specified,
-  the value defaults to the default resolver, which uses /etc/resolv.conf for configuration. For cluster types other than *strict_dns* and *logical_dns* this setting is
+  *(optional, array)* If DNS resolvers are specified and the cluster type is either *strict_dns*, or
+  *logical_dns*, this value is used to specify the cluster's dns resolvers. If this setting is not
+  specified, the value defaults to the default resolver, which uses /etc/resolv.conf for
+  configuration. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
 
 :ref:`outlier_detection <config_cluster_manager_cluster_outlier_detection>`
