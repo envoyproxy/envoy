@@ -53,10 +53,8 @@ class RawConnectionDriver {
 public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
-  // TODO(hennna): Deprecate when IPv6 test support is finished.
-  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback);
-  RawConnectionDriver(uint32_t port, const Network::Address::IpVersion version,
-                      Buffer::Instance& initial_data, ReadCallback data_callback);
+  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
+                      Network::Address::IpVersion version);
   ~RawConnectionDriver();
   void run();
   void close();
@@ -89,25 +87,19 @@ class IntegrationUtil {
 public:
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
-   * @param version the IP addess version of the client and server.
    * @param port supplies the port to connect to on localhost.
    * @param method supplies the request method.
    * @param url supplies the request url.
    * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
+   * @param version the IP addess version of the client and server.
    * @param host supplies the host header to use for the request.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
    */
   static BufferingStreamDecoderPtr
-  makeSingleRequest(const Network::Address::IpVersion version, uint32_t port,
-                    const std::string& method, const std::string& url, const std::string& body,
-                    Http::CodecClient::Type type, const std::string& host = "host");
-  // TODO(henna): Deprecate when IPv6 test support is finished.
-  static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, const std::string& method,
-                                                     const std::string& url,
-                                                     const std::string& body,
-                                                     Http::CodecClient::Type type,
-                                                     const std::string& host = "host");
+  makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
+                    const std::string& body, Http::CodecClient::Type type,
+                    Network::Address::IpVersion version, const std::string& host = "host");
 };
 } // Envoy

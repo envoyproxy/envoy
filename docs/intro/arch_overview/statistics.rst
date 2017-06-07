@@ -18,6 +18,6 @@ documented in detail in the operations guide.
 
 Envoy uses statsd as the statistics output format, though plugging in a different statistics sink
 would not be difficult. Both TCP and UDP statsd is supported. Internally, counters and gauges are
-latched and periodically flushed to improve performance. Timers are written as they are received.
+batched and periodically flushed to improve performance. Timers are written as they are received.
 
 Statistics :ref:`configuration <config_overview>`.

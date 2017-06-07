@@ -13,81 +13,85 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-TEST_F(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
 
-TEST_F(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
+INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
+
+TEST_P(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
   testRouterNotFoundWithBody(lookupPort("http"), Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
+TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
   testRouterNotFoundWithBody(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
+TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
 
-TEST_F(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
+TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
-TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
-TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
-TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 1024 * 1024, 1024 * 1024,
                                        false);
 }
 
-TEST_F(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
+TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
+TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
+TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, true);
 }
 
-TEST_F(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
   testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                     Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                      Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                       Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                        Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                   Http::CodecClient::Type::HTTP2);
 }
 
-TEST_F(Http2IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP2); }
+TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP2); }
 
-TEST_F(Http2IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
+TEST_P(Http2IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
 
-TEST_F(Http2IntegrationTest, MaxHeadersInCodec) {
+TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
@@ -104,7 +108,7 @@ TEST_F(Http2IntegrationTest, MaxHeadersInCodec) {
        [&]() -> void { response->waitForReset(); }, [&]() -> void { codec_client->close(); }});
 }
 
-TEST_F(Http2IntegrationTest, MaxHeadersInConnectionManager) {
+TEST_P(Http2IntegrationTest, MaxHeadersInConnectionManager) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
@@ -123,35 +127,37 @@ TEST_F(Http2IntegrationTest, MaxHeadersInConnectionManager) {
   EXPECT_STREQ("400", response->headers().Status()->value().c_str());
 }
 
-TEST_F(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
+TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
   testDownstreamResetBeforeResponseComplete();
 }
 
-TEST_F(Http2IntegrationTest, BadMagic) {
+TEST_P(Http2IntegrationTest, BadMagic) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data)
-          -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+      }, version_);
 
   connection.run();
   EXPECT_EQ("", response);
 }
 
-TEST_F(Http2IntegrationTest, BadFrame) {
+TEST_P(Http2IntegrationTest, BadFrame) {
   Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data)
-          -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+      }, version_);
 
   connection.run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
 }
 
-TEST_F(Http2IntegrationTest, GoAway) {
+TEST_P(Http2IntegrationTest, GoAway) {
   IntegrationCodecClientPtr codec_client;
   Http::StreamEncoder* encoder;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
@@ -174,11 +180,11 @@ TEST_F(Http2IntegrationTest, GoAway) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-TEST_F(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
-TEST_F(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
+TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
-TEST_F(Http2IntegrationTest, SimultaneousRequest) {
+TEST_P(Http2IntegrationTest, SimultaneousRequest) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;

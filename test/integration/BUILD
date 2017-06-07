@@ -66,7 +66,7 @@ envoy_cc_test(
     name = "integration_admin_test",
     srcs = [
         "integration_admin_test.cc",
-        "integration_test.h",
+        "integration_admin_test.h",
     ],
     data = [
         "//test/config/integration:server.json",

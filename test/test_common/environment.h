@@ -28,7 +28,7 @@ public:
    * @param Network::Address::IpVersion IP address version to check.
    * @return bool if testing only with IP type addresses only.
    */
-  static bool shouldRunTestForIpVersion(const Network::Address::IpVersion& type);
+  static bool shouldRunTestForIpVersion(Network::Address::IpVersion type);
 
   /**
    * Return a vector of IP address parameters to test. Tests can be run with
@@ -104,26 +104,16 @@ public:
    */
   static std::string substitute(const std::string str);
 
-  // TODO(hennna): Deprecate after IPv6 test support is finished.
-  /**
-   * Substitue ports and paths in a JSON file in the private writable test temporary directory.
-   * @param path path prefix for the input file with port and path templates.
-   * @param port_map map from port name to port number.
-   * @return std::string path for the generated file.
-   */
-  static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map);
-
   /**
    * Substitue ports, paths, and IP loopback addressses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
-   * @param version IP address version to substitute.
    * @param port_map map from port name to port number.
+   * @param version IP address version to substitute.
    * @return std::string path for the generated file.
    */
-  static std::string temporaryFileSubstitute(const std::string& path,
-                                             const Network::Address::IpVersion& version,
-                                             const PortMap& port_map);
+  static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
+                                             Network::Address::IpVersion version);
 
   /**
    * Build JSON object from a string subject to environment path substitution.

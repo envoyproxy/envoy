@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # This tool is a helper script that queries the admin address for all listener
 # addresses after envoy startup. (The admin adress is written out to a file by
