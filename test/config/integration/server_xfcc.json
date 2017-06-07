@@ -81,7 +81,8 @@
           },
           { "type": "decoder", "name": "router", "config": {} }
         ],
-        "forward_client_cert": "{{ xfcc_config }}"
+        "forward_client_cert": "forward_only",
+        "set_client_cert_details": ["SAN"]
       }
     }]
   }],

@@ -92,8 +92,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("forward_client_cert")) {
-    // TODO: Checki mTLS.
-    const std::string forward_client_cert = config.getString("forward_client_Cert");
+    // TODO: Check mTLS.
+    const std::string forward_client_cert = config.getString("forward_client_cert");
     if (forward_client_cert == "forward_only") {
       forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
     } else if (forward_client_cert == "append_forward") {

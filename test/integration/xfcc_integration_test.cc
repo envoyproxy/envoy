@@ -24,12 +24,12 @@ void XfccIntegrationTest::SetUp() {
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
-  fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+  fake_upstreams_.emplace_back(new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
   registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
   std::string config = TestEnvironment::temporaryFileSubstitute(
       "test/config/integration/server_xfcc.json", port_map_);
-  replaceXfccConfigs(config, "");
   test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, Network::Address::IpVersion::v4);
+  registerTestServerPorts({"http"});
 }
 
 void XfccIntegrationTest::TearDown() {
@@ -84,24 +84,20 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
   FakeStreamPtr upstream_request;
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
-      },
+         codec_client = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
+       },
        [&]() -> void {
          codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                      {":path", "/test/long/url"},
                                                                      {":scheme", "http"},
                                                                      {":authority", "host"},
                                                                      {"x-forwarded-client-cert",
-                                                                      expected_xfcc}},
+                                                                      xfcc_header_.c_str()}},
                                              *response);
        },
-       [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
+       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_); },
        [&]() -> void { upstream_request = fake_upstream_connection->waitForNewStream(); },
-
        [&]() -> void { upstream_request->waitForEndStream(*dispatcher_); },
-
        [&]() -> void {
          EXPECT_STREQ(expected_xfcc.c_str(), upstream_request->headers().ForwardedClientCert()->value().c_str());
          upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
@@ -125,19 +121,5 @@ TEST_F(XfccIntegrationTest, ForwardOnly) {
           Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))),
       xfcc_header_);
 }
-
-/* 
-TEST_F(Http2UpstreamIntegrationTest, RouterRedirect) {
-  testRouterRedirect(Http::CodecClient::Type::HTTP2);
-}
-
-TEST_F(Http2UpstreamIntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
-
-TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP2, 1024, 512, false);
-}
-*/
-
 } // Xfcc
 } // Envoy
