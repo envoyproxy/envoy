@@ -60,4 +60,9 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
 }
+
+TEST(OptionsImplTest, BadCliOption) {
+  EXPECT_DEATH(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
+               "error: unknown IP address version 'foo'");
+}
 } // Envoy
