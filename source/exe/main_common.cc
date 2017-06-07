@@ -41,7 +41,7 @@ int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& rest
   Envoy::Event::Libevent::Global::initialize();
   Envoy::Server::ProdComponentFactory component_factory;
   Envoy::LocalInfo::LocalInfoImpl local_info(
-      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
+      Envoy::Network::Utility::getLocalAddress(options.localAddressIpVersion()),
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
@@ -58,7 +58,6 @@ int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& rest
   Envoy::Logger::Registry::initialize(options.logLevel(), restarter.logLock());
   Envoy::DefaultTestHooks default_test_hooks;
   Envoy::Stats::ThreadLocalStoreImpl stats_store(restarter);
-  // TODO(henna): Add CLI option for local address IP version.
   Envoy::Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
                                      restarter.accessLogLock(), component_factory, local_info);
   server.run();

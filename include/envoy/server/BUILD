@@ -79,5 +79,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
-    deps = ["//include/envoy/event:dispatcher_interface"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:address_interface",
+    ],
 )
