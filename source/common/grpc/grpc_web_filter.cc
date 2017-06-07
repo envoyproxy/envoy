@@ -4,6 +4,7 @@
 
 #include "common/common/base64.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 
 #include "spdlog/spdlog.h"
@@ -169,45 +170,16 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  if (!route || !route->routeEntry()) {
+  cluster_ = Common::resolveClusterInfo(decoder_callbacks_, cm_);
+  if (!cluster_) {
     return;
   }
-
-  const Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = cm_.get(route_entry->clusterName());
-  if (!cluster) {
-    return;
-  }
-  cluster_ = cluster->info();
-
-  if (headers.Path() != nullptr && headers.Path()->value().c_str() != nullptr) {
-    std::vector<std::string> parts = StringUtil::split(headers.Path()->value().c_str(), '/');
-    if (parts.size() != 2) {
-      return;
-    }
-    grpc_service_ = parts[0];
-    grpc_method_ = parts[1];
-    do_stat_tracking_ = true;
-  }
+  do_stat_tracking_ =
+      Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
-  if (!grpc_status_header) {
-    return;
-  }
-  uint64_t grpc_status_code;
-  bool success = StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) &&
-                 grpc_status_code == 0;
-  // TODO(fengli): Add fine grained stat for gRPC status.
-  cluster_->statsScope()
-      .counter(fmt::format("grpc-web.{}.{}.{}", grpc_service_, grpc_method_,
-                           success ? "success" : "failure"))
-      .inc();
-  cluster_->statsScope()
-      .counter(fmt::format("grpc-web.{}.{}.total", grpc_service_, grpc_method_))
-      .inc();
+  Common::chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_, headers.GrpcStatus());
 }
 
 } // namespace Grpc

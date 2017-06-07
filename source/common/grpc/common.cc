@@ -24,13 +24,63 @@ namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
 
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                        const std::string& grpc_service, const std::string& grpc_method,
+                        const Http::HeaderEntry* grpc_status) {
+  if (!grpc_status) {
+    return;
+  }
+  uint64_t grpc_status_code;
+  bool success =
+      StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+  chargeStat(cluster, protocol, grpc_service, grpc_method, success);
+}
+
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                        const std::string& grpc_service, const std::string& grpc_method,
+                        bool success) {
+  cluster.statsScope()
+      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
+                           success ? "success" : "failure"))
+      .inc();
+  cluster.statsScope()
+      .counter(fmt::format("{}.{}.{}.total", protocol, grpc_service, grpc_method))
+      .inc();
+}
+
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                         const std::string& grpc_method, bool success) {
-  cluster.statsScope()
-      .counter(
-           fmt::format("grpc.{}.{}.{}", grpc_service, grpc_method, success ? "success" : "failure"))
-      .inc();
-  cluster.statsScope().counter(fmt::format("grpc.{}.{}.total", grpc_service, grpc_method)).inc();
+  chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
+}
+
+Upstream::ClusterInfoConstSharedPtr
+Common::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callbacks,
+                           Upstream::ClusterManager& cm) {
+  Router::RouteConstSharedPtr route = decoder_callbacks->route();
+  if (!route || !route->routeEntry()) {
+    return nullptr;
+  }
+
+  const Router::RouteEntry* route_entry = route->routeEntry();
+  Upstream::ThreadLocalCluster* cluster = cm.get(route_entry->clusterName());
+  if (!cluster) {
+    return nullptr;
+  }
+  return cluster->info();
+}
+
+bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
+                                     std::string* method) {
+  if (path == nullptr || path->value().c_str() == nullptr) {
+    return false;
+  }
+  std::vector<std::string> parts = StringUtil::split(path->value().c_str(), '/');
+  if (parts.size() != 2) {
+    return false;
+  }
+  *service = parts[0];
+  *method = parts[1];
+  return true;
 }
 
 Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {
