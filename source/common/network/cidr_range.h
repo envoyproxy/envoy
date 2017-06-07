@@ -1,7 +1,9 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
+#include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
 namespace Envoy {
@@ -64,6 +66,7 @@ public:
              if the range is uninitialized or if the argument is not of the same IpVersion.
    */
   bool isInRange(InstanceConstSharedPtr address) const;
+  bool isInRange(const Instance& address) const;
 
   /**
    * @return a human readable string for the range. This string will be in the following format:
@@ -115,6 +118,23 @@ private:
 
   InstanceConstSharedPtr address_;
   int length_;
+};
+
+/**
+ * Class for keeping a list of CidrRanges, and then determining whether an
+ * IP address is in the CidrRange list.
+ */
+class IpList {
+public:
+  IpList(const std::vector<std::string>& subnets);
+  IpList(const Json::Object& config, const std::string& member_name);
+  IpList(){};
+
+  bool contains(const Instance& address) const;
+  bool empty() const { return ip_list_.empty(); }
+
+private:
+  std::vector<CidrRange> ip_list_;
 };
 
 } // Address

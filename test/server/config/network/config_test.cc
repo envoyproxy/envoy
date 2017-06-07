@@ -77,23 +77,36 @@ TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
                Json::Exception);
 }
 
-TEST(NetworkFilterConfigTest, TcpProxy) {
+class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
+                        ::testing::Values(R"EOF("destination_ip_list": [
+                                                  "192.168.1.1/32",
+                                                  "192.168.1.0/24"
+                                                ],
+                                                "source_ip_list": [
+                                                  "192.168.0.0/16",
+                                                  "192.0.0.0/8",
+                                                  "127.0.0.0/8"
+                                                ],)EOF",
+                                          R"EOF("destination_ip_list": [
+                                                  "2001:abcd::/64",
+                                                  "2002:ffff::/32"
+                                                ],
+                                                "source_ip_list": [
+                                                  "ffee::/128",
+                                                  "2001::abcd/64",
+                                                  "1234::5678/128"
+                                                ],)EOF"));
+
+TEST_P(RouteIpListConfigTest, TcpProxy) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
     "route_config": {
       "routes": [
-        {
-          "destination_ip_list": [
-            "192.168.1.1/32",
-            "192.168.1.0/24"
-          ],
-          "source_ip_list": [
-            "192.168.0.0/16",
-            "192.0.0.0/8",
-            "127.0.0.0/8"
-          ],
-          "destination_ports": "1-1024,2048-4096,12345",
+        {)EOF" + GetParam() +
+                            R"EOF("destination_ports": "1-1024,2048-4096,12345",
           "cluster": "fake_cluster"
         },
         {
@@ -118,12 +131,19 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
                EnvoyException);
 }
 
-TEST(NetworkFilterConfigTest, ClientSslAuth) {
+class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_CASE_P(IpList, IpWhiteListConfigTest,
+                        ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",
+                                          R"EOF(["2001:abcd::/64"])EOF"));
+
+TEST_P(IpWhiteListConfigTest, ClientSslAuth) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
     "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"]
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
   }
   )EOF";
 

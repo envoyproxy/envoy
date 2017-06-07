@@ -79,13 +79,20 @@ IpVersion CidrRange::version() const {
 }
 
 bool CidrRange::isInRange(InstanceConstSharedPtr address) const {
-  if (address == nullptr || length_ < 0 || address->type() != Type::Ip ||
-      address->ip()->version() != version()) {
+  if (address == nullptr) {
+    return false;
+  }
+
+  return isInRange(*address);
+}
+
+bool CidrRange::isInRange(const Instance& address) const {
+  if (length_ < 0 || address.type() != Type::Ip || address.ip()->version() != version()) {
     return false;
   }
   // Make an CidrRange from the address, of the same length as this. If the two ranges have
   // are the same, then the address is in this range.
-  CidrRange other = create(address, length_);
+  CidrRange other = create(address.ip()->addressAsString(), length_);
   ASSERT(length() == other.length());
   ASSERT(version() == other.version());
   return *this == other;
@@ -192,6 +199,35 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
   }
   NOT_REACHED
 }
+
+IpList::IpList(const std::vector<std::string>& subnets) {
+  for (const std::string& entry : subnets) {
+    CidrRange list_entry = CidrRange::create(entry);
+    if (list_entry.isValid()) {
+      ip_list_.push_back(list_entry);
+    } else {
+      throw EnvoyException(
+          fmt::format("invalid ip/mask combo '{}' (format is <ip>/<# mask bits>)", entry));
+    }
+  }
+}
+
+bool IpList::contains(const Instance& address) const {
+  if (address.type() != Type::Ip) {
+    return false;
+  }
+
+  for (const CidrRange& entry : ip_list_) {
+    if (entry.isInRange(address)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+IpList::IpList(const Json::Object& config, const std::string& member_name)
+    : IpList(config.hasObject(member_name) ? config.getStringArray(member_name)
+                                           : std::vector<std::string>()) {}
 
 } // Address
 } // Network

@@ -4,7 +4,6 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -14,107 +13,6 @@
 
 namespace Envoy {
 namespace Network {
-
-TEST(IpListTest, Errors) {
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["foo"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["foo/bar"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["192.168.1.1/33"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "ip_white_list": ["192.168.1.1/24"]
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
-  }
-}
-
-TEST(IpListTest, Normal) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "192.168.3.0/24",
-      "50.1.2.3/32",
-      "10.15.0.0/16"
-     ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
-
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.2.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.4.0")));
-
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("50.1.2.3")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.2")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.4")));
-
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.90.90")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.255.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.14.255.255")));
-  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.16.0.0")));
-
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
-}
-
-TEST(IpListTest, MatchAny) {
-  std::string json = R"EOF(
-  {
-    "ip_white_list": [
-      "0.0.0.0/0"
-     ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  IpList wl(*loader, "ip_white_list");
-
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.0.0.0")));
-  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("1.1.1.1")));
-
-  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
-}
 
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));

@@ -24,7 +24,7 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
   cluster_name_ = config.getString("cluster");
 
   if (config.hasObject("source_ip_list")) {
-    source_ips_ = Network::IpList(config.getStringArray("source_ip_list"));
+    source_ips_ = Network::Address::IpList(config.getStringArray("source_ip_list"));
   }
 
   if (config.hasObject("source_ports")) {
@@ -33,7 +33,7 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
   }
 
   if (config.hasObject("destination_ip_list")) {
-    destination_ips_ = Network::IpList(config.getStringArray("destination_ip_list"));
+    destination_ips_ = Network::Address::IpList(config.getStringArray("destination_ip_list"));
   }
 
   if (config.hasObject("destination_ports")) {
