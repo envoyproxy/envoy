@@ -1,5 +1,6 @@
 #include "xfcc_integration_test.h"
 
+#include <stdio.h>
 #include <regex>
 
 #include "common/event/dispatcher_impl.h"
@@ -38,12 +39,6 @@ void XfccIntegrationTest::TearDown() {
   upstream_ssl_ctx_.reset();
   context_manager_.reset();
   runtime_.reset();
-}
-
-std::string XfccIntegrationTest::replaceXfccConfigs(std::string config, std::string content) {
-  const std::regex port_regex("\\{\\{ xfcc_config \\}\\}");
-  config = std::regex_replace(config, port_regex, content);
-  return config;
 }
 
 Ssl::ClientContextPtr XfccIntegrationTest::createClientSslContext() {
@@ -99,7 +94,11 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
        [&]() -> void { upstream_request = fake_upstream_connection->waitForNewStream(); },
        [&]() -> void { upstream_request->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         EXPECT_STREQ(expected_xfcc.c_str(), upstream_request->headers().ForwardedClientCert()->value().c_str());
+         if (expected_xfcc.empty()) {
+           EXPECT_EQ(nullptr, upstream_request->headers().ForwardedClientCert());
+         } else {
+           EXPECT_STREQ(expected_xfcc.c_str(), upstream_request->headers().ForwardedClientCert()->value().c_str());
+        }
          upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
        },
        [&]() -> void {
@@ -114,12 +113,34 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
   EXPECT_TRUE(response->complete());
 }
 
+void XfccIntegrationTest::modifyXfccConfigs(std::string fcc, std::string sccd) {
+  test_server_.reset();
+  std::string config = TestEnvironment::temporaryFileSubstitute(
+      "test/config/integration/server_xfcc.json", port_map_);
+  printf("Oliver:\n%s\nabc\n", config.c_str());
+  const std::regex fcc_regex("forward_only");
+  config = std::regex_replace(config, fcc_regex, fcc);
+  const std::regex sccd_regex("SAN");
+  config = std::regex_replace(config, sccd_regex, sccd);
+  printf("Oliver:\n%s\nabc\n", config.c_str());
+  test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, Network::Address::IpVersion::v4);
+  registerTestServerPorts({"http"});
+}
+
 TEST_F(XfccIntegrationTest, ForwardOnly) {
   testRequestAndResponseWithXfccHeader(
       dispatcher_->createSslClientConnection(
           *createClientSslContext(),
           Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))),
       xfcc_header_);
+}
+
+TEST_F(XfccIntegrationTest, Sanitize) {
+  modifyXfccConfigs("sanitize", "SAN");
+  testRequestAndResponseWithXfccHeader(
+      dispatcher_->createSslClientConnection(
+          *createClientSslContext(),
+          Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))), "");
 }
 } // Xfcc
 } // Envoy

@@ -27,13 +27,12 @@ public:
   Ssl::ClientContextPtr createClientSslContext();
   void testRequestAndResponseWithXfccHeader(
       Network::ClientConnectionPtr&& conn, std::string expected_xfcc);
+  void modifyXfccConfigs(std::string config, std::string content);
 
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Ssl::ServerContextPtr upstream_ssl_ctx_;
-
-  std::string replaceXfccConfigs(std::string config, std::string content);
 };
 } // Xfcc
 } // Envoy
