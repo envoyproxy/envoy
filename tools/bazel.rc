@@ -5,6 +5,8 @@ build --workspace_status_command=bazel/get_workspace_status
 # Basic ASAN/UBSAN that works for gcc
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
+build:asan --copt -fno-sanitize=vptr
+build:asan --linkopt -fno-sanitize=vptr
 build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
