@@ -80,6 +80,26 @@ def python_deps(skip_targets):
             actual = "@jinja2_git//:jinja2",
         )
 
+def cc_grpc_httpjson_transcoding_dep():
+    native.git_repository(
+        name = "grpc_httpjson_transcoding",
+        remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding.git",
+        commit = "193aa283914ba701c12cfdfa5967c1c4210468e3",
+    )
+
+# Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
+def cc_deps(skip_targets):
+    if 'grpc-httpjson-transcoding' not in skip_targets:
+        cc_grpc_httpjson_transcoding_dep()
+        native.bind(
+            name = "path_matcher",
+            actual = "@grpc_httpjson_transcoding//src:path_matcher",
+        )
+        native.bind(
+            name = "grpc_transcoding",
+            actual = "@grpc_httpjson_transcoding//src:transcoding",
+        )
+
 def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
@@ -148,4 +168,5 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
             )
 
     python_deps(skip_targets)
+    cc_deps(skip_targets)
     envoy_api_deps(skip_targets)
