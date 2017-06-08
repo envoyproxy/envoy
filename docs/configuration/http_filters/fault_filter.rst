@@ -70,7 +70,7 @@ upstream_cluster:
 downstream_nodes:
   *(optional, array)* Faults are injected for the specified list of downstream hosts. If this setting is
   not set, faults are injected for all downstream nodes. Downstream node name is taken from
-  :ref:`the HTTP x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-cluster>`
+  :ref:`the HTTP x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-node>`
   header and compared against downstream_nodes list.
 
 The abort and delay blocks can be omitted. If they are not specified in the
@@ -148,7 +148,8 @@ http.fault.delay.fixed_duration_ms
   injected.
 
 *Note*, fault filter runtime settings for the specific downstream cluster
-overrides the default ones if present:
+override the default ones if present. The following are downstream specific
+runtime keys:
 * http.fault.<downstream-cluster>.abort.abort_percent
 * http.fault.<downstream-cluster>.abort.http_status
 * http.fault.<downstream-cluster>.delay.fixed_delay_percent
