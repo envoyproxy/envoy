@@ -17,8 +17,8 @@ namespace Grpc {
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
 // Supported gRPC-Web content-types.
-const std::vector<std::string>& GrpcWebFilter::GRPC_WEB_CONTENT_TYPES() const {
-  static const std::vector<std::string> types{
+const std::unordered_set<std::string>& GrpcWebFilter::GRPC_WEB_CONTENT_TYPES() const {
+  static const std::unordered_set<std::string> types{
       Http::Headers::get().ContentTypeValues.GrpcWeb,
       Http::Headers::get().ContentTypeValues.GrpcWebProto,
       Http::Headers::get().ContentTypeValues.GrpcWebText,
@@ -29,11 +29,7 @@ const std::vector<std::string>& GrpcWebFilter::GRPC_WEB_CONTENT_TYPES() const {
 bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    for (const std::string& valid : GrpcWebFilter::GRPC_WEB_CONTENT_TYPES()) {
-      if (valid == content_type->value().c_str()) {
-        return true;
-      }
-    }
+    return GRPC_WEB_CONTENT_TYPES().count(content_type->value().c_str());
   }
   return false;
 }

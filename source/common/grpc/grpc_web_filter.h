@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_set>
+
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -44,7 +46,7 @@ private:
   bool isGrpcWebRequest(const Http::HeaderMap& headers);
 
   static const uint8_t GRPC_WEB_TRAILER;
-  const std::vector<std::string>& GRPC_WEB_CONTENT_TYPES() const;
+  const std::unordered_set<std::string>& GRPC_WEB_CONTENT_TYPES() const;
 
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
