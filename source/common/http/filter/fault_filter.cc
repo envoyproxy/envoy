@@ -152,9 +152,11 @@ bool FaultFilter::isAbortEnabled() {
   return enabled;
 }
 
-uint64_t FaultFilter::delayDuration() {
-  uint64_t duration =
-      config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
+Optional<uint64_t> FaultFilter::delayDuration() {
+  Optional
+
+      uint64_t duration =
+          config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
   if (!downstream_cluster_delay_duration_key_.empty()) {
     duration =
         config_->runtime().snapshot().getInteger(downstream_cluster_delay_duration_key_, duration);

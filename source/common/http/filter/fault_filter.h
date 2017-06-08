@@ -98,9 +98,8 @@ private:
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const HeaderMap& headers);
 
-  bool isDelayEnabled();
   bool isAbortEnabled();
-  uint64_t delayDuration();
+  Optional<uint64_t> delayDuration();
   std::string abortHttpStatus();
 
   FaultFilterConfigSharedPtr config_;
