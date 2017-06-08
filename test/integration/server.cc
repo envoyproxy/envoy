@@ -56,9 +56,8 @@ IntegrationTestServer::~IntegrationTestServer() {
   log().info("stopping integration test server");
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      server_->admin().socket().localAddress()->ip()->version(),
       server_->admin().socket().localAddress()->ip()->port(), "GET", "/quitquitquit", "",
-      Http::CodecClient::Type::HTTP1);
+      Http::CodecClient::Type::HTTP1, server_->admin().socket().localAddress()->ip()->version());
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 

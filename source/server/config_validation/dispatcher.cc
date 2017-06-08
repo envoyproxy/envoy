@@ -16,7 +16,10 @@ ValidationDispatcher::createSslClientConnection(Ssl::ClientContext&,
   NOT_IMPLEMENTED;
 }
 
-Network::DnsResolverPtr ValidationDispatcher::createDnsResolver() { NOT_IMPLEMENTED; }
+Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
+    const std::vector<Network::Address::InstanceConstSharedPtr>&) {
+  NOT_IMPLEMENTED;
+}
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::ConnectionHandler&,
                                                           Network::ListenSocket&,

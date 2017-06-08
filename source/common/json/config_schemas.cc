@@ -1304,6 +1304,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "dns_resolvers": {
+        "type" : "array",
+        "items" : {"type" : "string"},
+        "minItems" : 1,
+        "uniqueItems" : true
+      },
       "dns_lookup_family" : {
         "type" : "string",
         "enum" : ["v4_only", "v6_only", "auto"]

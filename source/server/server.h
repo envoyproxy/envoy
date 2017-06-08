@@ -114,7 +114,7 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return handler_.dispatcher(); }
-  Network::DnsResolver& dnsResolver() override { return *dns_resolver_; }
+  Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   bool draining() override { return drain_manager_->draining(); }
   void drainListeners() override;
   DrainManager& drainManager() override { return *drain_manager_; }
@@ -170,7 +170,7 @@ private:
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
-  Network::DnsResolverPtr dns_resolver_;
+  Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   const LocalInfo::LocalInfo& local_info_;
   DrainManagerPtr drain_manager_;

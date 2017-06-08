@@ -38,7 +38,7 @@ public:
   }
 
   void expectResolve(Network::DnsLookupFamily dns_lookup_family) {
-    EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", dns_lookup_family, _))
+    EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", dns_lookup_family, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
@@ -48,7 +48,8 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<Network::MockDnsResolver> dns_resolver_;
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new NiceMock<Network::MockDnsResolver>};
   Network::MockActiveDnsQuery active_dns_query_;
   Network::DnsResolver::ResolveCb dns_callback_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -115,7 +116,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
+  EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_));

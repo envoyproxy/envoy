@@ -87,7 +87,8 @@ public:
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Network::MockDnsResolver> dns_resolver_;
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
@@ -684,7 +685,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
-  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _, _))
+  EXPECT_CALL(*factory_.dns_resolver_, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 

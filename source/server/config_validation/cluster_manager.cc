@@ -5,7 +5,7 @@ namespace Upstream {
 
 ValidationClusterManagerFactory::ValidationClusterManagerFactory(
     Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::RandomGenerator& random, Network::DnsResolver& dns_resolver,
+    Runtime::RandomGenerator& random, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& primary_dispatcher,
     const LocalInfo::LocalInfo& local_info)
     : ProdClusterManagerFactory(runtime, stats, tls, random, dns_resolver, ssl_context_manager,

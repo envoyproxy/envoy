@@ -5,27 +5,31 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-TEST_F(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+
+INSTANTIATE_TEST_CASE_P(IpVersions, UdsIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
 }
 
-TEST_F(UdsIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
+TEST_P(UdsIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
                                          Http::CodecClient::Type::HTTP1);
 }
 
-TEST_F(UdsIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+TEST_P(UdsIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                      Http::CodecClient::Type::HTTP1);
 }
 
-TEST_F(UdsIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+TEST_P(UdsIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                       Http::CodecClient::Type::HTTP1);
 }
 
-TEST_F(UdsIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+TEST_P(UdsIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                        Http::CodecClient::Type::HTTP1);
 }

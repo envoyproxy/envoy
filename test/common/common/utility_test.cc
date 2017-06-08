@@ -135,6 +135,20 @@ TEST(StringUtil, split) {
               ContainerEq(StringUtil::split("hello   world", " ", true)));
 }
 
+TEST(StringUtil, join) {
+  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
+  EXPECT_EQ("", StringUtil::join({}, ","));
+
+  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
+  EXPECT_EQ("", StringUtil::join({}, ""));
+
+  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
+  EXPECT_EQ("", StringUtil::join({}, ",,"));
+}
+
 TEST(StringUtil, endsWith) {
   EXPECT_TRUE(StringUtil::endsWith("test", "st"));
   EXPECT_TRUE(StringUtil::endsWith("t", "t"));

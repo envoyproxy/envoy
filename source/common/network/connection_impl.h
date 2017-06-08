@@ -99,8 +99,6 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
-  static const Address::InstanceConstSharedPtr null_local_address_;
-
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
