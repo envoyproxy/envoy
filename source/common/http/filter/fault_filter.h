@@ -99,6 +99,7 @@ private:
   bool matchesDownstreamNodes(const HeaderMap& headers);
 
   bool isAbortEnabled();
+  bool isDelayEnabled();
   Optional<uint64_t> delayDuration();
   std::string abortHttpStatus();
 

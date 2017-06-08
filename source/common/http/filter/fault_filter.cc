@@ -106,18 +106,13 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
   }
 
-  if (isDelayEnabled()) {
-    uint64_t duration_ms = delayDuration();
-
-    // Delay only if the duration is >0ms
-    if (0 != duration_ms) {
-      delay_timer_ =
-          callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
-      delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms));
-      recordDelaysInjectedStats();
-      callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected);
-      return FilterHeadersStatus::StopIteration;
-    }
+  Optional<uint64_t> duration_ms = delayDuration();
+  if (duration_ms.valid()) {
+    delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
+    delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
+    recordDelaysInjectedStats();
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected);
+    return FilterHeadersStatus::StopIteration;
   }
 
   if (isAbortEnabled()) {
@@ -153,16 +148,25 @@ bool FaultFilter::isAbortEnabled() {
 }
 
 Optional<uint64_t> FaultFilter::delayDuration() {
-  Optional
+  Optional<uint64_t> ret;
 
-      uint64_t duration =
-          config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
+  if (!isDelayEnabled()) {
+    return ret;
+  }
+
+  uint64_t duration =
+      config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
   if (!downstream_cluster_delay_duration_key_.empty()) {
     duration =
         config_->runtime().snapshot().getInteger(downstream_cluster_delay_duration_key_, duration);
   }
 
-  return duration;
+  // Delay only if the duration is >0ms
+  if (duration > 0) {
+    ret.value(duration);
+  }
+
+  return ret;
 }
 
 std::string FaultFilter::abortHttpStatus() {
