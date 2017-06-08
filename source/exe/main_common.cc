@@ -41,8 +41,8 @@ int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
   Event::Libevent::Global::initialize();
   Server::ProdComponentFactory component_factory;
   LocalInfo::LocalInfoImpl local_info(
-      Network::Utility::getLocalAddress(options.localAddressIpVersion()),
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+      Network::Utility::getLocalAddress(options.localAddressIpVersion()), options.serviceZone(),
+      options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
   case Server::Mode::Serve:
@@ -59,7 +59,7 @@ int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
   DefaultTestHooks default_test_hooks;
   Stats::ThreadLocalStoreImpl stats_store(restarter);
   Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
-                                     restarter.accessLogLock(), component_factory, local_info);
+                              restarter.accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();
   return 0;
