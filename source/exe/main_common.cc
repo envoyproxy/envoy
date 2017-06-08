@@ -37,29 +37,29 @@ public:
 
 } // Server
 
-int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& restarter) {
-  Envoy::Event::Libevent::Global::initialize();
-  Envoy::Server::ProdComponentFactory component_factory;
-  Envoy::LocalInfo::LocalInfoImpl local_info(
-      Envoy::Network::Utility::getLocalAddress(options.localAddressIpVersion()),
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
+  Event::Libevent::Global::initialize();
+  Server::ProdComponentFactory component_factory;
+  LocalInfo::LocalInfoImpl local_info(
+      Network::Utility::getLocalAddress(options.localAddressIpVersion()), options.serviceZone(),
+      options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
-  case Envoy::Server::Mode::Serve:
+  case Server::Mode::Serve:
     break;
-  case Envoy::Server::Mode::Validate:
-    Envoy::Thread::MutexBasicLockable log_lock;
-    Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
-    return Envoy::Server::validateConfig(options, component_factory, local_info) ? 0 : 1;
+  case Server::Mode::Validate:
+    Thread::MutexBasicLockable log_lock;
+    Logger::Registry::initialize(options.logLevel(), log_lock);
+    return Server::validateConfig(options, component_factory, local_info) ? 0 : 1;
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
 
-  Envoy::Logger::Registry::initialize(options.logLevel(), restarter.logLock());
-  Envoy::DefaultTestHooks default_test_hooks;
-  Envoy::Stats::ThreadLocalStoreImpl stats_store(restarter);
-  Envoy::Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
-                                     restarter.accessLogLock(), component_factory, local_info);
+  Logger::Registry::initialize(options.logLevel(), restarter.logLock());
+  DefaultTestHooks default_test_hooks;
+  Stats::ThreadLocalStoreImpl stats_store(restarter);
+  Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
+                              restarter.accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();
   return 0;
