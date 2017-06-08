@@ -9,8 +9,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
-#include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/upstream.h"
 
 #include "google/protobuf/message.h"
 
@@ -60,15 +58,6 @@ public:
      */
   static void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                          const std::string& grpc_method, bool success);
-
-  /**
-   * Resolve the cluster info.
-   * @param decoder_callbacks supplies the decoder callback of filter.
-   * @param cm supplies the cluster manager of the filter.
-   */
-  static Upstream::ClusterInfoConstSharedPtr
-  resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callbacks,
-                     Upstream::ClusterManager& cm);
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.

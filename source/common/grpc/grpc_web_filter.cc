@@ -6,6 +6,7 @@
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
+#include "common/upstream/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -170,7 +171,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  cluster_ = Common::resolveClusterInfo(decoder_callbacks_, cm_);
+  cluster_ = Upstream::Utility::resolveClusterInfo(decoder_callbacks_, cm_);
   if (!cluster_) {
     return;
   }

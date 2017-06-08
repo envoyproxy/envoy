@@ -53,22 +53,6 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
 }
 
-Upstream::ClusterInfoConstSharedPtr
-Common::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callbacks,
-                           Upstream::ClusterManager& cm) {
-  Router::RouteConstSharedPtr route = decoder_callbacks->route();
-  if (!route || !route->routeEntry()) {
-    return nullptr;
-  }
-
-  const Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = cm.get(route_entry->clusterName());
-  if (!cluster) {
-    return nullptr;
-  }
-  return cluster->info();
-}
-
 bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
                                      std::string* method) {
   if (path == nullptr || path->value().c_str() == nullptr) {
