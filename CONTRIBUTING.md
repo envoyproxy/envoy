@@ -31,9 +31,7 @@ maximize the chances of your PR being merged.
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. We make no guarantees about code or deployments that rely on undocumented
   behavior.
-* All deprecations/breaking changes will be clearly listed in the release notes.
-* Commit message must mention what has been deprecated as part of the message.
-* See [DEPRECATED.md](DEPRECATED.md) for the list of deprecated features.
+* All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
 
 # Release cadence
 
@@ -74,6 +72,8 @@ maximize the chances of your PR being merged.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us keep on top of all of the work currently in flight.
+* If a commit deprecates a feature, the commit message must mention what has been deprecated.
+  Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
 
 # PR review policy for committers
 
