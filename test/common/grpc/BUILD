@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto",
+        "//test/test_common:utility_lib",
     ],
 )
 
