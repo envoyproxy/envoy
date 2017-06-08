@@ -16,9 +16,6 @@
 #include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-#include "common/tracing/lightstep_tracer_impl.h"
-#include "common/tracing/zipkin/zipkin_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -53,8 +50,18 @@ void MainImpl::initialize(const Json::Object& json) {
         Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
   }
 
+  if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
+    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
+                         "are mutually exclusive.");
+  }
+
+  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
   if (json.hasObject("statsd_local_udp_port")) {
     statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
+  }
+
+  if (json.hasObject("statsd_udp_ip_address")) {
+    statsd_udp_ip_address_.value(json.getString("statsd_udp_ip_address"));
   }
 
   if (json.hasObject("statsd_tcp_cluster_name")) {

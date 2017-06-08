@@ -55,17 +55,26 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
-TEST(ConnectionImplDeathTest, BadFd) {
+class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, Utility::resolveUrl("tcp://127.0.0.1:0"),
-                              Utility::resolveUrl("tcp://127.0.0.1:0")),
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
+                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                              Network::Test::getCanonicalLoopbackAddress(GetParam())),
                ".*assert failure: fd_ != -1.*");
 }
 
-TEST(ConnectionImplTest, CloseDuringConnectCallback) {
+class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getIpv4AnyAddress(), true);
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(GetParam()), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -112,10 +121,10 @@ struct MockBufferStats {
   StrictMock<Stats::MockGauge> tx_current_;
 };
 
-TEST(ConnectionImplTest, BufferStats) {
+TEST_P(ConnectionImplTest, BufferStats) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getIpv4AnyAddress(), true);
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(GetParam()), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -247,23 +256,33 @@ TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
 TEST_P(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
 
-TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
+class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;
-  // Connecting to 255.255.255.255 will cause a perm error and not ECONNREFUSED which is a
-  // different path in libevent. Make sure this doesn't crash.
-  ClientConnectionPtr connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://255.255.255.255:1"));
+  Address::InstanceConstSharedPtr address;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    // Connecting to 255.255.255.255 will cause a perm error and not ECONNREFUSED which is a
+    // different path in libevent. Make sure this doesn't crash.
+    address = Utility::resolveUrl("tcp://255.255.255.255:1");
+  } else {
+    // IPv6 reserved multicast address.
+    address = Utility::resolveUrl("tcp://[ff00::]:1");
+  }
+  ClientConnectionPtr connection = dispatcher.createClientConnection(address);
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(TcpClientConnectionImplTest, BadConnectConnRefused) {
+TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   Event::DispatcherImpl dispatcher;
   // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
   // path from other errors. Test this also.
-  ClientConnectionPtr connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:1"));
+  ClientConnectionPtr connection = dispatcher.createClientConnection(Utility::resolveUrl(
+      fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))));
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);

@@ -104,6 +104,7 @@ envoy_cc_library(
     hdrs = ["options_impl.h"],
     external_deps = ["tclap"],
     deps = [
+        "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
@@ -137,6 +138,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_lib",

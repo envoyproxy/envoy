@@ -176,7 +176,7 @@ public:
     return per_connection_buffer_limit_bytes_;
   }
   uint64_t features() const override { return features_; }
-  uint64_t httpCodecOptions() const override { return http_codec_options_; }
+  const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
@@ -209,7 +209,7 @@ private:
   mutable ClusterStats stats_;
   Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
-  const uint64_t http_codec_options_;
+  const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   LoadBalancerType lb_type_;
@@ -224,7 +224,7 @@ class ClusterImplBase : public Cluster,
 
 public:
   static ClusterPtr create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
-                           ThreadLocal::Instance& tls, Network::DnsResolver& dns_resolver,
+                           ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                            const Optional<SdsConfig>& sds_config,
@@ -320,8 +320,8 @@ protected:
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
-                       Event::Dispatcher& dispatcher);
+                       Ssl::ContextManager& ssl_context_manager,
+                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -347,7 +347,7 @@ private:
   void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
                       const std::vector<HostSharedPtr>& hosts_removed);
 
-  Network::DnsResolver& dns_resolver_;
+  Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;

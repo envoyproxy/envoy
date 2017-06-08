@@ -48,6 +48,7 @@ public:
   MOCK_METHOD0(concurrency, uint32_t());
   MOCK_METHOD0(configPath, const std::string&());
   MOCK_METHOD0(adminAddressPath, const std::string&());
+  MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
   MOCK_METHOD0(logLevel, spdlog::level::level_enum());
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
@@ -113,7 +114,7 @@ public:
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(dnsResolver, Network::DnsResolver&());
+  MOCK_METHOD0(dnsResolver, Network::DnsResolverSharedPtr());
   MOCK_METHOD0(draining, bool());
   MOCK_METHOD0(drainListeners, void());
   MOCK_METHOD0(drainManager, DrainManager&());
@@ -141,7 +142,8 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
-  testing::NiceMock<Network::MockDnsResolver> dns_resolver_;
+  std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -170,6 +172,7 @@ public:
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
   MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
+  MOCK_METHOD0(statsdUdpIpAddress, Optional<std::string>());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());

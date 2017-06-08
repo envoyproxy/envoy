@@ -5,9 +5,12 @@
 
 #include "common/common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::ContainerEq;
+
 TEST(StringUtil, atoul) {
   uint64_t out;
   EXPECT_FALSE(StringUtil::atoul("123b", out));
@@ -116,6 +119,34 @@ TEST(StringUtil, split) {
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello, ", ", "));
   EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ","));
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
+
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello world", " ")));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello   world", " ")));
+
+  EXPECT_THAT(std::vector<std::string>({"", "", "hello", "world"}),
+              ContainerEq(StringUtil::split("  hello world", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world", ""}),
+              ContainerEq(StringUtil::split("hello world ", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello world", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "", "", "world"}),
+              ContainerEq(StringUtil::split("hello   world", " ", true)));
+}
+
+TEST(StringUtil, join) {
+  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
+  EXPECT_EQ("", StringUtil::join({}, ","));
+
+  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
+  EXPECT_EQ("", StringUtil::join({}, ""));
+
+  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
+  EXPECT_EQ("", StringUtil::join({}, ",,"));
 }
 
 TEST(StringUtil, endsWith) {

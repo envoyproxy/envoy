@@ -25,6 +25,12 @@ following are the command line options that Envoy supports.
 
   *(optional)* The output file path where the admin address and port will be written.
 
+.. option:: --local-address-ip-version <string>
+
+  *(optional)* The IP address version that is used to populate the server local IP address. This
+  parameter affects various headers including what is appended to the X-Forwarded-For (XFF) header.
+  The options are ``v4`` or ``v6``. The default is ``v4``.
+
 .. option:: --base-id <integer>
 
   *(optional)* The base ID to use when allocating shared memory regions. Envoy uses shared memory

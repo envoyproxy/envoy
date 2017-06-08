@@ -157,6 +157,12 @@ envoy_cc_library(
     ],
 )
 
+# Placeholder that just links API protos for now.
+envoy_cc_library(
+    name = "eds_lib",
+    external_deps = ["envoy_eds"],
+)
+
 envoy_cc_library(
     name = "sds_lib",
     srcs = ["sds.cc"],
@@ -191,6 +197,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:dns_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:connection_lib",
         "//source/common/ssl:context_config_lib",

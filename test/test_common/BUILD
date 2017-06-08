@@ -59,6 +59,7 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",

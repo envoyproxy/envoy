@@ -36,9 +36,9 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
       new HttpConnectionManagerConfig(config, server));
   return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-        new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
-                                        server.httpTracer(), server.runtime())});
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+        *http_config, server.drainManager(), server.random(), server.httpTracer(), server.runtime(),
+        server.localInfo())});
   };
 }
 
@@ -77,7 +77,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
-      codec_options_(Http::Utility::parseCodecOptions(config)),
+      http2_settings_(Http::Utility::parseHttp2Settings(config)),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(server.dispatcher(), server.threadLocal()) {
@@ -124,7 +124,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("access_log")) {
-    for (Json::ObjectSharedPtr access_log : config.getObjectArray("access_log")) {
+    for (const Json::ObjectSharedPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstanceSharedPtr current_access_log =
           Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
                                                   server.accessLogManager());
@@ -193,12 +193,12 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, server_.stats(), codec_options_)};
+        connection, callbacks, server_.stats(), http2_settings_)};
   case CodecType::AUTO:
     if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
         Http::Http2::ALPN_STRING) {
       return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, server_.stats(), codec_options_)};
+          connection, callbacks, server_.stats(), http2_settings_)};
     } else {
       return Http::ServerConnectionPtr{
           new Http::Http1::ServerConnectionImpl(connection, callbacks)};

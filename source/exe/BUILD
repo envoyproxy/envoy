@@ -17,7 +17,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = ["envoy_main_lib"],
+    deps = ["envoy_main_entry_lib"],
 )
 
 envoy_cc_library(
@@ -53,17 +53,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_main_lib",
+    name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
     deps = [
-        "//source/common/common:compiler_requirements_lib",
-        ":envoy_common_lib",
+        ":envoy_main_common_lib",
         ":hot_restart_lib",
-        "//source/server/config_validation:server_lib",
+        "//source/server:options_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [":sigaction_lib"],
     }),
+)
+
+envoy_cc_library(
+    name = "envoy_main_common_lib",
+    srcs = ["main_common.cc"],
+    hdrs = ["main_common.h"],
+    deps = [
+        ":envoy_common_lib",
+        ":hot_restart_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/server/config_validation:server_lib",
+    ],
 )
 
 envoy_cc_library(

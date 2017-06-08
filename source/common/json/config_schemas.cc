@@ -262,6 +262,31 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["no_compression"]
       },
+      "http2_settings" : {
+        "type" : "object",
+        "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 4294967295
+          },
+          "max_concurrent_streams" : {
+            "type": "integer",
+            "minimum": 1,
+            "maximum" : 2147483647
+          },
+          "initial_stream_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          },
+          "initial_connection_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          }
+        }
+      },
       "server_name" : {"type" : "string"},
       "idle_timeout_s" : {"type" : "integer"},
       "drain_timeout_ms" : {"type" : "integer"},
@@ -832,6 +857,39 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "request_type" : {
+        "type" : "string",
+        "enum" : ["internal", "external", "both"]
+      },
+      "ip_tags" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type" : "object",
+          "properties" : {
+            "ip_tag_name" : { "type" : "string" },
+            "ip_list" : {
+              "type" : "array",
+              "minItems" : 1,
+              "uniqueItems" : true,
+              "items" : { "type" : "string" }
+            }
+          },
+          "required" : ["ip_tag_name", "ip_list"],
+          "additionalProperties" : false
+        }
+      }
+    },
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1014,6 +1072,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "cluster_manager" : {"type" : "object"},
       "flags_path" : {"type" : "string"},
       "statsd_local_udp_port" : {"type" : "integer"},
+      "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
       "tracing" : {
@@ -1204,11 +1263,45 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["http2"]
       },
-      "http_codec_options" : {"type" : "string"},
+      "http_codec_options" : {
+        "type" : "string",
+        "enum" : ["no_compression"]
+      },
+      "http2_settings" : {
+        "type" : "object",
+        "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 4294967295
+          },
+          "max_concurrent_streams" : {
+            "type": "integer",
+            "minimum": 1,
+            "maximum" : 2147483647
+          },
+          "initial_stream_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          },
+          "initial_connection_window_size" : {
+            "type": "integer",
+            "minimum": 65535,
+            "maximum" : 2147483647
+          }
+        }
+      },
       "dns_refresh_rate_ms" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
+      },
+      "dns_resolvers": {
+        "type" : "array",
+        "items" : {"type" : "string"},
+        "minItems" : 1,
+        "uniqueItems" : true
       },
       "dns_lookup_family" : {
         "type" : "string",

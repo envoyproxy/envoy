@@ -23,6 +23,7 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
+  const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
@@ -75,7 +76,9 @@ public:
     const std::string Text{"text/plain"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
+    const std::string GrpcWebProto{"application/grpc-web+proto"};
     const std::string GrpcWebText{"application/grpc-web-text"};
+    const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
   } ContentTypeValues;
 
   struct {

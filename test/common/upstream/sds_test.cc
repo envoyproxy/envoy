@@ -66,7 +66,7 @@ protected:
 
   uint64_t numHealthy() {
     uint64_t healthy = 0;
-    for (HostSharedPtr host : cluster_->hosts()) {
+    for (const HostSharedPtr& host : cluster_->hosts()) {
       if (host->healthy()) {
         healthy++;
       }

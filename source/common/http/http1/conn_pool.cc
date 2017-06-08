@@ -51,7 +51,7 @@ void ConnPoolImpl::checkForDrained() {
       ready_clients_.front()->codec_client_->close();
     }
 
-    for (DrainedCb cb : drained_callbacks_) {
+    for (const DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }

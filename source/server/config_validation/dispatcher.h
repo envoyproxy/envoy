@@ -18,7 +18,8 @@ public:
       createClientConnection(Network::Address::InstanceConstSharedPtr) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext&, Network::Address::InstanceConstSharedPtr) override;
-  Network::DnsResolverPtr createDnsResolver() override;
+  Network::DnsResolverSharedPtr createDnsResolver(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   Network::ListenerPtr createListener(Network::ConnectionHandler&, Network::ListenSocket&,
                                       Network::ListenerCallbacks&, Stats::Scope&,
                                       const Network::ListenerOptions&) override;

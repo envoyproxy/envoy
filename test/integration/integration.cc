@@ -21,6 +21,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -174,10 +175,11 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port)
+IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+                                           Network::Address::IpVersion version)
     : callbacks_(new ConnectionCallbacks(*this)) {
-  connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+  connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(callbacks_);
   connection_->connect();
@@ -224,10 +226,10 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest()
+BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
-      default_log_level_(TestEnvironment::getOptions().logLevel()) {
+      default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -240,8 +242,8 @@ BaseIntegrationTest::BaseIntegrationTest()
 BaseIntegrationTest::~BaseIntegrationTest() {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+  return dispatcher_->createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)));
 }
 
 IntegrationCodecClientPtr BaseIntegrationTest::makeHttpConnection(uint32_t port,
@@ -254,13 +256,15 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                         Http::CodecClient::Type type) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+      cluster, "", Network::Utility::resolveUrl(fmt::format(
+                       "tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_))),
+      false, "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port)};
+  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port, version_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -277,7 +281,7 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
   int index = 0;
-  for (auto it : port_names) {
+  for (const auto& it : port_names) {
     Network::ListenSocket* listen_socket = test_server_->server().getListenSocketByIndex(index++);
     RELEASE_ASSERT(listen_socket != nullptr);
     registerPort(it, listen_socket->localAddress()->ip()->port());
@@ -286,17 +290,10 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const Network::Address::IpVersion version,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, version, port_map_), version);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
   registerTestServerPorts(port_names);
-}
-
-// TODO(hennna): Deprecate when IPv6 test support is finished.
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  BaseIntegrationTest::createTestServer(json_path, Network::Address::IpVersion::v4, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
@@ -386,22 +383,22 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
 }
 
 void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "", type);
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/notfound", "", type, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type);
+      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/foo", "", type, "www.redirect.com");
+      lookupPort("http"), "GET", "/foo", "", type, version_, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
@@ -769,9 +766,10 @@ void BaseIntegrationTest::testBadHttpRequest() {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data)
-          -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+      }, version_);
 
   connection.run();
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
@@ -781,11 +779,11 @@ void BaseIntegrationTest::testHttp10Request() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version_);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
@@ -795,11 +793,11 @@ void BaseIntegrationTest::testNoHost() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version_);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
@@ -809,11 +807,11 @@ void BaseIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+      lookupPort("http"),
+      buffer, [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         client.close(Network::ConnectionCloseType::NoFlush);
-      });
+      }, version_);
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);

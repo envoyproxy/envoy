@@ -5,6 +5,7 @@
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_web.h"
+#include "server/config/http/ip_tagging.h"
 #include "server/config/http/lightstep_http_tracer.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
@@ -189,6 +190,46 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   RouterFilterConfig factory;
+  EXPECT_THROW(factory.createFilterFactory(HttpFilterType::Decoder, *json_config, "stats", server),
+               Json::Exception);
+}
+
+TEST(HttpFilterConfigTest, IpTaggingFilter) {
+  std::string json_string = R"EOF(
+  {
+    "request_type" : "internal",
+    "ip_tags" : [
+      { "ip_tag_name" : "example_tag",
+        "ip_list" : ["0.0.0.0"]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockInstance> server;
+  IpTaggingFilterConfig factory;
+  HttpFilterFactoryCb cb =
+      factory.createFilterFactory(HttpFilterType::Decoder, *json_config, "stats", server);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
+  std::string json_string = R"EOF(
+  {
+    "request_type" : "internal",
+    "ip_tags" : [
+      { "ip_tag_name" : "example_tag"
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockInstance> server;
+  IpTaggingFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(HttpFilterType::Decoder, *json_config, "stats", server),
                Json::Exception);
 }

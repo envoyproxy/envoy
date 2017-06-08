@@ -131,7 +131,8 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
   if (type == Type::HTTP1) {
     codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
   } else {
-    codec_.reset(new Http::Http2::ServerConnectionImpl(connection_, *this, store, 0));
+    codec_.reset(
+        new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));
     ASSERT(type == Type::HTTP2);
   }
 
@@ -199,38 +200,26 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   log().info("starting fake server on unix domain socket {}", uds_path);
 }
 
-// TODO(henna): Deprecate when IPv6 test support is finished.
-static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
-  auto addr =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("0.0.0.0", port)};
-  return Network::ListenSocketPtr{new Network::TcpListenSocket(addr, true)};
-}
-
-static Network::ListenSocketPtr makeTcpListenSocket(const Network::Address::IpVersion version,
-                                                    uint32_t port) {
+static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
+                                                    Network::Address::IpVersion version) {
   return Network::ListenSocketPtr{new Network::TcpListenSocket(
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
       true)};
 }
 
-// TODO(henna): Deprecate when IPv6 test support is finished.
-FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, makeTcpListenSocket(port), type) {
-  log().info("starting fake server on port {}", this->localAddress()->ip()->port());
-}
-
-FakeUpstream::FakeUpstream(Network::Address::IpVersion version, uint32_t port,
-                           FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, makeTcpListenSocket(version, port), type) {
+FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
+                           Network::Address::IpVersion version)
+    : FakeUpstream(nullptr, makeTcpListenSocket(port, version), type) {
   log().info("starting fake server on port {}. Address version is {}",
              this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
-                           FakeHttpConnection::Type type)
-    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port), type) {
-  log().info("starting fake SSL server on port {}", this->localAddress()->ip()->port());
+                           FakeHttpConnection::Type type, Network::Address::IpVersion version)
+    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port, version), type) {
+  log().info("starting fake SSL server on port {}. Address version is {}",
+             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,

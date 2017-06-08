@@ -65,6 +65,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_tagging_lib",
+    srcs = ["ip_tagging.cc"],
+    hdrs = ["ip_tagging.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+        "//source/common/http/filter:ip_tagging_filter_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "lightstep_lib",
     srcs = ["lightstep_http_tracer.cc"],
     hdrs = ["lightstep_http_tracer.h"],

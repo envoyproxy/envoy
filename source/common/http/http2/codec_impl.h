@@ -32,7 +32,7 @@ const std::string ALPN_STRING = "h2";
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
 /**
- * All stats for the http/2 codec. @see stats_macros.h
+ * All stats for the HTTP/2 codec. @see stats_macros.h
  */
 // clang-format off
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
@@ -44,7 +44,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 // clang-format on
 
 /**
- * Wrapper struct for the http/2 codec stats. @see stats_macros.h
+ * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
 struct CodecStats {
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
@@ -81,8 +81,6 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
-
-  static const uint64_t MAX_CONCURRENT_STREAMS = 1024;
 
 protected:
   /**
@@ -195,7 +193,7 @@ protected:
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
-  void sendSettings(uint64_t codec_options);
+  void sendSettings(const Http2Settings& http2_settings);
 
   static Http2Callbacks http2_callbacks_;
   static Http2Options http2_options_;
@@ -215,10 +213,6 @@ private:
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
 
-  // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if
-  // needed.
-  static const uint64_t DEFAULT_WINDOW_SIZE = 256 * 1024 * 1024;
-
   static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
 
   Network::Connection& connection_;
@@ -233,7 +227,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, uint64_t codec_options);
+                       Stats::Scope& stats, const Http2Settings& http2_settings);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -253,7 +247,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Store& stats, uint64_t codec_options);
+                       Stats::Store& stats, const Http2Settings& http2_settings);
 
 private:
   // ConnectionImpl

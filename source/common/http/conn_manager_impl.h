@@ -229,7 +229,7 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
-                        Runtime::Loader& runtime);
+                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
@@ -504,6 +504,7 @@ private:
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
+  const LocalInfo::LocalInfo& local_info_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

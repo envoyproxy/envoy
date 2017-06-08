@@ -25,6 +25,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
@@ -100,7 +101,7 @@ INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generate
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   ReadyWatcher initialized;
@@ -118,7 +119,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   }
   )EOF";
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
+  EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
@@ -135,13 +136,13 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
 
   // gmock matches in LIFO order which is why these are swapped.
-  ResolverData resolver2(dns_resolver, dispatcher);
-  ResolverData resolver1(dns_resolver, dispatcher);
+  ResolverData resolver2(*dns_resolver, dispatcher);
+  ResolverData resolver1(*dns_resolver, dispatcher);
 
   std::string json = R"EOF(
   {
@@ -184,8 +185,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::NoCompression),
-            cluster.info()->httpCodecOptions());
+  EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());
@@ -198,7 +198,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
       [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
           -> void { membership_updated.ready(); });
 
-  resolver1.expectResolve(dns_resolver);
+  resolver1.expectResolve(*dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
@@ -207,14 +207,14 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ("localhost1", cluster.hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.hosts()[1]->hostname());
 
-  resolver1.expectResolve(dns_resolver);
+  resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
-  resolver1.expectResolve(dns_resolver);
+  resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
@@ -244,9 +244,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
 
   // Make sure we cancel.
-  resolver1.expectResolve(dns_resolver);
+  resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
-  resolver2.expectResolve(dns_resolver);
+  resolver2.expectResolve(*dns_resolver);
   resolver2.timer_->callback_();
 
   EXPECT_CALL(resolver1.active_dns_query_, cancel());
@@ -467,7 +467,8 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->httpCodecOptions());
+  EXPECT_EQ(Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
+            cluster.info()->http2Settings().hpack_table_size_);
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
   EXPECT_THAT(std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));

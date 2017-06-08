@@ -11,6 +11,7 @@
 #include "envoy/network/dns.h"
 
 #include "common/common/linked_object.h"
+#include "common/common/utility.h"
 
 #include "ares.h"
 
@@ -25,7 +26,8 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher);
+  DnsResolverImpl(Event::Dispatcher& dispatcher,
+                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver

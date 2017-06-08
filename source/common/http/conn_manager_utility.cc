@@ -32,7 +32,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
                                                     ConnectionManagerConfig& config,
                                                     const Router::Config& route_config,
                                                     Runtime::RandomGenerator& random,
-                                                    Runtime::Loader& runtime) {
+                                                    Runtime::Loader& runtime,
+                                                    const LocalInfo::LocalInfo& local_info) {
   // Clean proxy headers.
   request_headers.removeConnection();
   request_headers.removeEnvoyInternalRequest();
@@ -76,6 +77,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   } else {
     if (edge_request) {
       request_headers.removeEnvoyDownstreamServiceCluster();
+      request_headers.removeEnvoyDownstreamServiceNode();
     }
 
     request_headers.removeEnvoyRetryOn();
@@ -96,6 +98,10 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
       user_agent_header.value(config.userAgent().value());
+    }
+
+    if (!local_info.nodeName().empty()) {
+      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
     }
   }
 

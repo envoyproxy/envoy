@@ -22,6 +22,18 @@
 namespace Envoy {
 namespace Network {
 
+namespace {
+// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
+// looks at this currently, but we may want to populate this later for logging purposes.
+Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address) {
+  if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
+    return Utility::getIpv6AnyAddress();
+  }
+  // Default to IPv4 any address.
+  return Utility::getIpv4AnyAddress();
+}
+} // namespace
+
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
                                               Stats::Gauge& stat_current) {
@@ -41,11 +53,6 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 }
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
-
-// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
-// looks at this currently, but we may want to populate this later for logging purposes.
-const Address::InstanceConstSharedPtr
-    ConnectionImpl::null_local_address_(new Address::Ipv4Instance("0.0.0.0"));
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
@@ -454,7 +461,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     null_local_address_) {}
+                     getNullLocalAddress(*address)) {}
 
 } // Network
 } // Envoy
