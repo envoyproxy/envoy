@@ -14,6 +14,6 @@ make V=1 install
 # These internal headers are needed by the GRPC-JSON transcoding library.
 # https://github.com/grpc-ecosystem/grpc-httpjson-transcoding
 # TODO(htuch): Clean up protobuf deps builds with envoy-api
-rsync -av --include '*/' --include '*.h' --exclude '*' src/google/protobuf/util/internal $THIRDPARTY_BUILD/include/google/protobuf/util/
+rsync -av src/google/protobuf/util/internal/*.h $THIRDPARTY_BUILD/include/google/protobuf/util/internal
 cp src/google/protobuf/stubs/strutil.h $THIRDPARTY_BUILD/include/google/protobuf/stubs/
 cp src/google/protobuf/stubs/statusor.h $THIRDPARTY_BUILD/include/google/protobuf/stubs/
