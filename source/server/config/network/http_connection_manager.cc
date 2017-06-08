@@ -150,9 +150,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     std::string string_name = filters[i]->getString("name");
     Json::ObjectSharedPtr config_object = filters[i]->getObject("config");
 
-    log().info("    filter #{}", i);
-    log().info("      type: {}", string_type);
-    log().info("      name: {}", string_name);
+    log_facility(info, "    filter #{}", i);
+    log_facility(info, "      type: {}", string_type);
+    log_facility(info, "      name: {}", string_name);
 
     HttpFilterType type = stringToType(string_type);
 

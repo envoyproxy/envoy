@@ -40,7 +40,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version) {
-  log().info("starting integration test server");
+  log_facility(info, "starting integration test server");
   ASSERT(!thread_);
   thread_.reset(new Thread::Thread([version, this]() -> void { threadRoutine(version); }));
   // First, we want to wait until we know the server's worker threads are all
@@ -53,7 +53,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version) {
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
-  log().info("stopping integration test server");
+  log_facility(info, "stopping integration test server");
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       server_->admin().socket().localAddress()->ip()->port(), "GET", "/quitquitquit", "",

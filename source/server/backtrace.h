@@ -73,7 +73,7 @@ public:
     // The size must be at least two for useful info - there is a sentinel frame
     // at the end that we ignore.
     if (stack_trace_.size() < 2) {
-      log().critical("Back trace attempt failed");
+      log_facility(critical, "Back trace attempt failed");
       return;
     }
 
@@ -81,7 +81,8 @@ public:
     backward::ResolvedTrace first_frame_trace = resolver.resolve(stack_trace_[0]);
     auto obj_name = first_frame_trace.object_filename;
 
-    log().critical("Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name, thread_id);
+    log_facility(critical, "Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name,
+                 thread_id);
 
     // Backtrace gets tagged by ASAN when we try the object name resolution for the last
     // frame on stack, so skip the last one. It has no useful info anyway.
@@ -89,15 +90,16 @@ public:
       backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
       if (trace.object_filename != obj_name) {
         obj_name = trace.object_filename;
-        log().critical("thr<{}> obj<{}>", thread_id, obj_name);
+        log_facility(critical, "thr<{}> obj<{}>", thread_id, obj_name);
       }
-      log().critical("thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
+      log_facility(critical, "thr<{}> #{} {}", thread_id, stack_trace_[i].idx,
+                   stack_trace_[i].addr);
     }
-    log().critical("end backtrace thread {}", stack_trace_.thread_id());
+    log_facility(critical, "end backtrace thread {}", stack_trace_.thread_id());
   }
 
   void logFault(const char* signame, const void* addr) {
-    log().critical("Caught {}, suspect faulting address {}", signame, addr);
+    log_facility(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
 private:

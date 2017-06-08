@@ -31,7 +31,7 @@ bool DrainManagerImpl::drainClose() {
 }
 
 void DrainManagerImpl::drainSequenceTick() {
-  log_trace("drain tick #{}", drain_time_completed_.count());
+  log_facility(trace, "drain tick #{}", drain_time_completed_.count());
   ASSERT(drain_time_completed_ < server_.options().drainTime());
   drain_time_completed_ += std::chrono::seconds(1);
 
@@ -50,7 +50,7 @@ void DrainManagerImpl::startParentShutdownSequence() {
   ASSERT(!parent_shutdown_timer_);
   parent_shutdown_timer_ = server_.dispatcher().createTimer([this]() -> void {
     // Shut down the parent now. It should have already been draining.
-    log().warn("shutting down parent after drain");
+    log_facility(warn, "shutting down parent after drain");
     server_.hotRestart().terminateParent();
   });
 

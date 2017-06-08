@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Filter {
 
 Network::FilterStatus Echo::onData(Buffer::Instance& data) {
-  conn_log_trace("echo: got {} bytes", read_callbacks_->connection(), data.length());
+  conn_log_facility(trace, "echo: got {} bytes", read_callbacks_->connection(), data.length());
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;

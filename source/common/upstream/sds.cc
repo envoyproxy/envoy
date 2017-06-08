@@ -47,7 +47,7 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    log_debug("sds hosts changed for cluster: {} ({})", info_->name(), hosts().size());
+    log_facility(debug, "sds hosts changed for cluster: {} ({})", info_->name(), hosts().size());
     HostListsSharedPtr per_zone(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
@@ -89,15 +89,15 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
 }
 
 void SdsClusterImpl::onFetchFailure(EnvoyException* e) {
-  log_debug("sds refresh failure for cluster: {}", info_->name());
+  log_facility(debug, "sds refresh failure for cluster: {}", info_->name());
   info_->stats().update_failure_.inc();
   if (e) {
-    log().warn("sds parsing error: {}", e->what());
+    log_facility(warn, "sds parsing error: {}", e->what());
   }
 }
 
 void SdsClusterImpl::createRequest(Http::Message& message) {
-  log_debug("starting sds refresh for cluster: {}", info_->name());
+  log_facility(debug, "starting sds refresh for cluster: {}", info_->name());
   info_->stats().update_attempt_.inc();
 
   message.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
@@ -105,7 +105,7 @@ void SdsClusterImpl::createRequest(Http::Message& message) {
 }
 
 void SdsClusterImpl::onFetchComplete() {
-  log_debug("sds refresh complete for cluster: {}", info_->name());
+  log_facility(debug, "sds refresh complete for cluster: {}", info_->name());
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
   if (initialize_callback_ && pending_health_checks_ == 0) {

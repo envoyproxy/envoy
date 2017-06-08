@@ -99,7 +99,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   }
 
   uint64_t data_to_write = write_buffer_.length();
-  conn_log_debug("closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
+  conn_log_facility(debug, "closing data_to_write={} type={}", *this, data_to_write,
+                    enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
@@ -132,7 +133,7 @@ void ConnectionImpl::closeSocket(uint32_t close_type) {
     return;
   }
 
-  conn_log_debug("closing socket: {}", *this, close_type);
+  conn_log_facility(debug, "closing socket: {}", *this, close_type);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -194,7 +195,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
 void ConnectionImpl::readDisable(bool disable) {
   bool read_enabled = readEnabled();
   UNREFERENCED_PARAMETER(read_enabled);
-  conn_log_trace("readDisable: enabled={} disable={}", *this, read_enabled, disable);
+  conn_log_facility(trace, "readDisable: enabled={} disable={}", *this, read_enabled, disable);
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -247,7 +248,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
   }
 
   if (data.length() > 0) {
-    conn_log_trace("writing {} bytes", *this, data.length());
+    conn_log_facility(trace, "writing {} bytes", *this, data.length());
     // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
     // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
     // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
@@ -262,10 +263,10 @@ void ConnectionImpl::write(Buffer::Instance& data) {
 }
 
 void ConnectionImpl::onFileEvent(uint32_t events) {
-  conn_log_trace("socket event: {}", *this, events);
+  conn_log_facility(trace, "socket event: {}", *this, events);
 
   if (state_ & InternalState::ImmediateConnectionError) {
-    conn_log_debug("raising immediate connect error", *this);
+    conn_log_facility(debug, "raising immediate connect error", *this);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
@@ -274,7 +275,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     ASSERT(!(events & Event::FileReadyType::Read));
-    conn_log_debug("remote early close", *this);
+    conn_log_facility(debug, "remote early close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
@@ -302,7 +303,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
     // ioctl(). The extra syscall is not worth it.
     int rc = read_buffer_.read(fd_, 16384);
-    conn_log_trace("read returns: {}", *this, rc);
+    conn_log_facility(trace, "read returns: {}", *this, rc);
 
     // Remote close. Might need to raise data before raising close.
     if (rc == 0) {
@@ -310,7 +311,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
-      conn_log_trace("read error: {}", *this, errno);
+      conn_log_facility(trace, "read error: {}", *this, errno);
       if (errno != EAGAIN) {
         action = PostIoAction::Close;
       }
@@ -338,7 +339,7 @@ void ConnectionImpl::onReadReady() {
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close) {
-    conn_log_debug("remote close", *this);
+    conn_log_facility(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
 }
@@ -353,9 +354,9 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
 
     int rc = write_buffer_.write(fd_);
-    conn_log_trace("write returns: {}", *this, rc);
+    conn_log_facility(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
-      conn_log_trace("write error: {}", *this, errno);
+      conn_log_facility(trace, "write error: {}", *this, errno);
       if (errno == EAGAIN) {
         action = PostIoAction::KeepOpen;
       } else {
@@ -374,7 +375,7 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 void ConnectionImpl::onConnected() { raiseEvents(ConnectionEvent::Connected); }
 
 void ConnectionImpl::onWriteReady() {
-  conn_log_trace("write ready", *this);
+  conn_log_facility(trace, "write ready", *this);
 
   if (state_ & InternalState::Connecting) {
     int error;
@@ -384,16 +385,16 @@ void ConnectionImpl::onWriteReady() {
     UNREFERENCED_PARAMETER(rc);
 
     if (error == 0) {
-      conn_log_debug("connected", *this);
+      conn_log_facility(debug, "connected", *this);
       state_ &= ~InternalState::Connecting;
       onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
-        conn_log_debug("close during connected callback", *this);
+        conn_log_facility(debug, "close during connected callback", *this);
         return;
       }
     } else {
-      conn_log_debug("delayed connection error: {}", *this, error);
+      conn_log_facility(debug, "delayed connection error: {}", *this, error);
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
@@ -409,13 +410,13 @@ void ConnectionImpl::onWriteReady() {
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
   } else if ((state_ & InternalState::CloseWithFlush) && new_buffer_size == 0) {
-    conn_log_debug("write flush complete", *this);
+    conn_log_facility(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   }
 }
 
 void ConnectionImpl::doConnect() {
-  conn_log_debug("connecting to {}", *this, remote_address_->asString());
+  conn_log_facility(debug, "connecting to {}", *this, remote_address_->asString());
   int rc = remote_address_->connect(fd_);
   if (rc == 0) {
     // write will become ready.
@@ -424,11 +425,11 @@ void ConnectionImpl::doConnect() {
     ASSERT(rc == -1);
     if (errno == EINPROGRESS) {
       state_ |= InternalState::Connecting;
-      conn_log_debug("connection in progress", *this);
+      conn_log_facility(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
       state_ |= InternalState::ImmediateConnectionError;
-      conn_log_debug("immediate connection error: {}", *this, errno);
+      conn_log_facility(debug, "immediate connection error: {}", *this, errno);
     }
   }
 }
