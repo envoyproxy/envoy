@@ -21,6 +21,11 @@
 namespace Envoy {
 namespace Http {
 
+const std::string FaultFilter::DELAY_PERCENT_KEY = "fault.http.delay.fixed_delay_percent";
+const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_percent";
+const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
+const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
+
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
                                      const std::string& stats_prefix, Stats::Store& stats)
     : runtime_(runtime), stats_(generateStats(stats_prefix, stats)), stats_prefix_(stats_prefix),
@@ -60,9 +65,6 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 
-  downstream_cluster_specific_settings_ =
-      json_config.getBoolean("downstream_cluster_specific_settings", false);
-
   if (json_config.hasObject("downstream_nodes")) {
     std::vector<std::string> nodes = json_config.getStringArray("downstream_nodes");
     downstream_nodes_.insert(nodes.begin(), nodes.end());
@@ -91,24 +93,21 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  if (config_->downstreamClusterSpecificSettings()) {
-    if (headers.EnvoyDownstreamServiceCluster()) {
-      downstream_cluster_ = headers.EnvoyDownstreamServiceCluster()->value().c_str();
+  if (headers.EnvoyDownstreamServiceCluster()) {
+    downstream_cluster_ = headers.EnvoyDownstreamServiceCluster()->value().c_str();
 
-      delay_percent_key_ =
-          fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
-      abort_percent_key_ = fmt::format("fault.http.{}.abort.abort_percent", downstream_cluster_);
-      delay_duration_key_ =
-          fmt::format("fault.http.{}.delay.fixed_duration_ms", downstream_cluster_);
-      abort_http_status_key_ = fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
-    } else {
-      return FilterHeadersStatus::Continue;
-    }
+    downstream_cluster_delay_percent_key_ =
+        fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
+    downstream_cluster_abort_percent_key_ =
+        fmt::format("fault.http.{}.abort.abort_percent", downstream_cluster_);
+    downstream_cluster_delay_duration_key_ =
+        fmt::format("fault.http.{}.delay.fixed_duration_ms", downstream_cluster_);
+    downstream_cluster_abort_http_status_key_ =
+        fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
   }
 
-  if (config_->runtime().snapshot().featureEnabled(delay_percent_key_, config_->delayPercent())) {
-    uint64_t duration_ms =
-        config_->runtime().snapshot().getInteger(delay_duration_key_, config_->delayDuration());
+  if (isDelayEnabled()) {
+    uint64_t duration_ms = delayDuration();
 
     // Delay only if the duration is >0ms
     if (0 != duration_ms) {
@@ -121,12 +120,60 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     }
   }
 
-  if (config_->runtime().snapshot().featureEnabled(abort_percent_key_, config_->abortPercent())) {
+  if (isAbortEnabled()) {
     abortWithHTTPStatus();
     return FilterHeadersStatus::StopIteration;
   }
 
   return FilterHeadersStatus::Continue;
+}
+
+bool FaultFilter::isDelayEnabled() {
+  bool enabled =
+      config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY, config_->delayPercent());
+
+  if (!downstream_cluster_delay_percent_key_.empty()) {
+    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
+                                                            config_->delayPercent());
+  }
+
+  return enabled;
+}
+
+bool FaultFilter::isAbortEnabled() {
+  bool enabled =
+      config_->runtime().snapshot().featureEnabled(ABORT_PERCENT_KEY, config_->abortPercent());
+
+  if (!downstream_cluster_abort_percent_key_.empty()) {
+    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                            config_->abortPercent());
+  }
+
+  return enabled;
+}
+
+uint64_t FaultFilter::delayDuration() {
+  uint64_t duration =
+      config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
+  if (!downstream_cluster_delay_duration_key_.empty()) {
+    duration =
+        config_->runtime().snapshot().getInteger(downstream_cluster_delay_duration_key_, duration);
+  }
+
+  return duration;
+}
+
+std::string FaultFilter::abortHttpStatus() {
+  // TODO(mattklein123): check http status codes obtained from runtime.
+  uint64_t http_status =
+      config_->runtime().snapshot().getInteger(ABORT_HTTP_STATUS_KEY, config_->abortCode());
+
+  if (!downstream_cluster_abort_http_status_key_.empty()) {
+    http_status = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, http_status);
+  }
+
+  return std::to_string(http_status);
 }
 
 void FaultFilter::recordDelaysInjectedStats() {
@@ -174,7 +221,7 @@ void FaultFilter::postDelayInjection() {
   resetTimerState();
 
   // Delays can be followed by aborts
-  if (config_->runtime().snapshot().featureEnabled(abort_percent_key_, config_->abortPercent())) {
+  if (isAbortEnabled()) {
     abortWithHTTPStatus();
   } else {
     // Continue request processing.
@@ -183,10 +230,8 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
-  // TODO(mattklein123): check http status codes obtained from runtime
-  Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-      {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
-                                  abort_http_status_key_, config_->abortCode()))}}};
+  Http::HeaderMapPtr response_headers{
+      new HeaderMapImpl{{Headers::get().Status, abortHttpStatus()}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);
   recordAbortsInjectedStats();
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);

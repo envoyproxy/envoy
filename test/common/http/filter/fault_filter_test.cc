@@ -49,17 +49,6 @@ public:
     }
     )EOF";
 
-  const std::string fixed_delay_downstream_cluster_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "downstream_cluster_specific_settings": true
-    }
-    )EOF";
-
   const std::string fixed_delay_only_json = R"EOF(
     {
       "delay" : {
@@ -182,20 +171,6 @@ TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
         "http_status" : 503
       },
       "downstream_nodes": []
-    }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
-}
-
-TEST(FaultFilterBadConfigTest, NotBooleanMatchDownstreamCluster) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 80,
-        "http_status" : 503
-      },
-      "match_downstream_cluster": "string"
     }
   )EOF";
 
@@ -368,14 +343,19 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
 }
 
 TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
-  SetUpTest(fixed_delay_downstream_cluster_json);
+  SetUpTest(fixed_delay_only_json);
 
   // Delay related calls.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
                                                  100)).WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.delay.fixed_duration_ms", 5000))
-      .WillOnce(Return(5000UL));
-  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(125UL));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.delay.fixed_duration_ms", 125UL))
+      .WillOnce(Return(500UL));
+  expectDelayTimer(500UL);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
 
@@ -383,11 +363,14 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
+      .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.abort.abort_percent", 0))
       .WillOnce(Return(false));
 
   // Delay only case, no aborts.
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", _)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
@@ -401,26 +384,6 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
   EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
-}
-
-TEST_F(FaultFilterTest, DelayForDownstreamClusterNotTriggered) {
-  SetUpTest(fixed_delay_downstream_cluster_json);
-
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
-      .Times(0);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _)).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_, setResponseFlag(_)).Times(0);
-  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-
-  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
-  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbort) {
