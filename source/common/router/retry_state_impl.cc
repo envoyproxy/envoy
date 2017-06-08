@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -19,6 +20,11 @@ namespace Router {
 const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
+
+
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::HeaderMap& request_headers,
@@ -29,7 +35,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   RetryStatePtr ret;
 
   // We short circuit here and do not both with an allocation if there is no chance we will retry.
-  if (request_headers.EnvoyRetryOn() || route_policy.retryOn()) {
+  if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() || route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -48,12 +54,15 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
-    if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-      const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
-      uint64_t temp;
-      if (StringUtil::atoul(max_retries, temp)) {
-        retries_remaining_ = temp;
-      }
+  }
+  if (request_headers.EnvoyRetryGrpcOn()) {
+    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().c_str());
+  }
+  if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
+    const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
+    uint64_t temp;
+    if (StringUtil::atoul(max_retries, temp)) {
+      retries_remaining_ = temp;
     }
   }
 
@@ -90,6 +99,22 @@ uint32_t RetryStateImpl::parseRetryOn(const std::string& config) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
+    }
+  }
+
+  return ret;
+}
+
+uint32_t RetryStateImpl::parseRetryGrpcOn(const std::string& retry_grpc_on_header) {
+  uint32_t ret = 0;
+  std::vector<std::string> retry_on_list = StringUtil::split(retry_grpc_on_header, ',');
+  for (const std::string& retry_on : retry_on_list) {
+    if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.DeadlineExceeded) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.ResourceExhausted) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
     }
   }
 
@@ -165,6 +190,17 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX) && response_headers) {
     Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(*response_headers));
     if (code == Http::Code::Conflict) {
+      return true;
+    }
+  }
+
+  if (retry_on_ & (RetryPolicy::RETRY_ON_GRPC_CANCELLED |
+                   RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
+                   RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) && response_headers) {
+    Grpc::Common::GrpcStatus status = Grpc::Common::getGrpcStatus(*response_headers);
+    if ((status == Grpc::Common::Canceled && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
+        (status == Grpc::Common::DeadlineExceeded && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
+        (status == Grpc::Common::ResourceExhausted && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED))) {
       return true;
     }
   }
