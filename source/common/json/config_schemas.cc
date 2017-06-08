@@ -846,15 +846,12 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
       },
       "upstream_cluster" : {"type" : "string"},
       "downstream_nodes": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        },
-        "downstream_cluster_specific_settings": {
-          "type": "boolean"
-        },
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string"
+        }
+      },
       "headers" : {
         "type" : "array",
         "minItems" : 1,
