@@ -413,11 +413,11 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.abort.abort_percent", 100))
-      .WillOnce(Return(false));
+      .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
       .WillOnce(Return(503));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", 503))
       .WillOnce(Return(500));
 
   Http::TestHeaderMapImpl response_headers{{":status", "500"}};
