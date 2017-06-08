@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
-const std::string ResponsaeFlagUtils::NONE = "-";
+const std::string ResponseFlagUtils::NONE = "-";
 const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
 const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
 const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
