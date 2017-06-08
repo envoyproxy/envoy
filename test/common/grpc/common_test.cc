@@ -31,5 +31,26 @@ TEST(GrpcCommonTest, prepareHeaders) {
   EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 }
 
+TEST(GrpcCommonTest, resolveServiceAndMethod) {
+  std::string service;
+  std::string method;
+  Http::HeaderMapImpl headers;
+  Http::HeaderEntry& path = headers.insertPath();
+  path.value(std::string("/service_name/method_name"));
+  EXPECT_TRUE(Common::resolveServiceAndMethod(&path, &service, &method));
+  EXPECT_EQ("service_name", service);
+  EXPECT_EQ("method_name", method);
+  path.value(std::string(""));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("//"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/service_name"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/service_name/"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+}
+
 } // Grpc
 } // Envoy
