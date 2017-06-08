@@ -66,6 +66,7 @@ upstream_cluster:
   against all the specified headers in the filter config. A match will happen if all the headers in
   the config are present in the request with the same values (or based on presence if the ``value``
   field is not in the config).
+  TODO: allow runtime configuration on per entry basis for headers match.
 
 downstream_nodes:
   *(optional, array)* Faults are injected for the specified list of downstream hosts. If this setting is

@@ -49,7 +49,7 @@ public:
   const std::string& upstreamCluster() { return upstream_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
-  std::unordered_set<std::string>& downstreamNodes() { return downstream_nodes_; }
+  const std::unordered_set<std::string>& downstreamNodes() { return downstream_nodes_; }
   const std::string& statsPrefix() { return stats_prefix_; }
   Stats::Store& statsStore() { return store_; }
 
