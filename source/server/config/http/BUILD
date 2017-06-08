@@ -83,6 +83,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:instance_interface",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:lightstep_tracer_lib",
         "//source/server:configuration_lib",
     ],
 )

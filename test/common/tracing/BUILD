@@ -22,6 +22,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:lightstep_tracer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
