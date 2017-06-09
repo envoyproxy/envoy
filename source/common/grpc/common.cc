@@ -114,10 +114,8 @@ void Common::validateResponse(Http::Message& http_response) {
     throw Exception(Optional<uint64_t>(), "no response trailers");
   }
 
-  const Http::HeaderEntry* grpc_status_header = http_response.trailers()->GrpcStatus();
-  uint64_t grpc_status_code;
-  if (!grpc_status_header ||
-      !StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
+  uint64_t grpc_status_code = Common::getGrpcStatus(*http_response.trailers());
+  if (grpc_status_code == Status::GrpcStatus::InvalidCode) {
     throw Exception(Optional<uint64_t>(), "bad grpc-status trailer");
   }
 

@@ -34,13 +34,6 @@ public:
   static Status::GrpcStatus getGrpcStatus(const Http::HeaderMap& headers);
 
   /**
-   * Returns the GrpcStatus code from a given set of headers, if present.
-   * @headers the headers to parse.
-   * @returns the parsed status code or InvalidCode if no valid status is found.
-   */
-  static Status::GrpcStatus getGrpcStatus(const Http::HeaderMap& headers);
-
-  /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param grpc_service supplies the service name.
