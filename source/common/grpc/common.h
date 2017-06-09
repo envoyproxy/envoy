@@ -26,33 +26,12 @@ public:
 
 class Common {
 public:
-  enum GrpcStatus {
-    Ok = 0,
-    Canceled = 1,
-    Unknown = 2,
-    InvalidArgument = 3,
-    DeadlineExceeded = 4,
-    NotFound = 5,
-    AlreadyExists = 6,
-    PermissionDenied = 7,
-    Unauthenticated = 16,
-    ResourceExhausted = 8,
-    FailedPrecondition = 9,
-    Aborted = 10,
-    OutOfRange = 11,
-    Unimplemented = 12,
-    Internal = 13,
-    Unavailable = 14,
-    DataLoss = 15,
-    InvalidCode = 16,
-  };
-
   /**
    * Returns the GrpcStatus code from a given set of headers, if present.
    * @headers the headers to parse.
    * @returns the parsed status code or InvalidCode if no valid status is found.
    */
-  static GrpcStatus getGrpcStatus(const Http::HeaderMap& headers);
+  static Status::GrpcStatus getGrpcStatus(const Http::HeaderMap& headers);
 
   /**
    * Returns the GrpcStatus code from a given set of headers, if present.
