@@ -40,7 +40,7 @@ public:
   /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
-   * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.
+   * @param protocol supplies the downstream protocol in use, either "grpc" or "grpc-web".
    * @param grpc_service supplies the service name.
    * @param grpc_method supplies the method name.
    * @param success supplies whether the call succeeded.
