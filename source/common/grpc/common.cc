@@ -28,11 +28,13 @@ Status::GrpcStatus Common::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
-  if (!grpc_status_header ||
-      !StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
+  if (!grpc_status_header || grpc_status_header->value().empty()) {
+    return Status::GrpcStatus::MissingStatus;
+  }
+  if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
     return Status::GrpcStatus::InvalidCode;
   }
-  if (grpc_status_code > Status::GrpcStatus::InvalidCode) {
+  if (grpc_status_code > Status::GrpcStatus::DataLoss) {
     return Status::GrpcStatus::InvalidCode;
   }
   return static_cast<Status::GrpcStatus>(grpc_status_code);
@@ -87,13 +89,12 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
 
 void Common::checkForHeaderOnlyError(Http::Message& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
-  const Http::HeaderEntry* grpc_status_header = http_response.headers().GrpcStatus();
-  if (!grpc_status_header) {
+  Status::GrpcStatus grpc_status_code = Common::getGrpcStatus(http_response.headers());
+  if (grpc_status_code == Status::GrpcStatus::MissingStatus) {
     return;
   }
 
-  uint64_t grpc_status_code;
-  if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
+  if (grpc_status_code == Status::GrpcStatus::InvalidCode) {
     throw Exception(Optional<uint64_t>(), "bad grpc-status header");
   }
 
@@ -114,8 +115,8 @@ void Common::validateResponse(Http::Message& http_response) {
     throw Exception(Optional<uint64_t>(), "no response trailers");
   }
 
-  uint64_t grpc_status_code = Common::getGrpcStatus(*http_response.trailers());
-  if (grpc_status_code == Status::GrpcStatus::InvalidCode) {
+  Status::GrpcStatus grpc_status_code = Common::getGrpcStatus(*http_response.trailers());
+  if (grpc_status_code < 0) {
     throw Exception(Optional<uint64_t>(), "bad grpc-status trailer");
   }
 
