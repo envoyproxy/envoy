@@ -254,7 +254,26 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
   NiceMock<MockConfig> config;
 
-  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
+  finalizer.finalize(*span);
+}
+
+TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
+  Optional<uint32_t> response_code;
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+
+  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("response_size", "11"));
+  EXPECT_CALL(*span, setTag("response_flags", "-"));
+  EXPECT_CALL(*span, setTag("request_size", "10"));
+  NiceMock<MockConfig> config;
+
+  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
   finalizer.finalize(*span);
 }
 
@@ -288,7 +307,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
   NiceMock<MockConfig> config;
 
-  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
   finalizer.finalize(*span);
 }
 
@@ -340,7 +359,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
-  HttpConnManFinalizerImpl finalizer{request_headers, request_info, config};
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
   finalizer.finalize(*span);
 }
 

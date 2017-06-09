@@ -116,7 +116,7 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   NOT_REACHED;
 }
 
-HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap& request_headers,
+HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
                                                    Http::AccessLog::RequestInfo& request_info,
                                                    Config& tracing_config)
     : request_headers_(request_headers), request_info_(request_info),
@@ -124,26 +124,28 @@ HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap& request_head
 
 void HttpConnManFinalizerImpl::finalize(Span& span) {
   // Pre response data.
-  span.setTag("guid:x-request-id", std::string(request_headers_.RequestId()->value().c_str()));
-  span.setTag("request_line", buildRequestLine(request_headers_, request_info_));
-  span.setTag("request_size", std::to_string(request_info_.bytesReceived()));
-  span.setTag("host_header", valueOrDefault(request_headers_.Host(), "-"));
-  span.setTag("downstream_cluster",
-              valueOrDefault(request_headers_.EnvoyDownstreamServiceCluster(), "-"));
-  span.setTag("user_agent", valueOrDefault(request_headers_.UserAgent(), "-"));
+  if (request_headers_) {
+    span.setTag("guid:x-request-id", std::string(request_headers_->RequestId()->value().c_str()));
+    span.setTag("request_line", buildRequestLine(*request_headers_, request_info_));
+    span.setTag("host_header", valueOrDefault(request_headers_->Host(), "-"));
+    span.setTag("downstream_cluster",
+                valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
+    span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
 
-  if (request_headers_.ClientTraceId()) {
-    span.setTag("guid:x-client-trace-id",
-                std::string(request_headers_.ClientTraceId()->value().c_str()));
-  }
+    if (request_headers_->ClientTraceId()) {
+      span.setTag("guid:x-client-trace-id",
+                  std::string(request_headers_->ClientTraceId()->value().c_str()));
+    }
 
-  // Build tags based on the custom headers.
-  for (const Http::LowerCaseString& header : tracing_config_.requestHeadersForTags()) {
-    const Http::HeaderEntry* entry = request_headers_.get(header);
-    if (entry) {
-      span.setTag(header.get(), entry->value().c_str());
+    // Build tags based on the custom headers.
+    for (const Http::LowerCaseString& header : tracing_config_.requestHeadersForTags()) {
+      const Http::HeaderEntry* entry = request_headers_->get(header);
+      if (entry) {
+        span.setTag(header.get(), entry->value().c_str());
+      }
     }
   }
+  span.setTag("request_size", std::to_string(request_info_.bytesReceived()));
 
   // Post response data.
   span.setTag("response_code", buildResponseCode(request_info_));
