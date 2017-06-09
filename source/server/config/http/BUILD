@@ -55,6 +55,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_transcoding_lib",
+    srcs = ["grpc_transcoding.cc"],
+    hdrs = ["grpc_transcoding.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+        "//source/common/grpc:transcoding_filter_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_web_lib",
     srcs = ["grpc_web.cc"],
     hdrs = ["grpc_web.h"],
