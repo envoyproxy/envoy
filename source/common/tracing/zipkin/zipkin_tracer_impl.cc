@@ -14,7 +14,10 @@ namespace Zipkin {
 
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
-void ZipkinSpan::finishSpan() { span_.finish(); }
+void ZipkinSpan::finishSpan(Tracing::SpanFinalizer& finalizer) {
+  finalizer.finalize(*this);
+  span_.finish();
+}
 
 void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
   if (this->hasCSAnnotation()) {

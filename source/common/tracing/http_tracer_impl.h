@@ -62,11 +62,42 @@ public:
   static const std::string EGRESS_OPERATION;
 };
 
+class NullSpan : public Span {
+public:
+  // Tracing::Span
+  void setTag(const std::string&, const std::string&) override {}
+  void finishSpan(SpanFinalizer&) override {}
+  void injectContext(Http::HeaderMap&) override {}
+  SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
+};
+
+class NullFinalizer : public SpanFinalizer {
+public:
+  // Tracing::SpanFinalizer
+  void finalize(Span&) override {}
+};
+
+/**
+ * Finalizer for Spans covering standard request ingress.
+ */
+class HttpConnManFinalizerImpl : public SpanFinalizer {
+public:
+  HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
+                           Http::AccessLog::RequestInfo& request_info, Config& tracing_config);
+
+  void finalize(Span& span) override;
+
+private:
+  Http::HeaderMap* request_headers_;
+  Http::AccessLog::RequestInfo& request_info_;
+  Config& tracing_config_;
+};
+
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
-    return nullptr;
+    return SpanPtr{new NullSpan()};
   }
 };
 
@@ -81,15 +112,6 @@ public:
 private:
   DriverPtr driver_;
   const LocalInfo::LocalInfo& local_info_;
-};
-
-class NullSpan : public Tracing::Span {
-public:
-  // Tracing::Span
-  void setTag(const std::string&, const std::string&) override {}
-  void finishSpan() override {}
-  void injectContext(Http::HeaderMap&) override {}
-  SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
 };
 
 } // Tracing
