@@ -29,7 +29,7 @@
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
   the callsite clear. Otherwise, it's difficult to tell if a const reference is actually being
-  passed to teh called function.
+  passed to the called function.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
   This _includes_ types such as `std::string`. We encourage the use of the
   advice in the [C++ FAQ on the static initialization
