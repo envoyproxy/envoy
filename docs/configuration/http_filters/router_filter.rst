@@ -147,29 +147,6 @@ Note that retry policies can also be applied at the :ref:`route level
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
-x-envoy-grpc-retry-on
-^^^^^^^^^^^^^^^^^^^^^
-Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number of
-retries defaults to 1, and is configured as x-envoy-grpc-retry is, above).  gRPC retries are currently
-only supported for gRPC status codes in response headers.  gRPC status codes in trailers will not trigger
-retry logic.One or more policies can be specified  using a ',' delimited list. The supported policies are:
-
-cancelled
-  Envoy will attempt a retry if the gRPC status code in the response headers is "cancelled" (1)
-
-deadline-exceeded
-  Envoy will attempt a retry if the gRPC status code in the response headers is "deadline-exceeded" (4)
-
-resource-exhausted
-  Envoy will attempt a retry if the gRPC status code in the response headers is "resource-exhausted" (8)
-
-As with x-envoy-grpc-retry, the number of retries can be controlled via the
-:ref:`config_http_filters_router_x-envoy-max-retries` header
-
-TODO(alyssawilk) get feedback if this should be in retry_on in route policy, or have an grpc_retry_on equivalent.
-
-By default, Envoy will *not* perform retries unless you've configured them per above.
-
 x-envoy-upstream-alt-stat-name
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
