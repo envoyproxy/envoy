@@ -127,6 +127,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   if (cluster.hasObject("dns_resolvers")) {
     auto resolver_addrs = cluster.getStringArray("dns_resolvers");
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+    resolvers.reserve(resolver_addrs.size());
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Utility::parseInternetAddressAndPort(resolver_addr));
     }
