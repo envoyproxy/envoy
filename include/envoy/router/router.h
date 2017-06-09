@@ -41,9 +41,9 @@ public:
   static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x2;
   static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x4;
   static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x8;
-  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x16;
-  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x32;
-  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x64;
+  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x10;
+  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x20;
+  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x40;
   // clang-format on
 
   virtual ~RetryPolicy() {}

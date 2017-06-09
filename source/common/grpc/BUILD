@@ -25,6 +25,7 @@ envoy_cc_library(
     external_deps = ["protobuf"],
     deps = [
         "//include/envoy/common:optional",
+        "//include/envoy/grpc:status_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
