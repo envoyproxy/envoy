@@ -216,7 +216,8 @@ HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 
 retry_on
   *(required, string)* specifies the conditions under which retry takes place. These are the same
-  conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on`.
+  conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
+  :ref:`config_http_filters_router_x-envoy-grpc-retry-on`.
 
 num_retries
   *(optional, integer)* specifies the allowed number of retries. This parameter is optional and
