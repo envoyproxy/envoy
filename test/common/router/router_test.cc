@@ -739,7 +739,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
-  // 5xx response.
+  // gRPC with status "cancelled" (1)
   router_.retry_state_->expectRetry();
   Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "200"}, {":grpc-status", "1"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));

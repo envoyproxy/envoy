@@ -51,8 +51,9 @@ x-envoy-max-retries
 If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is in place, Envoy will default to retrying one 
 time unless explicitly specified. The number of retries can be explicitly set in the 
 :ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header. 
-If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured or a 
-:ref:`config_http_filters_router_x-envoy-retry-on` header is not specified, Envoy will not retry a failed request.
+If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured and
+:ref:`config_http_filters_router_x-envoy-retry-on` or
+:ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
 
 A few notes on how Envoy does retries:
 
@@ -120,12 +121,14 @@ Note that retry policies can also be applied at the :ref:`route level
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
+.. _config_http_filters_router_x-envoy-grpc-retry-on:
+
 x-envoy-grpc-retry-on
 ^^^^^^^^^^^^^^^^^^^^^
 Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number of
 retries defaults to 1, and is configured as x-envoy-grpc-retry is, above).  gRPC retries are currently
 only supported for gRPC status codes in response headers.  gRPC status codes in trailers will not trigger
-retry logic.One or more policies can be specified  using a ',' delimited list. The supported policies are:
+retry logic. One or more policies can be specified  using a ',' delimited list. The supported policies are:
 
 cancelled
   Envoy will attempt a retry if the gRPC status code in the response headers is "cancelled" (1)
@@ -139,7 +142,8 @@ resource-exhausted
 As with x-envoy-grpc-retry, the number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header
 
-TODO(alyssawilk) get feedback if this should be in retry_on in route policy, or have an grpc_retry_on equivalent.
+Note that retry policies can also be applied at the :ref:`route level
+<config_http_conn_man_route_table_route_retry>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
