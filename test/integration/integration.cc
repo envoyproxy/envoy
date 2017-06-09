@@ -709,7 +709,6 @@ void BaseIntegrationTest::testGrpcRetry() {
       {[&]() -> void { codec_client =
                        makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2); },
        [&]() -> void {
-         Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
          Http::StreamEncoder* request_encoder;
          request_encoder =
              &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -719,8 +718,7 @@ void BaseIntegrationTest::testGrpcRetry() {
                                                                  {"x-forwarded-for", "10.0.0.1"},
                                                                  {"x-envoy-retry-grpc-on", "cancelled"}},
                                          *response);
-         codec_client->sendData(*request_encoder, 1024, false);
-         codec_client->sendTrailers(*request_encoder, request_trailers);
+         codec_client->sendData(*request_encoder, 1024, true);
        },
        [&]() -> void {
          fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);

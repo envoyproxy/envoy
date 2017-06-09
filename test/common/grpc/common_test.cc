@@ -12,16 +12,16 @@ namespace Grpc {
 
 TEST(GrpcCommonTest, getGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
-  EXPECT_EQ(Common::Ok, Common::getGrpcStatus(ok_trailers));
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers));
 
   Http::TestHeaderMapImpl no_status_trailers{{"foo", "bar"}};
-  EXPECT_EQ(Common::InvalidCode, Common::getGrpcStatus(no_status_trailers));
+  EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(no_status_trailers));
 
   Http::TestHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
-  EXPECT_EQ(Common::Aborted, Common::getGrpcStatus(aborted_trailers));
+  EXPECT_EQ(Status::Aborted, Common::getGrpcStatus(aborted_trailers));
 
   Http::TestHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
-  EXPECT_EQ(Common::InvalidCode, Common::getGrpcStatus(invalid_trailers));
+  EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers));
 }
 
 TEST(GrpcCommonTest, chargeStats) {
