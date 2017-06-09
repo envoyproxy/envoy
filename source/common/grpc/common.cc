@@ -24,18 +24,18 @@ namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
 
-Common::GrpcStatus Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+Status::GrpcStatus Common::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
   if (!grpc_status_header ||
       !StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
-    return GrpcStatus::InvalidCode;
+    return Status::GrpcStatus::InvalidCode;
   }
-  if (grpc_status_code > InvalidCode) {
-    return GrpcStatus::InvalidCode;
+  if (grpc_status_code > Status::GrpcStatus::InvalidCode) {
+    return Status::GrpcStatus::InvalidCode;
   }
-  return static_cast<GrpcStatus>(grpc_status_code);
+  return static_cast<Status::GrpcStatus>(grpc_status_code);
 }
 
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,

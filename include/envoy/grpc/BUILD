@@ -17,3 +17,9 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "status_interface",
+    hdrs = ["status.h"],
+)
+
