@@ -31,7 +31,7 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
     return;
   }
   uint64_t grpc_status_code;
-  bool success =
+  const bool success =
       StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }

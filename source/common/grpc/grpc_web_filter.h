@@ -46,7 +46,7 @@ private:
   bool isGrpcWebRequest(const Http::HeaderMap& headers);
 
   static const uint8_t GRPC_WEB_TRAILER;
-  const std::unordered_set<std::string>& GRPC_WEB_CONTENT_TYPES() const;
+  const std::unordered_set<std::string>& gRpcWebContentTypes() const;
 
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;

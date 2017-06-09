@@ -17,19 +17,19 @@ namespace Grpc {
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
 // Supported gRPC-Web content-types.
-const std::unordered_set<std::string>& GrpcWebFilter::GRPC_WEB_CONTENT_TYPES() const {
-  static const std::unordered_set<std::string> types{
-      Http::Headers::get().ContentTypeValues.GrpcWeb,
-      Http::Headers::get().ContentTypeValues.GrpcWebProto,
-      Http::Headers::get().ContentTypeValues.GrpcWebText,
-      Http::Headers::get().ContentTypeValues.GrpcWebTextProto};
-  return types;
+const std::unordered_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() const {
+  static const std::unordered_set<std::string>* types = new std::unordered_set<std::string>(
+      {Http::Headers::get().ContentTypeValues.GrpcWeb,
+       Http::Headers::get().ContentTypeValues.GrpcWebProto,
+       Http::Headers::get().ContentTypeValues.GrpcWebText,
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto});
+  return *types;
 }
 
 bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    return GRPC_WEB_CONTENT_TYPES().count(content_type->value().c_str());
+    return gRpcWebContentTypes().count(content_type->value().c_str()) > 0;
   }
   return false;
 }
