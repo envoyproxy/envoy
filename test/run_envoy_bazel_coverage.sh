@@ -45,6 +45,15 @@ COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 
+# Copy .gcno objects into the same location that we find the .gcda.
+# TODO(htuch): Should use rsync, but there are some symlink loops to fight.
+pushd "${GCOVR_DIR}"
+for f in $(find -L bazel-out/ -name "*.gcno")
+do
+  cp --parents "$f" bazel-out/local-fastbuild/bin/test/coverage/coverage_tests.runfiles/envoy
+done
+popd
+
 # gcovr is extremely picky about where it is run and where the paths of the
 # original source are relative to its execution location.
 cd "${SRCDIR}"
