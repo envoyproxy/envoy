@@ -33,8 +33,9 @@ DnsResolverImpl::DnsResolverImpl(
 
   initializeChannel(&options, 0);
 
-  if (resolvers.size() > 0) {
+  if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;
+    resolver_addrs.reserve(resolvers.size());
     for (const auto& resolver : resolvers) {
       resolver_addrs.push_back(resolver->asString());
     }
