@@ -22,7 +22,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
-  FUNCTION(general)              \
+  FUNCTION(misc)              \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(hc)                   \
@@ -125,32 +125,41 @@ protected:
 } // Logger
 
 /**
- * Base logging macros.
+ * Base logging macros.  It is expected that users will use the convenience macros below rather than
+ * invoke these directly.
  */
 #ifdef NDEBUG
-#define log_trace(LOGGER, ...)
-#define log_debug(LOGGER, ...)
+#define log_trace_to_logger(LOGGER, ...)
+#define log_debug_to_logger(LOGGER, ...)
 #else
-#define log_trace(LOGGER, ...) LOGGER.trace(__VA_ARGS__)
-#define log_debug(LOGGER, ...) LOGGER.debug(__VA_ARGS__)
+#define log_trace_to_logger(LOGGER, ...) LOGGER.trace(__VA_ARGS__)
+#define log_debug_to_logger(LOGGER, ...) LOGGER.debug(__VA_ARGS__)
 #endif
 
-#define log_info(LOGGER, ...) LOGGER.info(__VA_ARGS__)
-#define log_warn(LOGGER, ...) LOGGER.warn(__VA_ARGS__)
-#define log_err(LOGGER, ...) LOGGER.err(__VA_ARGS__)
-#define log_critical(LOGGER, ...) LOGGER.critical(__VA_ARGS__)
+#define log_info_to_logger(LOGGER, ...) LOGGER.info(__VA_ARGS__)
+#define log_warn_to_logger(LOGGER, ...) LOGGER.warn(__VA_ARGS__)
+#define log_err_to_logger(LOGGER, ...) LOGGER.err(__VA_ARGS__)
+#define log_critical_to_logger(LOGGER, ...) LOGGER.critical(__VA_ARGS__)
 
 /**
- * Convenience macros to call the above macros with or without a logger.
+ * Convenience macro to log to a user-specified logger.
  */
-#define log_facility(LEVEL, ...) log_##LEVEL(log(), ##__VA_ARGS__)
-#define log_to_logger(LOGGER, LEVEL, ...) log_##LEVEL(LOGGER, ##__VA_ARGS__)
+#define log_to_logger(LOGGER, LEVEL, ...) log_##LEVEL##_to_logger(LOGGER, ##__VA_ARGS__)
 
 /**
- * Convenience macros to log to the general logger.
+ * Convenience macro to log to the facility of the class in which the macro is invoked. Note:
+ * facilities are a way of grouping classes within envoy. A facility is specified by Id enum values
+ * listed above. The facility_log is enabled within a class when the class inherits from the
+ * Loggable class templated by the choice of facility.
  */
-#define get_general_logger() Logger::Loggable<Logger::Id::general>::log()
-#define log_general(LEVEL, ...) log_to_logger(get_general_logger(), LEVEL, ##__VA_ARGS__)
+#define log_facility(LEVEL, ...) log_to_logger(log(), LEVEL, ##__VA_ARGS__)
+
+/**
+ * Convenience macro to log to the misc logger, which allows for logging without of direct access to
+ * a logger.
+ */
+#define get_misc_logger() Logger::Registry::getLog(Logger::Id::misc)
+#define log_misc(LEVEL, ...) log_to_logger(get_misc_logger(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with connection ID.
@@ -170,5 +179,53 @@ protected:
 
 #define stream_log_facility(LEVEL, FORMAT, STREAM, ...)                                            \
   stream_log_to_logger(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+
+/**
+ * DEPRECATED: Logging macros.
+ */
+#ifdef NDEBUG
+#define log_trace(...)
+#define log_debug(...)
+#else
+#define log_trace(...) log().trace(__VA_ARGS__)
+#define log_debug(...) log().debug(__VA_ARGS__)
+#endif
+
+/**
+ * DEPRECATED: Convenience macros for logging with connection ID.
+ */
+#define conn_log(LOG, LEVEL, FORMAT, CONNECTION, ...)                                              \
+  LOG.LEVEL("[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
+
+#ifdef NDEBUG
+#define conn_log_trace(...)
+#define conn_log_debug(...)
+#else
+#define conn_log_trace(FORMAT, CONNECTION, ...)                                                    \
+  conn_log(log(), trace, FORMAT, CONNECTION, ##__VA_ARGS__)
+#define conn_log_debug(FORMAT, CONNECTION, ...)                                                    \
+  conn_log(log(), debug, FORMAT, CONNECTION, ##__VA_ARGS__)
+#endif
+
+#define conn_log_info(FORMAT, CONNECTION, ...)                                                     \
+  conn_log(log(), info, FORMAT, CONNECTION, ##__VA_ARGS__)
+
+/**
+ * DEPRECATED: Convenience macros for logging with a stream ID and a connection ID.
+ */
+#define stream_log(LOG, LEVEL, FORMAT, STREAM, ...)                                                \
+  LOG.LEVEL("[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), ##__VA_ARGS__)
+
+#ifdef NDEBUG
+#define stream_log_trace(...)
+#define stream_log_debug(...)
+#else
+#define stream_log_trace(FORMAT, STREAM, ...)                                                      \
+  stream_log(log(), trace, FORMAT, STREAM, ##__VA_ARGS__)
+#define stream_log_debug(FORMAT, STREAM, ...)                                                      \
+  stream_log(log(), debug, FORMAT, STREAM, ##__VA_ARGS__)
+#endif
+
+#define stream_log_info(FORMAT, STREAM, ...) stream_log(log(), info, FORMAT, STREAM, ##__VA_ARGS__)
 
 } // Envoy
