@@ -5,6 +5,8 @@ import os
 import os.path
 import sys
 
+USAGE = "usage: check_format.py <check|fix> [<directory|file>]"
+
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-")
 SUFFIXES = (".cc", ".h", "BUILD")
@@ -93,11 +95,15 @@ def checkFormatVisitor(arg, dir_name, names):
 
 if __name__ == "__main__":
   if len(sys.argv) != 2 and len(sys.argv) != 3:
-    print("usage: check_format.py <check|fix> [<directory|file>]")
+    print(USAGE)
     sys.exit(1)
 
   operation_type = sys.argv[1]
   target_path = sys.argv[2] if len(sys.argv) == 3 else "."
+
+  if operation_type not in {"check", "fix"}:
+    print(USAGE)
+    sys.exit(1)
 
   if os.path.isfile(target_path):
     checkFormat("./" + target_path)
