@@ -1196,7 +1196,7 @@ TEST(RouteMatcherTest, GrpcRetry) {
                     ->retryPolicy()
                     .numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-            RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED ,
+                RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()

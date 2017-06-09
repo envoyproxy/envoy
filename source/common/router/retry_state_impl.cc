@@ -24,8 +24,6 @@ const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 
-
-
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::HeaderMap& request_headers,
                                      const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
@@ -35,7 +33,8 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   RetryStatePtr ret;
 
   // We short circuit here and do not both with an allocation if there is no chance we will retry.
-  if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() || route_policy.retryOn()) {
+  if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
+      route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -194,13 +193,16 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     }
   }
 
-  if (retry_on_ & (RetryPolicy::RETRY_ON_GRPC_CANCELLED |
-                   RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-                   RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) && response_headers) {
+  if (retry_on_ &
+          (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
+           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) &&
+      response_headers) {
     Grpc::Status::GrpcStatus status = Grpc::Common::getGrpcStatus(*response_headers);
     if ((status == Grpc::Status::Canceled && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
-        (status == Grpc::Status::DeadlineExceeded && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
-        (status == Grpc::Status::ResourceExhausted && (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED))) {
+        (status == Grpc::Status::DeadlineExceeded &&
+         (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
+        (status == Grpc::Status::ResourceExhausted &&
+         (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED))) {
       return true;
     }
   }

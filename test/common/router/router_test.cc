@@ -722,7 +722,6 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                     .value());
 }
 
-
 TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -735,13 +734,15 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
                            }));
   expectResponseTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-grpc-retry-on", "cancelled"}, {"x-envoy-internal", "true"}};
+  Http::TestHeaderMapImpl headers{{"x-envoy-grpc-retry-on", "cancelled"},
+                                  {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
   // gRPC with status "cancelled" (1)
   router_.retry_state_->expectRetry();
-  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "200"}, {":grpc-status", "1"}});
+  Http::HeaderMapPtr response_headers1(
+      new Http::TestHeaderMapImpl{{":status", "200"}, {":grpc-status", "1"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
 

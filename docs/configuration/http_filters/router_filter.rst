@@ -53,7 +53,7 @@ time unless explicitly specified. The number of retries can be explicitly set in
 :ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header. 
 If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured and
 :ref:`config_http_filters_router_x-envoy-retry-on` or
-:ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
+:ref:`config_http_filters_router_x-envoy-grpc-retry-on` headers are not specified, Envoy will not retry a failed request.
 
 A few notes on how Envoy does retries:
 

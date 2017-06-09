@@ -22,4 +22,3 @@ envoy_cc_library(
     name = "status_interface",
     hdrs = ["status.h"],
 )
-
