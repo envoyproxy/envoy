@@ -295,7 +295,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
       }));
   EXPECT_CALL(*span, finishSpan(_))
       .WillOnce(
-          Invoke([&](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
+          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(":method", "GET"));
