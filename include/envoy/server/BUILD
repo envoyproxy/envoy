@@ -84,3 +84,8 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "filter_config_interface",
+    hdrs = ["filter_config.h"],
+)

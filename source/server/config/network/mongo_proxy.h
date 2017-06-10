@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "server/configuration_impl.h"
+#include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,10 +14,11 @@ namespace Configuration {
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
-                                             Server::Instance& server) override;
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+                                             FactoryContext& context) override;
 
-  std::string name() override;
+  std::string name() override { return "mongo_proxy"; }
+  NetworkFilterType type() override { return NetworkFilterType::Both; }
 };
 
 } // Configuration

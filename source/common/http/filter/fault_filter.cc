@@ -27,7 +27,7 @@ const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_dura
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
-                                     const std::string& stats_prefix, Stats::Store& stats)
+                                     const std::string& stats_prefix, Stats::Scope& stats)
     : runtime_(runtime), stats_(generateStats(stats_prefix, stats)), stats_prefix_(stats_prefix),
       store_(stats) {
 
@@ -216,7 +216,7 @@ FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Store& store) {
+FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& store) {
   std::string final_prefix = prefix + "fault.";
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }

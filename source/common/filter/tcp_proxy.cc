@@ -43,7 +43,7 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 }
 
 TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
-                               Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
+                               Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_store)
     : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
   config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
@@ -106,7 +106,7 @@ TcpProxy::~TcpProxy() {
   }
 }
 
-TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Store& store) {
+TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scope& store) {
   std::string final_prefix = fmt::format("tcp.{}.", name);
   return {ALL_TCP_PROXY_STATS(POOL_COUNTER_PREFIX(store, final_prefix),
                               POOL_GAUGE_PREFIX(store, final_prefix))};

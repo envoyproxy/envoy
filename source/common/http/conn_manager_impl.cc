@@ -34,7 +34,7 @@ namespace Envoy {
 namespace Http {
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
-                                                            Stats::Store& stats) {
+                                                            Stats::Scope& stats) {
   return {
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(stats, prefix), POOL_GAUGE_PREFIX(stats, prefix),
                                POOL_TIMER_PREFIX(stats, prefix))},
@@ -43,7 +43,7 @@ ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& p
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
-                                                                          Stats::Store& stats) {
+                                                                          Stats::Scope& stats) {
   return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(stats, prefix + "tracing."))};
 }
 

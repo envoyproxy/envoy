@@ -26,23 +26,17 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    NetworkFilterType type, const Json::Object& config, Server::Instance& server) {
-  if (type != NetworkFilterType::Read) {
-    throw EnvoyException(
-        fmt::format("{} network filter must be configured as a read filter.", name()));
-  }
-
+NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& config,
+                                                              FactoryContext& context) {
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
-      new HttpConnectionManagerConfig(config, server));
-  return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
+      new HttpConnectionManagerConfig(config, context));
+  return [http_config, &context](Network::FilterManager& filter_manager) mutable -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *http_config, server.drainManager(), server.random(), server.httpTracer(), server.runtime(),
-        server.localInfo())});
+        *http_config, context.drainManager(), context.random(), context.httpTracer(),
+        context.runtime(), context.localInfo())});
   };
 }
-
-std::string HttpConnectionManagerFilterConfigFactory::name() { return "http_connection_manager"; }
 
 /**
  * Static registration for the HTTP connection manager filter. @see
@@ -71,28 +65,28 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 }
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
-                                                         Server::Instance& server)
-    : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), server_(server),
+                                                         FactoryContext& context)
+    : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), context_(context),
       stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
-      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
+      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
+          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       http2_settings_(Http::Utility::parseHttp2Settings(config)),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
-      date_provider_(server.dispatcher(), server.threadLocal()) {
+      date_provider_(context_.dispatcher(), context_.threadLocal()) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
-      config, server.runtime(), server.clusterManager(), server.dispatcher(), server.random(),
-      server.localInfo(), server.stats(), stats_prefix_, server.threadLocal(),
-      server.initManager());
+      config, context_.runtime(), context_.clusterManager(), context_.dispatcher(),
+      context_.random(), context_.localInfo(), context_.scope(), stats_prefix_,
+      context_.threadLocal(), context_.initManager());
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");
   }
 
   if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
-    user_agent_.value(server.localInfo().clusterName());
+    user_agent_.value(context_.localInfo().clusterName());
   }
 
   if (config.hasObject("tracing")) {
@@ -126,8 +120,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   if (config.hasObject("access_log")) {
     for (const Json::ObjectSharedPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstanceSharedPtr current_access_log =
-          Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
-                                                  server.accessLogManager());
+          Http::AccessLog::InstanceImpl::fromJson(*access_log, context_.runtime(),
+                                                  context_.accessLogManager());
       access_logs_.push_back(current_access_log);
     }
   }
@@ -158,9 +152,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
     // Now see if there is a factory that will accept the config.
     auto search_it = namedFilterConfigFactories().find(string_name);
-    if (search_it != namedFilterConfigFactories().end()) {
+    if (search_it != namedFilterConfigFactories().end() && search_it->second->type() == type) {
       HttpFilterFactoryCb callback =
-          search_it->second->createFilterFactory(type, *config_object, stats_prefix_, server);
+          search_it->second->createFilterFactory(*config_object, stats_prefix_, context_);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED
@@ -168,7 +162,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       bool found_filter = false;
       for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
         HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *config_object, stats_prefix_, server);
+            type, string_name, *config_object, stats_prefix_, context_.server());
         if (callback) {
           filter_factories_.push_back(callback);
           found_filter = true;
@@ -193,12 +187,12 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, server_.stats(), http2_settings_)};
+        connection, callbacks, context_.scope(), http2_settings_)};
   case CodecType::AUTO:
     if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
         Http::Http2::ALPN_STRING) {
       return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, server_.stats(), http2_settings_)};
+          connection, callbacks, context_.scope(), http2_settings_)};
     } else {
       return Http::ServerConnectionPtr{
           new Http::Http1::ServerConnectionImpl(connection, callbacks)};
@@ -226,7 +220,7 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
-  return *server_.localInfo().address();
+  return *context_.localInfo().address();
 }
 
 } // Configuration

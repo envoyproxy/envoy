@@ -22,7 +22,7 @@ namespace Auth {
 namespace ClientSsl {
 
 Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Store& stats_store,
+               Event::Dispatcher& dispatcher, Stats::Scope& stats_store,
                Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 60000))),
@@ -43,7 +43,7 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
 
 ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                               Stats::Store& stats_store, Runtime::RandomGenerator& random) {
+                               Stats::Scope& stats_store, Runtime::RandomGenerator& random) {
   ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, stats_store, random));
   new_config->initialize();
   return new_config;
@@ -53,7 +53,7 @@ const AllowedPrincipals& Config::allowedPrincipals() {
   return tls_.getTyped<AllowedPrincipals>(tls_slot_);
 }
 
-GlobalStats Config::generateStats(Stats::Store& store, const std::string& prefix) {
+GlobalStats Config::generateStats(Stats::Scope& store, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
   GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(store, final_prefix),
                                               POOL_GAUGE_PREFIX(store, final_prefix))};

@@ -32,5 +32,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
