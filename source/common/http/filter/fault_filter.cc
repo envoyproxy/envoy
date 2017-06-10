@@ -27,9 +27,9 @@ const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_dura
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
-                                     const std::string& stats_prefix, Stats::Scope& stats)
-    : runtime_(runtime), stats_(generateStats(stats_prefix, stats)), stats_prefix_(stats_prefix),
-      store_(stats) {
+                                     const std::string& stats_prefix, Stats::Scope& scope)
+    : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
+      scope_(scope) {
 
   json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
@@ -188,7 +188,7 @@ void FaultFilter::recordDelaysInjectedStats() {
     const std::string stats_counter =
         fmt::format("{}fault.{}.delays_injected", config_->statsPrefix(), downstream_cluster_);
 
-    config_->statsStore().counter(stats_counter).inc();
+    config_->scope().counter(stats_counter).inc();
   }
 
   // General stats.
@@ -201,7 +201,7 @@ void FaultFilter::recordAbortsInjectedStats() {
     const std::string stats_counter =
         fmt::format("{}fault.{}.aborts_injected", config_->statsPrefix(), downstream_cluster_);
 
-    config_->statsStore().counter(stats_counter).inc();
+    config_->scope().counter(stats_counter).inc();
   }
 
   // General stats.
@@ -218,9 +218,9 @@ FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
                                  : FilterTrailersStatus::StopIteration;
 }
 
-FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& store) {
+FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   std::string final_prefix = prefix + "fault.";
-  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
+  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 void FaultFilter::onDestroy() { resetTimerState(); }

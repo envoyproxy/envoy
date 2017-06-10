@@ -684,8 +684,8 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Scope& stats, const Http2Settings& http2_settings)
-    : ConnectionImpl(connection, stats), callbacks_(callbacks) {
+                                           Stats::Scope& scope, const Http2Settings& http2_settings)
+    : ConnectionImpl(connection, scope), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
   sendSettings(http2_settings);

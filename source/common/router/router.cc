@@ -113,8 +113,8 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
     Http::CodeUtility::ResponseStatInfo info{
-        config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_headers,
-        internal_request, route_entry_->virtualHost().name(),
+        config_.scope_, cluster_->statsScope(), EMPTY_STRING, response_headers, internal_request,
+        route_entry_->virtualHost().name(),
         request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
         config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
 
@@ -122,7 +122,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
     if (!alt_stat_prefix_.empty()) {
       Http::CodeUtility::ResponseStatInfo info{
-          config_.global_store_, cluster_->statsScope(), alt_stat_prefix_, response_headers,
+          config_.scope_, cluster_->statsScope(), alt_stat_prefix_, response_headers,
           internal_request, EMPTY_STRING, EMPTY_STRING, config_.local_info_.zoneName(),
           upstreamZone(upstream_host), is_canary};
 
@@ -517,7 +517,7 @@ void Filter::onUpstreamComplete() {
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
     Http::CodeUtility::ResponseTimingInfo info{
-        config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_time,
+        config_.scope_, cluster_->statsScope(), EMPTY_STRING, response_time,
         upstream_request_->upstream_canary_, internal_request, route_entry_->virtualHost().name(),
         request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
         config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
@@ -526,7 +526,7 @@ void Filter::onUpstreamComplete() {
 
     if (!alt_stat_prefix_.empty()) {
       Http::CodeUtility::ResponseTimingInfo info{
-          config_.global_store_, cluster_->statsScope(), alt_stat_prefix_, response_time,
+          config_.scope_, cluster_->statsScope(), alt_stat_prefix_, response_time,
           upstream_request_->upstream_canary_, internal_request, EMPTY_STRING, EMPTY_STRING,
           config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
 

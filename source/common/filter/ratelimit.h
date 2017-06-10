@@ -42,14 +42,14 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const Json::Object& config, Stats::Scope& stats_store, Runtime::Loader& runtime);
+  Config(const Json::Object& config, Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
   const std::vector<Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
 
 private:
-  static InstanceStats generateStats(const std::string& name, Stats::Scope& store);
+  static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
 
   std::string domain_;
   std::vector<Descriptor> descriptors_;
