@@ -52,8 +52,6 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 # Copy .gcno objects into the same location that we find the .gcda.
 # TODO(htuch): Should use rsync, but there are some symlink loops to fight.
 pushd "${GCOVR_DIR}"
-env
-ls -lR  bazel-out/local-dbg/bin/test
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
   cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
