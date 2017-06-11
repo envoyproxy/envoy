@@ -91,6 +91,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
+  export WORKSPACE=ci
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip

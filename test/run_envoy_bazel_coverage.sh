@@ -7,6 +7,7 @@ set -e
 [[ -z "${TESTLOGS_DIR}" ]] && TESTLOGS_DIR="${SRCDIR}/bazel-testlogs"
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
+[[ -z "${WORKSPACE}" ]] && WORKSPACE=envoy
 
 # This is the target that will be run to generate coverage data. It can be overriden by consumer
 # projects that want to run coverage on a different/combined target.
@@ -51,10 +52,11 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 # Copy .gcno objects into the same location that we find the .gcda.
 # TODO(htuch): Should use rsync, but there are some symlink loops to fight.
 pushd "${GCOVR_DIR}"
+env
+ls -lR  bazel-out/local-dbg/bin/test
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
-  ls -lR  bazel-out/local-dbg/bin/test
-  cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/envoy
+  cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
 done
 popd
 
