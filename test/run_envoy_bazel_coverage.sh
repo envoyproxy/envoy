@@ -50,6 +50,9 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 pushd "${GCOVR_DIR}"
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
+  echo $f
+  ls -l bazel-out/local-fastbuild/bin/test/coverage/coverage_tests.runfiles
+  "${BAZEL_COVERAGE}" version
   cp --parents "$f" bazel-out/local-fastbuild/bin/test/coverage/coverage_tests.runfiles/envoy
 done
 popd
