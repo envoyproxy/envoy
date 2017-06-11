@@ -101,7 +101,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # some Bazel created symlinks to the source directory in its output
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   rsync -av "${ENVOY_BUILD_DIR}"/bazel-envoy/generated/coverage/ "${ENVOY_COVERAGE_DIR}"
   exit 0

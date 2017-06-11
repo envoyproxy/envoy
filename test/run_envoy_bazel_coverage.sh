@@ -23,6 +23,9 @@ do
 done
 echo "Cleanup completed."
 
+# Force dbg for path consistency later, don't include debug code in coverage.
+BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
+
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
 # coverage" method, which is currently broken for C++ (see
@@ -50,10 +53,11 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 pushd "${GCOVR_DIR}"
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
+  set +e
   echo $f
-  ls -l bazel-out/local-fastbuild/bin/test/coverage/coverage_tests.runfiles
   "${BAZEL_COVERAGE}" version
-  cp --parents "$f" bazel-out/local-fastbuild/bin/test/coverage/coverage_tests.runfiles/envoy
+  ls -l bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles
+  cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/envoy
 done
 popd
 
