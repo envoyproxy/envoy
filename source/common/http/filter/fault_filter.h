@@ -100,7 +100,6 @@ private:
 
   bool isAbortEnabled();
   bool isDelayEnabled();
-  bool isDownstreamNodesMatchEnabled();
   Optional<uint64_t> delayDuration();
   std::string abortHttpStatus();
 

@@ -256,16 +256,12 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   return matches;
 }
 
-bool FaultFilter::isDownstreamNodesMatchEnabled() {
-  return config_->runtime().snapshot().featureEnabled(DOWNSTREAM_NODES_KEY, 100UL);
-}
-
 bool FaultFilter::matchesDownstreamNodes(const HeaderMap& headers) {
   if (config_->downstreamNodes().empty()) {
     return true;
   }
 
-  if (isDownstreamNodesMatchEnabled()) {
+  if (config_->runtime().snapshot().featureEnabled(DOWNSTREAM_NODES_KEY, 100UL)) {
     if (!headers.EnvoyDownstreamServiceNode()) {
       return false;
     }
