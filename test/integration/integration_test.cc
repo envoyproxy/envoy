@@ -110,7 +110,13 @@ TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
 
-TEST_P(IntegrationTest, BadHttpRequest) { testBadHttpRequest(); }
+TEST_P(IntegrationTest, BadFirstline) { testBadFirstline(); }
+
+TEST_P(IntegrationTest, MissingDelimiter) { testMissingDelimiter(); }
+
+TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFirstline(); }
+
+TEST_P(IntegrationTest, LowVersion) { testLowVersion(); }
 
 TEST_P(IntegrationTest, Http10Request) { testHttp10Request(); }
 
