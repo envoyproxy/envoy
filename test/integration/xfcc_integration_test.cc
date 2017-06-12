@@ -1,6 +1,5 @@
 #include "xfcc_integration_test.h"
 
-#include <stdio.h>
 #include <regex>
 
 #include "common/event/dispatcher_impl.h"
@@ -9,6 +8,7 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "ssl_integration_test.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -25,16 +25,18 @@ void XfccIntegrationTest::SetUp() {
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
-  fake_upstreams_.emplace_back(new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
   registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-  std::string config = TestEnvironment::temporaryFileSubstitute(
-      "test/config/integration/server_xfcc.json", port_map_);
-  test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, Network::Address::IpVersion::v4);
-  registerTestServerPorts({"http"});
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
+  registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
+  client_ssl_ctx_ = createClientSslContext();
 }
 
 void XfccIntegrationTest::TearDown() {
   test_server_.reset();
+  client_ssl_ctx_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
   context_manager_.reset();
@@ -47,7 +49,7 @@ Ssl::ClientContextPtr XfccIntegrationTest::createClientSslContext() {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
   "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
 }
 )EOF";
  
@@ -71,6 +73,13 @@ Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
+Network::ClientConnectionPtr XfccIntegrationTest::makeSslClientConnection() {
+  Network::Address::InstanceConstSharedPtr address =
+    Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
+        ":" + std::to_string(lookupPort("http")));
+  return dispatcher_->createSslClientConnection(*client_ssl_ctx_, address);
+}
+
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
     Network::ClientConnectionPtr&& conn, std::string expected_xfcc) {
   IntegrationCodecClientPtr codec_client;
@@ -87,7 +96,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
                                                                      {":scheme", "http"},
                                                                      {":authority", "host"},
                                                                      {"x-forwarded-client-cert",
-                                                                      xfcc_header_.c_str()}},
+                                                                      previous_xfcc_.c_str()}},
                                              *response);
        },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_); },
@@ -113,34 +122,33 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(
   EXPECT_TRUE(response->complete());
 }
 
-void XfccIntegrationTest::modifyXfccConfigs(std::string fcc, std::string sccd) {
-  test_server_.reset();
+void XfccIntegrationTest::startTestServerWithXfccConfig(std::string fcc, std::string sccd) {
+  TestEnvironment::ParamMap param_map;
+  param_map["forward_client_cert"] = fcc;
+  param_map["set_client_cert_details"] = sccd;
   std::string config = TestEnvironment::temporaryFileSubstitute(
-      "test/config/integration/server_xfcc.json", port_map_);
-  printf("Oliver:\n%s\nabc\n", config.c_str());
-  const std::regex fcc_regex("forward_only");
-  config = std::regex_replace(config, fcc_regex, fcc);
-  const std::regex sccd_regex("SAN");
-  config = std::regex_replace(config, sccd_regex, sccd);
-  printf("Oliver:\n%s\nabc\n", config.c_str());
-  test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, Network::Address::IpVersion::v4);
+      "test/config/integration/server_xfcc.json", param_map, port_map_, version_);
+  test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, version_);
   registerTestServerPorts({"http"});
 }
 
-TEST_F(XfccIntegrationTest, ForwardOnly) {
-  testRequestAndResponseWithXfccHeader(
-      dispatcher_->createSslClientConnection(
-          *createClientSslContext(),
-          Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))),
-      xfcc_header_);
+INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,
+    testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(XfccIntegrationTest, ForwardOnly) {
+  startTestServerWithXfccConfig("forward_only", "\"SAN\"");
+  testRequestAndResponseWithXfccHeader(makeSslClientConnection(), previous_xfcc_);
 }
 
-TEST_F(XfccIntegrationTest, Sanitize) {
-  modifyXfccConfigs("sanitize", "SAN");
-  testRequestAndResponseWithXfccHeader(
-      dispatcher_->createSslClientConnection(
-          *createClientSslContext(),
-          Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http")))), "");
+TEST_P(XfccIntegrationTest, Sanitize) {
+  startTestServerWithXfccConfig("sanitize", "");
+  testRequestAndResponseWithXfccHeader(makeSslClientConnection(), "");
+}
+
+TEST_P(XfccIntegrationTest, AppendForward) {
+  startTestServerWithXfccConfig("append_forward", "\"SAN\"");
+  testRequestAndResponseWithXfccHeader(makeSslClientConnection(),
+                                       previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_san_);
 }
 } // Xfcc
 } // Envoy

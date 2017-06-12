@@ -33,7 +33,7 @@ public:
 private:
   PostIoAction doHandshake();
   void drainErrorQueue();
-  std::string getUriSanFromCertificate(bssl::UniquePtr<X509>);
+  std::string getUriSanFromCertificate(X509* cert);
 
   // Network::ConnectionImpl
   void closeSocket(uint32_t close_type) override;

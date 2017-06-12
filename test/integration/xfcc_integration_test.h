@@ -15,23 +15,36 @@ using testing::NiceMock;
 
 namespace Xfcc {
 
-class XfccIntegrationTest : public BaseIntegrationTest, public testing::Test {
+class XfccIntegrationTest : public BaseIntegrationTest,
+                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  const std::string xfcc_header_ = "BY=test://bar.com/client;Hash=123456;SAN=test://foo.com/frontend";
+  const std::string previous_xfcc_ =
+    "BY=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
+  const std::string current_xfcc_by_hash_ =
+    "BY=spiffe://lyft.com/backend-team;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688";
+  const std::string client_san_ = "SAN=spiffe://lyft.com/frontend-team";
 
+  XfccIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  /**
+   * Initializer for an individual test.
+   */
   void SetUp() override;
+  /**
+   * Destructor for an individual test.
+   */
   void TearDown() override;
 
-  Network::ClientConnectionPtr makeSslClientConnection();
   Ssl::ServerContextPtr createUpstreamSslContext();
   Ssl::ClientContextPtr createClientSslContext();
+  Network::ClientConnectionPtr makeSslClientConnection();
   void testRequestAndResponseWithXfccHeader(
       Network::ClientConnectionPtr&& conn, std::string expected_xfcc);
-  void modifyXfccConfigs(std::string config, std::string content);
+  void startTestServerWithXfccConfig(std::string config, std::string content);
 
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
+  Ssl::ClientContextPtr client_ssl_ctx_;
   Ssl::ServerContextPtr upstream_ssl_ctx_;
 };
 } // Xfcc

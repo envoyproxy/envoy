@@ -116,7 +116,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
         set_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
       } else {
         ASSERT(detail == "SAN");
-        set_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
+        set_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
       }
     }
   }

@@ -200,22 +200,13 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
-/*
-std::string ConnectionImpl::subjectLocalCertificate() {
-  bssl::UniquePtr<X509> cert(SSL_get_certificate(ssl_.get()));
-  if (!cert) {
-    return "";
-  }
-  return getSubjectFromCertificate(std::move(cert));
-}
-*/
-
 std::string ConnectionImpl::uriSanLocalCertificate() {
-  bssl::UniquePtr<X509> cert(SSL_get_certificate(ssl_.get()));
+  // Not owned.
+  X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
     return "";
   }
-  return getUriSanFromCertificate(std::move(cert));
+  return getUriSanFromCertificate(cert);
 }
 
 std::string ConnectionImpl::sha256PeerCertificateDigest() {
@@ -231,27 +222,17 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-/*
-std::string ConnectionImpl::subjectPeerCertificate() {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return "";
-  }
-  return getSubjectFromCertificate(std::move(cert));
-}
-*/
-
 std::string ConnectionImpl::uriSanPeerCertificate() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
   }
-  return getUriSanFromCertificate(std::move(cert));
+  return getUriSanFromCertificate(cert.get());
 }
 
-std::string ConnectionImpl::getUriSanFromCertificate(bssl::UniquePtr<X509> cert) {
+std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr));
+      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
 
   if (altnames == nullptr) {
     return "";

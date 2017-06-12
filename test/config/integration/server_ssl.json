@@ -6,7 +6,7 @@
       "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
       "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/servercert.pem",
       "private_key_file": "{{ test_rundir }}/test/config/integration/certs/serverkey.pem",
-      "verify_certificate_hash": "75:1D:5F:48:82:7E:30:1D:06:33:EC:B2:88:E3:22:5F:D0:48:D8:F2:D4:F8:7F:A9:89:7F:7E:AF:8F:89:AB:D0",
+      "verify_certificate_hash": "46:8E:D3:3B:E7:4E:EE:65:56:D9:0C:01:49:C1:30:9E:9B:A6:1D:64:25:30:34:43:C0:74:8A:02:DD:8D:E6:88",
       "alpn_protocols": "h2,http/1.1",
       "alt_alpn_protocols": "http/1.1"
     },

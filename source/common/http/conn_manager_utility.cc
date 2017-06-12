@@ -153,6 +153,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
         }
       }
     }
+
     switch (config.forwardClientCert()) {
       case Http::ForwardClientCertType::ForwardOnly:
       case Http::ForwardClientCertType::AlwaysForwardOnly:
@@ -170,8 +171,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
         break;
       case Http::ForwardClientCertType::SanitizeSet:
         request_headers.removeForwardedClientCert();
-        request_headers.insertForwardedClientCert().value(
-            clientCertDetails.c_str(), clientCertDetails.length());
+        request_headers.insertForwardedClientCert().value(clientCertDetails);
     }
   } else {
     request_headers.removeForwardedClientCert();

@@ -121,6 +121,13 @@ std::string TestEnvironment::substitute(const std::string str) {
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
                                                      const PortMap& port_map,
                                                      Network::Address::IpVersion version) {
+  return temporaryFileSubstitute(path, ParamMap(), port_map, version);
+}
+
+std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const ParamMap& param_map,
+                                                     const PortMap& port_map,
+                                                     Network::Address::IpVersion version) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
   const std::string json_path = TestEnvironment::runfilesPath(path);
@@ -136,6 +143,12 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
     file_string_stream << file.rdbuf();
     out_json_string = file_string_stream.str();
   }
+  // Substitude params.
+  for (auto it : param_map) {
+    const std::regex param_regex("\\{\\{ " + it.first + " \\}\\}");
+    out_json_string = std::regex_replace(out_json_string, param_regex, it.second);
+  }
+
   // Substitute ports.
   for (auto it : port_map) {
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
