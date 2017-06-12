@@ -32,6 +32,8 @@ maximize the chances of your PR being merged.
   deprecation window. We make no guarantees about code or deployments that rely on undocumented
   behavior.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
+* All deprecations/breaking changes will be announced to the 
+  [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # Release cadence
 
@@ -74,6 +76,8 @@ maximize the chances of your PR being merged.
   Closing stale PRs helps us keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
   Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
+* Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
+  mailing list.
 
 # PR review policy for committers
 
@@ -98,6 +102,8 @@ maximize the chances of your PR being merged.
 * Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
   commit message with every individual commit from the PR. Generally, we want a commit message
   that is roughly equal to the original PR title and description.
+* If a PR includes a deprecation/breaking change, notification should be sent to the 
+  [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # CLA
 
