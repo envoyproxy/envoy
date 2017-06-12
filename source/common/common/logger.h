@@ -128,7 +128,7 @@ protected:
  * Base logging macros.  It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
-#ifdef NDEBUG
+#ifdef NVLOG
 #define log_trace_to_logger(LOGGER, ...)
 #define log_debug_to_logger(LOGGER, ...)
 #else
@@ -183,7 +183,7 @@ protected:
 /**
  * DEPRECATED: Logging macros.
  */
-#ifdef NDEBUG
+#ifdef NVLOG
 #define log_trace(...)
 #define log_debug(...)
 #else
@@ -197,7 +197,7 @@ protected:
 #define conn_log(LOG, LEVEL, FORMAT, CONNECTION, ...)                                              \
   LOG.LEVEL("[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
-#ifdef NDEBUG
+#ifdef NVLOG
 #define conn_log_trace(...)
 #define conn_log_debug(...)
 #else
@@ -216,7 +216,7 @@ protected:
 #define stream_log(LOG, LEVEL, FORMAT, STREAM, ...)                                                \
   LOG.LEVEL("[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), ##__VA_ARGS__)
 
-#ifdef NDEBUG
+#ifdef NVLOG
 #define stream_log_trace(...)
 #define stream_log_debug(...)
 #else

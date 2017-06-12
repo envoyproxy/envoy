@@ -115,7 +115,7 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
 
   std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs)
                                             -> bool { return lhs.hash_ < rhs.hash_; });
-#ifndef NDEBUG
+#ifndef NVLOG
   for (auto entry : ring_) {
     log_facility(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(),
                  entry.hash_);

@@ -71,7 +71,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
 }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-#ifndef NDEBUG
+#ifndef NVLOG
   log_facility(debug, "async http request response headers (end_stream={}):", end_stream);
   headers->iterate([](const HeaderEntry& header, void*) -> void {
     log_facility(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
@@ -90,7 +90,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
-#ifndef NDEBUG
+#ifndef NVLOG
   log_facility(debug, "async http request response trailers:");
   trailers->iterate([](const HeaderEntry& header, void*) -> void {
     log_facility(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());

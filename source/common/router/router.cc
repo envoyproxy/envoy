@@ -231,7 +231,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
                                               callbacks_->streamId());
 
-#ifndef NDEBUG
+#ifndef NVLOG
   headers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
     stream_log_facility(debug, "  '{}':'{}'",
                         *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
