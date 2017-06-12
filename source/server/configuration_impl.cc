@@ -118,7 +118,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   Json::ObjectSharedPtr driver = http_tracer_config->getObject("driver");
 
   std::string type = driver->getString("type");
-  log_facility(info, fmt::format("  loading tracing driver: {}", type));
+  log_facility(info, "  loading tracing driver: {}", type);
 
   Json::ObjectSharedPtr driver_config = driver->getObject("config");
 

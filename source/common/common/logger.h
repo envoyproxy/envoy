@@ -22,7 +22,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
-  FUNCTION(misc)              \
+  FUNCTION(misc)                 \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(hc)                   \
@@ -124,6 +124,12 @@ protected:
 
 } // Logger
 
+// Convert the line macro to a string literal for concatenation in log macros.
+#define DO_STRINGIZE(x) STRINGIZE(x)
+#define STRINGIZE(x) #x
+#define LINE_STRING DO_STRINGIZE(__LINE__)
+#define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
+
 /**
  * Base logging macros.  It is expected that users will use the convenience macros below rather than
  * invoke these directly.
@@ -132,14 +138,14 @@ protected:
 #define log_trace_to_logger(LOGGER, ...)
 #define log_debug_to_logger(LOGGER, ...)
 #else
-#define log_trace_to_logger(LOGGER, ...) LOGGER.trace(__VA_ARGS__)
-#define log_debug_to_logger(LOGGER, ...) LOGGER.debug(__VA_ARGS__)
+#define log_trace_to_logger(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
+#define log_debug_to_logger(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
 #endif
 
-#define log_info_to_logger(LOGGER, ...) LOGGER.info(__VA_ARGS__)
-#define log_warn_to_logger(LOGGER, ...) LOGGER.warn(__VA_ARGS__)
-#define log_err_to_logger(LOGGER, ...) LOGGER.err(__VA_ARGS__)
-#define log_critical_to_logger(LOGGER, ...) LOGGER.critical(__VA_ARGS__)
+#define log_info_to_logger(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
+#define log_warn_to_logger(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
+#define log_err_to_logger(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
+#define log_critical_to_logger(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
 
 /**
  * Convenience macro to log to a user-specified logger.
