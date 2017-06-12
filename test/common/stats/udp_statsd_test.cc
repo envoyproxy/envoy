@@ -35,7 +35,8 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   // Check that fd has not changed.
   sink.flushCounter("test_counter", 1);
   sink.flushGauge("test_gauge", 1);
-  sink.onTimespanComplete("test_counter", std::chrono::milliseconds(5));
+  sink.onHistogramComplete("histogram_test_timer", 5);
+  sink.onTimespanComplete("test_timer", std::chrono::milliseconds(5));
   EXPECT_EQ(fd, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {
