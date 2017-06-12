@@ -78,6 +78,10 @@ maximize the chances of your PR being merged.
   Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
+* If your PR involves any changes to 
+  [envoy-filter-example](https://github.com/lyft/envoy-filter-example) (for example making a new
+  branch so that CI can pass) it is your responsibility to follow through with merging those
+  changes back to master once the CI dance is done.
 
 # PR review policy for committers
 
