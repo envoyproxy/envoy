@@ -32,7 +32,7 @@ Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& traile
     return Optional<Status::GrpcStatus>();
   }
   if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::DataLoss) {
+      grpc_status_code > Status::GrpcStatus::Unauthenticated) {
     return Optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
   return Optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));

@@ -20,8 +20,8 @@ TEST(GrpcCommonTest, getGrpcStatus) {
   Http::TestHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
   EXPECT_EQ(Status::Aborted, Common::getGrpcStatus(aborted_trailers).value());
 
-  Http::TestHeaderMapImpl data_loss_trailers{{"grpc-status", "15"}};
-  EXPECT_EQ(Status::DataLoss, Common::getGrpcStatus(data_loss_trailers).value());
+  Http::TestHeaderMapImpl unauth_trailers{{"grpc-status", "16"}};
+  EXPECT_EQ(Status::Unauthenticated, Common::getGrpcStatus(unauth_trailers).value());
 
   Http::TestHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
