@@ -68,6 +68,8 @@ upstream_cluster:
   field is not in the config).
   TODO: allow runtime configuration on per entry basis for headers match.
 
+.. _config_http_filters_fault_injection_runtime_downstream_nodes:
+ 
 downstream_nodes:
   *(optional, array)* Faults are injected for the specified list of downstream hosts. If this setting is
   not set, faults are injected for all downstream nodes. Downstream node name is taken from
@@ -127,22 +129,26 @@ Runtime
 
 The HTTP fault injection filter supports the following global runtime settings:
 
-http.fault.abort.abort_percent
+fault.http.abort.abort_percent
   % of requests that will be aborted if the headers match. Defaults to the
   *abort_percent* specified in config. If the config does not contain an
   *abort* block, then *abort_percent* defaults to 0.
 
-http.fault.abort.http_status
+fault.http.abort.http_status
   HTTP status code that will be used as the  of requests that will be
   aborted if the headers match. Defaults to the HTTP status code specified
   in the config. If the config does not contain an *abort* block, then
   *http_status* defaults to 0.
 
-http.fault.delay.fixed_delay_percent
+fault.http.delay.fixed_delay_percent
   % of requests that will be delayed if the headers match. Defaults to the
   *delay_percent* specified in the config or 0 otherwise.
 
-http.fault.delay.fixed_duration_ms
+fault.http.enable_downstream_nodes_match
+  % of requests for which :ref:`downstream node <config_http_filters_fault_injection_runtime_downstream_nodes>`
+  matching will be performed. Default value is 100% and supported values are integers in a range of [0,100].
+
+fault.http.delay.fixed_duration_ms
   The delay duration in milliseconds. If not specified, the
   *fixed_duration_ms* specified in the config will be used. If this field
   is missing from both the runtime and the config, no delays will be
@@ -151,10 +157,10 @@ http.fault.delay.fixed_duration_ms
 *Note*, fault filter runtime settings for the specific downstream cluster
 override the default ones if present. The following are downstream specific
 runtime keys:
-* http.fault.<downstream-cluster>.abort.abort_percent
-* http.fault.<downstream-cluster>.abort.http_status
-* http.fault.<downstream-cluster>.delay.fixed_delay_percent
-* http.fault.<downstream-cluster>.delay.fixed_duration_ms
+* fault.http.<downstream-cluster>.abort.abort_percent
+* fault.http.<downstream-cluster>.abort.http_status
+* fault.http.<downstream-cluster>.delay.fixed_delay_percent
+* fault.http.<downstream-cluster>.delay.fixed_duration_ms
 Downstream cluster name is taken from
 :ref:`the HTTP x-envoy-downstream-service-cluster <config_http_conn_man_headers_downstream-service-cluster>`
 header. If the following settings are not found in the runtime it defaults to the global runtime settings

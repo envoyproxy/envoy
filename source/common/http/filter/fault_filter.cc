@@ -25,6 +25,7 @@ const std::string FaultFilter::DELAY_PERCENT_KEY = "fault.http.delay.fixed_delay
 const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_percent";
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
+const std::string FaultFilter::DOWNSTREAM_NODES_KEY = "fault.http.enable_downstream_nodes_match";
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
                                      const std::string& stats_prefix, Stats::Store& stats)
@@ -260,12 +261,16 @@ bool FaultFilter::matchesDownstreamNodes(const HeaderMap& headers) {
     return true;
   }
 
-  if (!headers.EnvoyDownstreamServiceNode()) {
-    return false;
+  if (config_->runtime().snapshot().featureEnabled(DOWNSTREAM_NODES_KEY, 100UL)) {
+    if (!headers.EnvoyDownstreamServiceNode()) {
+      return false;
+    }
+
+    const std::string downstream_node = headers.EnvoyDownstreamServiceNode()->value().c_str();
+    return config_->downstreamNodes().find(downstream_node) != config_->downstreamNodes().end();
   }
 
-  const std::string downstream_node = headers.EnvoyDownstreamServiceNode()->value().c_str();
-  return config_->downstreamNodes().find(downstream_node) != config_->downstreamNodes().end();
+  return true;
 }
 
 void FaultFilter::resetTimerState() {
