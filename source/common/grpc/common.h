@@ -31,7 +31,7 @@ public:
    * @headers the headers to parse.
    * @returns the parsed status code or InvalidCode if no valid status is found.
    */
-  static Status::GrpcStatus getGrpcStatus(const Http::HeaderMap& headers);
+  static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& headers);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.

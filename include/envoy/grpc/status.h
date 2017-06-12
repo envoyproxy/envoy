@@ -22,8 +22,6 @@ public:
     AlreadyExists = 6,
     // Permission was denied for the RPC.
     PermissionDenied = 7,
-    // The RPC does not have required credentials for the RPC to succeed.
-    Unauthenticated = 16,
     // Some resource is exhausted, resulting in RPC failure.
     ResourceExhausted = 8,
     // Some precondition for the RPC failed.
@@ -40,13 +38,12 @@ public:
     Unavailable = 14,
     // There was some data loss resulting in RPC failure.
     DataLoss = 15,
+    // The RPC does not have required credentials for the RPC to succeed.
+    Unauthenticated = 16,
 
     // This is a non-GRPC error code, indicating the status code in gRPC headers
-    // was missing or empty.
-    MissingStatus = -1,
-    // This is a non-GRPC error code, indicating the status code in gRPC headers
     // was invalid.
-    InvalidCode = -2,
+    InvalidCode = -1,
   };
 };
 
