@@ -107,4 +107,11 @@ TEST(Signals, LegalStackAccessTest) {
   SignalAction actions;
   actions.doGoodAccessForTest();
 }
+
+TEST(Signals, HandlerTest) {
+  siginfo_t fake_si;
+  fake_si.si_addr = nullptr;
+  SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
+}
+
 } // Envoy

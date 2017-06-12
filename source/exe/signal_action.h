@@ -60,6 +60,12 @@ public:
    */
   void doGoodAccessForTest();
   void tryEvilAccessForTest(bool end);
+  /**
+   * The actual signal handler function with prototype matching signal.h
+   *
+   * Public so that we can exercise it directly from a test.
+   */
+  static void sigHandler(int sig, siginfo_t* info, void* context);
 
 private:
   /**
@@ -91,10 +97,6 @@ private:
    * Return the memory size we actually map including two guard pages.
    */
   size_t mapSizeWithGuards() const { return altstack_size_ + guard_size_ * 2; }
-  /**
-   * The actual signal handler function with prototype matching signal.h
-   */
-  static void sigHandler(int sig, siginfo_t* info, void* context);
   /**
    * Install all signal handlers and setup signal handling stack.
    */
