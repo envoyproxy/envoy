@@ -857,6 +857,13 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
         "additionalProperties" : false
       },
       "upstream_cluster" : {"type" : "string"},
+      "downstream_nodes": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string"
+        }
+      },
       "headers" : {
         "type" : "array",
         "minItems" : 1,
@@ -1308,6 +1315,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
+      },
+      "dns_resolvers": {
+        "type" : "array",
+        "items" : {"type" : "string"},
+        "minItems" : 1,
+        "uniqueItems" : true
       },
       "dns_lookup_family" : {
         "type" : "string",

@@ -29,7 +29,7 @@ class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
                             ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-                            Network::DnsResolver& dns_resolver,
+                            Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& primary_dispatcher,
                             const LocalInfo::LocalInfo& local_info)
@@ -56,7 +56,7 @@ private:
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
-  Network::DnsResolver& dns_resolver_;
+  Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   Event::Dispatcher& primary_dispatcher_;
   const LocalInfo::LocalInfo& local_info_;

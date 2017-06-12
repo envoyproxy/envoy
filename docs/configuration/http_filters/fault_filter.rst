@@ -40,7 +40,8 @@ including the router filter.*
       "abort" : "{...}",
       "delay" : "{...}",
       "upstream_cluster" : "...",
-      "headers" : []
+      "headers" : [],
+      "downstream_nodes": []
     }
   }
 
@@ -65,6 +66,13 @@ upstream_cluster:
   against all the specified headers in the filter config. A match will happen if all the headers in
   the config are present in the request with the same values (or based on presence if the ``value``
   field is not in the config).
+  TODO: allow runtime configuration on per entry basis for headers match.
+
+downstream_nodes:
+  *(optional, array)* Faults are injected for the specified list of downstream hosts. If this setting is
+  not set, faults are injected for all downstream nodes. Downstream node name is taken from
+  :ref:`the HTTP x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-node>`
+  header and compared against downstream_nodes list.
 
 The abort and delay blocks can be omitted. If they are not specified in the
 configuration file, their respective values will be obtained from the
@@ -117,7 +125,7 @@ fixed_duration_ms:
 Runtime
 -------
 
-The HTTP fault injection filter supports the following runtime settings:
+The HTTP fault injection filter supports the following global runtime settings:
 
 http.fault.abort.abort_percent
   % of requests that will be aborted if the headers match. Defaults to the
@@ -140,6 +148,18 @@ http.fault.delay.fixed_duration_ms
   is missing from both the runtime and the config, no delays will be
   injected.
 
+*Note*, fault filter runtime settings for the specific downstream cluster
+override the default ones if present. The following are downstream specific
+runtime keys:
+* http.fault.<downstream-cluster>.abort.abort_percent
+* http.fault.<downstream-cluster>.abort.http_status
+* http.fault.<downstream-cluster>.delay.fixed_delay_percent
+* http.fault.<downstream-cluster>.delay.fixed_duration_ms
+Downstream cluster name is taken from
+:ref:`the HTTP x-envoy-downstream-service-cluster <config_http_conn_man_headers_downstream-service-cluster>`
+header. If the following settings are not found in the runtime it defaults to the global runtime settings
+which defaults to the config settings.
+
 Statistics
 ----------
 
@@ -152,3 +172,5 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
 
   delays_injected, Counter, Total requests that were delayed
   aborts_injected, Counter, Total requests that were aborted
+  <downstream-cluster>.delays_injected, Counter, Total delayed requests for the given downstream cluster
+  <downstream-cluster>.aborts_injected, Counter, Total aborted requests for the given downstream cluster

@@ -32,6 +32,10 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
+  TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",
+                                                        "The local "
+                                                        "IP address version (v4 or v6).",
+                                                        false, "v4", "string", cmd);
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
@@ -83,6 +87,16 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
     mode_ = Server::Mode::Validate;
   } else {
     std::cerr << "error: unknown mode '" << mode.getValue() << "'" << std::endl;
+    exit(1);
+  }
+
+  if (local_address_ip_version.getValue() == "v4") {
+    local_address_ip_version_ = Network::Address::IpVersion::v4;
+  } else if (local_address_ip_version.getValue() == "v6") {
+    local_address_ip_version_ = Network::Address::IpVersion::v6;
+  } else {
+    std::cerr << "error: unknown IP address version '" << local_address_ip_version.getValue() << "'"
+              << std::endl;
     exit(1);
   }
 

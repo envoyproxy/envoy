@@ -336,13 +336,11 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (active_span_) {
-    if (request_info_.healthCheck()) {
-      connection_manager_.config_.tracingStats().health_check_.inc();
-    } else {
-      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, *request_headers_, request_info_,
-                                               *this);
-    }
+  if (request_info_.healthCheck()) {
+    connection_manager_.config_.tracingStats().health_check_.inc();
+  } else {
+    Tracing::HttpConnManFinalizerImpl finalizer(request_headers_.get(), request_info_, *this);
+    active_span_->finishSpan(finalizer);
   }
 
   ASSERT(state_.filter_call_state_ == 0);

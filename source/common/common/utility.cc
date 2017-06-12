@@ -3,6 +3,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -121,6 +122,15 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
   } while (next_index != source.size());
 
   return ret;
+}
+
+std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
+  std::ostringstream buf;
+  std::copy(source.begin(), source.end(),
+            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+  std::string ret = buf.str();
+  // copy will always end with an extra delimiter, we remove it here.
+  return ret.substr(0, ret.length() - delimiter.length());
 }
 
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
