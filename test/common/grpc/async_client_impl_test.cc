@@ -28,7 +28,7 @@ namespace {
 
 const std::string HELLO_REQUEST = "ABC";
 // We expect the 5 byte header to only have a length of 5 indicating the size of the protobuf. The
-// protobuf beings with 0x0a, indicating this is the first field of type string. This is followed
+// protobuf begins with 0x0a, indicating this is the first field of type string. This is followed
 // by 0x03 for the number of characters and the name ABC set above.
 const char HELLO_REQUEST_DATA[] = "\x00\x00\x00\x00\x05\x0a\x03\x41\x42\x43";
 const size_t HELLO_REQUEST_SIZE = sizeof(HELLO_REQUEST_DATA) - 1;
