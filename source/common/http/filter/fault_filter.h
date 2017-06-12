@@ -100,6 +100,7 @@ private:
 
   bool isAbortEnabled();
   bool isDelayEnabled();
+  bool isDownstreamNodesMatchEnabled();
   Optional<uint64_t> delayDuration();
   std::string abortHttpStatus();
 
@@ -117,6 +118,7 @@ private:
   const static std::string ABORT_PERCENT_KEY;
   const static std::string DELAY_DURATION_KEY;
   const static std::string ABORT_HTTP_STATUS_KEY;
+  const static std::string DOWNSTREAM_NODES_KEY;
 };
 
 } // Http

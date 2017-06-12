@@ -486,29 +486,37 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .WillOnce(Return(true));
+      .Times(2)
+      .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .WillOnce(Return(5000UL));
+      .Times(2)
+      .WillRepeatedly(Return(5000UL));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.enable_downstream_nodes_match", 100))
+      .Times(2)
+      .WillRepeatedly(Return(true));
 
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected)).Times(2);
 
   request_headers_.addViaCopy("x-envoy-downstream-service-node", "canary");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
-      .WillOnce(Return(true));
+      .Times(2)
+      .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
-      .WillOnce(Return(503));
+      .Times(2)
+      .WillRepeatedly(Return(503));
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true))
+      .Times(2);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(2);
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -517,10 +525,20 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
+  // Remove downstream node header, no injection happens.
   request_headers_.removeEnvoyDownstreamServiceNode();
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+
+  // Disable runtime check against downstream nodes.
+  expectDelayTimer(5000UL);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.enable_downstream_nodes_match", 100))
+      .WillOnce(Return(false));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  timer_->callback_();
+  EXPECT_EQ(2UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(2UL, config_->stats().aborts_injected_.value());
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
