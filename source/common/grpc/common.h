@@ -5,6 +5,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
@@ -25,6 +26,13 @@ public:
 
 class Common {
 public:
+  /**
+   * Returns the GrpcStatus code from a given set of headers, if present.
+   * @headers the headers to parse.
+   * @returns the parsed status code or InvalidCode if no valid status is found.
+   */
+  static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& headers);
+
   /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.

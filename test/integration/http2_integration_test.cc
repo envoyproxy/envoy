@@ -91,6 +91,8 @@ TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::T
 
 TEST_P(Http2IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
 
+TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
+
 TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
