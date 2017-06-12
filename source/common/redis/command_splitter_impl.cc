@@ -92,7 +92,7 @@ MGETCommandHandler::SplitRequestImpl::SplitRequestImpl(SplitCallbacks& callbacks
 }
 
 MGETCommandHandler::SplitRequestImpl::~SplitRequestImpl() {
-#ifndef NVLOG
+#ifndef NDEBUG
   for (const PendingRequest& request : pending_requests_) {
     ASSERT(!request.handle_);
   }
