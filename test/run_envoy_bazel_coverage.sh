@@ -7,6 +7,7 @@ set -e
 [[ -z "${TESTLOGS_DIR}" ]] && TESTLOGS_DIR="${SRCDIR}/bazel-testlogs"
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
+[[ -z "${WORKSPACE}" ]] && WORKSPACE=envoy
 
 # This is the target that will be run to generate coverage data. It can be overriden by consumer
 # projects that want to run coverage on a different/combined target.
@@ -22,6 +23,9 @@ do
   rm -f "${f}"
 done
 echo "Cleanup completed."
+
+# Force dbg for path consistency later, don't include debug code in coverage.
+BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
@@ -44,6 +48,15 @@ echo "Cleanup completed."
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
+
+# Copy .gcno objects into the same location that we find the .gcda.
+# TODO(htuch): Should use rsync, but there are some symlink loops to fight.
+pushd "${GCOVR_DIR}"
+for f in $(find -L bazel-out/ -name "*.gcno")
+do
+  cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
+done
+popd
 
 # gcovr is extremely picky about where it is run and where the paths of the
 # original source are relative to its execution location.
