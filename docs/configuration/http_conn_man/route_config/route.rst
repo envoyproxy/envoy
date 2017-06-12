@@ -114,7 +114,7 @@ auto_host_rewrite
 .. _config_http_conn_man_route_table_route_case_sensitive:
 
 case_sensitive
-  *(optional, string)* Indicates that prefix/path matching should be case sensitive. The default
+  *(optional, boolean)* Indicates that prefix/path matching should be case sensitive. The default
   is true.
 
 .. _config_http_conn_man_route_table_route_timeout:
