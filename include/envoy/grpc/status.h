@@ -42,8 +42,11 @@ public:
     DataLoss = 15,
 
     // This is a non-GRPC error code, indicating the status code in gRPC headers
-    // was either invalid or missing.
-    InvalidCode = 16,
+    // was missing or empty.
+    MissingStatus = -1,
+    // This is a non-GRPC error code, indicating the status code in gRPC headers
+    // was invalid.
+    InvalidCode = -2,
   };
 };
 
