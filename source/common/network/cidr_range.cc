@@ -90,7 +90,7 @@ bool CidrRange::isInRange(const Instance& address) const {
   if (length_ < 0 || address.type() != Type::Ip || address.ip()->version() != version()) {
     return false;
   }
-  // Make an CidrRange from the address, of the same length as this. If the two ranges have
+  // Make a CidrRange from the address, of the same length as this. If the two ranges have
   // are the same, then the address is in this range.
   CidrRange other = create(address.ip()->addressAsString(), length_);
   ASSERT(length() == other.length());
