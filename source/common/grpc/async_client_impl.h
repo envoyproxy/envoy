@@ -95,6 +95,11 @@ public:
 
   void onData(Buffer::Instance& data, bool end_stream) override {
     ASSERT(!remote_closed_);
+    if (end_stream) {
+      streamError(Status::GrpcStatus::Internal);
+      return;
+    }
+
     decoded_frames_.clear();
     if (!decoder_.decode(data, decoded_frames_)) {
       streamError(Status::GrpcStatus::Internal);
@@ -113,10 +118,6 @@ public:
         return;
       }
       callbacks_.onReceiveMessage(std::move(response));
-    }
-    if (end_stream) {
-      streamError(Status::GrpcStatus::Internal);
-      return;
     }
   }
 
