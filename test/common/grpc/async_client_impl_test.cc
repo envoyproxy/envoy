@@ -155,15 +155,14 @@ public:
     for (auto& value : initial_metadata) {
       headers.addStatic(value.first, value.second);
     }
-    EXPECT_CALL(stream->http_stream_, sendHeaders(HeaderMapEqualRef(&headers), _));
-
-    ON_CALL(http_client_, start(_, _))
-        .WillByDefault(Invoke([&stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                        const Optional<std::chrono::milliseconds>& timeout) {
+    EXPECT_CALL(http_client_, start(_, _))
+        .WillOnce(Invoke([&stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                   const Optional<std::chrono::milliseconds>& timeout) {
           UNREFERENCED_PARAMETER(timeout);
           stream->http_callbacks_ = &callbacks;
           return &stream->http_stream_;
         }));
+    EXPECT_CALL(stream->http_stream_, sendHeaders(HeaderMapEqualRef(&headers), _));
     stream->grpc_stream_ =
         grpc_client_->start(*method_descriptor_, *stream, Optional<std::chrono::milliseconds>());
     EXPECT_NE(stream->grpc_stream_, nullptr);
@@ -212,6 +211,33 @@ TEST_F(GrpcAsyncClientImplTest, HttpStartFail) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validate that a failure to sendHeaders() in the HTTP client returns
+// immediately with status INTERNAL.
+TEST_F(GrpcAsyncClientImplTest, HttpSendHeadersFail) {
+  MockAsyncClientCallbacks<helloworld::HelloReply> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const Optional<std::chrono::milliseconds>& timeout) {
+            UNREFERENCED_PARAMETER(timeout);
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
+        UNREFERENCED_PARAMETER(headers);
+        UNREFERENCED_PARAMETER(end_stream);
+        http_callbacks->onReset();
+      }));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal));
+  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                          Optional<std::chrono::milliseconds>());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validate that a non-200 HTTP status results in the gRPC error as per
 // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
 TEST_F(GrpcAsyncClientImplTest, HttpNon200Status) {
@@ -240,8 +266,9 @@ TEST_F(GrpcAsyncClientImplTest, GrpcStatusFallback) {
 TEST_F(GrpcAsyncClientImplTest, HttpReset) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  stream->expectGrpcStatus(Status::GrpcStatus::Internal);
+  EXPECT_CALL(*stream, onRemoteClose(Status::GrpcStatus::Internal));
   stream->http_callbacks_->onReset();
+  stream->clearStream();
 }
 
 // Validate that a reply with bad gRPC framing is handled as an INTERNAL gRPC

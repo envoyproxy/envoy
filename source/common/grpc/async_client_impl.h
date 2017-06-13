@@ -46,8 +46,12 @@ public:
     callbacks.onCreateInitialMetadata(message->headers());
 
     http_stream->sendHeaders(message->headers(), false);
-    grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+    // If sendHeaders() caused a reset, onRemoteClose() has been called inline and we should bail.
+    if (grpc_stream->http_reset_) {
+      return nullptr;
+    }
 
+    grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
     return active_streams_.front().get();
   }
 
@@ -138,6 +142,7 @@ public:
       return;
     }
 
+    http_reset_ = true;
     streamError(Status::GrpcStatus::Internal);
   }
 
