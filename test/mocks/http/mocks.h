@@ -390,6 +390,9 @@ public:
 
 class MockAsyncClientStream : public AsyncClient::Stream {
 public:
+  MockAsyncClientStream();
+  ~MockAsyncClientStream();
+
   MOCK_METHOD2(sendHeaders, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(sendData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(sendTrailers, void(HeaderMap& trailers));
