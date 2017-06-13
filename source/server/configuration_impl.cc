@@ -44,14 +44,8 @@ void MainImpl::initialize(const Json::Object& json) {
   std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
   LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
-<<<<<<< HEAD
-    log().info("listener #{}:", i);
-    listeners_.emplace_back(ListenerPtr{new ListenerConfig(server_, *listeners[i])});
-=======
     LOG(info, "listener #{}:", i);
-    listeners_.emplace_back(
-        Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
->>>>>>> origin/master
+    listeners_.emplace_back(ListenerPtr{new ListenerConfig(server_, *listeners[i])});
   }
 
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
