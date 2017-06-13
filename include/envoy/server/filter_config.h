@@ -134,7 +134,7 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param context supplies the filter's context.
-   * @return NetworkFilterFactoryCb fixfix
+   * @return NetworkFilterFactoryCb the factory creation function.
    */
   virtual NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                      FactoryContext& context) PURE;
@@ -180,7 +180,7 @@ public:
    * @param config supplies the general json configuration for the filter
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return HttpFilterFactoryCb fixfix
+   * @return HttpFilterFactoryCb the factory creation function.
    */
   virtual HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                   const std::string& stat_prefix,
