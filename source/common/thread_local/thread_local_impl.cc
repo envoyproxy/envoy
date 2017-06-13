@@ -59,7 +59,7 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
     thread_local_data_.data_.resize(index + 1);
   }
 
-  thread_local_data_.data_[index] = object;
+  thread_local_data_.data_[index] = std::move(object);
 }
 
 void InstanceImpl::shutdownThread() {

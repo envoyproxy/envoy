@@ -300,7 +300,7 @@ private:
                                      LinkedObject<ActiveStreamDecoderFilter> {
     ActiveStreamDecoderFilter(ActiveStream& parent, StreamDecoderFilterSharedPtr filter,
                               bool dual_filter)
-        : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+        : ActiveStreamFilterBase(parent, dual_filter), handle_(std::move(filter)) {}
 
     // ActiveStreamFilterBase
     Buffer::InstancePtr& bufferedData() override { return parent_.buffered_request_data_; }
@@ -337,7 +337,7 @@ private:
                                      LinkedObject<ActiveStreamEncoderFilter> {
     ActiveStreamEncoderFilter(ActiveStream& parent, StreamEncoderFilterSharedPtr filter,
                               bool dual_filter)
-        : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+        : ActiveStreamFilterBase(parent, dual_filter), handle_(std::move(filter)) {}
 
     // ActiveStreamFilterBase
     Buffer::InstancePtr& bufferedData() override { return parent_.buffered_response_data_; }

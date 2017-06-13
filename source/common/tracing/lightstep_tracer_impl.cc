@@ -104,7 +104,7 @@ void LightStepRecorder::flushSpans() {
 
 LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer,
                                                         LightStepDriver& driver)
-    : tracer_(new lightstep::Tracer(tracer)), driver_(driver) {}
+    : tracer_(new lightstep::Tracer(std::move(tracer))), driver_(driver) {}
 
 LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,

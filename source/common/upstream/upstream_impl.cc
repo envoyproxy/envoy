@@ -158,7 +158,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster, cluster, dispatcher, runtime, outlier_event_logger));
+      *new_cluster, cluster, dispatcher, runtime, std::move(outlier_event_logger)));
   return std::move(new_cluster);
 }
 

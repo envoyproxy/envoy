@@ -71,7 +71,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   }
 }
 
-FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
+FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 

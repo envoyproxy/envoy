@@ -53,7 +53,7 @@ public:
  */
 struct HostSuccessRatePair {
   HostSuccessRatePair(HostSharedPtr host, double success_rate)
-      : host_(host), success_rate_(success_rate) {}
+      : host_(std::move(host)), success_rate_(success_rate) {}
   HostSharedPtr host_;
   double success_rate_;
 };
@@ -102,7 +102,7 @@ class DetectorImpl;
  */
 class DetectorHostSinkImpl : public DetectorHostSink {
 public:
-  DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
+  DetectorHostSinkImpl(const std::shared_ptr<DetectorImpl>& detector, const HostSharedPtr& host)
       : detector_(detector), host_(host), success_rate_(-1) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();

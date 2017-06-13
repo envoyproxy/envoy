@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Thread {
 
-Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_routine) {
+Thread::Thread(std::function<void()> thread_routine) : thread_routine_(std::move(thread_routine)) {
   int rc = pthread_create(&thread_id_, nullptr, [](void* arg) -> void* {
     static_cast<Thread*>(arg)->thread_routine_();
     return nullptr;

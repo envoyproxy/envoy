@@ -38,7 +38,8 @@ public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr address, bool canary,
                       const std::string& zone)
-      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary), zone_(zone),
+      : cluster_(std::move(cluster)), hostname_(hostname), address_(std::move(address)),
+        canary_(canary), zone_(zone),
         stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
@@ -80,7 +81,7 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, bool canary, uint32_t initial_weight,
            const std::string& zone)
-      : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
+      : HostDescriptionImpl(std::move(cluster), hostname, std::move(address), canary, zone) {
     weight(initial_weight);
   }
 
@@ -128,10 +129,10 @@ public:
                    HostListsConstSharedPtr healthy_hosts_per_zone,
                    const std::vector<HostSharedPtr>& hosts_added,
                    const std::vector<HostSharedPtr>& hosts_removed) {
-    hosts_ = hosts;
-    healthy_hosts_ = healthy_hosts;
-    hosts_per_zone_ = hosts_per_zone;
-    healthy_hosts_per_zone_ = healthy_hosts_per_zone;
+    hosts_ = std::move(hosts);
+    healthy_hosts_ = std::move(healthy_hosts);
+    hosts_per_zone_ = std::move(hosts_per_zone);
+    healthy_hosts_per_zone_ = std::move(healthy_hosts_per_zone);
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 

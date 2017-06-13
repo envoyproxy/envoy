@@ -96,7 +96,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 
 class RateLimitConfiguration : public testing::Test {
 public:
-  void SetUpTest(const std::string json) {
+  void SetUpTest(const std::string& json) {
     Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     config_.reset(new ConfigImpl(*loader, runtime_, cm_, true));
   }
@@ -337,7 +337,7 @@ TEST_F(RateLimitConfiguration, Stages) {
 
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
-  void SetUpTest(const std::string json) {
+  void SetUpTest(const std::string& json) {
     Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     rate_limit_entry_.reset(new RateLimitPolicyEntryImpl(*loader));
     descriptors_.clear();

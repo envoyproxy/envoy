@@ -24,7 +24,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
   return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, zone)};
+      new HostImpl(std::move(cluster), "", Network::Utility::resolveUrl(url), false, weight, zone)};
 }
 
 /**
@@ -49,8 +49,9 @@ public:
    * @param healthy_destination_cluster total number of healthy hosts in each zone in upstream
    * cluster.
    */
-  void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
-           std::vector<uint32_t> healthy_destination_cluster) {
+  void run(const std::vector<uint32_t>& originating_cluster,
+           const std::vector<uint32_t>& all_destination_cluster,
+           const std::vector<uint32_t>& healthy_destination_cluster) {
     local_host_set_ = new HostSetImpl();
     // TODO(mattklein123): make load balancer per originating cluster host.
     RandomLoadBalancer lb(cluster_, local_host_set_, stats_, runtime_, random_);
