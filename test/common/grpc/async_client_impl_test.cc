@@ -105,7 +105,9 @@ public:
     for (auto& value : metadata) {
       reply_trailers->addStatic(value.first, value.second);
     }
-    EXPECT_CALL(*this, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers.get())));
+    if (grpc_status == Status::GrpcStatus::Ok) {
+      EXPECT_CALL(*this, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers.get())));
+    }
     expectGrpcStatus(grpc_status);
     if (trailers_only) {
       http_callbacks_->onHeaders(std::move(reply_trailers), true);
@@ -155,8 +157,8 @@ public:
     EXPECT_CALL(stream->http_stream_, sendHeaders(HeaderMapEqualRef(&headers), _));
 
     ON_CALL(http_client_, start(_, _))
-        .WillByDefault(Invoke([this, &stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                              const Optional<std::chrono::milliseconds>& timeout) {
+        .WillByDefault(Invoke([&stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                        const Optional<std::chrono::milliseconds>& timeout) {
           UNREFERENCED_PARAMETER(timeout);
           stream->http_callbacks_ = &callbacks;
           return &stream->http_stream_;
@@ -209,13 +211,28 @@ TEST_F(GrpcAsyncClientImplTest, HttpStartFail) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that a non-200 HTTP status results in an INTERNAL gRPC error.
+// Validate that a non-200 HTTP status results in the gRPC error as per
+// https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
 TEST_F(GrpcAsyncClientImplTest, HttpNon200Status) {
+  for (const auto http_response_status : {400, 401, 403, 404, 429, 431}) {
+    TestMetadata empty_metadata;
+    auto stream = createStream(empty_metadata);
+    Http::HeaderMapPtr reply_headers{
+        new Http::TestHeaderMapImpl{{":status", std::to_string(http_response_status)}}};
+    stream->expectGrpcStatus(Common::httpToGrpcStatus(http_response_status));
+    stream->http_callbacks_->onHeaders(std::move(reply_headers), false);
+  }
+}
+
+// Validate that a non-200 HTTP status results in fallback to grpc-status.
+TEST_F(GrpcAsyncClientImplTest, GrpcStatusFallback) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "404"}}};
-  stream->expectGrpcStatus(Status::GrpcStatus::Internal);
-  stream->http_callbacks_->onHeaders(std::move(reply_headers), false);
+  Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{
+      {":status", "404"},
+      {"grpc-status", std::to_string(enumToInt(Status::GrpcStatus::PermissionDenied))}}};
+  stream->expectGrpcStatus(Status::GrpcStatus::PermissionDenied);
+  stream->http_callbacks_->onHeaders(std::move(reply_headers), true);
 }
 
 // Validate that a HTTP-level reset is handled as an INTERNAL gRPC error.
@@ -259,7 +276,6 @@ TEST_F(GrpcAsyncClientImplTest, OutOfRangeGrpcStatus) {
   stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
   Http::HeaderMapPtr reply_trailers{
       new Http::TestHeaderMapImpl{{"grpc-status", std::to_string(0x1337)}}};
-  EXPECT_CALL(*stream, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers.get())));
   stream->http_callbacks_->onTrailers(std::move(reply_trailers));
 }
 
@@ -271,7 +287,6 @@ TEST_F(GrpcAsyncClientImplTest, MissingGrpcStatus) {
   stream->sendReply();
   stream->expectGrpcStatus(Status::GrpcStatus::Internal);
   Http::HeaderMapPtr reply_trailers{new Http::TestHeaderMapImpl{}};
-  EXPECT_CALL(*stream, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers.get())));
   stream->http_callbacks_->onTrailers(std::move(reply_trailers));
 }
 

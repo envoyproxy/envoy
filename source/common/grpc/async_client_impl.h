@@ -71,8 +71,15 @@ public:
   // Http::AsyncClient::StreamCallbacks
   void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override {
     ASSERT(!remote_closed_);
-    if (Http::Utility::getResponseStatus(*headers) != enumToInt(Http::Code::OK)) {
-      streamError(Status::GrpcStatus::Internal);
+    const auto http_response_status = Http::Utility::getResponseStatus(*headers);
+    if (http_response_status != enumToInt(Http::Code::OK)) {
+      // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
+      // grpc-status be used if available.
+      if (end_stream && Common::getGrpcStatus(*headers).valid()) {
+        onTrailers(std::move(headers));
+        return;
+      }
+      streamError(Common::httpToGrpcStatus(http_response_status));
       return;
     }
     if (end_stream) {
@@ -111,7 +118,6 @@ public:
 
   void onTrailers(Http::HeaderMapPtr&& trailers) override {
     ASSERT(!remote_closed_);
-    callbacks_.onReceiveTrailingMetadata(std::move(trailers));
 
     const Optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(*trailers);
     if (!grpc_status.valid()) {
@@ -122,7 +128,7 @@ public:
       streamError(grpc_status.value());
       return;
     }
-
+    callbacks_.onReceiveTrailingMetadata(std::move(trailers));
     callbacks_.onRemoteClose(Status::GrpcStatus::Ok);
     closeRemote();
   }
