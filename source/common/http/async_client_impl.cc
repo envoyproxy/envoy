@@ -72,9 +72,9 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 #ifndef NVLOG
-  log_facility(debug, "async http request response headers (end_stream={}):", end_stream);
+  LOG(debug, "async http request response headers (end_stream={}):", end_stream);
   headers->iterate([](const HeaderEntry& header, void*) -> void {
-    log_facility(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
+    LOG(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
   }, nullptr);
 #endif
 
@@ -83,17 +83,17 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
-  log_facility(trace, "async http request response data (length={} end_stream={})", data.length(),
-               end_stream);
+  LOG(trace, "async http request response data (length={} end_stream={})", data.length(),
+      end_stream);
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
 }
 
 void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 #ifndef NVLOG
-  log_facility(debug, "async http request response trailers:");
+  LOG(debug, "async http request response trailers:");
   trailers->iterate([](const HeaderEntry& header, void*) -> void {
-    log_facility(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
+    LOG(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
   }, nullptr);
 #endif
 

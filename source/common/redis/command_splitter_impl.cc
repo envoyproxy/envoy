@@ -42,7 +42,7 @@ void AllParamsToOneServerCommandHandler::SplitRequestImpl::cancel() {
 
 void AllParamsToOneServerCommandHandler::SplitRequestImpl::onResponse(RespValuePtr&& response) {
   handle_ = nullptr;
-  log_facility(debug, "redis: response: '{}'", response->toString());
+  LOG(debug, "redis: response: '{}'", response->toString());
   callbacks_.onResponse(std::move(response));
 }
 
@@ -70,7 +70,7 @@ SplitRequestPtr MGETCommandHandler::startRequest(const RespValue& request,
     SplitRequestImpl::PendingRequest& pending_request = request_handle->pending_requests_.back();
 
     single_mget.asArray()[1].asString() = request.asArray()[i].asString();
-    log_facility(debug, "redis: parallel get: '{}'", single_mget.toString());
+    LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
     pending_request.handle_ =
         conn_pool_.makeRequest(request.asArray()[i].asString(), single_mget, pending_request);
     if (!pending_request.handle_) {
@@ -131,7 +131,7 @@ void MGETCommandHandler::SplitRequestImpl::onResponse(RespValuePtr&& value, uint
 
   ASSERT(pending_responses_ > 0);
   if (--pending_responses_ == 0) {
-    log_facility(debug, "redis: response: '{}'", pending_response_->toString());
+    LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
 }
@@ -175,7 +175,7 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     return nullptr;
   }
 
-  log_facility(debug, "redis: splitting '{}'", request.toString());
+  LOG(debug, "redis: splitting '{}'", request.toString());
   handler->second.total_.inc();
   return handler->second.handler_.get().startRequest(request, callbacks);
 }

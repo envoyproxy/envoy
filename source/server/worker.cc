@@ -59,11 +59,11 @@ void Worker::onNoExitTimer() {
 }
 
 void Worker::threadRoutine(Server::GuardDog& guard_dog) {
-  log_facility(info, "worker entering dispatch loop");
+  LOG(info, "worker entering dispatch loop");
   auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(handler_->dispatcher());
   handler_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  log_facility(info, "worker exited dispatch loop");
+  LOG(info, "worker exited dispatch loop");
   guard_dog.stopWatching(watchdog);
 
   // We must close all active connections before we actually exit the thread. This prevents any

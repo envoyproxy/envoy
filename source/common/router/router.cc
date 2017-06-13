@@ -149,8 +149,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
-    stream_log_facility(debug, "no cluster match for URL '{}'", *callbacks_,
-                        headers.Path()->value().c_str());
+    STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
+               headers.Path()->value().c_str());
 
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
     Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
@@ -171,7 +171,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();
-    stream_log_facility(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
+    STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
     Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
@@ -183,8 +183,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
-  stream_log_facility(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                      route_entry_->clusterName(), headers.Path()->value().c_str());
+  STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_, route_entry_->clusterName(),
+             headers.Path()->value().c_str());
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
@@ -233,9 +233,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 #ifndef NVLOG
   headers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    stream_log_facility(debug, "  '{}':'{}'",
-                        *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
-                        header.key().c_str(), header.value().c_str());
+    STREAM_LOG(debug, "  '{}':'{}'", *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
+               header.key().c_str(), header.value().c_str());
   }, callbacks_);
 #endif
 
@@ -359,7 +358,7 @@ void Filter::onDestroy() {
 }
 
 void Filter::onResponseTimeout() {
-  stream_log_facility(debug, "upstream timeout", *callbacks_);
+  STREAM_LOG(debug, "upstream timeout", *callbacks_);
   cluster_->stats().upstream_rq_timeout_.inc();
 
   // It's possible to timeout during a retry backoff delay when we have no upstream request. In
@@ -378,7 +377,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
                              const Optional<Http::StreamResetReason>& reset_reason) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
-    stream_log_facility(debug, "upstream reset", *callbacks_);
+    STREAM_LOG(debug, "upstream reset", *callbacks_);
   }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host;
@@ -448,7 +447,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
 }
 
 void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
-  stream_log_facility(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
+  STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
   ASSERT(!downstream_response_started_);
 
   upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(
@@ -548,7 +547,7 @@ bool Filter::setupRetry(bool end_stream) {
     return false;
   }
 
-  stream_log_facility(debug, "performing retry", *callbacks_);
+  STREAM_LOG(debug, "performing retry", *callbacks_);
   if (!end_stream) {
     upstream_request_->resetStream();
   }
@@ -622,14 +621,14 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   encode_complete_ = end_stream;
 
   if (!request_encoder_) {
-    stream_log_facility(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
+    STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
       buffered_request_body_.reset(new Buffer::OwnedImpl());
     }
 
     buffered_request_body_->move(data);
   } else {
-    stream_log_facility(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
+    STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     request_encoder_->encodeData(data, end_stream);
   }
 }
@@ -640,9 +639,9 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   encode_trailers_ = true;
 
   if (!request_encoder_) {
-    stream_log_facility(trace, "buffering trailers", *parent_.callbacks_);
+    STREAM_LOG(trace, "buffering trailers", *parent_.callbacks_);
   } else {
-    stream_log_facility(trace, "proxying trailers", *parent_.callbacks_);
+    STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
   }
 }
@@ -658,14 +657,14 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
 
 void Filter::UpstreamRequest::resetStream() {
   if (conn_pool_stream_handle_) {
-    stream_log_facility(debug, "cancelling pool request", *parent_.callbacks_);
+    STREAM_LOG(debug, "cancelling pool request", *parent_.callbacks_);
     ASSERT(!request_encoder_);
     conn_pool_stream_handle_->cancel();
     conn_pool_stream_handle_ = nullptr;
   }
 
   if (request_encoder_) {
-    stream_log_facility(debug, "resetting pool request", *parent_.callbacks_);
+    STREAM_LOG(debug, "resetting pool request", *parent_.callbacks_);
     request_encoder_->getStream().removeCallbacks(*this);
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
@@ -681,7 +680,7 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
-  stream_log_facility(debug, "upstream per try timeout", *parent_.callbacks_);
+  STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
   parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
   upstream_host_->stats().rq_timeout_.inc();
   resetStream();
@@ -708,7 +707,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
-  stream_log_facility(debug, "pool ready", *parent_.callbacks_);
+  STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 

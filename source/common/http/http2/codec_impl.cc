@@ -224,7 +224,7 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
-  conn_log_facility(trace, "dispatching {} bytes", connection_, data.length());
+  CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   data.getRawSlices(slices, num_slices);
@@ -239,7 +239,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
     dispatching_ = false;
   }
 
-  conn_log_facility(trace, "dispatched {} bytes", connection_, data.length());
+  CONN_LOG(trace, "dispatched {} bytes", connection_, data.length());
   data.drain(data.length());
 
   // Decoding incoming frames can generate outbound frames so flush pending.
@@ -274,8 +274,7 @@ void ConnectionImpl::shutdownNotice() {
 }
 
 int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
-  conn_log_facility(trace, "recv frame type={}", connection_,
-                    static_cast<uint64_t>(frame->hd.type));
+  CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
   // notifications are the same as a normal GOAWAY.
@@ -374,7 +373,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     break;
   }
   case NGHTTP2_RST_STREAM: {
-    conn_log_facility(trace, "remote reset: {}", connection_, frame->rst_stream.error_code);
+    CONN_LOG(trace, "remote reset: {}", connection_, frame->rst_stream.error_code);
     stats_.rx_reset_.inc();
     break;
   }
@@ -388,8 +387,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // data from our peer. Sometimes it raises the invalid frame callback, and sometimes it does not.
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
-  conn_log_facility(trace, "sent frame type={}", connection_,
-                    static_cast<uint64_t>(frame->hd.type));
+  CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
@@ -399,7 +397,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   }
 
   case NGHTTP2_RST_STREAM: {
-    conn_log_facility(debug, "sent reset code={}", connection_, frame->rst_stream.error_code);
+    CONN_LOG(debug, "sent reset code={}", connection_, frame->rst_stream.error_code);
     stats_.tx_reset_.inc();
     break;
   }
@@ -418,14 +416,14 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
 int ConnectionImpl::onInvalidFrame(int error_code) {
   UNREFERENCED_PARAMETER(error_code);
 
-  conn_log_facility(debug, "invalid frame: {}", connection_, nghttp2_strerror(error_code));
+  CONN_LOG(debug, "invalid frame: {}", connection_, nghttp2_strerror(error_code));
   // Cause dispatch to return with an error code.
   return NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   // TODO(mattklein123): Back pressure.
-  conn_log_facility(trace, "send data: bytes={}", connection_, length);
+  CONN_LOG(trace, "send data: bytes={}", connection_, length);
   Buffer::OwnedImpl buffer(data, length);
   connection_.write(buffer);
   return length;
@@ -436,7 +434,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 
   StreamImpl* stream = getStream(stream_id);
   if (stream) {
-    conn_log_facility(debug, "stream closed: {}", connection_, error_code);
+    CONN_LOG(debug, "stream closed: {}", connection_, error_code);
     if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
       stream->runResetCallbacks(error_code == NGHTTP2_REFUSED_STREAM
                                     ? StreamResetReason::RemoteRefusedStreamReset
@@ -524,21 +522,21 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
-    conn_log_facility(debug, "setting HPACK table size to {}", connection_,
-                      http2_settings.hpack_table_size_);
+    CONN_LOG(debug, "setting HPACK table size to {}", connection_,
+             http2_settings.hpack_table_size_);
   }
 
   if (http2_settings.max_concurrent_streams_ != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
     iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
-    conn_log_facility(debug, "setting max concurrent streams to {}", connection_,
-                      http2_settings.max_concurrent_streams_);
+    CONN_LOG(debug, "setting max concurrent streams to {}", connection_,
+             http2_settings.max_concurrent_streams_);
   }
 
   if (http2_settings.initial_stream_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
     iv.push_back(
         {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
-    conn_log_facility(debug, "setting stream-level initial window size to {}", connection_,
-                      http2_settings.initial_stream_window_size_);
+    CONN_LOG(debug, "setting stream-level initial window size to {}", connection_,
+             http2_settings.initial_stream_window_size_);
   }
 
   if (!iv.empty()) {
@@ -554,8 +552,8 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
 
   // Increase connection window size up to our default size.
   if (http2_settings.initial_connection_window_size_ != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
-    conn_log_facility(debug, "updating connection-level initial window size to {}", connection_,
-                      http2_settings.initial_connection_window_size_);
+    CONN_LOG(debug, "updating connection-level initial window size to {}", connection_,
+             http2_settings.initial_connection_window_size_);
     int rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
                                           http2_settings.initial_connection_window_size_ -
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);

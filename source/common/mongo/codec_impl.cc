@@ -37,12 +37,12 @@ MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& docu
 }
 
 void GetMoreMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_facility(trace, "decoding get more message");
+  LOG(trace, "decoding get more message");
   Bson::BufferHelper::removeInt32(data); // "zero" (unused)
   full_collection_name_ = Bson::BufferHelper::removeCString(data);
   number_to_return_ = Bson::BufferHelper::removeInt32(data);
   cursor_id_ = Bson::BufferHelper::removeInt64(data);
-  log_facility(trace, "{}", toString(true));
+  LOG(trace, "{}", toString(true));
 }
 
 bool GetMoreMessageImpl::operator==(const GetMoreMessage& rhs) const {
@@ -59,7 +59,7 @@ std::string GetMoreMessageImpl::toString(bool) const {
 }
 
 void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
-  log_facility(trace, "decoding insert message");
+  LOG(trace, "decoding insert message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
 
@@ -69,7 +69,7 @@ void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& da
     documents_.emplace_back(Bson::DocumentImpl::create(data));
   }
 
-  log_facility(trace, "{}", toString(true));
+  LOG(trace, "{}", toString(true));
 }
 
 bool InsertMessageImpl::operator==(const InsertMessage& rhs) const {
@@ -98,14 +98,14 @@ std::string InsertMessageImpl::toString(bool full) const {
 }
 
 void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_facility(trace, "decoding kill cursors message");
+  LOG(trace, "decoding kill cursors message");
   Bson::BufferHelper::removeInt32(data); // zero
   number_of_cursor_ids_ = Bson::BufferHelper::removeInt32(data);
   for (int32_t i = 0; i < number_of_cursor_ids_; i++) {
     cursor_ids_.push_back(Bson::BufferHelper::removeInt64(data));
   }
 
-  log_facility(trace, "{}", toString(true));
+  LOG(trace, "{}", toString(true));
 }
 
 bool KillCursorsMessageImpl::operator==(const KillCursorsMessage& rhs) const {
@@ -132,7 +132,7 @@ std::string KillCursorsMessageImpl::toString(bool) const {
 }
 
 void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
-  log_facility(trace, "decoding query message");
+  LOG(trace, "decoding query message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
 
@@ -146,7 +146,7 @@ void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& dat
     return_fields_selector_ = Bson::DocumentImpl::create(data);
   }
 
-  log_facility(trace, "{}", toString(true));
+  LOG(trace, "{}", toString(true));
 }
 
 bool QueryMessageImpl::operator==(const QueryMessage& rhs) const {
@@ -182,7 +182,7 @@ std::string QueryMessageImpl::toString(bool full) const {
 }
 
 void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_facility(trace, "decoding reply message");
+  LOG(trace, "decoding reply message");
   flags_ = Bson::BufferHelper::removeInt32(data);
   cursor_id_ = Bson::BufferHelper::removeInt64(data);
   starting_from_ = Bson::BufferHelper::removeInt32(data);
@@ -191,7 +191,7 @@ void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
     documents_.emplace_back(Bson::DocumentImpl::create(data));
   }
 
-  log_facility(trace, "{}", toString(true));
+  LOG(trace, "{}", toString(true));
 }
 
 bool ReplyMessageImpl::operator==(const ReplyMessage& rhs) const {
@@ -222,13 +222,13 @@ std::string ReplyMessageImpl::toString(bool full) const {
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   // See if we have enough data for the message length.
-  log_facility(trace, "decoding {} bytes", data.length());
+  LOG(trace, "decoding {} bytes", data.length());
   if (data.length() < sizeof(int32_t)) {
     return false;
   }
 
   uint32_t message_length = Bson::BufferHelper::peakInt32(data);
-  log_facility(trace, "message is {} bytes", message_length);
+  LOG(trace, "message is {} bytes", message_length);
   if (data.length() < message_length) {
     return false;
   }
@@ -237,7 +237,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   int32_t request_id = Bson::BufferHelper::removeInt32(data);
   int32_t response_to = Bson::BufferHelper::removeInt32(data);
   Message::OpCode op_code = static_cast<Message::OpCode>(Bson::BufferHelper::removeInt32(data));
-  log_facility(trace, "message op: {}", static_cast<int32_t>(op_code));
+  LOG(trace, "message op: {}", static_cast<int32_t>(op_code));
 
   // Some messages need to know how long they are to parse. Subtract the header that we have already
   // parsed off before passing the final value.
@@ -284,7 +284,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     throw EnvoyException(fmt::format("invalid mongo op {}", static_cast<int32_t>(op_code)));
   }
 
-  log_facility(trace, "{} bytes remaining after decoding", data.length());
+  LOG(trace, "{} bytes remaining after decoding", data.length());
   return true;
 }
 

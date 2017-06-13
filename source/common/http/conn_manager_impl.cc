@@ -162,7 +162,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
     idle_timer_->disableTimer();
   }
 
-  conn_log_facility(debug, "new stream", read_callbacks_->connection());
+  CONN_LOG(debug, "new stream", read_callbacks_->connection());
   ActiveStreamPtr new_stream(new ActiveStream(*this));
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
@@ -192,7 +192,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     } catch (const CodecProtocolException& e) {
       // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
       // GOAWAY.
-      conn_log_facility(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
+      CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
       stats_.named_.downstream_cx_protocol_error_.inc();
 
       // In the protocol error case, we need to reset all streams now. Since we do a flush write,
@@ -274,7 +274,7 @@ void ConnectionManagerImpl::onGoAway() {
 }
 
 void ConnectionManagerImpl::onIdleTimeout() {
-  conn_log_facility(debug, "idle timeout", read_callbacks_->connection());
+  CONN_LOG(debug, "idle timeout", read_callbacks_->connection());
   stats_.named_.downstream_cx_idle_timeout_.inc();
   if (!codec_) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
@@ -399,11 +399,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   state_.remote_complete_ = end_stream;
 
   request_headers_ = std::move(headers);
-  stream_log_facility(debug, "request headers complete (end_stream={}):", *this, end_stream);
+  STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NVLOG
   request_headers_->iterate([](const HeaderEntry& header, void* context) -> void {
-    stream_log_facility(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                        header.key().c_str(), header.value().c_str());
+    STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+               header.value().c_str());
   }, this);
 #endif
 
@@ -502,8 +502,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(
         headers, end_stream && continue_data_entry == decoder_filters_.end());
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
-    stream_log_facility(trace, "decode headers called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
@@ -533,7 +533,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
   if (state_.remote_complete_) {
-    stream_log_facility(debug, "request end stream", *this);
+    STREAM_LOG(debug, "request end stream", *this);
   }
 
   decodeData(nullptr, data, end_stream);
@@ -559,8 +559,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
-    stream_log_facility(trace, "decode data called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
       return;
     }
@@ -611,8 +611,8 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
-    stream_log_facility(trace, "decode trailers called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
@@ -656,8 +656,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
         headers, end_stream && continue_data_entry == encoder_filters_.end());
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
-    stream_log_facility(trace, "encode headers called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
       return;
     }
@@ -685,11 +685,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     // HTTP/1.1 and HTTP/2.
     connection_manager_.startDrainSequence();
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
-    stream_log_facility(debug, "drain closing connection", *this);
+    STREAM_LOG(debug, "drain closing connection", *this);
   }
 
   if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
-    stream_log_facility(debug, "closing connection due to connection close header", *this);
+    STREAM_LOG(debug, "closing connection due to connection close header", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
   }
 
@@ -711,12 +711,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   chargeStats(headers);
 
-  stream_log_facility(debug, "encoding headers via codec (end_stream={}):", *this,
-                      end_stream && continue_data_entry == encoder_filters_.end());
+  STREAM_LOG(debug, "encoding headers via codec (end_stream={}):", *this,
+             end_stream && continue_data_entry == encoder_filters_.end());
 #ifndef NVLOG
   headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    stream_log_facility(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                        header.key().c_str(), header.value().c_str());
+    STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+               header.value().c_str());
   }, this);
 #endif
 
@@ -761,15 +761,15 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
-    stream_log_facility(trace, "encode data called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
       return;
     }
   }
 
-  stream_log_facility(trace, "encoding data via codec (size={} end_stream={})", *this,
-                      data.length(), end_stream);
+  STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
+             end_stream);
 
   request_info_.bytes_sent_ += data.length();
   response_encoder_->encodeData(data, end_stream);
@@ -784,18 +784,18 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
-    stream_log_facility(trace, "encode trailers called: filter={} status={}", *this,
-                        static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
+               static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
   }
 
-  stream_log_facility(debug, "encoding trailers via codec", *this);
+  STREAM_LOG(debug, "encoding trailers via codec", *this);
 #ifndef NVLOG
   trailers.iterate([](const HeaderEntry& header, void* context) -> void {
-    stream_log_facility(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                        header.key().c_str(), header.value().c_str());
+    STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+               header.value().c_str());
   }, this);
 #endif
 
@@ -831,8 +831,7 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   // TODO(mattklein123): Raise an error if this is called during a callback.
-  stream_log_facility(trace, "continuing filter chain: filter={}", parent_,
-                      static_cast<const void*>(this));
+  STREAM_LOG(trace, "continuing filter chain: filter={}", parent_, static_cast<const void*>(this));
   ASSERT(stopped_);
   stopped_ = false;
 

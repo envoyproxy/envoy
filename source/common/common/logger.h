@@ -135,56 +135,53 @@ protected:
  * invoke these directly.
  */
 #ifdef NVLOG
-#define log_trace_to_logger(LOGGER, ...)
-#define log_debug_to_logger(LOGGER, ...)
+#define LOG_trace_TO_LOGGER(LOGGER, ...)
+#define LOG_debug_TO_LOGGER(LOGGER, ...)
 #else
-#define log_trace_to_logger(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
-#define log_debug_to_logger(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
+#define LOG_trace_TO_LOGGER(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
+#define LOG_debug_TO_LOGGER(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
 #endif
 
-#define log_info_to_logger(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
-#define log_warn_to_logger(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
-#define log_err_to_logger(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
-#define log_critical_to_logger(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
+#define LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
+#define LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
+#define LOG_err_TO_LOGGER(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
+#define LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
 
 /**
  * Convenience macro to log to a user-specified logger.
  */
-#define log_to_logger(LOGGER, LEVEL, ...) log_##LEVEL##_to_logger(LOGGER, ##__VA_ARGS__)
+#define LOG_TO_LOGGER(LOGGER, LEVEL, ...) LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
 
 /**
- * Convenience macro to log to the facility of the class in which the macro is invoked. Note:
- * facilities are a way of grouping classes within envoy. A facility is specified by Id enum values
- * listed above. The facility_log is enabled within a class when the class inherits from the
- * Loggable class templated by the choice of facility.
+ * Convenience macro to log to the class' logger.
  */
-#define log_facility(LEVEL, ...) log_to_logger(log(), LEVEL, ##__VA_ARGS__)
+#define LOG(LEVEL, ...) LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
  * a logger.
  */
-#define get_misc_logger() Logger::Registry::getLog(Logger::Id::misc)
-#define log_misc(LEVEL, ...) log_to_logger(get_misc_logger(), LEVEL, ##__VA_ARGS__)
+#define GET_MISC_LOGGER() Logger::Registry::getLog(Logger::Id::misc)
+#define LOG_MISC(LEVEL, ...) LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with connection ID.
  */
-#define conn_log_to_logger(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                                 \
-  log_to_logger(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
+#define CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                                 \
+  LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
-#define conn_log_facility(LEVEL, FORMAT, CONNECTION, ...)                                          \
-  conn_log_to_logger(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+#define CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                                   \
+  CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
  */
-#define stream_log_to_logger(LOGGER, LEVEL, FORMAT, STREAM, ...)                                   \
-  log_to_logger(LOGGER, LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), \
+#define STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                                   \
+  LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), \
                 ##__VA_ARGS__)
 
-#define stream_log_facility(LEVEL, FORMAT, STREAM, ...)                                            \
-  stream_log_to_logger(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+#define STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                                     \
+  STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 /**
  * DEPRECATED: Logging macros.
