@@ -149,8 +149,11 @@ public:
   void close() override { closeLocal(); }
 
   void reset() override {
-    closeLocal();
-    closeRemote();
+    // Both closeLocal() and closeRemote() might self-destruct the object. We don't use these below
+    // to avoid sequencing issues.
+    local_closed_ |= true;
+    remote_closed_ |= true;
+    cleanup();
   }
 
   void set_stream(Http::AsyncClient::Stream* stream) { stream_ = stream; }

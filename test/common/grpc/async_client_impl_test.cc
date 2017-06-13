@@ -97,22 +97,23 @@ public:
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, TestMetadata metadata,
                           bool trailers_only = false) {
-    Http::HeaderMapPtr reply_trailers{
-        new Http::TestHeaderMapImpl{{"grpc-status", std::to_string(enumToInt(grpc_status))}}};
+    auto* reply_trailers =
+        new Http::TestHeaderMapImpl{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (trailers_only) {
-      reply_trailers->addStatic(Http::LowerCaseString(":status"), "200");
+      reply_trailers->addViaCopy(":status", "200");
     }
-    for (auto& value : metadata) {
-      reply_trailers->addStatic(value.first, value.second);
+    for (const auto& value : metadata) {
+      reply_trailers->addViaCopy(value.first, value.second);
     }
+    Http::HeaderMapPtr reply_trailers_ptr{reply_trailers};
     if (grpc_status == Status::GrpcStatus::Ok) {
-      EXPECT_CALL(*this, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers.get())));
+      EXPECT_CALL(*this, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers)));
     }
     expectGrpcStatus(grpc_status);
     if (trailers_only) {
-      http_callbacks_->onHeaders(std::move(reply_trailers), true);
+      http_callbacks_->onHeaders(std::move(reply_trailers_ptr), true);
     } else {
-      http_callbacks_->onTrailers(std::move(reply_trailers));
+      http_callbacks_->onTrailers(std::move(reply_trailers_ptr));
     }
   }
 
@@ -374,6 +375,26 @@ TEST_F(GrpcAsyncClientImplTest, SendAfterRemoteClose) {
   stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
   stream->sendRequest();
   stream->closeStream();
+}
+
+// Validate that reset() doesn't explode on a half-closed stream (local).
+TEST_F(GrpcAsyncClientImplTest, resetAfterCloseLocal) {
+  TestMetadata empty_metadata;
+  auto stream = createStream(empty_metadata);
+  stream->grpc_stream_->close();
+  EXPECT_CALL(stream->http_stream_, reset());
+  stream->grpc_stream_->reset();
+  stream->clearStream();
+}
+
+// Validate that reset() doesn't explode on a half-closed stream (remote).
+TEST_F(GrpcAsyncClientImplTest, resetAfterCloseRemote) {
+  TestMetadata empty_metadata;
+  auto stream = createStream(empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
+  EXPECT_CALL(stream->http_stream_, reset());
+  stream->grpc_stream_->reset();
+  stream->clearStream();
 }
 
 } // namespace
