@@ -16,7 +16,7 @@ using testing::Return;
 namespace Server {
 namespace Configuration {
 
-TEST(HttpConnectionManagerConfigTest, invalidFilter) {
+TEST(HttpConnectionManagerConfigTest, InvalidFilterName) {
   std::string json_string = R"EOF(
   {
     "codec_type": "http1",
@@ -49,7 +49,40 @@ TEST(HttpConnectionManagerConfigTest, invalidFilter) {
                             "unable to create http filter factory for 'foo'/'encoder'");
 }
 
-TEST(HttpConnectionManagerConfigUtilityTest, determineNextProtocol) {
+TEST(HttpConnectionManagerConfigTest, InvalidFilterType) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type": "http1",
+    "stat_prefix": "router",
+    "route_config":
+    {
+      "virtual_hosts": [
+        {
+          "name": "service",
+          "domains": [ "*" ],
+          "routes": [
+            {
+              "prefix": "/",
+              "cluster": "cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters": [
+      { "type": "encoder", "name": "router", "config": {}
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context), EnvoyException,
+                            "unable to create http filter factory for 'router'/'encoder'");
+}
+
+TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
   {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));

@@ -110,9 +110,12 @@ public:
 enum class NetworkFilterType { Read, Write, Both };
 
 /**
- * This lambda is used to wrap the creation of a network filter chain for new connections as they
- * come in. Filter factories create the lambda at configuration initialization time, and then they
- * are used at runtime. This maps JSON -> runtime configuration.
+ * This function is used to wrap the creation of a network filter chain for new connections as
+ * they come in. Filter factories create the lambda at configuration initialization time, and then
+ * they are used at runtime.
+ * @param filter_manager supplies the filter manager for the connection to install filters
+ * to. Typically the function will install a single filter, but it's technically possibly to
+ * install more than one of desired.
  */
 typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
 
@@ -131,13 +134,14 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param context supplies the filter's context.
+   * @return NetworkFilterFactoryCb fixfix
    */
   virtual NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                      FactoryContext& context) PURE;
 
   /**
-   * Returns the identifying name for a particular implementation of a network filter produced by
-   * the factory.
+   * @return std::string the identifying name for a particular implementation of a network filter
+   * produced by the factory.
    */
   virtual std::string name() PURE;
 
@@ -150,9 +154,14 @@ public:
 enum class HttpFilterType { Decoder, Encoder, Both };
 
 /**
- * Callback lambda used for dynamic HTTP filter chain construction.
+ * This function is used to wrap the creation of an HTTP filter chain for new streams as they
+ * come in. Filter factories create the function at configuration initialization time, and then
+ * they are used at runtime.
+ * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
+ * function will install a single filter, but it's technically possibly to install more than one
+ * of desired.
  */
-typedef std::function<void(Http::FilterChainFactoryCallbacks&)> HttpFilterFactoryCb;
+typedef std::function<void(Http::FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
 
 /**
  * Implemented by each HTTP filter and registered via registerNamedHttpFilterConfigFactory() or the
@@ -163,21 +172,23 @@ public:
   virtual ~NamedHttpFilterConfigFactory() {}
 
   /**
-  * Create a particular http filter factory implementation.  If the implementation is unable to
-  * produce a factory with the provided parameters, it should throw an EnvoyException in the case of
-  * general error or a Json::Exception if the json configuration is erroneous.  The returned
-  * callback should always be initialized.
-  * @param config supplies the general json configuration for the filter
-  * @param stat_prefix prefix for stat logging
-  * @param context supplies the filter's context.
-  */
+   * Create a particular http filter factory implementation.  If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
+   * of
+   * general error or a Json::Exception if the json configuration is erroneous.  The returned
+   * callback should always be initialized.
+   * @param config supplies the general json configuration for the filter
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's context.
+   * @return HttpFilterFactoryCb fixfix
+   */
   virtual HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                   const std::string& stat_prefix,
                                                   FactoryContext& context) PURE;
 
   /**
-   * Returns the identifying name for a particular implementation of an http filter produced by the
-   * factory.
+   * @return std::string the identifying name for a particular implementation of an http filter
+   * produced by the factory.
    */
   virtual std::string name() PURE;
 
