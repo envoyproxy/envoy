@@ -95,13 +95,13 @@ public:
 
   void onData(Buffer::Instance& data, bool end_stream) override {
     ASSERT(!remote_closed_);
-    std::vector<Frame> frames;
-    if (!decoder_.decode(data, frames)) {
+    decoded_frames_.clear();
+    if (!decoder_.decode(data, decoded_frames_)) {
       streamError(Status::GrpcStatus::Internal);
       return;
     }
 
-    for (const auto& frame : frames) {
+    for (const auto& frame : decoded_frames_) {
       std::unique_ptr<ResponseType> response(new ResponseType());
       // TODO(htuch): We can avoid linearizing the buffer here when Buffer::Instance implements
       // protobuf ZeroCopyInputStream.
@@ -206,6 +206,8 @@ private:
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;
+  // This is a member to avoid reallocation on every onData().
+  std::vector<Frame> decoded_frames_;
 
   friend class AsyncClientImpl<RequestType, ResponseType>;
 };
