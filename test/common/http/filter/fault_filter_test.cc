@@ -333,10 +333,10 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  timer_->callback_();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -376,9 +376,10 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
@@ -607,8 +608,8 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
               setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
-
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
 
   // delay timer should have been fired by now. If caller resets the stream while we are waiting
   // on the delay timer, check if timers are cancelled
@@ -623,7 +624,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, true));
 
   filter_->onDestroy();
 }
