@@ -10,3 +10,7 @@ The following features have been DEPRECATED and will be removed in the specified
   `statsd_udp_ip_address`.
   * `HttpFilterConfigFactory` filter API has been deprecated in favor of `NamedHttpFilterConfigFactory`.
   * Config option `http_codec_options` has been deprecated and has been replaced with `http2_settings`.
+  * The following log macros have been deprecated: `log_trace`, `log_debug`, `conn_log`,
+  `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
+  `stream_log_debug`, `stream_log_trace`.  For replacements, please see
+  [logger.h](https://github.com/lyft/envoy/blob/master/source/common/common/logger.h).

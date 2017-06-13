@@ -55,7 +55,7 @@ SnapshotImpl::SnapshotImpl(const std::string& root_path, const std::string& over
     stats.load_success_.inc();
   } catch (EnvoyException& e) {
     stats.load_error_.inc();
-    log_debug("error creating runtime snapshot: {}", e.what());
+    LOG(debug, "error creating runtime snapshot: {}", e.what());
   }
 
   stats.num_keys_.set(values_.size());
@@ -80,7 +80,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 }
 
 void SnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
-  log_debug("walking directory: {}", path);
+  LOG(debug, "walking directory: {}", path);
   Directory current_dir(path);
   while (true) {
     errno = 0;
@@ -108,7 +108,7 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
-      log_debug("reading file: {}", full_path);
+      LOG(debug, "reading file: {}", full_path);
       Entry entry;
       entry.string_value_ = Filesystem::fileReadToEnd(full_path);
       StringUtil::rtrim(entry.string_value_);

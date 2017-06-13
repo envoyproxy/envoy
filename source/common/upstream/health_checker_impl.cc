@@ -290,15 +290,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
     return;
   }
 
-  conn_log_debug("connection/stream error health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
+  CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+           HostUtility::healthFlagsToString(*host_));
   handleFailure(true);
 }
 
 bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded() {
   uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
-  conn_log_debug("hc response={} health_flags={}", *client_, response_code,
-                 HostUtility::healthFlagsToString(*host_));
+  CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
+           HostUtility::healthFlagsToString(*host_));
 
   if (response_code != enumToInt(Http::Code::OK)) {
     return false;
@@ -336,8 +336,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
-  conn_log_debug("connection/stream timeout health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
+  CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
+           HostUtility::healthFlagsToString(*host_));
 
   // If there is an active request it will get reset, so make sure we ignore the reset.
   expect_reset_ = true;
@@ -390,7 +390,7 @@ TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession(
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
-  conn_log_trace("total pending buffer={}", *client_, data.length());
+  CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
     data.drain(data.length());
     handleSuccess();
