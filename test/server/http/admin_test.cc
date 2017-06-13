@@ -67,7 +67,10 @@ public:
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_) {}
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_) {
+    EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
+    admin_.tracingStats().random_sampling_.inc();
+  }
 
   std::string address_out_path_;
   std::string cpu_profile_path_;
@@ -115,5 +118,15 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
                                        server_);
   EXPECT_FALSE(std::ifstream(bad_path));
 }
-} // namespace Server
+
+TEST_P(AdminInstanceTest, CustomHandler) {
+  auto callback =
+      [&](const std::string&, Buffer::Instance&) -> Http::Code { return Http::Code::Accepted; };
+
+  admin_.addHandler("/foo/bar", "hello", callback);
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+}
+
+} // Server
 } // Envoy

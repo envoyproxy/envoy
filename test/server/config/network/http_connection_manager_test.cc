@@ -10,9 +10,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
+using testing::ContainerEq;
 using testing::Return;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -80,6 +81,44 @@ TEST(HttpConnectionManagerConfigTest, InvalidFilterType) {
   NiceMock<MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context), EnvoyException,
                             "unable to create http filter factory for 'router'/'encoder'");
+}
+
+TEST(HttpConnectionManagerConfigTest, MiscConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type": "http1",
+    "stat_prefix": "router",
+    "route_config":
+    {
+      "virtual_hosts": [
+        {
+          "name": "service",
+          "domains": [ "*" ],
+          "routes": [
+            {
+              "prefix": "/",
+              "cluster": "cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "tracing": {
+      "operation_name": "ingress",
+      "request_headers_for_tags": [ "foo" ]
+    },
+    "filters": [
+      { "type": "both", "name": "http_dynamo_filter", "config": {} }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  HttpConnectionManagerConfig config(*json_config, context);
+  EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
+              ContainerEq(config.tracingConfig()->request_headers_for_tags_));
+  EXPECT_EQ(*context.local_info_.address_, config.localAddress());
 }
 
 TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
