@@ -253,6 +253,8 @@ bool Utility::isInternalAddress(const char* address) {
         (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
         addr.s_addr == htonl(INADDR_LOOPBACK)) {
       return true;
+    } else {
+      return false;
     }
   }
 
