@@ -183,6 +183,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // example, localhost lookup.
     return nullptr;
   } else {
+    // Enable timer to wake us up if the request times out.
+    updateAresTimer();
+
     // The PendingResolution will self-delete when the request completes
     // (including if cancelled or if ~DnsResolverImpl() happens).
     pending_resolution->owned_ = true;
