@@ -115,7 +115,7 @@ enum class NetworkFilterType { Read, Write, Both };
  * they are used at runtime.
  * @param filter_manager supplies the filter manager for the connection to install filters
  * to. Typically the function will install a single filter, but it's technically possibly to
- * install more than one of desired.
+ * install more than one if desired.
  */
 typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
 
@@ -159,7 +159,7 @@ enum class HttpFilterType { Decoder, Encoder, Both };
  * they are used at runtime.
  * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
  * function will install a single filter, but it's technically possibly to install more than one
- * of desired.
+ * if desired.
  */
 typedef std::function<void(Http::FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
 
