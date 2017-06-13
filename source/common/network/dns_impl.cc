@@ -59,7 +59,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
+void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int timeouts,
+                                                            hostent* hostent) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -95,6 +96,10 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     }
   }
 
+  if (timeouts > 0) {
+    LOG(debug, "DNS request timed out {} times", timeouts);
+  }
+
   if (completed_) {
     if (!cancelled_) {
       callback_(std::move(address_list));
@@ -119,8 +124,10 @@ void DnsResolverImpl::updateAresTimer() {
   timeval timeout;
   timeval* timeout_result = ares_timeout(channel_, nullptr, &timeout);
   if (timeout_result != nullptr) {
-    timer_->enableTimer(
-        std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000));
+    const auto ms =
+        std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000);
+    LOG(debug, "Setting DNS resolution timer for {} milliseconds", ms.count());
+    timer_->enableTimer(ms);
   } else {
     timer_->disableTimer();
   }
@@ -185,8 +192,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
   ares_gethostbyname(channel_, dns_name_.c_str(),
-                     family, [](void* arg, int status, int, hostent* hostent) {
-                       static_cast<PendingResolution*>(arg)->onAresHostCallback(status, hostent);
+                     family, [](void* arg, int status, int timeouts, hostent* hostent) {
+                       static_cast<PendingResolution*>(arg)
+                           ->onAresHostCallback(status, timeouts, hostent);
                      }, this);
 }
 
