@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::Eq;
@@ -19,6 +18,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Mock;
 
+namespace Envoy {
 namespace Grpc {
 
 template class AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>;
@@ -329,7 +329,6 @@ TEST_F(GrpcAsyncClientImplTest, ReplyNoTrailers) {
   Buffer::OwnedImpl reply_buffer(HELLO_REPLY_DATA, HELLO_REPLY_SIZE);
   helloworld::HelloReply reply;
   reply.set_message(HELLO_REPLY);
-  EXPECT_CALL(*stream, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY)));
   stream->http_callbacks_->onData(reply_buffer, true);
 }
 
