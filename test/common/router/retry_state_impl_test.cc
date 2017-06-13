@@ -101,6 +101,48 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote503) {
   EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "cancelled"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGrpcDeadlineExceeded) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "deadline-exceeded"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "4"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGrpcResourceExhausted) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "resource-exhausted"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "8"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
 TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   // Don't retry after reply start.
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};

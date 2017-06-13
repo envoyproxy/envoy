@@ -19,6 +19,9 @@ to find out more about the origin story and design philosophy of Envoy.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
 * [lyft/envoy](https://gitter.im/lyft/envoy): Gitter (most people use Gitter)
 
+Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread 
+for information on email list usage.
+
 ## Reporting security vulnerabilities
 
 If you've found a vulnerability or a potential vulnerability in Envoy please let us know at

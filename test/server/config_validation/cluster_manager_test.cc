@@ -25,7 +25,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   Ssl::ContextManagerImpl ssl_context_manager{runtime};
   NiceMock<Event::MockDispatcher> dispatcher;
   LocalInfo::MockLocalInfo local_info;

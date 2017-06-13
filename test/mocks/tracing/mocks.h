@@ -33,7 +33,7 @@ public:
   ~MockSpan();
 
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
-  MOCK_METHOD0(finishSpan, void());
+  MOCK_METHOD1(finishSpan, void(SpanFinalizer& finalizer));
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
 
   SpanPtr spawnChild(const std::string& name, SystemTime start_time) override {
@@ -41,6 +41,14 @@ public:
   }
 
   MOCK_METHOD2(spawnChild_, Span*(const std::string& name, SystemTime start_time));
+};
+
+class MockFinalizer : public SpanFinalizer {
+public:
+  MockFinalizer();
+  ~MockFinalizer();
+
+  MOCK_METHOD1(finalize, void(Span& span));
 };
 
 class MockHttpTracer : public HttpTracer {

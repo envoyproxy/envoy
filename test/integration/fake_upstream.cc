@@ -197,7 +197,7 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream() {
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
     : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::UdsListenSocket(uds_path)},
                    type) {
-  log().info("starting fake server on unix domain socket {}", uds_path);
+  LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
 static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
@@ -211,15 +211,15 @@ static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
                            Network::Address::IpVersion version)
     : FakeUpstream(nullptr, makeTcpListenSocket(port, version), type) {
-  log().info("starting fake server on port {}. Address version is {}",
-             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
+  LOG(info, "starting fake server on port {}. Address version is {}",
+      this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
                            FakeHttpConnection::Type type, Network::Address::IpVersion version)
     : FakeUpstream(ssl_ctx, makeTcpListenSocket(port, version), type) {
-  log().info("starting fake SSL server on port {}. Address version is {}",
-             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
+  LOG(info, "starting fake SSL server on port {}. Address version is {}",
+      this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
@@ -280,7 +280,7 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
 FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
   std::unique_lock<std::mutex> lock(lock_);
   if (new_connections_.empty()) {
-    log_debug("waiting for raw connection");
+    LOG(debug, "waiting for raw connection");
     new_connection_event_.wait(lock);
   }
 
@@ -294,7 +294,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
 void FakeRawConnection::waitForData(uint64_t num_bytes) {
   std::unique_lock<std::mutex> lock(lock_);
   while (data_.size() != num_bytes) {
-    log_debug("waiting for {} bytes of data", num_bytes);
+    LOG(debug, "waiting for {} bytes of data", num_bytes);
     connection_event_.wait(lock);
   }
 }
@@ -308,7 +308,7 @@ void FakeRawConnection::write(const std::string& data) {
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  log_debug("got {} bytes", data.length());
+  LOG(debug, "got {} bytes", data.length());
   parent_.data_.append(TestUtility::bufferToString(data));
   data.drain(data.length());
   parent_.connection_event_.notify_one();

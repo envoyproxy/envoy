@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
@@ -55,11 +57,14 @@ public:
                             Network::Address::InstanceConstSharedPtr address) PURE;
 
   /**
-   * Create an async DNS resolver. Only a single resolver can exist in the process at a time and it
-   * should only be used on the thread that runs this dispatcher.
-   * @return Network::DnsResolverPtr that is owned by the caller.
+   * Create an async DNS resolver. The resolver should only be used on the thread that runs this
+   * dispatcher.
+   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
+   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
+   * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
-  virtual Network::DnsResolverPtr createDnsResolver() PURE;
+  virtual Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
 
   /**
    * Create a file event that will signal when a file is readable or writable. On UNIX systems this

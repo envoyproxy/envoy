@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -129,6 +130,14 @@ public:
    */
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
+
+  /**
+   * Join elements of a vector into a string delimited by delimiter.
+   * @param source supplies the strings to join.
+   * @param delimiter supplies the delimiter to join them together.
+   * @return string combining elements of `source` with `delimiter` in between each element.
+   */
+  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
 
   /**
    * Split a string.

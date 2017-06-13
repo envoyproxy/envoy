@@ -204,6 +204,7 @@ protected:
   void testBadPath();
   void testDrainClose(Http::CodecClient::Type type);
   void testRetry(Http::CodecClient::Type type);
+  void testGrpcRetry();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

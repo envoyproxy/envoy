@@ -30,6 +30,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "log_macros_test",
+    srcs = ["log_macros_test.cc"],
+    deps = [
+        "//source/common/common:logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = ["//source/common/common:utility_lib"],

@@ -52,25 +52,25 @@ ProxyFilter::~ProxyFilter() {}
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   stats_.op_get_more_.inc();
   logMessage(*message, true);
-  log_debug("decoded GET_MORE: {}", message->toString(true));
+  LOG(debug, "decoded GET_MORE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   stats_.op_insert_.inc();
   logMessage(*message, true);
-  log_debug("decoded INSERT: {}", message->toString(true));
+  LOG(debug, "decoded INSERT: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
-  log_debug("decoded KILL_CURSORS: {}", message->toString(true));
+  LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   stats_.op_query_.inc();
   logMessage(*message, true);
-  log_debug("decoded QUERY: {}", message->toString(true));
+  LOG(debug, "decoded QUERY: {}", message->toString(true));
 
   if (message->flags() & QueryMessage::Flags::TailableCursor) {
     stats_.op_query_tailable_cursor_.inc();
@@ -132,7 +132,7 @@ void ProxyFilter::chargeQueryStats(const std::string& prefix,
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
   stats_.op_reply_.inc();
   logMessage(*message, false);
-  log_debug("decoded REPLY: {}", message->toString(true));
+  LOG(debug, "decoded REPLY: {}", message->toString(true));
 
   if (message->cursorId() != 0) {
     stats_.op_reply_valid_cursor_.inc();
@@ -206,7 +206,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
   try {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
-    log().info("mongo decoding error: {}", e.what());
+    LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;
   }
