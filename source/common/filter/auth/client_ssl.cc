@@ -22,12 +22,11 @@ namespace Auth {
 namespace ClientSsl {
 
 Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Scope& stats_store,
-               Runtime::RandomGenerator& random)
+               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 60000))),
       tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
-      stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
+      stats_(generateStats(scope, config.getString("stat_prefix"))) {
 
   config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
 
@@ -43,8 +42,8 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
 
 ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                               Stats::Scope& stats_store, Runtime::RandomGenerator& random) {
-  ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, stats_store, random));
+                               Stats::Scope& scope, Runtime::RandomGenerator& random) {
+  ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
   return new_config;
 }
@@ -53,10 +52,10 @@ const AllowedPrincipals& Config::allowedPrincipals() {
   return tls_.getTyped<AllowedPrincipals>(tls_slot_);
 }
 
-GlobalStats Config::generateStats(Stats::Scope& store, const std::string& prefix) {
+GlobalStats Config::generateStats(Stats::Scope& scope, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
-  GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(store, final_prefix),
-                                              POOL_GAUGE_PREFIX(store, final_prefix))};
+  GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                              POOL_GAUGE_PREFIX(scope, final_prefix))};
   return stats;
 }
 

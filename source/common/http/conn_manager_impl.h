@@ -84,7 +84,7 @@ struct ConnectionManagerNamedStats {
 struct ConnectionManagerStats {
   ConnectionManagerNamedStats named_;
   std::string prefix_;
-  Stats::Scope& store_;
+  Stats::Scope& scope_;
 };
 
 /**
@@ -232,9 +232,9 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
   ~ConnectionManagerImpl();
 
-  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& stats);
+  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
-                                                            Stats::Scope& stats);
+                                                            Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
 

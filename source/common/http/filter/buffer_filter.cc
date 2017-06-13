@@ -52,9 +52,9 @@ FilterTrailersStatus BufferFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Scope& store) {
+BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   std::string final_prefix = prefix + "buffer.";
-  return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
+  return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 void BufferFilter::onDestroy() { resetInternalState(); }

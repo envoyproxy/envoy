@@ -48,7 +48,7 @@ public:
   BufferFilter(BufferFilterConfigConstSharedPtr config);
   ~BufferFilter();
 
-  static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& store);
+  static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   // Http::StreamFilterBase
   void onDestroy() override;

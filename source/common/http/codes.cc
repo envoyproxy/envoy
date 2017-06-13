@@ -53,10 +53,10 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    info.global_store_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}",
+    info.global_scope_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}",
                                            info.request_vhost_name_, info.request_vcluster_name_,
                                            group_string)).inc();
-    info.global_store_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}",
+    info.global_scope_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}",
                                            info.request_vhost_name_, info.request_vcluster_name_,
                                            response_code)).inc();
   }
@@ -86,7 +86,7 @@ void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    info.global_store_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
+    info.global_scope_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
                                                 info.request_vcluster_name_ + ".upstream_rq_time",
                                             info.response_time_);
   }

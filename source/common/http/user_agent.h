@@ -43,10 +43,10 @@ public:
    * is assumed to be the same for further requests.
    * @param headers supplies the request headers.
    * @param prefix supplies the stat prefix for the UA stats.
-   * @param stat_store supplies the backing stat store.
+   * @param scope supplies the backing stat scope.
    */
   void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                             Stats::Scope& stat_store);
+                             Stats::Scope& scope);
 
   /**
    * Called when a connection is being destroyed.
