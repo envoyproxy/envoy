@@ -209,11 +209,13 @@ void FaultFilter::recordAbortsInjectedStats() {
 }
 
 FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
-  return FilterDataStatus::Continue;
+  return delay_timer_ == nullptr ? FilterDataStatus::Continue
+                                 : FilterDataStatus::StopIterationAndBuffer;
 }
 
 FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
-  return FilterTrailersStatus::Continue;
+  return delay_timer_ == nullptr ? FilterTrailersStatus::Continue
+                                 : FilterTrailersStatus::StopIteration;
 }
 
 FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Store& store) {
