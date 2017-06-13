@@ -23,7 +23,7 @@ public:
                                       Code response_code);
 
   struct ResponseStatInfo {
-    Stats::Store& global_store_;
+    Stats::Scope& global_store_;
     Stats::Scope& cluster_scope_;
     const std::string& prefix_;
     const HeaderMap& response_headers_;
@@ -43,7 +43,7 @@ public:
   static void chargeResponseStat(const ResponseStatInfo& info);
 
   struct ResponseTimingInfo {
-    Stats::Store& global_store_;
+    Stats::Scope& global_store_;
     Stats::Scope& cluster_scope_;
     const std::string& prefix_;
     std::chrono::milliseconds response_time_;

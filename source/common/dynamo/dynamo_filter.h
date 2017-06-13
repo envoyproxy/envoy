@@ -21,7 +21,7 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Store& stats)
+  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& stats)
       : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), stats_(stats) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
@@ -58,7 +58,7 @@ private:
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;
-  Stats::Store& stats_;
+  Stats::Scope& stats_;
 
   bool enabled_{};
   std::string operation_{};

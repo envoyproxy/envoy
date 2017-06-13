@@ -78,7 +78,7 @@ public:
 class FilterConfig {
 public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+               Stats::Scope& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
       : global_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
@@ -87,7 +87,7 @@ public:
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
-  Stats::Store& global_store_;
+  Stats::Scope& global_store_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;

@@ -33,8 +33,7 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-MainImpl::MainImpl(Server::Instance& server,
-                   Upstream::ClusterManagerFactory& cluster_manager_factory)
+MainImpl::MainImpl(Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory)
     : server_(server), cluster_manager_factory_(cluster_manager_factory) {}
 
 void MainImpl::initialize(const Json::Object& json) {
@@ -46,8 +45,7 @@ void MainImpl::initialize(const Json::Object& json) {
   LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     LOG(info, "listener #{}:", i);
-    listeners_.emplace_back(
-        Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
+    listeners_.emplace_back(ListenerPtr{new ListenerConfig(server_, *listeners[i])});
   }
 
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
@@ -131,9 +129,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   }
 }
 
-const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
+const std::list<ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
-MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) : parent_(parent) {
+MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json) : server_(server) {
   address_ = Network::Utility::resolveUrl(json.getString("address"));
 
   // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
@@ -141,15 +139,14 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
   std::string final_stat_name = fmt::format("listener.{}.", address_->asString());
   std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
 
-  scope_ = parent_.server_.stats().createScope(final_stat_name);
+  scope_ = server.stats().createScope(final_stat_name);
   LOG(info, "  address={}", address_->asString());
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
-    ssl_context_ =
-        parent_.server_.sslContextManager().createSslServerContext(*scope_, context_config);
+    ssl_context_ = server.sslContextManager().createSslServerContext(*scope_, context_config);
   }
 
   bind_to_port_ = json.getBoolean("bind_to_port", true);
@@ -180,9 +177,8 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
 
     // Now see if there is a factory that will accept the config.
     auto search_it = namedFilterConfigFactories().find(string_name);
-    if (search_it != namedFilterConfigFactories().end()) {
-      NetworkFilterFactoryCb callback =
-          search_it->second->createFilterFactory(type, *config, parent_.server_);
+    if (search_it != namedFilterConfigFactories().end() && search_it->second->type() == type) {
+      NetworkFilterFactoryCb callback = search_it->second->createFilterFactory(*config, *this);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED
@@ -190,7 +186,7 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
       bool found_filter = false;
       for (NetworkFilterConfigFactory* config_factory : filterConfigFactories()) {
         NetworkFilterFactoryCb callback =
-            config_factory->tryCreateFilterFactory(type, string_name, *config, parent_.server_);
+            config_factory->tryCreateFilterFactory(type, string_name, *config, server);
         if (callback) {
           filter_factories_.push_back(callback);
           found_filter = true;

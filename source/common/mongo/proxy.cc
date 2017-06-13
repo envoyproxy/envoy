@@ -35,7 +35,7 @@ void AccessLog::logMessage(const Message& message, bool full,
   file_->write(log_line);
 }
 
-ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Store& store,
+ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& store,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log)
     : stat_prefix_(stat_prefix), stat_store_(store), stats_(generateStats(stat_prefix, store)),
       runtime_(runtime), access_log_(access_log) {

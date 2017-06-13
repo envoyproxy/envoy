@@ -20,7 +20,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                                      Stats::Store& stat_store) {
+                                      Stats::Scope& stat_store) {
   // We assume that the user-agent is consistent based on the first request.
   if (type_ != Type::NotInitialized) {
     return;

@@ -247,7 +247,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Store& stats, const Http2Settings& http2_settings);
+                       Stats::Scope& stats, const Http2Settings& http2_settings);
 
 private:
   // ConnectionImpl

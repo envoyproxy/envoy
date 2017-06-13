@@ -46,7 +46,7 @@ public:
    * @param stat_store supplies the backing stat store.
    */
   void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                             Stats::Store& stat_store);
+                             Stats::Scope& stat_store);
 
   /**
    * Called when a connection is being destroyed.
