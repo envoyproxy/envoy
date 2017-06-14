@@ -127,5 +127,14 @@ public:
   TimerCb callback_;
 };
 
+class MockFileEvent : public FileEvent {
+public:
+  MockFileEvent();
+  ~MockFileEvent();
+
+  MOCK_METHOD1(activate, void(uint32_t events));
+  MOCK_METHOD1(setEnabled, void(uint32_t events));
+};
+
 } // Event
 } // Envoy

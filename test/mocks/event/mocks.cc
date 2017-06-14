@@ -32,5 +32,8 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) {
 
 MockTimer::~MockTimer() {}
 
+MockFileEvent::MockFileEvent() {}
+MockFileEvent::~MockFileEvent() {}
+
 } // Event
 } // Envoy

@@ -28,6 +28,11 @@
 #include "ares_dns.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::Mock;
+using testing::NiceMock;
+using testing::Return;
+
 namespace Envoy {
 namespace Network {
 
@@ -569,6 +574,24 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(address_list.empty());
+}
+
+// Validate that the resolution timeout timer is enabled if we don't resolve
+// immediately.
+TEST(DnsImplUnitTest, PendingTimerEnable) {
+  Event::MockDispatcher dispatcher;
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  DnsResolverImpl resolver(dispatcher, {});
+  Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
+  EXPECT_CALL(*timer, disableTimer());
+  EXPECT_CALL(*timer, enableTimer(_));
+  EXPECT_NE(nullptr, resolver.resolve("some.bad.domain", DnsLookupFamily::V4Only,
+                                      [&](std::list<Address::InstanceConstSharedPtr>&& results) {
+                                        UNREFERENCED_PARAMETER(results);
+                                      }));
+  Mock::VerifyAndClearExpectations(timer);
 }
 
 } // Network
