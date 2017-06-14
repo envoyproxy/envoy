@@ -41,7 +41,7 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD4_T(start, AsyncClientStream<RequestType>*(
+  MOCK_METHOD3_T(start, AsyncClientStream<RequestType>*(
                             const google::protobuf::MethodDescriptor& service_method,
                             AsyncClientCallbacks<ResponseType>& callbacks,
                             const Optional<std::chrono::milliseconds>& timeout));
