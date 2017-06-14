@@ -829,16 +829,39 @@ void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
 
-void BaseIntegrationTest::testBadHttpRequest() {
-  Buffer::OwnedImpl buffer("hello");
-  std::string response;
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
+                                                        std::string* response) {
+  Buffer::OwnedImpl buffer(raw_http);
   RawConnectionDriver connection(
       lookupPort("http"),
       buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response->append(TestUtility::bufferToString(data));
       }, version_);
 
   connection.run();
+}
+
+void BaseIntegrationTest::testBadFirstline() {
+  std::string response;
+  sendRawHttpAndWaitForResponse("hello", &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+void BaseIntegrationTest::testMissingDelimiter() {
+  std::string response;
+  sendRawHttpAndWaitForResponse("GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+void BaseIntegrationTest::testInvalidCharacterInFirstline() {
+  std::string response;
+  sendRawHttpAndWaitForResponse("GET /\t HTTP/1.1\r\nHost: host\r\n\r\n", &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+void BaseIntegrationTest::testLowVersion() {
+  std::string response;
+  sendRawHttpAndWaitForResponse("GET / HTTP/0.8\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
