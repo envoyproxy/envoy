@@ -31,6 +31,10 @@ TEST(OptionsImplDeathTest, InvalidMode) {
   EXPECT_EXIT(createOptionsImpl("envoy --mode bogus"), testing::ExitedWithCode(1), "bogus");
 }
 
+TEST(OptionsImplDeathTest, InvalidCommandLine) {
+  EXPECT_EXIT(createOptionsImpl("envoy ---blah"), testing::ExitedWithCode(1), "PARSE ERROR");
+}
+
 TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "

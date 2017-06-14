@@ -674,6 +674,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
       "name": "cluster_1",
       "connect_timeout_ms": 250,
       "type": "strict_dns",
+      "dns_resolvers": [ "1.2.3.4:80" ],
       "lb_type": "round_robin",
       "hosts": [{"url": "tcp://localhost:11001"}]
     }]
@@ -682,10 +683,13 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
-  EXPECT_CALL(*factory_.dns_resolver_, resolve(_, _, _))
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 
