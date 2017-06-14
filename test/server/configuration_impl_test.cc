@@ -289,7 +289,7 @@ TEST_F(ConfigurationImplTest, BadFilterName) {
         "address": "tcp://127.0.0.1:1234",
         "filters": [
           {
-            "type" : "read",
+            "type" : "write",
             "name" : "invalid",
             "config" : {}
           }
@@ -306,7 +306,35 @@ TEST_F(ConfigurationImplTest, BadFilterName) {
 
   MainImpl config(server_, cluster_manager_factory_);
   EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader), EnvoyException,
-                            "unable to create filter factory for 'invalid'/'read'");
+                            "unable to create filter factory for 'invalid'/'write'");
+}
+
+TEST_F(ConfigurationImplTest, BadFilterType) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": [
+          {
+            "type" : "write",
+            "name" : "echo",
+            "config" : {}
+          }
+        ]
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+
+  MainImpl config(server_, cluster_manager_factory_);
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader), EnvoyException,
+                            "unable to create filter factory for 'echo'/'write'");
 }
 
 TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
@@ -431,6 +459,50 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
                             "No HttpTracerFactory found for type: invalid");
 }
 
+class TestStatsConfigFactory : public NamedNetworkFilterConfigFactory {
+public:
+  // NetworkFilterConfigFactory
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object&,
+                                             FactoryContext& context) override {
+    context.scope().counter("bar").inc();
+    return [](Network::FilterManager&) -> void {};
+  }
+  std::string name() override { return "stats_test"; }
+  NetworkFilterType type() override { return NetworkFilterType::Read; }
+};
+
+TEST_F(ConfigurationImplTest, StatsScopeTest) {
+  RegisterNamedNetworkFilterConfigFactory<TestStatsConfigFactory> registered;
+
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": [
+          {
+            "type" : "read",
+            "name" : "stats_test",
+            "config" : {}
+          }
+        ]
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  MainImpl config(server_, cluster_manager_factory_);
+  config.initialize(*loader);
+  config.listeners().front()->listenerScope().counter("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
+}
+
 /**
  * Config registration for the echo filter using the deprecated registration class.
  */
@@ -479,6 +551,7 @@ TEST_F(ConfigurationImplTest, DeprecatedFilterConfigFactoryRegistrationTest) {
   MainImpl config(server_, cluster_manager_factory_);
   config.initialize(*loader);
 }
+
 } // Configuration
 } // Server
 } // Envoy

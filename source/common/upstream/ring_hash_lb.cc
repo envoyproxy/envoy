@@ -77,7 +77,7 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerCont
 
 void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
                                         const std::vector<HostSharedPtr>& hosts) {
-  log_trace("ring hash: building ring");
+  LOG(trace, "ring hash: building ring");
   ring_.clear();
   if (hosts.empty()) {
     return;
@@ -101,22 +101,22 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
     }
   }
 
-  log_trace("ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
+  LOG(trace, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
   ring_.reserve(hosts.size() * hashes_per_host);
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
       std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
       uint64_t hash = std::hash<std::string>()(hash_key);
-      log_trace("ring hash: hash_key={} hash={}", hash_key, hash);
+      LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});
     }
   }
 
   std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs)
                                             -> bool { return lhs.hash_ < rhs.hash_; });
-#ifndef NDEBUG
+#ifndef NVLOG
   for (auto entry : ring_) {
-    log_trace("ring hash: host={} hash={}", entry.host_->address()->asString(), entry.hash_);
+    LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(), entry.hash_);
   }
 #endif
 }

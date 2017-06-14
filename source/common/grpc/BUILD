@@ -9,6 +9,17 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "async_client_lib",
+    hdrs = ["async_client_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":common_lib",
+        "//include/envoy/grpc:async_client_interface",
+        "//source/common/http:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec.cc"],
     hdrs = ["codec.h"],
@@ -25,15 +36,18 @@ envoy_cc_library(
     external_deps = ["protobuf"],
     deps = [
         "//include/envoy/common:optional",
+        "//include/envoy/grpc:status",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/http:filter_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -64,7 +78,9 @@ envoy_cc_library(
         ":codec_lib",
         ":common_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
+        "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],
 )

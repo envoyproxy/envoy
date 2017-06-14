@@ -91,6 +91,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
+  export WORKSPACE=ci
   # There is a bug in gcovr 3.3, where it takes the -r path,
   # in our case /source, and does a regex replacement of various
   # source file paths during HTML generation. It attempts to strip
@@ -101,7 +102,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # some Bazel created symlinks to the source directory in its output
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   rsync -av "${ENVOY_BUILD_DIR}"/bazel-envoy/generated/coverage/ "${ENVOY_COVERAGE_DIR}"
   exit 0

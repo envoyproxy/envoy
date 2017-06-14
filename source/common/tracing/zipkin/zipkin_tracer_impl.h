@@ -40,8 +40,10 @@ public:
   /**
    * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
    * This function is called by Tracing::HttpTracerUtility::finalizeSpan().
+   *
+   * @param finalizer SpanFinalizer to be called to complete this Span
    */
-  void finishSpan() override;
+  void finishSpan(Tracing::SpanFinalizer& finalizer) override;
 
   /**
    * This function adds a Zipkin "string" binary annotation to this span.

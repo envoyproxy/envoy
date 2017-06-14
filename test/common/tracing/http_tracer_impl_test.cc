@@ -234,7 +234,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
-TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
+TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
@@ -253,10 +253,31 @@ TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
+  finalizer.finalize(*span);
 }
 
-TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
+TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
+  Optional<uint32_t> response_code;
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+
+  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("response_size", "11"));
+  EXPECT_CALL(*span, setTag("response_flags", "-"));
+  EXPECT_CALL(*span, setTag("request_size", "10"));
+  NiceMock<MockConfig> config;
+
+  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
+  finalizer.finalize(*span);
+}
+
+TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
@@ -284,12 +305,13 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
-  EXPECT_CALL(*span, finishSpan());
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
+  finalizer.finalize(*span);
 }
 
-TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
+TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
@@ -337,8 +359,8 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
-  EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
+  finalizer.finalize(*span);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {
@@ -352,7 +374,12 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::AccessLog::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_EQ(nullptr, null_tracer.startSpan(config, request_headers, request_info));
+  SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
+  EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
+
+  span_ptr->setTag("foo", "bar");
+  span_ptr->injectContext(request_headers);
+  EXPECT_NE(nullptr, span_ptr->spawnChild("foo", std::chrono::system_clock::now()));
 }
 
 class HttpTracerImplTest : public Test {

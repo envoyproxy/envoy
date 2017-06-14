@@ -27,6 +27,8 @@ public:
     ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
   }
 
+  ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }
+
   NiceMock<Upstream::MockClusterManager> cm_;
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

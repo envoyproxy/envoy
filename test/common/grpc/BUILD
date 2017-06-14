@@ -9,6 +9,20 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "async_client_impl_test",
+    srcs = ["async_client_impl_test.cc"],
+    deps = [
+        "//source/common/grpc:async_client_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/proto:helloworld_proto",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
     deps = [
@@ -26,6 +40,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto",
+        "//test/test_common:utility_lib",
     ],
 )
 

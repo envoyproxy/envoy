@@ -8,25 +8,23 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
 
+#include "server/configuration_impl.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactory(
-    NetworkFilterType type, const Json::Object& config, Server::Instance& server) {
-  if (type != NetworkFilterType::Read) {
-    throw EnvoyException(
-        fmt::format("{} network filter must be configured as a read filter.", name()));
-  }
-
-  Redis::ProxyFilterConfigSharedPtr filter_config(
-      std::make_shared<Redis::ProxyFilterConfig>(config, server.clusterManager(), server.stats()));
+NetworkFilterFactoryCb
+RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
+                                                   FactoryContext& context) {
+  Redis::ProxyFilterConfigSharedPtr filter_config(std::make_shared<Redis::ProxyFilterConfig>(
+      config, context.clusterManager(), context.scope()));
   Redis::ConnPool::InstancePtr conn_pool(
-      new Redis::ConnPool::InstanceImpl(filter_config->clusterName(), server.clusterManager(),
+      new Redis::ConnPool::InstanceImpl(filter_config->clusterName(), context.clusterManager(),
                                         Redis::ConnPool::ClientFactoryImpl::instance_,
-                                        server.threadLocal(), *config.getObject("conn_pool")));
+                                        context.threadLocal(), *config.getObject("conn_pool")));
   std::shared_ptr<Redis::CommandSplitter::Instance> splitter(
-      new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), server.stats(),
+      new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), context.scope(),
                                                filter_config->statPrefix()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Redis::DecoderFactoryImpl factory;
@@ -34,8 +32,6 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactory(
         factory, Redis::EncoderPtr{new Redis::EncoderImpl()}, *splitter, filter_config));
   };
 }
-
-std::string RedisProxyFilterConfigFactory::name() { return "redis_proxy"; }
 
 /**
  * Static registration for the redis filter. @see RegisterNamedNetworkFilterConfigFactory.

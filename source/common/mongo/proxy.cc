@@ -35,9 +35,9 @@ void AccessLog::logMessage(const Message& message, bool full,
   file_->write(log_line);
 }
 
-ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Store& store,
+ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log)
-    : stat_prefix_(stat_prefix), stat_store_(store), stats_(generateStats(stat_prefix, store)),
+    : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), access_log_(access_log) {
 
   if (!runtime_.snapshot().featureEnabled("mongo.connection_logging_enabled", 100)) {
@@ -52,25 +52,25 @@ ProxyFilter::~ProxyFilter() {}
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   stats_.op_get_more_.inc();
   logMessage(*message, true);
-  log_debug("decoded GET_MORE: {}", message->toString(true));
+  LOG(debug, "decoded GET_MORE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   stats_.op_insert_.inc();
   logMessage(*message, true);
-  log_debug("decoded INSERT: {}", message->toString(true));
+  LOG(debug, "decoded INSERT: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
-  log_debug("decoded KILL_CURSORS: {}", message->toString(true));
+  LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   stats_.op_query_.inc();
   logMessage(*message, true);
-  log_debug("decoded QUERY: {}", message->toString(true));
+  LOG(debug, "decoded QUERY: {}", message->toString(true));
 
   if (message->flags() & QueryMessage::Flags::TailableCursor) {
     stats_.op_query_tailable_cursor_.inc();
@@ -88,8 +88,8 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   ActiveQueryPtr active_query(new ActiveQuery(*this, *message));
   if (!active_query->query_info_.command().empty()) {
     // First field key is the operation.
-    stat_store_.counter(fmt::format("{}cmd.{}.total", stat_prefix_,
-                                    active_query->query_info_.command())).inc();
+    scope_.counter(fmt::format("{}cmd.{}.total", stat_prefix_, active_query->query_info_.command()))
+        .inc();
   } else {
     // Normal query, get stats on a per collection basis first.
     std::string collection_stat_prefix =
@@ -121,18 +121,18 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
 
 void ProxyFilter::chargeQueryStats(const std::string& prefix,
                                    QueryMessageInfo::QueryType query_type) {
-  stat_store_.counter(fmt::format("{}.query.total", prefix)).inc();
+  scope_.counter(fmt::format("{}.query.total", prefix)).inc();
   if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
-    stat_store_.counter(fmt::format("{}.query.scatter_get", prefix)).inc();
+    scope_.counter(fmt::format("{}.query.scatter_get", prefix)).inc();
   } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
-    stat_store_.counter(fmt::format("{}.query.multi_get", prefix)).inc();
+    scope_.counter(fmt::format("{}.query.multi_get", prefix)).inc();
   }
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
   stats_.op_reply_.inc();
   logMessage(*message, false);
-  log_debug("decoded REPLY: {}", message->toString(true));
+  LOG(debug, "decoded REPLY: {}", message->toString(true));
 
   if (message->cursorId() != 0) {
     stats_.op_reply_valid_cursor_.inc();
@@ -181,14 +181,12 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
     reply_documents_byte_size += document->byteSize();
   }
 
-  stat_store_.deliverHistogramToSinks(fmt::format("{}.reply_num_docs", prefix),
-                                      message.documents().size());
-  stat_store_.deliverHistogramToSinks(fmt::format("{}.reply_size", prefix),
-                                      reply_documents_byte_size);
-  stat_store_.deliverTimingToSinks(
-      fmt::format("{}.reply_time_ms", prefix),
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
-                                                            active_query.start_time_));
+  scope_.deliverHistogramToSinks(fmt::format("{}.reply_num_docs", prefix),
+                                 message.documents().size());
+  scope_.deliverHistogramToSinks(fmt::format("{}.reply_size", prefix), reply_documents_byte_size);
+  scope_.deliverTimingToSinks(fmt::format("{}.reply_time_ms", prefix),
+                              std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now() - active_query.start_time_));
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {
@@ -206,7 +204,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
   try {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
-    log().info("mongo decoding error: {}", e.what());
+    LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;
   }

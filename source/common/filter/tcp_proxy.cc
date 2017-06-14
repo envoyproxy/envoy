@@ -43,8 +43,8 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 }
 
 TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
-                               Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
-    : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
+                               Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
+    : stats_(generateStats(config.getString("stat_prefix"), scope)) {
   config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   for (const Json::ObjectSharedPtr& route_desc :
@@ -106,15 +106,15 @@ TcpProxy::~TcpProxy() {
   }
 }
 
-TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Store& store) {
+TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scope& scope) {
   std::string final_prefix = fmt::format("tcp.{}.", name);
-  return {ALL_TCP_PROXY_STATS(POOL_COUNTER_PREFIX(store, final_prefix),
-                              POOL_GAUGE_PREFIX(store, final_prefix))};
+  return {ALL_TCP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                              POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  conn_log_info("new tcp proxy session", read_callbacks_->connection());
+  CONN_LOG(info, "new tcp proxy session", read_callbacks_->connection());
   config_->stats().downstream_cx_total_.inc();
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().setBufferStats({config_->stats().downstream_cx_rx_bytes_total_,
@@ -129,8 +129,8 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
   if (thread_local_cluster) {
-    conn_log_debug("Creating connection to cluster {}", read_callbacks_->connection(),
-                   cluster_name);
+    CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
+             cluster_name);
   } else {
     config_->stats().downstream_cx_no_route_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -180,7 +180,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 }
 
 void TcpProxy::onConnectTimeout() {
-  conn_log_debug("connect timeout", read_callbacks_->connection());
+  CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
 
   // This will close the upstream connection as well.
@@ -188,7 +188,7 @@ void TcpProxy::onConnectTimeout() {
 }
 
 Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
-  conn_log_trace("received {} bytes", read_callbacks_->connection(), data.length());
+  CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;

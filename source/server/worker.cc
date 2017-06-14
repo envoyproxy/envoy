@@ -29,10 +29,11 @@ void Worker::initializeConfiguration(Server::Configuration::Main& config,
         .per_connection_buffer_limit_bytes_ = listener->perConnectionBufferLimitBytes()};
     if (listener->sslContext()) {
       handler_->addSslListener(listener->filterChainFactory(), *listener->sslContext(),
-                               *socket_map.at(listener.get()), listener->scope(), listener_options);
+                               *socket_map.at(listener.get()), listener->listenerScope(),
+                               listener_options);
     } else {
       handler_->addListener(listener->filterChainFactory(), *socket_map.at(listener.get()),
-                            listener->scope(), listener_options);
+                            listener->listenerScope(), listener_options);
     }
   }
 
@@ -59,11 +60,11 @@ void Worker::onNoExitTimer() {
 }
 
 void Worker::threadRoutine(Server::GuardDog& guard_dog) {
-  log().info("worker entering dispatch loop");
+  LOG(info, "worker entering dispatch loop");
   auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(handler_->dispatcher());
   handler_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  log().info("worker exited dispatch loop");
+  LOG(info, "worker exited dispatch loop");
   guard_dog.stopWatching(watchdog);
 
   // We must close all active connections before we actually exit the thread. This prevents any

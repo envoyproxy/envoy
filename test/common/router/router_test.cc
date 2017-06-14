@@ -722,6 +722,49 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                     .value());
 }
 
+TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-grpc-retry-on", "cancelled"},
+                                  {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // gRPC with status "cancelled" (1)
+  router_.retry_state_->expectRetry();
+  Http::HeaderMapPtr response_headers1(
+      new Http::TestHeaderMapImpl{{":status", "200"}, {":grpc-status", "1"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  // We expect the grpc-status to result in a retried request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+  router_.retry_state_->callback_();
+
+  // Normal response.
+  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(false));
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 TEST_F(RouterTest, Shadow) {
   callbacks_.route_->route_entry_.shadow_policy_.cluster_ = "foo";
   callbacks_.route_->route_entry_.shadow_policy_.runtime_key_ = "bar";

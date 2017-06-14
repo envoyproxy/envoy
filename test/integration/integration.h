@@ -171,6 +171,7 @@ public:
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
+  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
 
@@ -197,13 +198,17 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                        Http::CodecClient::Type type);
   void testTwoRequests(Http::CodecClient::Type type);
-  void testBadHttpRequest();
+  void testBadFirstline();
+  void testMissingDelimiter();
+  void testInvalidCharacterInFirstline();
+  void testLowVersion();
   void testHttp10Request();
   void testNoHost();
   void testUpstreamProtocolError();
   void testBadPath();
   void testDrainClose(Http::CodecClient::Type type);
   void testRetry(Http::CodecClient::Type type);
+  void testGrpcRetry();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

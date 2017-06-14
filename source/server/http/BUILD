@@ -57,7 +57,6 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",

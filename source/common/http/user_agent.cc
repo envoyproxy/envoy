@@ -20,7 +20,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                                      Stats::Store& stat_store) {
+                                      Stats::Scope& scope) {
   // We assume that the user-agent is consistent based on the first request.
   if (type_ != Type::NotInitialized) {
     return;
@@ -41,8 +41,7 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
   }
 
   if (type_ != Type::Unknown) {
-    stats_.reset(
-        new UserAgentStats{ALL_USER_AGENTS_STATS(POOL_COUNTER_PREFIX(stat_store, prefix_))});
+    stats_.reset(new UserAgentStats{ALL_USER_AGENTS_STATS(POOL_COUNTER_PREFIX(scope, prefix_))});
     stats_->downstream_cx_total_.inc();
     stats_->downstream_rq_total_.inc();
   }

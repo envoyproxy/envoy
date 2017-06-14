@@ -131,6 +131,9 @@ MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() {}
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
+MockAsyncClientStream::MockAsyncClientStream() {}
+MockAsyncClientStream::~MockAsyncClientStream() {}
+
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
 

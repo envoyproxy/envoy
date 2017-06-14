@@ -77,7 +77,7 @@ class Config : public Http::RestApiFetcher {
 public:
   static ConfigSharedPtr create(const Json::Object& config, ThreadLocal::Instance& tls,
                                 Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                Stats::Store& stats_store, Runtime::RandomGenerator& random);
+                                Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::IpList& ipWhiteList() { return ip_white_list_; }
@@ -85,10 +85,9 @@ public:
 
 private:
   Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Stats::Store& stats_store,
-         Runtime::RandomGenerator& random);
+         Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
-  static GlobalStats generateStats(Stats::Store& store, const std::string& prefix);
+  static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
