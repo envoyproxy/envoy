@@ -197,7 +197,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:dns_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:connection_lib",
         "//source/common/ssl:context_config_lib",

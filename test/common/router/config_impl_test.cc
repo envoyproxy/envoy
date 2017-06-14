@@ -1533,6 +1533,16 @@ TEST(RouteMatcherTest, WeightedClusters) {
     EXPECT_EQ("cluster3", config.route(headers, 560)->routeEntry()->clusterName());
   }
 
+  // Make sure weighted cluster entries call through to the parent when needed.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+    const RouteEntry* route = config.route(headers, 115)->routeEntry();
+    EXPECT_EQ(nullptr, route->hashPolicy());
+    EXPECT_TRUE(route->opaqueConfig().empty());
+    EXPECT_FALSE(route->autoHostRewrite());
+    EXPECT_TRUE(route->includeVirtualHostRateLimits());
+  }
+
   // Weighted Cluster with valid runtime values
   {
     Http::TestHeaderMapImpl headers = genHeaders("www2.lyft.com", "/foo", "GET");

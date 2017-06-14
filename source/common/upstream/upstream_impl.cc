@@ -20,7 +20,6 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
-#include "common/network/dns_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
@@ -131,7 +130,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Utility::parseInternetAddressAndPort(resolver_addr));
     }
-    selected_dns_resolver = std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers);
+    selected_dns_resolver = dispatcher.createDnsResolver(resolvers);
   }
 
   if (string_type == "static") {
