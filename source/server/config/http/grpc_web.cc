@@ -9,9 +9,11 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactory(const Json::Object&,
-                                                             const std::string&, FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter()});
+                                                             const std::string&,
+                                                             FactoryContext& context) {
+  return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter(context.clusterManager())});
   };
 }
 

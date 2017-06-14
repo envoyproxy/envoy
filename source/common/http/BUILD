@@ -236,3 +236,13 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "filter_utility_lib",
+    srcs = ["filter_utility.cc"],
+    hdrs = ["filter_utility.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)

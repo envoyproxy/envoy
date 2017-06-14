@@ -24,6 +24,35 @@ namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
 
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                        const std::string& grpc_service, const std::string& grpc_method,
+                        const Http::HeaderEntry* grpc_status) {
+  if (!grpc_status) {
+    return;
+  }
+  uint64_t grpc_status_code;
+  const bool success =
+      StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+  chargeStat(cluster, protocol, grpc_service, grpc_method, success);
+}
+
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
+                        const std::string& grpc_service, const std::string& grpc_method,
+                        bool success) {
+  cluster.statsScope()
+      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
+                           success ? "success" : "failure"))
+      .inc();
+  cluster.statsScope()
+      .counter(fmt::format("{}.{}.{}.total", protocol, grpc_service, grpc_method))
+      .inc();
+}
+
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
+                        const std::string& grpc_method, bool success) {
+  chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
+}
+
 Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
@@ -36,6 +65,20 @@ Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& traile
     return Optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
   return Optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
+}
+
+bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
+                                     std::string* method) {
+  if (path == nullptr || path->value().c_str() == nullptr) {
+    return false;
+  }
+  std::vector<std::string> parts = StringUtil::split(path->value().c_str(), '/');
+  if (parts.size() != 2) {
+    return false;
+  }
+  *service = std::move(parts[0]);
+  *method = std::move(parts[1]);
+  return true;
 }
 
 Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
@@ -58,15 +101,6 @@ Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
   default:
     return Status::GrpcStatus::Unknown;
   }
-}
-
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                        const std::string& grpc_method, bool success) {
-  cluster.statsScope()
-      .counter(
-           fmt::format("grpc.{}.{}.{}", grpc_service, grpc_method, success ? "success" : "failure"))
-      .inc();
-  cluster.statsScope().counter(fmt::format("grpc.{}.{}.total", grpc_service, grpc_method)).inc();
 }
 
 Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {
