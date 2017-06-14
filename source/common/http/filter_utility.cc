@@ -1,11 +1,11 @@
-#include "common/upstream/utility.h"
+#include "common/http/filter_utility.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Http {
 
 Upstream::ClusterInfoConstSharedPtr
-Utility::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callbacks,
-                            Upstream::ClusterManager& cm) {
+FilterUtility::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callbacks,
+                                  Upstream::ClusterManager& cm) {
   Router::RouteConstSharedPtr route = decoder_callbacks->route();
   if (!route || !route->routeEntry()) {
     return nullptr;
@@ -19,5 +19,5 @@ Utility::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_callback
   return cluster->info();
 }
 
-} // Upstream
+} // Http
 } // Envoy

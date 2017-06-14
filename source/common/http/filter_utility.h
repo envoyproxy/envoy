@@ -4,12 +4,12 @@
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Http {
 
 /**
- * Utility functions for upstream.
+ * General utilities for HTTP filters.
  */
-class Utility {
+class FilterUtility {
 public:
   /**
    * Resolve the cluster info.
@@ -21,5 +21,5 @@ public:
                      Upstream::ClusterManager& cm);
 };
 
-} // Upstream
+} // Http
 } // Envoy

@@ -9,9 +9,9 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/filter_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/upstream/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -92,7 +92,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  cluster_ = Upstream::Utility::resolveClusterInfo(decoder_callbacks_, cm_);
+  cluster_ = Http::FilterUtility::resolveClusterInfo(decoder_callbacks_, cm_);
   if (!cluster_) {
     return;
   }

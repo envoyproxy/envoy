@@ -91,16 +91,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "utility_lib",
-    srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
