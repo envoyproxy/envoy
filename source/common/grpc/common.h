@@ -28,10 +28,20 @@ class Common {
 public:
   /**
    * Returns the GrpcStatus code from a given set of headers, if present.
-   * @headers the headers to parse.
-   * @returns the parsed status code or InvalidCode if no valid status is found.
+   * @param headers the headers to parse.
+   * @return Optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid status
+   *         is found.
    */
   static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& headers);
+
+  /**
+   * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
+   * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
+   * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+   * @param http_response_status HTTP status code.
+   * @return Status::GrpcStatus corresponding gRPC status code.
+   */
+  static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.

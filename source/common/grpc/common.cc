@@ -38,6 +38,28 @@ Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& traile
   return Optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
 }
 
+Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
+  // From
+  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+  switch (http_response_status) {
+  case 400:
+    return Status::GrpcStatus::Internal;
+  case 401:
+    return Status::GrpcStatus::Unauthenticated;
+  case 403:
+    return Status::GrpcStatus::PermissionDenied;
+  case 404:
+    return Status::GrpcStatus::Unimplemented;
+  case 429:
+  case 502:
+  case 503:
+  case 504:
+    return Status::GrpcStatus::Unavailable;
+  default:
+    return Status::GrpcStatus::Unknown;
+  }
+}
+
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                         const std::string& grpc_method, bool success) {
   cluster.statsScope()
