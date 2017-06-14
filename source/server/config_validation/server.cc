@@ -31,7 +31,8 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
   try {
     initialize(options, component_factory);
   } catch (const EnvoyException& e) {
-    LOG(critical, "error initializing configuration '{}': {}", options.configPath(), e.what());
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+              e.what());
     thread_local_.shutdownThread();
     throw;
   }

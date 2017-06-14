@@ -135,53 +135,53 @@ protected:
  * invoke these directly.
  */
 #ifdef NVLOG
-#define LOG_trace_TO_LOGGER(LOGGER, ...)
-#define LOG_debug_TO_LOGGER(LOGGER, ...)
+#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...)
+#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...)
 #else
-#define LOG_trace_TO_LOGGER(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
-#define LOG_debug_TO_LOGGER(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
 #endif
 
-#define LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
-#define LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
-#define LOG_err_TO_LOGGER(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
-#define LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_err_TO_LOGGER(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
 
 /**
  * Convenience macro to log to a user-specified logger.
  */
-#define LOG_TO_LOGGER(LOGGER, LEVEL, ...) LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
+#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the class' logger.
  */
-#define LOG(LEVEL, ...) LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
  * a logger.
  */
 #define GET_MISC_LOGGER() Logger::Registry::getLog(Logger::Id::misc)
-#define LOG_MISC(LEVEL, ...) LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with connection ID.
  */
-#define CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                                 \
-  LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
+#define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
+  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
-#define CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                                   \
-  CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  ENVOY_CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
  */
-#define STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                                   \
-  LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), \
-                ##__VA_ARGS__)
+#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
+  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connectionId(),                \
+                      (STREAM).streamId(), ##__VA_ARGS__)
 
-#define STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                                     \
-  STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  ENVOY_STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 /**
  * DEPRECATED: Logging macros.
