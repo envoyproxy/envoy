@@ -587,7 +587,7 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, disableTimer());
   EXPECT_CALL(*timer, enableTimer(_));
-  EXPECT_NE(nullptr, resolver.resolve("some.bad.domain", DnsLookupFamily::V4Only,
+  EXPECT_NE(nullptr, resolver.resolve("some.bad.domain.invalid", DnsLookupFamily::V4Only,
                                       [&](std::list<Address::InstanceConstSharedPtr>&& results) {
                                         UNREFERENCED_PARAMETER(results);
                                       }));
