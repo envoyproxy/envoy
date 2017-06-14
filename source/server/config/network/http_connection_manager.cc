@@ -144,9 +144,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     std::string string_name = filters[i]->getString("name");
     Json::ObjectSharedPtr config_object = filters[i]->getObject("config");
 
-    LOG(info, "    filter #{}", i);
-    LOG(info, "      type: {}", string_type);
-    LOG(info, "      name: {}", string_name);
+    ENVOY_LOG(info, "    filter #{}", i);
+    ENVOY_LOG(info, "      type: {}", string_type);
+    ENVOY_LOG(info, "      name: {}", string_name);
 
     HttpFilterType type = stringToType(string_type);
 
