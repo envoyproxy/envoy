@@ -176,6 +176,7 @@ private:
     bool useProxyProto() override { return use_proxy_proto_; }
     bool useOriginalDst() override { return use_original_dst_; }
     uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+    Stats::Scope& listenerScope() override { return *listener_scope_; }
 
     // Server::Configuration::FactoryContext
     AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
@@ -193,7 +194,7 @@ private:
     }
     Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
     Instance& server() override { return server_; }
-    Stats::Scope& scope() override { return *scope_; }
+    Stats::Scope& scope() override { return *global_scope_; }
     ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
 
     // Network::FilterChainFactory
@@ -203,7 +204,8 @@ private:
     Instance& server_;
     Network::Address::InstanceConstSharedPtr address_;
     bool bind_to_port_{};
-    Stats::ScopePtr scope_;
+    Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
+    Stats::ScopePtr listener_scope_; // Stats with listener named scope.
     Ssl::ServerContextPtr ssl_context_;
     bool use_proxy_proto_{};
     bool use_original_dst_{};

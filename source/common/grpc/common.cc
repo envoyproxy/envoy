@@ -81,6 +81,28 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   return true;
 }
 
+Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
+  // From
+  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+  switch (http_response_status) {
+  case 400:
+    return Status::GrpcStatus::Internal;
+  case 401:
+    return Status::GrpcStatus::Unauthenticated;
+  case 403:
+    return Status::GrpcStatus::PermissionDenied;
+  case 404:
+    return Status::GrpcStatus::Unimplemented;
+  case 429:
+  case 502:
+  case 503:
+  case 504:
+    return Status::GrpcStatus::Unavailable;
+  default:
+    return Status::GrpcStatus::Unknown;
+  }
+}
+
 Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.

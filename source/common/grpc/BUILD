@@ -9,6 +9,17 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "async_client_lib",
+    hdrs = ["async_client_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":common_lib",
+        "//include/envoy/grpc:async_client_interface",
+        "//source/common/http:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec.cc"],
     hdrs = ["codec.h"],

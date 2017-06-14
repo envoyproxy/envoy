@@ -109,6 +109,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_EQ(6502U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), address));
+  EXPECT_EQ(nullptr, address.ip()->ipv6());
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -162,6 +163,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_EQ(32000U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), address));
+  EXPECT_EQ(nullptr, address.ip()->ipv4());
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
