@@ -41,6 +41,8 @@ public:
   }
 
 private:
+  friend class GrpcWebFilterTest;
+
   void chargeStat(const Http::HeaderMap& headers);
   void setupStatTracking(const Http::HeaderMap& headers);
   bool isGrpcWebRequest(const Http::HeaderMap& headers);
