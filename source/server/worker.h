@@ -3,17 +3,16 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
-#include "common/network/listen_socket_impl.h"
 
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {
-typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> SocketMap;
+namespace Server {
 
 /**
  * A server threaded worker that wraps up a worker thread, event loop, etc.
@@ -25,8 +24,7 @@ public:
 
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
   Network::ConnectionHandler* handler() { return handler_.get(); }
-  void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map,
-                               Server::GuardDog& guard_dog);
+  void initializeConfiguration(ListenerManager& listener_manager, GuardDog& guard_dog);
 
   /**
    * Exit the worker. Will block until the worker thread joins. Called from the main thread.
@@ -35,13 +33,15 @@ public:
 
 private:
   void onNoExitTimer();
-  void threadRoutine(Server::GuardDog& guard_dog);
+  void threadRoutine(GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;
-  Server::ConnectionHandlerImplPtr handler_;
+  ConnectionHandlerImplPtr handler_;
   Event::TimerPtr no_exit_timer_;
   Thread::ThreadPtr thread_;
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;
+
+} // Server
 } // Envoy

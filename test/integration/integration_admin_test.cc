@@ -139,9 +139,13 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->asObjectArray();
-  for (std::size_t index = 0; index < listener_info.size(); index++) {
-    EXPECT_EQ(test_server_->server().getListenSocketByIndex(index)->localAddress()->asString(),
-              listener_info[index]->asString());
+  auto listener_info_it = listener_info.begin();
+  auto listeners = test_server_->server().listenerManager().listeners();
+  auto listener_it = listeners.begin();
+  for (; listener_info_it != listener_info.end() && listener_it != listeners.end();
+       ++listener_info_it, ++listener_it) {
+    EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
+              (*listener_info_it)->asString());
   }
 }
 
@@ -161,4 +165,5 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 #endif
+
 } // Envoy

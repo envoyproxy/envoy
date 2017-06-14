@@ -22,6 +22,7 @@
 
 #include "server/connection_handler_impl.h"
 #include "server/http/admin.h"
+#include "server/listener_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
 
@@ -120,11 +121,10 @@ public:
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
-  int getListenSocketFd(const std::string& address) override;
-  Network::ListenSocket* getListenSocketByIndex(uint32_t index) override;
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
+  ListenerManager& listenerManager() override { return listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
@@ -158,11 +158,12 @@ private:
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;
-  SocketMap socket_map_;
   ConnectionHandlerImpl handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  ProdListenSocketFactory listen_socket_factory_;
+  ListenerManagerImpl listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
   Stats::ScopePtr admin_scope_;

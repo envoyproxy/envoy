@@ -20,6 +20,7 @@
 #include "server/config_validation/connection_handler.h"
 #include "server/config_validation/dns.h"
 #include "server/http/admin.h"
+#include "server/listener_manager_impl.h"
 #include "server/server.h"
 #include "server/worker.h"
 
@@ -45,7 +46,9 @@ bool validateConfig(Options& options, ComponentFactory& component_factory,
  * If we finish initialization, and reach the point where an ordinary Envoy run would begin serving
  * requests, the validation is considered successful.
  */
-class ValidationInstance : Logger::Loggable<Logger::Id::main>, public Instance {
+class ValidationInstance : Logger::Loggable<Logger::Id::main>,
+                           public Instance,
+                           public ListenSocketFactory {
 public:
   ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
                      Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -63,11 +66,10 @@ public:
   DrainManager& drainManager() override { NOT_IMPLEMENTED; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override { NOT_IMPLEMENTED; }
-  int getListenSocketFd(const std::string&) override { NOT_IMPLEMENTED; }
-  Network::ListenSocket* getListenSocketByIndex(uint32_t) override { NOT_IMPLEMENTED; }
   void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED; }
   Init::Manager& initManager() override { return init_manager_; }
+  ListenerManager& listenerManager() override { return listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
@@ -85,6 +87,13 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
+  // Server::ListenSocketFactory
+  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr, bool) override {
+    // Returned sockets are not currently used so we can return nothing here safely vs. a
+    // validation mock.
+    return nullptr;
+  }
+
 private:
   void initialize(Options& options, ComponentFactory& component_factory);
 
@@ -101,6 +110,7 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
+  ListenerManagerImpl listener_manager_;
 };
 
 } // Server
