@@ -131,22 +131,24 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
 
 const std::list<ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
-MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json) : server_(server) {
-  address_ = Network::Utility::resolveUrl(json.getString("address"));
+MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json)
+    : server_(server), address_(Network::Utility::resolveUrl(json.getString("address"))),
+      global_scope_(server.stats().createScope("")) {
 
   // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
   // later.
   std::string final_stat_name = fmt::format("listener.{}.", address_->asString());
   std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
 
-  scope_ = server.stats().createScope(final_stat_name);
+  listener_scope_ = server.stats().createScope(final_stat_name);
   LOG(info, "  address={}", address_->asString());
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
-    ssl_context_ = server.sslContextManager().createSslServerContext(*scope_, context_config);
+    ssl_context_ =
+        server.sslContextManager().createSslServerContext(*listener_scope_, context_config);
   }
 
   bind_to_port_ = json.getBoolean("bind_to_port", true);
