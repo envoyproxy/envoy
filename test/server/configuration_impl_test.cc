@@ -289,7 +289,7 @@ TEST_F(ConfigurationImplTest, BadFilterName) {
         "address": "tcp://127.0.0.1:1234",
         "filters": [
           {
-            "type" : "read",
+            "type" : "write",
             "name" : "invalid",
             "config" : {}
           }
@@ -306,7 +306,35 @@ TEST_F(ConfigurationImplTest, BadFilterName) {
 
   MainImpl config(server_, cluster_manager_factory_);
   EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader), EnvoyException,
-                            "unable to create filter factory for 'invalid'/'read'");
+                            "unable to create filter factory for 'invalid'/'write'");
+}
+
+TEST_F(ConfigurationImplTest, BadFilterType) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": [
+          {
+            "type" : "write",
+            "name" : "echo",
+            "config" : {}
+          }
+        ]
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+
+  MainImpl config(server_, cluster_manager_factory_);
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader), EnvoyException,
+                            "unable to create filter factory for 'echo'/'write'");
 }
 
 TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {

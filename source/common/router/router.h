@@ -78,16 +78,16 @@ public:
 class FilterConfig {
 public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+               Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
-      : global_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
+        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
-  Stats::Store& global_store_;
+  Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;

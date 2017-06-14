@@ -37,7 +37,7 @@ struct FaultFilterStats {
 class FaultFilterConfig {
 public:
   FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
-                    const std::string& stats_prefix, Stats::Store& stats);
+                    const std::string& stats_prefix, Stats::Scope& scope);
 
   const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
     return fault_filter_headers_;
@@ -51,10 +51,10 @@ public:
   FaultFilterStats& stats() { return stats_; }
   const std::unordered_set<std::string>& downstreamNodes() { return downstream_nodes_; }
   const std::string& statsPrefix() { return stats_prefix_; }
-  Stats::Store& statsStore() { return store_; }
+  Stats::Scope& scope() { return scope_; }
 
 private:
-  static FaultFilterStats generateStats(const std::string& prefix, Stats::Store& store);
+  static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   uint64_t abort_percent_{};       // 0-100
   uint64_t http_status_{};         // HTTP or gRPC return codes
@@ -67,7 +67,7 @@ private:
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
   const std::string stats_prefix_;
-  Stats::Store& store_;
+  Stats::Scope& scope_;
 };
 
 typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;

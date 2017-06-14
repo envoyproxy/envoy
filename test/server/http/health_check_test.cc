@@ -36,11 +36,11 @@ public:
   }
 
   void prepareFilter(bool pass_through) {
-    filter_.reset(new HealthCheckFilter(server_, pass_through, cache_manager_, "/healthcheck"));
+    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, "/healthcheck"));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::MockTimer* cache_timer_{};
   Event::MockDispatcher dispatcher_;
   HealthCheckCacheManagerSharedPtr cache_manager_;
@@ -66,21 +66,21 @@ public:
 };
 
 TEST_F(HealthCheckFilterNoPassThroughTest, OkOrFailed) {
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
-  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
@@ -102,7 +102,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
-  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -114,21 +114,21 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
-  EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, NotHcRequest) {
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
 
 TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
-  EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   cache_manager_->setCachedResponseCode(Http::Code::ServiceUnavailable);
 
@@ -148,7 +148,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
-  EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
   cache_manager_->setCachedResponseCode(Http::Code::OK);
 
@@ -196,7 +196,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
 }
 
 TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
-  EXPECT_CALL(server_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
@@ -206,21 +206,18 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
-  NiceMock<Server::MockInstance> serverMock;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(
-      healthCheckFilterConfig.createFilterFactory(Server::Configuration::HttpFilterType::Both,
-                                                  *config, "dummy_stats_prefix", serverMock),
-      EnvoyException);
+  EXPECT_THROW(healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context),
+               EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config =
       Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
-  NiceMock<Server::MockInstance> serverMock;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  healthCheckFilterConfig.createFilterFactory(Server::Configuration::HttpFilterType::Both, *config,
-                                              "dummy_stats_prefix", serverMock);
+  healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context);
 }
 } // Envoy

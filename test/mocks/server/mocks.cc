@@ -5,13 +5,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::_;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+namespace Envoy {
 namespace Server {
 
 MockOptions::MockOptions(const std::string& config_path)
@@ -53,6 +53,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
 MockInstance::~MockInstance() {}
 
 namespace Configuration {
+
 MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
     : wd_miss_(wd_miss), wd_megamiss_(wd_megamiss), wd_kill_(wd_kill), wd_multikill_(wd_multikill) {
   ON_CALL(*this, wdMissTimeout()).WillByDefault(Return(wd_miss_));
@@ -60,7 +61,24 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdKillTimeout()).WillByDefault(Return(wd_kill_));
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
-} // Configuration
 
+MockFactoryContext::MockFactoryContext() {
+  ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
+  ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
+  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, server()).WillByDefault(ReturnRef(server_));
+  ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+}
+
+MockFactoryContext::~MockFactoryContext() {}
+
+} // Configuration
 } // Server
 } // Envoy

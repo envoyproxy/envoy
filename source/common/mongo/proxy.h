@@ -81,7 +81,7 @@ class ProxyFilter : public Network::Filter,
                     public Network::ConnectionCallbacks,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
-  ProxyFilter(const std::string& stat_prefix, Stats::Store& store, Runtime::Loader& runtime,
+  ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log);
   ~ProxyFilter();
 
@@ -124,10 +124,10 @@ private:
 
   typedef std::unique_ptr<ActiveQuery> ActiveQueryPtr;
 
-  MongoProxyStats generateStats(const std::string& prefix, Stats::Store& store) {
-    return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(store, prefix),
-                                                 POOL_GAUGE_PREFIX(store, prefix),
-                                                 POOL_TIMER_PREFIX(store, prefix))};
+  MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                                 POOL_GAUGE_PREFIX(scope, prefix),
+                                                 POOL_TIMER_PREFIX(scope, prefix))};
   }
 
   void chargeQueryStats(const std::string& prefix, QueryMessageInfo::QueryType query_type);
@@ -138,7 +138,7 @@ private:
 
   std::unique_ptr<Decoder> decoder_;
   std::string stat_prefix_;
-  Stats::Store& stat_store_;
+  Stats::Scope& scope_;
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   Buffer::OwnedImpl read_buffer_;

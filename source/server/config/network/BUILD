@@ -13,8 +13,6 @@ envoy_cc_library(
     srcs = ["client_ssl_auth.cc"],
     hdrs = ["client_ssl_auth.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/server:instance_interface",
         "//source/common/filter/auth:client_ssl_lib",
         "//source/server:configuration_lib",
     ],
@@ -24,7 +22,6 @@ envoy_cc_library(
     name = "echo_lib",
     srcs = ["echo.cc"],
     deps = [
-        "//include/envoy/network:connection_interface",
         "//source/common/filter:echo_lib",
         "//source/server:configuration_lib",
     ],
@@ -37,8 +34,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
@@ -60,8 +55,6 @@ envoy_cc_library(
     srcs = ["mongo_proxy.cc"],
     hdrs = ["mongo_proxy.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/server:instance_interface",
         "//source/common/json:config_schemas_lib",
         "//source/common/mongo:proxy_lib",
         "//source/server:configuration_lib",
@@ -73,7 +66,6 @@ envoy_cc_library(
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
         "//source/common/filter:ratelimit_lib",
         "//source/server:configuration_lib",
     ],
@@ -97,8 +89,6 @@ envoy_cc_library(
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/server:instance_interface",
         "//source/common/filter:tcp_proxy_lib",
         "//source/server:configuration_lib",
     ],

@@ -35,6 +35,8 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  ~DynamoFilterTest() { filter_->onDestroy(); }
+
   std::unique_ptr<DynamoFilter> filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};

@@ -34,17 +34,17 @@ namespace Envoy {
 namespace Http {
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
-                                                            Stats::Store& stats) {
+                                                            Stats::Scope& scope) {
   return {
-      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(stats, prefix), POOL_GAUGE_PREFIX(stats, prefix),
-                               POOL_TIMER_PREFIX(stats, prefix))},
+      {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
+                               POOL_TIMER_PREFIX(scope, prefix))},
       prefix,
-      stats};
+      scope};
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
-                                                                          Stats::Store& stats) {
-  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(stats, prefix + "tracing."))};
+                                                                          Stats::Scope& scope) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
@@ -406,7 +406,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 #endif
 
   connection_manager_.user_agent_.initializeFromHeaders(
-      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.store_);
+      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
