@@ -22,7 +22,7 @@ bool ZeroCopyInputStreamImpl::Next(const void **data, int *size){
   }
 
   Buffer::RawSlice slice;
-  uint64_t num_slices = buffer_.getRawSlices(&slice, 1);
+  const uint64_t num_slices = buffer_.getRawSlices(&slice, 1);
 
   if (num_slices > 0) {
     *data = slice.mem_;
