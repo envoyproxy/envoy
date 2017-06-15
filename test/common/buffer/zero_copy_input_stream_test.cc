@@ -71,11 +71,6 @@ TEST_F(ZeroCopyInputStreamTest, Finish) {
   EXPECT_EQ(0, size_);
   stream_.finish();
   EXPECT_FALSE(stream_.Next(&data_, &size_));
-
-  Buffer::OwnedImpl buffer("efgh");
-  stream_.move(buffer);
-
-  EXPECT_EQ(4, buffer.length());
 }
 
 } // namespace
