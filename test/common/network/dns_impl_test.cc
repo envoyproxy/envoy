@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -579,19 +580,18 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 // Validate that the resolution timeout timer is enabled if we don't resolve
 // immediately.
 TEST(DnsImplUnitTest, PendingTimerEnable) {
+  InSequence s;
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
   DnsResolverImpl resolver(dispatcher, {});
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
-  EXPECT_CALL(*timer, disableTimer());
   EXPECT_CALL(*timer, enableTimer(_));
   EXPECT_NE(nullptr, resolver.resolve("some.bad.domain.invalid", DnsLookupFamily::V4Only,
                                       [&](std::list<Address::InstanceConstSharedPtr>&& results) {
                                         UNREFERENCED_PARAMETER(results);
                                       }));
-  Mock::VerifyAndClearExpectations(timer);
 }
 
 } // Network
