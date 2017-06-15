@@ -46,7 +46,7 @@ struct TcpProxyStats {
 class TcpProxyConfig {
 public:
   TcpProxyConfig(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                 Stats::Store& stats_store);
+                 Stats::Scope& scope);
 
   /**
    * Find out which cluster an upstream connection should be opened to based on the
@@ -71,7 +71,7 @@ private:
     std::string cluster_name_;
   };
 
-  static TcpProxyStats generateStats(const std::string& name, Stats::Store& store);
+  static TcpProxyStats generateStats(const std::string& name, Stats::Scope& scope);
 
   std::vector<Route> routes_;
   const TcpProxyStats stats_;

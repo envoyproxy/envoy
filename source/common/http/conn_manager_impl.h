@@ -84,7 +84,7 @@ struct ConnectionManagerNamedStats {
 struct ConnectionManagerStats {
   ConnectionManagerNamedStats named_;
   std::string prefix_;
-  Stats::Store& store_;
+  Stats::Scope& scope_;
 };
 
 /**
@@ -232,9 +232,9 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
   ~ConnectionManagerImpl();
 
-  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
+  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
-                                                            Stats::Store& stats);
+                                                            Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
 
@@ -445,7 +445,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
-    Tracing::SpanPtr active_span_;
+    Tracing::SpanPtr active_span_{new Tracing::NullSpan()};
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;

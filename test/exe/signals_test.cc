@@ -16,10 +16,10 @@ namespace Envoy {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
-// Memory violation signal tests are disabled under address sanitizer.  The
-// sanitizer does its own special signal handling and prints messages that are
-// not ours instead of what this test expects.  The signals special handled by ASAN
-// include SIGSEGV, SIGBUS, and SIGFPE.
+// Death tests that expect a particular output are disabled under address sanitizer.
+// The sanitizer does its own special signal handling and prints messages that are
+// not ours instead of what this test expects.  As of latest Clang this appears
+// to include abort() as well.
 #ifndef ASANITIZED
 TEST(Signals, InvalidAddressDeathTest) {
   SignalAction actions;
@@ -52,7 +52,6 @@ TEST(Signals, BadMathDeathTest) {
     raise(SIGFPE);
   }(), "backtrace.*Floating point");
 }
-#endif
 
 #if defined(__x86_64__) || defined(__i386__)
 // Unfortunately we don't have a reliable way to do this on other platforms
@@ -81,6 +80,7 @@ TEST(Signals, RestoredPreviousHandlerDeathTest) {
   // Outer SignalAction should be active again:
   EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Aborted");
 }
+#endif
 
 TEST(Signals, IllegalStackAccessDeathTest) {
   SignalAction actions;
@@ -107,4 +107,11 @@ TEST(Signals, LegalStackAccessTest) {
   SignalAction actions;
   actions.doGoodAccessForTest();
 }
+
+TEST(Signals, HandlerTest) {
+  siginfo_t fake_si;
+  fake_si.si_addr = nullptr;
+  SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
+}
+
 } // Envoy

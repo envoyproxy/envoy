@@ -27,6 +27,9 @@ public:
 
   static uint32_t parseRetryOn(const std::string& config);
 
+  // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
+  static uint32_t parseRetryGrpcOn(const std::string& retry_grpc_on_header);
+
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
   bool shouldRetry(const Http::HeaderMap* response_headers,

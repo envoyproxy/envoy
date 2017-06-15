@@ -16,6 +16,7 @@ using testing::_;
 using testing::Combine;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::Values;
 
 namespace Envoy {
@@ -33,9 +34,12 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  GrpcWebFilterTest() : filter_() { filter_.setEncoderFilterCallbacks(encoder_callbacks_); }
+  GrpcWebFilterTest() : filter_(cm_) {
+    filter_.setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_.setEncoderFilterCallbacks(encoder_callbacks_);
+  }
 
-  ~GrpcWebFilterTest() override {}
+  ~GrpcWebFilterTest() override { filter_.onDestroy(); }
 
   const std::string& request_content_type() const { return std::get<0>(GetParam()); }
 
@@ -61,7 +65,11 @@ public:
            request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
+  bool doStatTracking() const { return filter_.do_stat_tracking_; }
+
   GrpcWebFilter filter_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
@@ -80,6 +88,63 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
   }
 }
 
+TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
+  Http::TestHeaderMapImpl request_headers;
+  request_headers.addViaCopy(Http::Headers::get().ContentType, "unsupported");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+}
+
+TEST_F(GrpcWebFilterTest, NoContentType) {
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+}
+
+TEST_P(GrpcWebFilterTest, StatsNoCluster) {
+  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_CALL(cm_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_FALSE(doStatTracking());
+}
+
+TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
+  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
+TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
+  Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.failure")
+                     .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
   Http::TestHeaderMapImpl request_headers;
@@ -94,14 +159,29 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests request data.
   if (isBinaryRequest()) {
-    Buffer::OwnedImpl request_buffer(MESSAGE, MESSAGE_SIZE);
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
-    EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(request_buffer));
+    Buffer::OwnedImpl request_buffer;
+    Buffer::OwnedImpl decoded_buffer;
+    for (size_t i = 0; i < MESSAGE_SIZE; i++) {
+      request_buffer.add(&MESSAGE[i], 1);
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
+      decoded_buffer.move(request_buffer);
+    }
+    EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(decoded_buffer));
   } else if (isTextRequest()) {
-    Buffer::OwnedImpl request_buffer(B64_MESSAGE, B64_MESSAGE_SIZE);
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
+    Buffer::OwnedImpl request_buffer;
+    Buffer::OwnedImpl decoded_buffer;
+    for (size_t i = 0; i < B64_MESSAGE_SIZE; i++) {
+      request_buffer.add(&B64_MESSAGE[i], 1);
+      if (i % 4 == 3) {
+        EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
+      } else {
+        EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+                  filter_.decodeData(request_buffer, true));
+      }
+      decoded_buffer.move(request_buffer);
+    }
     EXPECT_EQ(std::string(TEXT_MESSAGE, TEXT_MESSAGE_SIZE),
-              TestUtility::bufferToString(request_buffer));
+              TestUtility::bufferToString(decoded_buffer));
   } else {
     FAIL() << "Unsupported gRPC-Web request content-type: " << request_content_type();
   }
@@ -131,14 +211,29 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests response data.
   if (accept_binary_response()) {
-    Buffer::OwnedImpl response_buffer(MESSAGE, MESSAGE_SIZE);
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
-    EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(response_buffer));
+    Buffer::OwnedImpl response_buffer;
+    Buffer::OwnedImpl encoded_buffer;
+    for (size_t i = 0; i < MESSAGE_SIZE; i++) {
+      response_buffer.add(&MESSAGE[i], 1);
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
+      encoded_buffer.move(response_buffer);
+    }
+    EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), TestUtility::bufferToString(encoded_buffer));
   } else if (accept_text_response()) {
-    Buffer::OwnedImpl response_buffer(TEXT_MESSAGE, TEXT_MESSAGE_SIZE);
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
+    Buffer::OwnedImpl response_buffer;
+    Buffer::OwnedImpl encoded_buffer;
+    for (size_t i = 0; i < TEXT_MESSAGE_SIZE; i++) {
+      response_buffer.add(&TEXT_MESSAGE[i], 1);
+      if (i < TEXT_MESSAGE_SIZE - 1) {
+        EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+                  filter_.encodeData(response_buffer, false));
+      } else {
+        EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
+      }
+      encoded_buffer.move(response_buffer);
+    }
     EXPECT_EQ(std::string(B64_MESSAGE, B64_MESSAGE_SIZE),
-              TestUtility::bufferToString(response_buffer));
+              TestUtility::bufferToString(encoded_buffer));
   } else {
     FAIL() << "Unsupported gRPC-Web response content-type: "
            << response_headers.ContentType()->value().c_str();

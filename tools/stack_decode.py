@@ -25,11 +25,14 @@ AddressList = collections.namedtuple("AddressList", "obj_file addresses")
 # the entire stack trace has been read.  End when EOF received.
 def decode_stacktrace_log(input_source):
   traces = {}
+  # Match something like [backtrace]
+  # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
+  backtrace_marker = "\[backtrace\] [^\s]+"
   trace_begin_re = re.compile(
-      "^(.+)\[backtrace\] Backtrace obj<(.+)> thr<(\d+)")
-  stackaddr_re = re.compile("\[backtrace\] thr<(\d+)> #\d+ (0x[0-9a-fA-F]+)$")
-  new_object_re = re.compile("\[backtrace\] thr<(\d+)> obj<(.+)>$")
-  trace_end_re = re.compile("\[backtrace\] end backtrace thread (\d+)")
+      "^(.+)%s Backtrace obj<(.+)> thr<(\d+)" % backtrace_marker)
+  stackaddr_re = re.compile("%s thr<(\d+)> #\d+ (0x[0-9a-fA-F]+)$" % backtrace_marker)
+  new_object_re = re.compile("%s thr<(\d+)> obj<(.+)>$" % backtrace_marker)
+  trace_end_re = re.compile("%s end backtrace thread (\d+)" % backtrace_marker)
 
   # build a dictionary indexed by thread_id, value is a Backtrace namedtuple
   try:

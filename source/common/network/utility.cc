@@ -184,18 +184,32 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 }
 
 bool Utility::isInternalAddress(const char* address) {
+  // First try as an IPv4 address.
   in_addr addr;
   int rc = inet_pton(AF_INET, address, &addr);
-  if (1 != rc) {
-    return false;
+  if (rc == 1) {
+    // Handle the RFC1918 space for IPV4. Also count loopback as internal.
+    uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&addr.s_addr);
+    if ((address_bytes[0] == 10) || (address_bytes[0] == 192 && address_bytes[1] == 168) ||
+        (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
+        addr.s_addr == htonl(INADDR_LOOPBACK)) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
-  // Handle the RFC1918 space for IPV4. Also count loopback as internal.
-  uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&addr.s_addr);
-  if ((address_bytes[0] == 10) || (address_bytes[0] == 192 && address_bytes[1] == 168) ||
-      (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
-      addr.s_addr == htonl(INADDR_LOOPBACK)) {
-    return true;
+  // Now try as an IPv6 address.
+  in6_addr addr6;
+  int rc6 = inet_pton(AF_INET6, address, &addr6);
+  if (rc6 == 1) {
+    // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
+    // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the future.
+    uint8_t* address6_bytes = reinterpret_cast<uint8_t*>(&addr6.s6_addr);
+    if (address6_bytes[0] == 0xfd ||
+        memcmp(address6_bytes, &in6addr_loopback, sizeof(in6addr_loopback)) == 0) {
+      return true;
+    }
   }
 
   return false;
@@ -257,7 +271,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
 
   if (status == 0) {
-    // TODO(mattklein123): IPv6 support
+    // TODO(mattklein123): IPv6 support. See github issue #1094.
     ASSERT(orig_addr.ss_family == AF_INET);
     return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};

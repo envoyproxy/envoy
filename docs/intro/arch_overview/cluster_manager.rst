@@ -4,8 +4,8 @@ Cluster manager
 ===============
 
 Envoy’s cluster manager manages all configured upstream clusters. Just as the Envoy configuration
-can contain any number of listeners, the configuration can also contain any number of upstream
-clusters each with different service discovery, health checking, and other settings.
+can contain any number of listeners, the configuration can also contain any number of independently
+configured upstream clusters.
 
 Upstream clusters and hosts are abstracted from the network/HTTP filter stack given that upstream
 clusters and hosts may be used for any number of different proxy tasks. The cluster manager exposes

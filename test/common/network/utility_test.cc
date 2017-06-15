@@ -127,6 +127,30 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
 
 TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
+TEST(NetworkUtility, InternalAddress) {
+  EXPECT_TRUE(Utility::isInternalAddress("127.0.0.1"));
+  EXPECT_TRUE(Utility::isInternalAddress("10.0.0.1"));
+  EXPECT_TRUE(Utility::isInternalAddress("192.168.0.0"));
+  EXPECT_TRUE(Utility::isInternalAddress("172.16.0.0"));
+  EXPECT_TRUE(Utility::isInternalAddress("172.30.2.1"));
+  EXPECT_FALSE(Utility::isInternalAddress(""));
+  EXPECT_FALSE(Utility::isInternalAddress("127"));
+  EXPECT_FALSE(Utility::isInternalAddress("192.167.0.0"));
+  EXPECT_FALSE(Utility::isInternalAddress("172.32.0.0"));
+  EXPECT_FALSE(Utility::isInternalAddress("11.0.0.1"));
+
+  EXPECT_TRUE(Utility::isInternalAddress("fd00::"));
+  EXPECT_TRUE(Utility::isInternalAddress("::1"));
+  EXPECT_TRUE(Utility::isInternalAddress("fdff::"));
+  EXPECT_TRUE(Utility::isInternalAddress("fd01::"));
+  EXPECT_TRUE(Utility::isInternalAddress("fd12:3456:7890:1234:5678:9012:3456:7890"));
+  EXPECT_FALSE(Utility::isInternalAddress("fd::"));
+  EXPECT_FALSE(Utility::isInternalAddress("::"));
+  EXPECT_FALSE(Utility::isInternalAddress("fc00::"));
+  EXPECT_FALSE(Utility::isInternalAddress("fe00::"));
+  EXPECT_FALSE(Utility::isInternalAddress("fd00:::"));
+}
+
 TEST(NetworkUtility, LoopbackAddress) {
   {
     Address::Ipv4Instance address("127.0.0.1");

@@ -110,13 +110,28 @@ TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
 
-TEST_P(IntegrationTest, BadHttpRequest) { testBadHttpRequest(); }
+TEST_P(IntegrationTest, BadFirstline) { testBadFirstline(); }
+
+TEST_P(IntegrationTest, MissingDelimiter) { testMissingDelimiter(); }
+
+TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFirstline(); }
+
+TEST_P(IntegrationTest, LowVersion) { testLowVersion(); }
 
 TEST_P(IntegrationTest, Http10Request) { testHttp10Request(); }
 
 TEST_P(IntegrationTest, NoHost) { testNoHost(); }
 
 TEST_P(IntegrationTest, BadPath) { testBadPath(); }
+
+TEST_P(IntegrationTest, MissingContentLength) { testMissingContentLength(); }
+
+TEST_P(IntegrationTest, InvalidContentLength) {
+  testInvalidContentLength(Http::CodecClient::Type::HTTP1);
+}
+TEST_P(IntegrationTest, MultipleContentLengths) {
+  testMultipleContentLengths(Http::CodecClient::Type::HTTP1);
+}
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 

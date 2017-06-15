@@ -25,6 +25,7 @@ build:clang-asan --define tcmalloc=disabled
 build:clang-asan --build_tag_filters=-no_asan
 build:clang-asan --test_tag_filters=-no_asan
 build:clang-asan --define signal_trace=disabled
+build:clang-asan --test_env=ASAN_SYMBOLIZER_PATH
 
 # Clang 5.0 TSAN
 build:clang-tsan --copt -fsanitize=thread

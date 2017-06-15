@@ -293,7 +293,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
         return span;
       }));
-  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, finishSpan(_))
+      .WillOnce(
+          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(":method", "GET"));
@@ -422,7 +424,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, finishSpan()).Times(0);
+  EXPECT_CALL(*span, finishSpan(_)).Times(0);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -958,6 +960,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         Buffer::OwnedImpl data("hello");
         encoder_filters_[0]->callbacks_->addEncodedData(data);
+        EXPECT_EQ(5UL, encoder_filters_[0]->callbacks_->encodingBuffer()->length());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))

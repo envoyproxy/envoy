@@ -18,7 +18,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  conn_log_info("connecting", *connection_);
+  ENVOY_CONN_LOG(info, "connecting", *connection_);
   connection_->connect();
 
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -47,7 +47,7 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
 
 void CodecClient::onEvent(uint32_t events) {
   if (events & Network::ConnectionEvent::Connected) {
-    conn_log_debug("connected", *connection_);
+    ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
   }
 
@@ -64,7 +64,7 @@ void CodecClient::onEvent(uint32_t events) {
 
   if ((events & Network::ConnectionEvent::RemoteClose) ||
       (events & Network::ConnectionEvent::LocalClose)) {
-    conn_log_debug("disconnect. resetting {} pending requests", *connection_,
+    ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
@@ -76,7 +76,7 @@ void CodecClient::onEvent(uint32_t events) {
 }
 
 void CodecClient::responseDecodeComplete(ActiveRequest& request) {
-  conn_log_debug("response complete", *connection_);
+  ENVOY_CONN_LOG(debug, "response complete", *connection_);
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
@@ -86,7 +86,7 @@ void CodecClient::responseDecodeComplete(ActiveRequest& request) {
 }
 
 void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
-  conn_log_debug("request reset", *connection_);
+  ENVOY_CONN_LOG(debug, "request reset", *connection_);
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamReset(reason);
   }
@@ -99,11 +99,11 @@ void CodecClient::onData(Buffer::Instance& data) {
   try {
     codec_->dispatch(data);
   } catch (CodecProtocolException& e) {
-    conn_log_info("protocol error: {}", *connection_, e.what());
+    ENVOY_CONN_LOG(info, "protocol error: {}", *connection_, e.what());
     close();
     protocol_error = true;
   } catch (PrematureResponseException& e) {
-    conn_log_info("premature response", *connection_);
+    ENVOY_CONN_LOG(info, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors

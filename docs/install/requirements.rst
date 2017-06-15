@@ -11,7 +11,7 @@ Envoy has the following requirements:
 * GCC 4.9+ (for C++11 regex support)
 * `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 0.11.0)
 * `http-parser <https://github.com/nodejs/http-parser>`_ (last tested with 2.7.0)
-* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.20.0)
+* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.23.1)
 * `libevent <http://libevent.org/>`_ (last tested with 2.1.8)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
 * `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.5.0)
@@ -21,7 +21,6 @@ Envoy has the following requirements:
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.12.0)
 * `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
-* `glog <https://github.com/google/glog>`_ (last tested with 0.3.5)
 
 In order to compile and run the tests the following is required:
 

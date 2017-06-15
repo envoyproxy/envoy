@@ -20,6 +20,7 @@ function setup_gcc_toolchain() {
 function setup_clang_toolchain() {
   export CC=clang-5.0
   export CXX=clang++-5.0
+  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-5.0/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -77,7 +78,7 @@ then
 fi
 
 # This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 48f83f5c697e61863b085e353cbdf77c4bba6d2a)
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout d4225fcf4df5ccc489be96effe489b179976ecbf)
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # Also setup some space for building Envoy standalone.

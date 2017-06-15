@@ -12,9 +12,9 @@ namespace Envoy {
 namespace RateLimit {
 namespace TcpFilter {
 
-Config::Config(const Json::Object& config, Stats::Store& stats_store, Runtime::Loader& runtime)
+Config::Config(const Json::Object& config, Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.getString("domain")),
-      stats_(generateStats(config.getString("stat_prefix"), stats_store)), runtime_(runtime) {
+      stats_(generateStats(config.getString("stat_prefix"), scope)), runtime_(runtime) {
 
   config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
 
@@ -27,10 +27,10 @@ Config::Config(const Json::Object& config, Stats::Store& stats_store, Runtime::L
   }
 }
 
-InstanceStats Config::generateStats(const std::string& name, Stats::Store& store) {
+InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   std::string final_prefix = fmt::format("ratelimit.{}.", name);
-  return {ALL_TCP_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(store, final_prefix),
-                                   POOL_GAUGE_PREFIX(store, final_prefix))};
+  return {ALL_TCP_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {

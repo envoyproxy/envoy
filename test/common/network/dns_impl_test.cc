@@ -28,6 +28,12 @@
 #include "ares_dns.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::InSequence;
+using testing::Mock;
+using testing::NiceMock;
+using testing::Return;
+
 namespace Envoy {
 namespace Network {
 
@@ -240,10 +246,34 @@ private:
   DnsResolverImpl* resolver_;
 };
 
+TEST(DnsImplConstructor, SupportsCustomResolvers) {
+  Event::DispatcherImpl dispatcher;
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+  auto resolver = dispatcher.createDnsResolver({addr4, addr6});
+  auto peer = std::unique_ptr<DnsResolverImplPeer>{
+      new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_free_data(resolvers);
+}
+
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void SetUp() override {
-    resolver_ = dispatcher_.createDnsResolver();
+    resolver_ = dispatcher_.createDnsResolver({});
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_.reset(new TestDnsServer());
@@ -277,7 +307,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
   Event::DispatcherImpl dispatcher_;
-  DnsResolverPtr resolver_;
+  DnsResolverSharedPtr resolver_;
 };
 
 static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results,
@@ -545,6 +575,23 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(address_list.empty());
+}
+
+// Validate that the resolution timeout timer is enabled if we don't resolve
+// immediately.
+TEST(DnsImplUnitTest, PendingTimerEnable) {
+  InSequence s;
+  Event::MockDispatcher dispatcher;
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  DnsResolverImpl resolver(dispatcher, {});
+  Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
+  EXPECT_CALL(*timer, enableTimer(_));
+  EXPECT_NE(nullptr, resolver.resolve("some.bad.domain.invalid", DnsLookupFamily::V4Only,
+                                      [&](std::list<Address::InstanceConstSharedPtr>&& results) {
+                                        UNREFERENCED_PARAMETER(results);
+                                      }));
 }
 
 } // Network

@@ -3,11 +3,29 @@
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
+
+TEST(GrpcCommonTest, getGrpcStatus) {
+  Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
+
+  Http::TestHeaderMapImpl no_status_trailers{{"foo", "bar"}};
+  EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers).valid());
+
+  Http::TestHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
+  EXPECT_EQ(Status::Aborted, Common::getGrpcStatus(aborted_trailers).value());
+
+  Http::TestHeaderMapImpl unauth_trailers{{"grpc-status", "16"}};
+  EXPECT_EQ(Status::Unauthenticated, Common::getGrpcStatus(unauth_trailers).value());
+
+  Http::TestHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
+  EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
+}
 
 TEST(GrpcCommonTest, chargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
@@ -29,6 +47,27 @@ TEST(GrpcCommonTest, prepareHeaders) {
   EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
   EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
   EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
+}
+
+TEST(GrpcCommonTest, resolveServiceAndMethod) {
+  std::string service;
+  std::string method;
+  Http::HeaderMapImpl headers;
+  Http::HeaderEntry& path = headers.insertPath();
+  path.value(std::string("/service_name/method_name"));
+  EXPECT_TRUE(Common::resolveServiceAndMethod(&path, &service, &method));
+  EXPECT_EQ("service_name", service);
+  EXPECT_EQ("method_name", method);
+  path.value(std::string(""));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("//"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/service_name"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+  path.value(std::string("/service_name/"));
+  EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
 }
 
 } // Grpc

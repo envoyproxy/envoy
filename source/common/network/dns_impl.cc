@@ -19,7 +19,9 @@
 namespace Envoy {
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
+DnsResolverImpl::DnsResolverImpl(
+    Event::Dispatcher& dispatcher,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is
@@ -28,7 +30,19 @@ DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
   // launch via main().
   ares_library_init(ARES_LIB_INIT_ALL);
   ares_options options;
+
   initializeChannel(&options, 0);
+
+  if (!resolvers.empty()) {
+    std::vector<std::string> resolver_addrs;
+    resolver_addrs.reserve(resolvers.size());
+    for (const auto& resolver : resolvers) {
+      resolver_addrs.push_back(resolver->asString());
+    }
+    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
+    int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
+    RELEASE_ASSERT(result == ARES_SUCCESS)
+  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
@@ -45,7 +59,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
+void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int timeouts,
+                                                            hostent* hostent) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -81,6 +96,10 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     }
   }
 
+  if (timeouts > 0) {
+    ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
+  }
+
   if (completed_) {
     if (!cancelled_) {
       callback_(std::move(address_list));
@@ -105,8 +124,10 @@ void DnsResolverImpl::updateAresTimer() {
   timeval timeout;
   timeval* timeout_result = ares_timeout(channel_, nullptr, &timeout);
   if (timeout_result != nullptr) {
-    timer_->enableTimer(
-        std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000));
+    const auto ms =
+        std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000);
+    ENVOY_LOG(debug, "Setting DNS resolution timer for {} milliseconds", ms.count());
+    timer_->enableTimer(ms);
   } else {
     timer_->disableTimer();
   }
@@ -162,6 +183,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // example, localhost lookup.
     return nullptr;
   } else {
+    // Enable timer to wake us up if the request times out.
+    updateAresTimer();
+
     // The PendingResolution will self-delete when the request completes
     // (including if cancelled or if ~DnsResolverImpl() happens).
     pending_resolution->owned_ = true;
@@ -171,8 +195,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
   ares_gethostbyname(channel_, dns_name_.c_str(),
-                     family, [](void* arg, int status, int, hostent* hostent) {
-                       static_cast<PendingResolution*>(arg)->onAresHostCallback(status, hostent);
+                     family, [](void* arg, int status, int timeouts, hostent* hostent) {
+                       static_cast<PendingResolution*>(arg)
+                           ->onAresHostCallback(status, timeouts, hostent);
                      }, this);
 }
 

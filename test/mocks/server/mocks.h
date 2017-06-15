@@ -8,6 +8,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/ssl/context_manager.h"
@@ -34,8 +35,6 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-using testing::NiceMock;
-
 namespace Server {
 
 class MockOptions : public Options {
@@ -114,7 +113,7 @@ public:
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(dnsResolver, Network::DnsResolver&());
+  MOCK_METHOD0(dnsResolver, Network::DnsResolverSharedPtr());
   MOCK_METHOD0(draining, bool());
   MOCK_METHOD0(drainListeners, void());
   MOCK_METHOD0(drainManager, DrainManager&());
@@ -142,7 +141,8 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
-  testing::NiceMock<Network::MockDnsResolver> dns_resolver_;
+  std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new testing::NiceMock<Network::MockDnsResolver>()};
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -165,6 +165,7 @@ class MockMain : public Main {
 public:
   MockMain() : MockMain(0, 0, 0, 0) {}
   MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
+
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(listeners, std::list<ListenerPtr>&());
@@ -182,6 +183,44 @@ public:
   std::chrono::milliseconds wd_megamiss_;
   std::chrono::milliseconds wd_kill_;
   std::chrono::milliseconds wd_multikill_;
+};
+
+class MockFactoryContext : public FactoryContext {
+public:
+  MockFactoryContext();
+  ~MockFactoryContext();
+
+  RateLimit::ClientPtr rateLimitClient(const Optional<std::chrono::milliseconds>&) override {
+    return RateLimit::ClientPtr{rateLimitClient_()};
+  }
+
+  MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(drainManager, DrainManager&());
+  MOCK_METHOD0(healthCheckFailed, bool());
+  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
+  MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
+  MOCK_METHOD0(scope, Stats::Scope&());
+  MOCK_METHOD0(server, Instance&());
+  MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
+
+  testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<MockDrainManager> drain_manager_;
+  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
+  testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
+  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<MockInstance> server_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 } // Configuration

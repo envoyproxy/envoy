@@ -34,10 +34,10 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  NetworkFilterFactoryCb cb =
-      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
+  EXPECT_EQ(NetworkFilterType::Read, factory.type());
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -52,10 +52,10 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  NetworkFilterFactoryCb cb =
-      factory.createFilterFactory(NetworkFilterType::Both, *json_config, server);
+  EXPECT_EQ(NetworkFilterType::Both, factory.type());
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -71,10 +71,9 @@ TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
-               Json::Exception);
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
@@ -119,16 +118,15 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   TcpProxyConfigFactory factory;
-  NetworkFilterFactoryCb cb =
-      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
+  EXPECT_EQ(NetworkFilterType::Read, factory.type());
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
-               EnvoyException);
+  factory.createFilterFactory(*json_config, context);
 }
 
 class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
@@ -148,10 +146,10 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuth) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  NetworkFilterFactoryCb cb =
-      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
+  EXPECT_EQ(NetworkFilterType::Read, factory.type());
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -167,10 +165,10 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
-  NetworkFilterFactoryCb cb =
-      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
+  EXPECT_EQ(NetworkFilterType::Read, factory.type());
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -201,9 +199,8 @@ TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
-               Json::Exception);
+  NiceMock<MockFactoryContext> context;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
@@ -243,9 +240,8 @@ TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
-               Json::Exception);
+  NiceMock<MockFactoryContext> context;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, BadAccessLogType) {
@@ -287,9 +283,8 @@ TEST(NetworkFilterConfigTest, BadAccessLogType) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
-               Json::Exception);
+  NiceMock<MockFactoryContext> context;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
@@ -341,9 +336,8 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
-               Json::Exception);
+  NiceMock<MockFactoryContext> context;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 /**
@@ -402,8 +396,8 @@ TEST(NetworkFilterConfigTest, DeprecatedHttpFilterConfigFactoryTest) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<Server::MockInstance> server;
-  factory.createFilterFactory(NetworkFilterType::Read, *loader, server);
+  NiceMock<MockFactoryContext> context;
+  factory.createFilterFactory(*loader, context);
 }
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {

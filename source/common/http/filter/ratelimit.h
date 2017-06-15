@@ -32,18 +32,18 @@ enum class FilterRequestType { Internal, External, Both };
 class FilterConfig : Json::Validator {
 public:
   FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+               Stats::Scope& scope, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : Json::Validator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
         domain_(config.getString("domain")),
         stage_(static_cast<uint64_t>(config.getInteger("stage", 0))),
         request_type_(stringToType(config.getString("request_type", "both"))),
-        local_info_(local_info), global_store_(global_store), runtime_(runtime), cm_(cm) {}
+        local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& globalStore() { return global_store_; }
+  Stats::Scope& scope() { return scope_; }
   Upstream::ClusterManager& cm() { return cm_; }
   FilterRequestType requestType() const { return request_type_; }
 
@@ -63,7 +63,7 @@ private:
   const uint64_t stage_;
   const FilterRequestType request_type_;
   const LocalInfo::LocalInfo& local_info_;
-  Stats::Store& global_store_;
+  Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
 };
