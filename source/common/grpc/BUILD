@@ -107,11 +107,8 @@ envoy_cc_library(
     name = "transcoder_input_stream_lib",
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],
-    external_deps = [
-        "protobuf",
-        "grpc_transcoding",
-    ],
+    external_deps = ["grpc_transcoding"],
     deps = [
-        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )
