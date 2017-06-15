@@ -234,9 +234,9 @@ private:
     uint64_t default_;
   };
 
-  class DynanmicRouteEntry : public RouteEntry, public Route {
+  class DynamicRouteEntry : public RouteEntry, public Route {
   public:
-    DynanmicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
+    DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
         : parent_(parent), cluster_name_(name) {}
 
     // Router::RouteEntry
@@ -282,11 +282,11 @@ private:
    * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
    * parent, with the exception of clusterName and routeEntry.
    */
-  class WeightedClusterEntry : public DynanmicRouteEntry {
+  class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
                          Runtime::Loader& loader, const std::string& name, uint64_t weight)
-        : DynanmicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
+        : DynamicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
           cluster_weight_(weight) {}
 
     uint64_t clusterWeight() const {
