@@ -41,6 +41,7 @@ public:
   std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
+  const std::string& logPath() override { return log_path_; }
   uint64_t restartEpoch() override { return 0; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
@@ -57,6 +58,7 @@ private:
   const std::string service_cluster_name_;
   const std::string service_node_name_;
   const std::string service_zone_;
+  const std::string log_path_;
 };
 
 class TestDrainManager : public DrainManager {

@@ -51,6 +51,15 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
+  if (!options.logPath().empty()) {
+    try {
+      Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
+    } catch (const EnvoyException& e) {
+      PANIC(
+          fmt::format("Failed to open log-file '{}'.  e.what(): {}", options.logPath(), e.what()));
+    }
+  }
+
   failHealthcheck(false);
 
   uint64_t version_int;
@@ -73,7 +82,13 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   }
 }
 
-InstanceImpl::~InstanceImpl() { restarter_.shutdown(); }
+InstanceImpl::~InstanceImpl() {
+  restarter_.shutdown();
+
+  // Stop logging to file before all the AccessLogManager and its dependencies are
+  // destructed to avoid crashing at shutdown.
+  Logger::Registry::getSink()->logToStdErr();
+}
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clusterManager(); }
 

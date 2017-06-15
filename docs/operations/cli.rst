@@ -48,6 +48,11 @@ following are the command line options that Envoy supports.
   *(optional)* The logging level. Non developers should generally never set this option. See the
   help text for the available log levels and the default.
 
+.. option:: --log-path <path string>
+
+   *(optional)* The output file path where logs should be written.  This file will be re-opened
+   when SIGUSR1 is handled.  If this is not set, log to stderr.
+
 .. option:: --restart-epoch <integer>
 
   *(optional)* The :ref:`hot restart <arch_overview_hot_restart>` epoch. (The number of times
