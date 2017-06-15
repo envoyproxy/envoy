@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -59,7 +60,8 @@ void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {
     }
 
     http_response->body()->drain(5);
-    if (!grpc_response_->ParseFromString(http_response->bodyAsString())) {
+    Buffer::ZeroCopyInputStreamImpl stream(*http_response->body());
+    if (!grpc_response_->ParseFromZeroCopyStream(&stream)) {
       throw Exception(Optional<uint64_t>(), "bad serialized body");
     }
 

@@ -15,6 +15,7 @@ envoy_cc_library(
         ":codec_lib",
         ":common_lib",
         "//include/envoy/grpc:async_client_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
     ],
 )
@@ -94,6 +95,7 @@ envoy_cc_library(
         ":common_lib",
         "//include/envoy/grpc:rpc_channel_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
