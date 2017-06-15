@@ -12,8 +12,12 @@ namespace Buffer{
 
 class ZeroCopyInputStreamImpl : public virtual google::protobuf::io::ZeroCopyInputStream {
  public:
+  // Create input stream with one buffer, and finish immediately
   ZeroCopyInputStreamImpl(Buffer::Instance& buffer);
+
+  // Create input stream with empty buffer
   ZeroCopyInputStreamImpl() {}
+
   virtual ~ZeroCopyInputStreamImpl() {}
 
   // Add a buffer to input stream, will consume all buffer from parameter
