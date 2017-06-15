@@ -42,9 +42,9 @@ void MainImpl::initialize(const Json::Object& json) {
       server_.random(), server_.localInfo(), server_.accessLogManager());
 
   std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
-  LOG(info, "loading {} listener(s)", listeners.size());
+  ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
-    LOG(info, "listener #{}:", i);
+    ENVOY_LOG(info, "listener #{}:", i);
     listeners_.emplace_back(ListenerPtr{new ListenerConfig(server_, *listeners[i])});
   }
 
@@ -93,7 +93,7 @@ void MainImpl::initialize(const Json::Object& json) {
 }
 
 void MainImpl::initializeTracers(const Json::Object& configuration) {
-  LOG(info, "loading tracing configuration");
+  ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.hasObject("tracing")) {
     http_tracer_.reset(new Tracing::HttpNullTracer());
@@ -116,7 +116,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   Json::ObjectSharedPtr driver = http_tracer_config->getObject("driver");
 
   std::string type = driver->getString("type");
-  LOG(info, "  loading tracing driver: {}", type);
+  ENVOY_LOG(info, "  loading tracing driver: {}", type);
 
   Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
@@ -141,7 +141,7 @@ MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json)
   std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
 
   listener_scope_ = server.stats().createScope(final_stat_name);
-  LOG(info, "  address={}", address_->asString());
+  ENVOY_LOG(info, "  address={}", address_->asString());
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
@@ -162,9 +162,9 @@ MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json)
     std::string string_type = filters[i]->getString("type");
     std::string string_name = filters[i]->getString("name");
     Json::ObjectSharedPtr config = filters[i]->getObject("config");
-    LOG(info, "  filter #{}:", i);
-    LOG(info, "    type: {}", string_type);
-    LOG(info, "    name: {}", string_name);
+    ENVOY_LOG(info, "  filter #{}:", i);
+    ENVOY_LOG(info, "    type: {}", string_type);
+    ENVOY_LOG(info, "    name: {}", string_name);
 
     // Map filter type string to enum.
     NetworkFilterType type;

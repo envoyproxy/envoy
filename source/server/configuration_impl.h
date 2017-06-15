@@ -83,7 +83,7 @@ public:
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
-  MainImpl(Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory_);
+  MainImpl(Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   /**
    * DEPRECATED - Register an NetworkFilterConfigFactory implementation as an option to create

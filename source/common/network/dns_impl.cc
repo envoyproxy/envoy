@@ -97,7 +97,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
   }
 
   if (timeouts > 0) {
-    LOG(debug, "DNS request timed out {} times", timeouts);
+    ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
   }
 
   if (completed_) {
@@ -126,7 +126,7 @@ void DnsResolverImpl::updateAresTimer() {
   if (timeout_result != nullptr) {
     const auto ms =
         std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000);
-    LOG(debug, "Setting DNS resolution timer for {} milliseconds", ms.count());
+    ENVOY_LOG(debug, "Setting DNS resolution timer for {} milliseconds", ms.count());
     timer_->enableTimer(ms);
   } else {
     timer_->disableTimer();

@@ -85,12 +85,12 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 
   // Now either change all levels or a single level.
   if (name == "level") {
-    LOG(debug, "change all log levels: level='{}'", level);
+    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
     for (const Logger::Logger& logger : Logger::Registry::loggers()) {
       logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
     }
   } else {
-    LOG(debug, "change log level: name='{}' level='{}'", name, level);
+    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
     const Logger::Logger* logger_to_change = nullptr;
     for (const Logger::Logger& logger : Logger::Registry::loggers()) {
       if (logger.name() == name) {
@@ -317,7 +317,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
 
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
-  STREAM_LOG(info, "request complete: path: {}", *callbacks_, path);
+  ENVOY_STREAM_LOG(info, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::Code code = parent_.runCallback(path, response);
@@ -363,7 +363,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {
-      LOG(critical, "cannot open admin address output file {} for writing.", address_out_path);
+      ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
+                address_out_path);
     } else {
       address_out_file << socket_->localAddress()->asString();
     }

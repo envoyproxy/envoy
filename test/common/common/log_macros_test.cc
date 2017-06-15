@@ -22,10 +22,10 @@ public:
   }
 
   void logMessage() {
-    LOG(trace, "fake message");
-    LOG(debug, "fake message");
-    CONN_LOG(info, "fake message", connection_);
-    STREAM_LOG(info, "fake message", stream_);
+    ENVOY_LOG(trace, "fake message");
+    ENVOY_LOG(debug, "fake message");
+    ENVOY_CONN_LOG(info, "fake message", connection_);
+    ENVOY_STREAM_LOG(info, "fake message", stream_);
   }
 
 private:
@@ -43,6 +43,6 @@ TEST(Logger, All) {
   filter.deprecatedLogMessage();
 
   // Misc logging with no facility.
-  LOG_MISC(info, "fake message");
+  ENVOY_LOG_MISC(info, "fake message");
 }
 } // Envoy
