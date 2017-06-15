@@ -12,7 +12,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;

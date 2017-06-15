@@ -53,8 +53,8 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
 }
 
-Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
-  const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
+Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {

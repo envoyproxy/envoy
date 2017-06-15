@@ -171,7 +171,7 @@ public:
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
-  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+  void sendRawHttpAndWaitForResponse(const char* http, std::string* raw_http);
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
 
