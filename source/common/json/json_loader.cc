@@ -531,7 +531,7 @@ bool ObjectHandler::StartObject() {
     state_ = expectKeyOrEndObject;
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
@@ -550,7 +550,7 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
     }
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
@@ -561,7 +561,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
     state_ = expectValueOrStartObjectArray;
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
@@ -585,7 +585,7 @@ bool ObjectHandler::StartArray() {
     state_ = expectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
@@ -605,7 +605,7 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
 
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
@@ -650,7 +650,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
     stack_.top()->append(ptr);
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 

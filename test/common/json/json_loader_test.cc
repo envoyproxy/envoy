@@ -314,6 +314,22 @@ TEST(JsonLoaderTest, NestedSchema) {
                             "key: #/value1");
 }
 
+TEST(JsonLoaderTest, MissingEnclosingDocument) {
+
+  std::string json_string = R"EOF(
+  "listeners" : [
+    {
+      "address": "tcp://127.0.0.1:1234",
+      "filters": []
+    }
+  ]
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString(json_string), Exception,
+                            "JSON supplied is not valid. Error(offset 14, line 2): Terminate "
+                            "parsing due to Handler error.\n");
+}
+
 TEST(JsonLoaderTest, AsString) {
   ObjectSharedPtr json = Factory::loadFromString("{\"name1\": \"value1\", \"name2\": true}");
   json->iterate([&](const std::string& key, const Json::Object& value) {
