@@ -297,7 +297,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       //       in the connection manager to account for this, but we may eventually want to have
       //       a chain of references that goes back to the route table root. That is complicated
       //       though.
-      return std::make_shared<DynanmicRouteEntry>(this, final_cluster_name);
+      return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
     }
   }
 
