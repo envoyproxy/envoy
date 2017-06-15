@@ -531,7 +531,7 @@ bool ObjectHandler::StartObject() {
     state_ = expectKeyOrEndObject;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -550,7 +550,7 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
     }
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -561,7 +561,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
     state_ = expectValueOrStartObjectArray;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -585,7 +585,7 @@ bool ObjectHandler::StartArray() {
     state_ = expectArrayValueOrEndArray;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -605,7 +605,7 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
 
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
