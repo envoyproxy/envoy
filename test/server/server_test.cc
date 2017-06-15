@@ -13,6 +13,7 @@
 namespace Envoy {
 using testing::_;
 using testing::InSequence;
+using testing::Invoke;
 
 namespace Server {
 
@@ -35,6 +36,19 @@ TEST(InitManagerImplTest, Targets) {
   manager.initialize([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
   target.callback_();
+}
+
+TEST(InitManagerImplTest, TargetRemoveWhile) {
+  InSequence s;
+  InitManagerImpl manager;
+  Init::MockTarget target1;
+  ReadyWatcher initialized;
+
+  manager.registerTarget(target1);
+  EXPECT_CALL(target1, initialize(_))
+      .WillOnce(Invoke([this](std::function<void()> callback) -> void { callback(); }));
+  EXPECT_CALL(initialized, ready());
+  manager.initialize([&]() -> void { initialized.ready(); });
 }
 
 // Class creates minimally viable server instance for testing.
