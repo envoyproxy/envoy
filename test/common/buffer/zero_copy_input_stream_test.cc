@@ -7,7 +7,7 @@ namespace Buffer {
 namespace {
 
 class ZeroCopyInputStreamTest : public testing::Test {
- public:
+public:
   ZeroCopyInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};
     stream_.move(buffer);

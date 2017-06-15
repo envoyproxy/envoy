@@ -2,16 +2,17 @@
 
 #include <cstdint>
 #include <string>
-#include "google/protobuf/io/zero_copy_stream.h"
 
 #include "common/buffer/buffer_impl.h"
 
+#include "google/protobuf/io/zero_copy_stream.h"
+
 namespace Envoy {
 
-namespace Buffer{
+namespace Buffer {
 
 class ZeroCopyInputStreamImpl : public virtual google::protobuf::io::ZeroCopyInputStream {
- public:
+public:
   // Create input stream with one buffer, and finish immediately
   ZeroCopyInputStreamImpl(Buffer::Instance& buffer);
 
@@ -33,15 +34,14 @@ class ZeroCopyInputStreamImpl : public virtual google::protobuf::io::ZeroCopyInp
   virtual bool Skip(int count) override; // Not implemented
   virtual google::protobuf::int64 ByteCount() const override { return byte_count_; }
 
- protected:
+protected:
   Buffer::OwnedImpl buffer_;
   uint64_t position_{0};
 
- private:
+private:
   bool finished_{false};
   int64_t byte_count_{0};
 };
 
 } // namespace Buffer
 } // namespace Envoy
-

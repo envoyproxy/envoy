@@ -112,8 +112,7 @@ public:
       // TODO(htuch): Need to add support for compressed responses as well here.
       Buffer::ZeroCopyInputStreamImpl stream(*frame.data_);
 
-      if (frame.flags_ != GRPC_FH_DEFAULT ||
-          !response->ParseFromZeroCopyStream(&stream)) {
+      if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
         streamError(Status::GrpcStatus::Internal);
         return;
       }

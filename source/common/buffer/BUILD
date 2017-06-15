@@ -27,4 +27,3 @@ envoy_cc_library(
         ":buffer_lib",
     ],
 )
-

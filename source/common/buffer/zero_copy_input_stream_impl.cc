@@ -1,5 +1,6 @@
-#include "common/common/assert.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -9,13 +10,13 @@ ZeroCopyInputStreamImpl::ZeroCopyInputStreamImpl(Buffer::Instance& buffer) {
   finish();
 }
 
-void ZeroCopyInputStreamImpl::move(Buffer::Instance &instance) {
+void ZeroCopyInputStreamImpl::move(Buffer::Instance& instance) {
   ASSERT(!finished_);
 
   buffer_.move(instance);
 }
 
-bool ZeroCopyInputStreamImpl::Next(const void **data, int *size){
+bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
   if (position_ != 0) {
     buffer_.drain(position_);
     position_ = 0;
@@ -40,9 +41,7 @@ bool ZeroCopyInputStreamImpl::Next(const void **data, int *size){
   return false;
 }
 
-bool ZeroCopyInputStreamImpl::Skip(int) {
-  NOT_IMPLEMENTED;
-}
+bool ZeroCopyInputStreamImpl::Skip(int) { NOT_IMPLEMENTED; }
 
 void ZeroCopyInputStreamImpl::BackUp(int count) {
   ASSERT(count > 0);
@@ -51,6 +50,5 @@ void ZeroCopyInputStreamImpl::BackUp(int count) {
   position_ -= count;
   byte_count_ -= count;
 }
-
 }
 }
