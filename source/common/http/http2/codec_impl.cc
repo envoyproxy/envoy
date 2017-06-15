@@ -414,9 +414,14 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
 }
 
 int ConnectionImpl::onInvalidFrame(int error_code) {
-  UNREFERENCED_PARAMETER(error_code);
-
   ENVOY_CONN_LOG(debug, "invalid frame: {}", connection_, nghttp2_strerror(error_code));
+
+  // The stream is about to be closed due to an invalid header.  Don't kill the
+  // entire connection if one stream has bad headers.
+  if (error_code == NGHTTP2_ERR_HTTP_HEADER) {
+    return 0;
+  }
+
   // Cause dispatch to return with an error code.
   return NGHTTP2_ERR_CALLBACK_FAILURE;
 }
