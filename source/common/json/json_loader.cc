@@ -650,7 +650,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
     stack_.top()->append(ptr);
     return true;
   default:
-    NOT_REACHED;
+    return false;
   }
 }
 
