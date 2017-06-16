@@ -25,9 +25,9 @@ public:
                    AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>* async_client,
                    Event::Dispatcher& dispatcher,
                    const google::protobuf::MethodDescriptor& service_method)
-      : async_client_(async_client), node_(node), service_method_(service_method),
+      : async_client_(async_client), service_method_(service_method),
         retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })) {
-    request_.mutable_node()->CopyFrom(node_);
+    request_.mutable_node()->CopyFrom(node);
   }
 
   ~SubscriptionImpl() {
@@ -106,7 +106,6 @@ public:
 
 private:
   std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>> async_client_;
-  envoy::api::v2::Node node_;
   const google::protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   google::protobuf::RepeatedPtrField<std::string> resources_;
