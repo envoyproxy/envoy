@@ -13,6 +13,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -56,6 +57,19 @@ public:
    * @return std::vector<std::string> filenames
    */
   static std::vector<std::string> listFiles(const std::string& path, bool recursive);
+
+  /**
+   * Compare two protos of the same type for equality.
+   *
+   * @param lhs proto on LHS.
+   * @param rhs proto on RHS.
+   * @return bool indicating whether the protos are equal. Type name and string serialization are
+   *         used for equality testing.
+   */
+  template <class ProtoType> static bool protoEqual(ProtoType lhs, ProtoType rhs) {
+    return lhs.GetTypeName() == rhs.GetTypeName() &&
+           lhs.SerializeAsString() == rhs.SerializeAsString();
+  }
 };
 
 /**
@@ -110,4 +124,21 @@ public:
 };
 
 } // Http
+
+MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
+
+MATCHER_P(RepeatedProtoEq, rhs, "") {
+  if (arg.size() != rhs.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < arg.size(); ++i) {
+    if (!TestUtility::protoEqual(arg[i], rhs[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 } // Envoy

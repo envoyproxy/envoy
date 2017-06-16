@@ -3,6 +3,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
+#include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
 
 #include "api/base.pb.h"
@@ -81,11 +82,7 @@ public:
   }
 
   void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
-    google::protobuf::RepeatedPtrField<ResourceType> typed_resources;
-    for (auto& resource : message->resources()) {
-      auto* typed_resource = typed_resources.Add();
-      resource.UnpackTo(typed_resource);
-    }
+    const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
     if (callbacks_->onConfigUpdate(typed_resources)) {
       request_.set_version_info(message->version_info());
       // This effectively ACKs the accepted configuration.

@@ -110,5 +110,6 @@ envoy_cc_library(
     deps = [
         ":async_client_lib",
         "//include/envoy/config:subscription_interface",
+        "//source/common/config:utility_lib",
     ],
 )

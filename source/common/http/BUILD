@@ -204,6 +204,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "subscription_lib",
+    hdrs = ["subscription_impl.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":headers_lib",
+        ":rest_api_fetcher_lib",
+        "//include/envoy/config:subscription_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "user_agent_lib",
     srcs = ["user_agent.cc"],
     hdrs = ["user_agent.h"],
