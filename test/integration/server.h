@@ -184,12 +184,28 @@ public:
     RELEASE_ASSERT(server_ != nullptr);
     return *server_;
   }
+  void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
+    on_worker_listener_added_cb_ = on_worker_listener_added;
+  }
+  void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
+    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+  }
   void start(const Network::Address::IpVersion version);
   void start();
   Stats::Store& store() { return stats_store_; }
 
   // TestHooks
   void onServerInitialized() override { server_initialized_.setReady(); }
+  void onWorkerListenerAdded() override {
+    if (on_worker_listener_added_cb_) {
+      on_worker_listener_added_cb_();
+    }
+  }
+  void onWorkerListenerRemoved() override {
+    if (on_worker_listener_removed_cb_) {
+      on_worker_listener_removed_cb_();
+    }
+  }
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
@@ -217,5 +233,8 @@ private:
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;
+  std::function<void()> on_worker_listener_added_cb_;
+  std::function<void()> on_worker_listener_removed_cb_;
 };
+
 } // namespace Envoy

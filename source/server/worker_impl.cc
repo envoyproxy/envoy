@@ -15,13 +15,13 @@ namespace Server {
 WorkerPtr ProdWorkerFactory::createWorker() {
   Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
   return WorkerPtr{
-      new WorkerImpl(tls_, std::move(dispatcher),
+      new WorkerImpl(tls_, hooks_, std::move(dispatcher),
                      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(log(), *dispatcher)})};
 }
 
-WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispatcher,
-                       Network::ConnectionHandlerPtr handler)
-    : tls_(tls), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)) {
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
+                       Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler)
+    : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)) {
   tls_.registerThread(*dispatcher_, false);
 }
 
@@ -53,6 +53,8 @@ void WorkerImpl::addListenerWorker(Listener& listener) {
     handler_->addListener(listener.filterChainFactory(), listener.socket(),
                           listener.listenerScope(), listener.listenerTag(), listener_options);
   }
+
+  hooks_.onWorkerListenerAdded();
 }
 
 uint64_t WorkerImpl::numConnections() {
@@ -69,6 +71,7 @@ void WorkerImpl::removeListener(Listener& listener, std::function<void()> comple
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->removeListeners(listener_tag);
     completion();
+    hooks_.onWorkerListenerRemoved();
   });
 }
 

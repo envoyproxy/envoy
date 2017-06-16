@@ -21,9 +21,9 @@ public:
    * Creates a socket.
    * @param address supplies the socket's address.
    * @param bind_to_port supplies whether to actually bind the socket.
-   * @return Network::ListenSocketPtr an initialized and potentially bound socket.
+   * @return Network::ListenSocketSharedPtr an initialized and potentially bound socket.
    */
-  virtual Network::ListenSocketPtr
+  virtual Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) PURE;
 
   /**
@@ -56,14 +56,8 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return Network::Address::InstanceConstSharedPtr the configured address for the listener. This
-   *         may be distinct to the bound address, e.g. if the port is zero.
-   */
-  virtual Network::Address::InstanceConstSharedPtr address() PURE;
-
-  /**
    * @return Network::ListenSocket& the actual listen socket. The address of this socket may be
-   *         different from address() if for example the configured address binds to port zero.
+   *         different from configured if for example the configured address binds to port zero.
    */
   virtual Network::ListenSocket& socket() PURE;
 
@@ -108,8 +102,6 @@ public:
   virtual uint64_t listenerTag() PURE;
 };
 
-typedef std::unique_ptr<Listener> ListenerPtr;
-
 /**
  * A manager for all listeners and all threaded connection handling workers.
  */
@@ -118,21 +110,39 @@ public:
   virtual ~ListenerManager() {}
 
   /**
-   * Add a listener to the manager.
-   * @param json supplies the configuration JSON. Will throw an EnvoyException if the listener can
-   *        not be added.
+   * Add or update a listener. Listeners are referenced by a unique name. If no name is provided,
+   * the manager will allocate a UUID. Listeners that expect to be dynamically updated should
+   * provide a unique name. The manager will search by name to find the existing listener that
+   * should be updated. The new listener must have the same configured address. The old listener
+   * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
+   * been initialized).
+   * @param json supplies the configuration JSON.
+   * @return TRUE if a listener was added or FALSE if the listener was not updated because it is
+   *         a duplicate of the existing listener. This routine will throw an EnvoyException if
+   *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual void addListener(const Json::Object& json) PURE;
+  virtual bool addOrUpdateListener(const Json::Object& json) PURE;
 
   /**
-   * @return std::list<std::reference_wrapper<Listener>> a list of the currently loaded listeners.
+   * @return std::vector<std::reference_wrapper<Listener>> a list of the currently loaded listeners.
+   * Note that this routine returns references to the existing listeners. The references are only
+   * valid in the context of the current call stack and should not be stored.
    */
-  virtual std::list<std::reference_wrapper<Listener>> listeners() PURE;
+  virtual std::vector<std::reference_wrapper<Listener>> listeners() PURE;
 
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
    */
   virtual uint64_t numConnections() PURE;
+
+  /**
+   * Remove a listener by name.
+   * @param name supplies the listener name to remove.
+   * @return TRUE if the listener was found and removed. Note that when this routine returns TRUE,
+   * the listener has not necessarily been actually deleted right away. The listener will be
+   * drained and fully removed at some later time.
+   */
+  virtual bool removeListener(const std::string& name) PURE;
 
   /**
    * Start all workers accepting new connections on all added listeners.

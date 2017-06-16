@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
@@ -38,7 +39,10 @@ MockGuardDog::~MockGuardDog() {}
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
-MockListenerComponentFactory::MockListenerComponentFactory() {}
+MockListenerComponentFactory::MockListenerComponentFactory()
+    : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
+  ON_CALL(*this, createListenSocket(_, _)).WillByDefault(Return(socket_));
+}
 MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
 MockListenerManager::MockListenerManager() {}
@@ -53,6 +57,15 @@ MockListener::~MockListener() {}
 
 MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}
+
+MockWorker::MockWorker() {
+  ON_CALL(*this, removeListener(_, _))
+      .WillByDefault(Invoke([this](Listener&, std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_listener_completion_);
+        remove_listener_completion_ = completion;
+      }));
+}
+MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));

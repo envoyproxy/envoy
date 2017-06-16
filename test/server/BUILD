@@ -20,6 +20,7 @@ envoy_cc_test(
     srcs = ["configuration_impl_test.cc"],
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/upstream:cluster_manager_lib",
         "//source/server:configuration_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
