@@ -46,7 +46,7 @@ TEST(InitManagerImplTest, TargetRemoveWhile) {
 
   manager.registerTarget(target1);
   EXPECT_CALL(target1, initialize(_))
-      .WillOnce(Invoke([this](std::function<void()> callback) -> void { callback(); }));
+      .WillOnce(Invoke([](std::function<void()> callback) -> void { callback(); }));
   EXPECT_CALL(initialized, ready());
   manager.initialize([&]() -> void { initialized.ready(); });
 }
