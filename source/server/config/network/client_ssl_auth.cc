@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/filter/auth/client_ssl.h"
 
@@ -25,9 +26,10 @@ ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
 }
 
 /**
- * Static registration for the client SSL auth filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the client SSL auth filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered_;
+static Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // Configuration
 } // Server

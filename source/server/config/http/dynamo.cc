@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/dynamo/dynamo_filter.h"
 
 #include "server/config/network/http_connection_manager.h"
@@ -20,9 +22,9 @@ HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
 }
 
 /**
- * Static registration for the http dynamodb filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the http dynamodb filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<DynamoFilterConfig> register_;
+static Registry::RegisterFactory<DynamoFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server

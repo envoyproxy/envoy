@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/http/filter/ratelimit.h"
 
 #include "server/config/network/http_connection_manager.h"
@@ -23,9 +25,9 @@ HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(const Json::Objec
 }
 
 /**
- * Static registration for the rate limit filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<RateLimitFilterConfig> register_;
+static Registry::RegisterFactory<RateLimitFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server

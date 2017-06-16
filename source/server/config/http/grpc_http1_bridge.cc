@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/grpc/http1_bridge_filter.h"
 
 #include "server/config/network/http_connection_manager.h"
@@ -20,9 +22,10 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(const Json:
 }
 
 /**
- * Static registration for the grpc HTTP1 bridge filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the grpc HTTP1 bridge filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
+static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig, NamedHttpFilterConfigFactory>
+    register_;
 
 } // Configuration
 } // Server

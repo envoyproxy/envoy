@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
@@ -233,8 +235,8 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
 
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
-      RegisterNamedHttpFilterConfigFactory<RouterFilterConfig>(), EnvoyException,
-      "Attempted to register multiple NamedHttpFilterConfigFactory objects with name: 'router'");
+      (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
+      EnvoyException, "Double registration for name: 'router'");
 }
 
 TEST(HttpTracerConfigTest, LightstepHttpTracer) {
@@ -275,8 +277,8 @@ TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
 
 TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
-      RegisterHttpTracerFactory<ZipkinHttpTracerFactory>(), EnvoyException,
-      "Attempted to register multiple HttpTracerFactory objects with name: 'zipkin'");
+      (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
+      "Double registration for name: 'zipkin'");
 }
 
 } // Configuration

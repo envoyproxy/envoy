@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
@@ -37,9 +39,9 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
 std::string LightstepHttpTracerFactory::name() { return "lightstep"; }
 
 /**
- * Static registration for the lightstep http tracer. @see RegisterHttpTracerFactory.
+ * Static registration for the lightstep http tracer. @see RegisterFactory.
  */
-static RegisterHttpTracerFactory<LightstepHttpTracerFactory> register_;
+static Registry::RegisterFactory<LightstepHttpTracerFactory, HttpTracerFactory> register_;
 
 } // Configuration
 } // Server

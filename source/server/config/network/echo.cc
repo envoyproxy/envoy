@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/filter/echo.h"
 
 #include "server/configuration_impl.h"
@@ -24,9 +26,9 @@ public:
 };
 
 /**
- * Static registration for the echo filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the echo filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<EchoConfigFactory> registered_;
+static Registry::RegisterFactory<EchoConfigFactory, NamedNetworkFilterConfigFactory> registered_;
 
 } // Configuration
 } // Server

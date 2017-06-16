@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/json/config_schemas.h"
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
@@ -28,9 +30,9 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
 }
 
 /**
- * Static registration for the router filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the router filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<RouterFilterConfig> register_;
+static Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server

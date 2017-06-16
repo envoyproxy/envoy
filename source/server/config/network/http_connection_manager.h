@@ -107,23 +107,6 @@ public:
     filterConfigFactories().push_back(&factory);
   }
 
-  /**
-   * Register a NamedHttpFilterConfigFactory implementation as an option to create instances of
-   * HttpFilterFactoryCb.
-   * @param factory the NamedHttpFilterConfigFactory implementation
-   */
-  static void registerNamedHttpFilterConfigFactory(NamedHttpFilterConfigFactory& factory) {
-    auto result = namedFilterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
-
-    // result is a pair whose second member is a boolean indicating, if false, that the key exists
-    // and that the value was not inserted.
-    if (!result.second) {
-      throw EnvoyException(fmt::format(
-          "Attempted to register multiple NamedHttpFilterConfigFactory objects with name: '{}'",
-          factory.name()));
-    }
-  }
-
   static const std::string DEFAULT_SERVER_STRING;
 
 private:
@@ -137,17 +120,6 @@ private:
     static std::list<HttpFilterConfigFactory*>* filter_config_factories =
         new std::list<HttpFilterConfigFactory*>;
     return *filter_config_factories;
-  }
-
-  /**
-   * Returns a map of the currently registered NamedHttpFilterConfigFactory implementations.
-   */
-  static std::unordered_map<std::string, NamedHttpFilterConfigFactory*>&
-  namedFilterConfigFactories() {
-    static std::unordered_map<std::string, NamedHttpFilterConfigFactory*>*
-        named_filter_config_factories =
-            new std::unordered_map<std::string, NamedHttpFilterConfigFactory*>;
-    return *named_filter_config_factories;
   }
 
   HttpFilterType stringToType(const std::string& type);
@@ -169,22 +141,6 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::TlsCachingDateProviderImpl date_provider_;
-};
-
-/**
- * @see NamedHttpFilterConfigFactory. An instantiation of this class registers a
- * NamedHttpFilterConfigFactory implementation (T) so it can be used to create instances of
- * HttpFilterFactoryCb.
- */
-template <class T> class RegisterNamedHttpFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterNamedHttpFilterConfigFactory() {
-    static T* instance = new T;
-    HttpConnectionManagerConfig::registerNamedHttpFilterConfigFactory(*instance);
-  }
 };
 
 /**

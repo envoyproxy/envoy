@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/filter/ratelimit.h"
 
@@ -24,9 +25,10 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
 }
 
 /**
- * Static registration for the rate limit filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<RateLimitConfigFactory> registered_;
+static Registry::RegisterFactory<RateLimitConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // Configuration
 } // Server
