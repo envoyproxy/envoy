@@ -62,5 +62,12 @@ when used alongside SDS and CDS, allows implementors to build a complex routing 
 (:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
 deployment, etc.) that will not require any Envoy restarts other than to obtain a new Envoy binary.
 
-Note that currently, there is no dynamic mechanism by which Envoy can add, update, and remove
-listeners. In the future it likely that a listener discovery service (LDS) API will be added.
+SDS, CDS, RDS, and LDS
+----------------------
+
+The :ref:`listener discovery service (LDS) <config_listeners_lds>` layers on a mechanism by which
+Envoy can discover entire listeners at runtime. This includes all filter stacks, up to and including
+HTTP filters with embedded references to :ref:`RDS <config_http_conn_man_rds>`. Adding LDS into
+the mix allows almost every aspect of Envoy to be dynamically configured. Hot restart should
+only be required for very rare configuration changes (admin, tracing driver, etc.) or binary
+updates.

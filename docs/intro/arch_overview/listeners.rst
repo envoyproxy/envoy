@@ -17,4 +17,7 @@ used for (e.g., :ref:`rate limiting <arch_overview_rate_limit>`, :ref:`TLS clien
 MongoDB :ref:`sniffing <arch_overview_mongo>`, raw :ref:`TCP proxy <arch_overview_tcp_proxy>`,
 etc.).
 
+Listeners can also be fetched dynamically via the :ref:`listener discovery service (LDS)
+<config_listeners_lds>`.
+
 Listener :ref:`configuration <config_listeners>`.

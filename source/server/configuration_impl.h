@@ -20,6 +20,8 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
+#include "server/lds_api.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -144,6 +146,7 @@ private:
   }
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
+  std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
   Optional<std::string> statsd_tcp_cluster_name_;
   Optional<uint32_t> statsd_udp_port_;

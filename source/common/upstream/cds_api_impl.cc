@@ -54,7 +54,7 @@ void CdsApiImpl::parseResponse(const Http::Message& response) {
   // We need to keep track of which clusters we might need to remove.
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : clusters) {
-    std::string cluster_name = cluster->getString("name");
+    const std::string cluster_name = cluster->getString("name");
     clusters_to_remove.erase(cluster_name);
     if (cm_.addOrUpdatePrimaryCluster(*cluster)) {
       ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster_name);

@@ -19,10 +19,12 @@ Each individual listener configuration has the following format:
     "per_connection_buffer_limit_bytes": "..."
   }
 
+.. _config_listeners_name:
+
 name
   *(optional, string)* The unique name by which this listener is known. If no name is provided,
   Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
-  updated or removed via LDS a unique name must be provided.
+  updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
 
 address
   *(required, string)* The address that the listener should listen on. Currently only TCP
@@ -73,3 +75,4 @@ per_connection_buffer_limit_bytes
   ssl
   stats
   runtime
+  lds
