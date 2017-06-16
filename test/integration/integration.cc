@@ -855,7 +855,7 @@ void BaseIntegrationTest::testMissingDelimiter() {
 
 void BaseIntegrationTest::testInvalidCharacterInFirstline() {
   std::string response;
-  sendRawHttpAndWaitForResponse("GET \t HTTP/1.1\r\nHost: host\r\n\r\n", &response);
+  sendRawHttpAndWaitForResponse("GE(T / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
