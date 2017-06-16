@@ -17,15 +17,17 @@ public:
   SubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                    const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                    const google::protobuf::MethodDescriptor& service_method)
-      : SubscriptionImpl(node, new AsyncClientImpl<envoy::api::v2::DiscoveryRequest, ResponseType>(
-                                   cm, remote_cluster_name),
-                         dispatcher, service_method) {}
+      : SubscriptionImpl(
+            node, std::unique_ptr<AsyncClientImpl<envoy::api::v2::DiscoveryRequest, ResponseType>>(
+                      new AsyncClientImpl<envoy::api::v2::DiscoveryRequest, ResponseType>(
+                          cm, remote_cluster_name)),
+            dispatcher, service_method) {}
 
-  SubscriptionImpl(const envoy::api::v2::Node& node,
-                   AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>* async_client,
-                   Event::Dispatcher& dispatcher,
-                   const google::protobuf::MethodDescriptor& service_method)
-      : async_client_(async_client), service_method_(service_method),
+  SubscriptionImpl(
+      const envoy::api::v2::Node& node,
+      std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>> async_client,
+      Event::Dispatcher& dispatcher, const google::protobuf::MethodDescriptor& service_method)
+      : async_client_(std::move(async_client)), service_method_(service_method),
         retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })) {
     request_.mutable_node()->CopyFrom(node);
   }

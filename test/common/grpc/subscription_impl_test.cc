@@ -66,8 +66,9 @@ public:
           timer_cb_ = timer_cb;
           return timer_;
         }));
-    subscription_.reset(
-        new EdsSubscriptionImpl(node_, async_client_, dispatcher_, *method_descriptor_));
+    subscription_.reset(new EdsSubscriptionImpl(node_,
+                                                std::unique_ptr<EdsMockAsyncClient>(async_client_),
+                                                dispatcher_, *method_descriptor_));
   }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
