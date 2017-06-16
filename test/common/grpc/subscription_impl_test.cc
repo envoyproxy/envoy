@@ -35,10 +35,12 @@ typedef SubscriptionImpl<envoy::api::v2::EndpointDiscoveryResponse,
 // TODO(htuch): Move this to a common utility for tests that want proto
 // equality.
 
-#define PROTO_EQ(lhs, rhs)                                                                         \
-  (lhs.GetTypeName() == rhs.GetTypeName() && lhs.SerializeAsString() == rhs.SerializeAsString())
+template <class ProtoType> bool protoEq(ProtoType lhs, ProtoType rhs) {
+  return lhs.GetTypeName() == rhs.GetTypeName() &&
+         lhs.SerializeAsString() == rhs.SerializeAsString();
+}
 
-MATCHER_P(ProtoEq, rhs, "") { return PROTO_EQ(arg, rhs); }
+MATCHER_P(ProtoEq, rhs, "") { return protoEq(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") {
   if (arg.size() != rhs.size()) {
@@ -46,7 +48,7 @@ MATCHER_P(RepeatedProtoEq, rhs, "") {
   }
 
   for (int i = 0; i < arg.size(); ++i) {
-    if (!PROTO_EQ(arg[i], rhs[i])) {
+    if (!protoEq(arg[i], rhs[i])) {
       return false;
     }
   }
@@ -183,7 +185,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
-TEST_F(GrpcSubscriptionImplTest, OnRemoteStreamClose) {
+TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->onReceiveTrailingMetadata(std::move(trailers));
