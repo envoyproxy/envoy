@@ -8,8 +8,6 @@
 
 #include "common/filter/ratelimit.h"
 
-#include "server/configuration_impl.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

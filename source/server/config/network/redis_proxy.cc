@@ -10,8 +10,6 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
 
-#include "server/configuration_impl.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/server/filter_config.h"
 #include "envoy/http/filter.h"
 
 #include "common/common/logger.h"
@@ -13,8 +14,6 @@
 #include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
 #include "common/json/json_validator.h"
-
-#include "server/configuration_impl.h"
 
 namespace Envoy {
 namespace Server {

@@ -7,8 +7,6 @@
 #include "common/http/filter/ip_tagging_filter.h"
 #include "common/json/config_schemas.h"
 
-#include "server/config/network/http_connection_manager.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

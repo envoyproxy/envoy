@@ -8,8 +8,6 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
-#include "server/config/network/http_connection_manager.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

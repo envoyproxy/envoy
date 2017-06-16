@@ -13,9 +13,10 @@ envoy_cc_library(
     srcs = ["buffer.cc"],
     hdrs = ["buffer.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/http/filter:buffer_filter_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -24,8 +25,9 @@ envoy_cc_library(
     srcs = ["dynamo.cc"],
     hdrs = ["dynamo.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/dynamo:dynamo_filter_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -34,9 +36,10 @@ envoy_cc_library(
     srcs = ["fault.cc"],
     hdrs = ["fault.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/http/filter:fault_filter_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -45,8 +48,9 @@ envoy_cc_library(
     srcs = ["grpc_http1_bridge.cc"],
     hdrs = ["grpc_http1_bridge.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/grpc:http1_bridge_filter_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -55,8 +59,9 @@ envoy_cc_library(
     srcs = ["grpc_web.cc"],
     hdrs = ["grpc_web.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/grpc:grpc_web_filter_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -65,9 +70,10 @@ envoy_cc_library(
     srcs = ["ip_tagging.cc"],
     hdrs = ["ip_tagging.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/http/filter:ip_tagging_filter_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -87,9 +93,10 @@ envoy_cc_library(
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 
@@ -98,10 +105,11 @@ envoy_cc_library(
     srcs = ["router.cc"],
     hdrs = ["router.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 

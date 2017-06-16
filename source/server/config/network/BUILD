@@ -13,8 +13,9 @@ envoy_cc_library(
     srcs = ["client_ssl_auth.cc"],
     hdrs = ["client_ssl_auth.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/filter/auth:client_ssl_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -22,8 +23,9 @@ envoy_cc_library(
     name = "echo_lib",
     srcs = ["echo.cc"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/filter:echo_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -34,6 +36,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
@@ -46,7 +50,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -55,9 +58,10 @@ envoy_cc_library(
     srcs = ["mongo_proxy.cc"],
     hdrs = ["mongo_proxy.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/json:config_schemas_lib",
         "//source/common/mongo:proxy_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -66,8 +70,9 @@ envoy_cc_library(
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/filter:ratelimit_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -76,11 +81,12 @@ envoy_cc_library(
     srcs = ["redis_proxy.cc"],
     hdrs = ["redis_proxy.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/redis:codec_lib",
         "//source/common/redis:command_splitter_lib",
         "//source/common/redis:conn_pool_lib",
         "//source/common/redis:proxy_filter_lib",
-        "//source/server:configuration_lib",
     ],
 )
 
@@ -89,7 +95,8 @@ envoy_cc_library(
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
     deps = [
+        "//include/envoy/registry:registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/filter:tcp_proxy_lib",
-        "//source/server:configuration_lib",
     ],
 )

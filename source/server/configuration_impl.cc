@@ -181,7 +181,7 @@ MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json)
     // Now see if there is a factory that will accept the config.
     NamedNetworkFilterConfigFactory* factory =
         Registry::FactoryRegistry<NamedNetworkFilterConfigFactory>::getFactory(string_name);
-    if (factory != nullptr) {
+    if (factory != nullptr && factory->type() == type) {
       NetworkFilterFactoryCb callback = factory->createFilterFactory(*config, *this);
       filter_factories_.push_back(callback);
     } else {

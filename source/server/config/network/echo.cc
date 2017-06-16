@@ -1,10 +1,9 @@
 #include <string>
 
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/filter/echo.h"
-
-#include "server/configuration_impl.h"
 
 namespace Envoy {
 namespace Server {

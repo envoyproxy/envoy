@@ -7,8 +7,6 @@
 
 #include "common/filter/auth/client_ssl.h"
 
-#include "server/configuration_impl.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
