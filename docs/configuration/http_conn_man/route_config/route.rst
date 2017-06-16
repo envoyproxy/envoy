@@ -468,6 +468,24 @@ specified in the following form:
     {"key": "header2", "value": "value2"}
   ]
 
+Envoy supports adding static and dynamic values to the request headers. Supported dynamic values are:
+
+%CLIENT_IP%
+   The original client IP which is already added by envoy as a  
+   :ref:`X-Forwarded-For <config_http_conn_man_headers_x-forwarded-for>` request header. 
+
+%PROTOCOL%
+    The original protocol which is already added by envoy as a 
+    :ref:`X-Forwarded-Proto <config_http_conn_man_headers_x-forwarded-proto>` request header. 
+
+An example for adding a dynamic value to the request headers is as follows:
+
+.. code-block:: json
+
+  [
+   {"key": "X-Client-IP", "value":"%CLIENT_IP%"}
+  ]
+
 *Note:* Headers are appended to requests in the following order:
 route-level headers, :ref:`virtual host level <config_http_conn_man_route_table_vhost_add_req_headers>`
 headers and finally global :ref:`route_config <config_http_conn_man_route_table_add_req_headers>`
