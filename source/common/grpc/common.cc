@@ -30,6 +30,10 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   if (!grpc_status) {
     return;
   }
+  cluster.statsScope()
+      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
+                           grpc_status->value().c_str()))
+      .inc();
   uint64_t grpc_status_code;
   const bool success =
       StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
