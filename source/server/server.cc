@@ -41,7 +41,11 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
   } else {
     callback_ = callback;
     state_ = State::Initializing;
-    for (auto target : targets_) {
+    // Target::initialize(...) method can modify the list to remove the item currently
+    // being initialized, so we increment the iterator before calling initialize.
+    for (auto iter = targets_.begin(); iter != targets_.end();) {
+      Init::Target* target = *iter;
+      ++iter;
       target->initialize([this, target]() -> void {
         ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
         targets_.remove(target);
