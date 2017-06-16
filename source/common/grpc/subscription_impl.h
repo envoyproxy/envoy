@@ -30,12 +30,6 @@ public:
     request_.mutable_node()->CopyFrom(node);
   }
 
-  ~SubscriptionImpl() {
-    if (stream_ != nullptr) {
-      stream_->reset();
-    }
-  }
-
   void setRetryTimer() { retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS)); }
 
   void establishNewStream() {

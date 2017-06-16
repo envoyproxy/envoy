@@ -70,12 +70,6 @@ public:
         new EdsSubscriptionImpl(node_, async_client_, dispatcher_, *method_descriptor_));
   }
 
-  void TearDown() override {
-    // Stop subscribing on the way out.
-    EXPECT_CALL(async_stream_, reset());
-    subscription_ = nullptr;
-  }
-
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) {
     envoy::api::v2::DiscoveryRequest expected_request;
