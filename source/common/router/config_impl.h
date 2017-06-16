@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
@@ -17,6 +18,7 @@
 
 #include "common/router/config_utility.h"
 #include "common/router/router_ratelimit.h"
+#include "common/http/access_log/access_log_formatter.h"
 
 namespace Envoy {
 namespace Router {
@@ -39,8 +41,12 @@ public:
                                       uint64_t random_value) const PURE;
 };
 
+//forward declaration
 class RouteEntryImplBase;
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
+
+class RequestHeaderParser;
+typedef std::shared_ptr <RequestHeaderParser> RequestHeaderParserSharedPtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -83,6 +89,8 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
+  RequestHeaderParserSharedPtr requestHeaderParser() const {return request_headers_parser_;};
+
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
@@ -119,6 +127,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ConfigImpl& global_route_config_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserSharedPtr request_headers_parser_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -173,6 +182,89 @@ private:
 };
 
 /**
+ * Interface for all types of header formatters used for custom request headers.
+ */
+class HeaderFormatter {
+
+public:
+	virtual ~HeaderFormatter(){};
+
+	virtual std::string  format(const Envoy::Http::AccessLog::RequestInfo& request_info) const PURE;
+};
+
+typedef std::shared_ptr<HeaderFormatter> HeaderFormatterSharedPtr;
+
+/**
+ * a formatter that expands the request header variable to a value based on info in RequestInfo.
+ */
+class RequestHeaderFormatter: public HeaderFormatter,
+							  Logger::Loggable<Logger::Id::config>  {
+
+public:
+	virtual ~RequestHeaderFormatter(){};
+	RequestHeaderFormatter(std::string& field_name);
+
+	std::string format(const Envoy::Http::AccessLog::RequestInfo& request_info) const;
+
+private:
+	std::function<std::string(const Envoy::Http::AccessLog::RequestInfo&)> field_extractor_;
+
+};
+
+/**
+ * Returns back the same static header value.
+ */
+class PlainHeaderFormatter : public HeaderFormatter {
+
+public:
+	virtual ~PlainHeaderFormatter(){};
+
+	PlainHeaderFormatter(const std::string& static_header_value) {
+		std::cout << "static header value: " << static_header_value << "\n";
+		static_value_ = static_header_value;
+	};
+
+	std::string format(const Envoy::Http::AccessLog::RequestInfo&) const {
+		std::cout << "static value: " << static_value_ << "\n";
+		return static_value_;
+	};
+private:
+	std::string static_value_;
+
+};
+
+
+// forward declaring the typedef and class
+class RequestHeaderParser;
+
+typedef std::shared_ptr <RequestHeaderParser> RequestHeaderParserSharedPtr;
+
+/**
+  * This class will hold the parsing logic required during configuration build and
+  * also perform evaluation for the variables at runtime.
+  */
+ class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
+
+ public:
+	 virtual ~RequestHeaderParser(){};
+
+	 static RequestHeaderParserSharedPtr parse(const Json::Object& config);
+
+	 static HeaderFormatterSharedPtr parseInternal(const std::string& format);
+
+	 void evaluateRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo,
+	   							  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
+
+	 std::map<Http::LowerCaseString, HeaderFormatterSharedPtr> headerFormatterMap() {return header_formatter_map_;};
+ private:
+ 	/**
+ 	 * building a map of request header formatters.
+ 	 */
+ 	std::map<Http::LowerCaseString, HeaderFormatterSharedPtr> header_formatter_map_;
+ };
+
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -195,7 +287,8 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const override;
+
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
@@ -227,6 +320,7 @@ protected:
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
+  RequestHeaderParserSharedPtr requestHeaderParser() const {return request_headers_parser_;};
 
 private:
   struct RuntimeData {
@@ -242,8 +336,8 @@ private:
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
 
-    void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
-      return parent_->finalizeRequestHeaders(headers);
+    void finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const override {
+      return parent_->finalizeRequestHeaders(headers, requestInfo);
     }
 
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
@@ -275,6 +369,7 @@ private:
     const RouteEntryImplBase* parent_;
     const std::string cluster_name_;
   };
+
 
   /**
    * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
@@ -327,6 +422,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserSharedPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -341,7 +437,7 @@ public:
                        Runtime::Loader& loader);
 
   // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -359,7 +455,7 @@ public:
                      Runtime::Loader& loader);
 
   // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -432,12 +528,16 @@ public:
 
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
+  RequestHeaderParserSharedPtr requestHeaderParser() const {return request_headers_parser_;};
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserSharedPtr request_headers_parser_;
+
 };
 
 /**

@@ -114,6 +114,17 @@ public:
    * Set whether the request is a health check request or not.
    */
   virtual void healthCheck(bool is_hc) PURE;
+
+  /**
+   * Set the downstream address
+   */
+  virtual void downStreamAddress(std::string address) PURE;
+
+  /**
+   * Get the down stream address.
+   */
+  virtual std::string downStreamAddress() const PURE;
+
 };
 
 /**
@@ -164,7 +175,7 @@ public:
                              const RequestInfo& request_info) const PURE;
 };
 
-typedef std::unique_ptr<Formatter> FormatterPtr;
+typedef std::shared_ptr<Formatter> FormatterPtr;
 
 } // namespace AccessLog
 } // namespace Http

@@ -481,6 +481,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
+  log().debug("setting down stream address '{}' on request info",
+		  	  connection_manager_.read_callbacks_->connection().remoteAddress().ip()->addressAsString());
+  request_info_.downStreamAddress(connection_manager_.read_callbacks_->connection().remoteAddress().ip()->addressAsString());
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 

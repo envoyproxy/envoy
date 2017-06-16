@@ -7,6 +7,7 @@
 #include <regex>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -21,6 +22,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/router/retry_state_impl.h"
+#include "common/http/access_log/access_log_formatter.h"
 
 #include "spdlog/spdlog.h"
 
@@ -67,6 +69,82 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   return hash;
 }
 
+HeaderFormatterSharedPtr RequestHeaderParser::parseInternal(const std::string& format) {
+	std::string variable_name;
+	if (format.find("%") == 0) {
+		size_t last_occ_pos = format.rfind("%");
+		if (last_occ_pos == std::string::npos || last_occ_pos <= 1) {
+			throw EnvoyException(fmt::format("Incorrect configuration: {}. Expected the variable to be of format %<variable_name>%",format));
+		}
+		variable_name = format.substr(1, last_occ_pos - 1);
+
+
+	}else {
+		HeaderFormatterSharedPtr plain_header_formatter_shard_ptr (new PlainHeaderFormatter(format));
+		return plain_header_formatter_shard_ptr;
+	}
+	HeaderFormatterSharedPtr request_header_formatter_shard_ptr(new RequestHeaderFormatter(variable_name));
+	return request_header_formatter_shard_ptr;
+}
+
+RequestHeaderParserSharedPtr RequestHeaderParser::parse(const Json::Object& config) {
+	RequestHeaderParser* parser = new RequestHeaderParser();
+	if (config.hasObject("request_headers_to_add")) {
+			std::vector<Json::ObjectSharedPtr> request_headers = config.getObjectArray("request_headers_to_add");
+			for (const Json::ObjectSharedPtr& header : request_headers) {
+				if (!header->getString("key").empty() && !header->getString("value").empty()) {
+					log().debug("adding key {} to header formatter map", header->getString("key"));
+					parser->header_formatter_map_.emplace(std::make_pair(Http::LowerCaseString(header->getString("key")),
+																 	    RequestHeaderParser::parseInternal(header->getString("value"))));
+				}
+			}
+	}
+	RequestHeaderParserSharedPtr request_header_parser(parser);
+	return request_header_parser;
+}
+
+void RequestHeaderParser::evaluateRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo,
+  							  	  	  	  	    const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const {
+  	for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd) {
+
+  		log().debug("request headers key {}", to_add.first.get());
+
+  	  //search if the request has formatters defined
+  	  if (header_formatter_map_.count(to_add.first) == 1) {
+
+  		  auto search = header_formatter_map_.find(to_add.first);
+  		  // access the formatter
+  		  if (search != header_formatter_map_.end()) {
+				std::string formatted_header_value = search->second->format(requestInfo);
+				log().debug("formatted header name: '{}', value: '{}'\n", to_add.first.get(), formatted_header_value);
+				headers.addStatic(to_add.first, formatted_header_value);
+  		  }
+  	  }else {
+  		  headers.addStatic(to_add.first, to_add.second);
+  	  }
+  	}
+}
+
+RequestHeaderFormatter::RequestHeaderFormatter(std::string& field_name) {
+	if (field_name == "PROTOCOL") {
+	    field_extractor_ = [](const Envoy::Http::AccessLog::RequestInfo& request_info) {
+	      return Envoy::Http::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
+	    };
+	 }else if (field_name == "CLIENT_IP") {
+		 field_extractor_ = [](const Envoy::Http::AccessLog::RequestInfo& request_info) {
+		  log().debug("field extractor invoked");
+		  return request_info.downStreamAddress();
+		};
+	 }else {
+		 throw EnvoyException(fmt::format("field {} not supported as custom request header", field_name));
+	 }
+}
+
+std::string RequestHeaderFormatter::format(const Envoy::Http::AccessLog::RequestInfo& request_info) const {
+	log().debug("request header formatter ");
+	return field_extractor_(request_info);
+}
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
@@ -82,7 +160,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       rate_limit_policy_(route), shadow_policy_(route),
-      priority_(ConfigUtility::parsePriority(route)), opaque_config_(parseOpaqueConfig(route)) {
+      priority_(ConfigUtility::parsePriority(route)),
+      request_headers_parser_(RequestHeaderParser::parse(route)),
+      opaque_config_(parseOpaqueConfig(route)) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
@@ -150,10 +230,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
 
   if (route.hasObject("request_headers_to_add")) {
     for (const Json::ObjectSharedPtr& header : route.getObjectArray("request_headers_to_add")) {
-      request_headers_to_add_.push_back(
-          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+      request_headers_to_add_.push_back({Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
+
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
@@ -176,19 +256,14 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       vhost_.globalRouteConfig().requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
+
+  request_headers_parser_->evaluateRequestHeaders(headers, requestInfo, requestHeadersToAdd());
+  vhost_.requestHeaderParser()->evaluateRequestHeaders(headers, requestInfo,vhost_.requestHeadersToAdd());
+  vhost_.globalRouteConfig().requestHeaderParser()->evaluateRequestHeaders(headers, requestInfo,
+		  	  	  	  	  	  	  	  	  	  	  	  	  	  	  	  	   vhost_.globalRouteConfig().requestHeadersToAdd());
 
   if (host_rewrite_.empty()) {
     return;
@@ -353,8 +428,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const J
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.getString("prefix")) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, prefix_);
 }
@@ -372,8 +447,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json:
                                        Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.getString("path")) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, path_);
 }
@@ -403,8 +478,10 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
-    : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host),
-      global_route_config_(global_route_config) {
+    : name_(virtual_host.getString("name")),
+      rate_limit_policy_(virtual_host),
+      global_route_config_(global_route_config),
+      request_headers_parser_(RequestHeaderParser::parse(virtual_host)) {
 
   virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
 
@@ -636,6 +713,7 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
+  request_headers_parser_ = RequestHeaderParser::parse(config);
 }
 
 } // namespace Router
