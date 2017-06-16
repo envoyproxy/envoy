@@ -19,6 +19,9 @@ namespace Registry {
  * of the program. Factories cannot be deregistered.
  * Factories should generally be registered by statically instantiating the RegisterFactory class.
  *
+ * Note: This class is not thread safe, so registration should only occur in a single threaded
+ * environment, which is guaranteed by the static instantiation mentioned above.
+ *
  * Exaple lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
@@ -31,6 +34,9 @@ public:
     }
   }
 
+  /**
+   * Gets a factory by name.  If the name isn't found in the registry, returns nullptr.
+   */
   static Base* getFactory(const std::string& name) {
     auto it = factories().find(name);
     if (it == factories().end()) {
@@ -40,6 +46,9 @@ public:
   }
 
 private:
+  /**
+   * Gets the current map of factory implementations.
+   */
   static std::unordered_map<std::string, Base*>& factories() {
     static std::unordered_map<std::string, Base*>* factories =
         new std::unordered_map<std::string, Base*>;
@@ -60,6 +69,9 @@ private:
  */
 template <class T, class Base> class RegisterFactory {
 public:
+  /**
+   * Contructor that registers an instance of the factory with the FactoryRegistry.
+   */
   RegisterFactory() {
     static T* instance = new T;
     FactoryRegistry<Base>::registerFactory(*instance);
