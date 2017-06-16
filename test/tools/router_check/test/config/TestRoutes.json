@@ -88,10 +88,19 @@
           "case_sensitive": true
         },
         {
+          "prefix": "/customheaders",
+          "cluster": "ats",
+          "host_rewrite": "new_host",
+          "request_headers_to_add":[
+            {"key": "X-Client-IP", "value":"%CLIENT_IP%"}
+          ]
+        },
+        {
           "prefix": "/",
           "cluster": "instant-server",
           "timeout_ms": 30000
-        }],
+        }
+      ],
       "virtual_clusters": [
         {"pattern": "^/rides$", "method": "POST", "name": "ride_request"},
         {"pattern": "^/rides/\\d+$", "method": "PUT", "name": "update_ride"},
