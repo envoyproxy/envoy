@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":file_event_interface",
+        ":process_interface",
         ":signal_interface",
         ":timer_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -33,6 +34,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "file_event_interface",
     hdrs = ["file_event.h"],
+)
+
+envoy_cc_library(
+    name = "process_interface",
+    hdrs = ["process.h"],
 )
 
 envoy_cc_library(

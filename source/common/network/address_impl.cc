@@ -88,6 +88,8 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
   int flags = SOCK_NONBLOCK;
 #endif
 
+  flags |= SOCK_CLOEXEC;
+
   if (socketType == SocketType::Stream) {
     flags |= SOCK_STREAM;
   } else {

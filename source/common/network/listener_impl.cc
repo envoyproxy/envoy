@@ -92,8 +92,8 @@ ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
       proxy_protocol_(scope), options_(listener_options), listener_(nullptr) {
 
   if (options_.bind_to_port_) {
-    listener_.reset(
-        evconnlistener_new(&dispatcher_.base(), listenCallback, this, 0, -1, socket.fd()));
+    listener_.reset(evconnlistener_new(&dispatcher_.base(), listenCallback, this,
+                                       LEV_OPT_CLOSE_ON_EXEC, -1, socket.fd()));
 
     if (!listener_) {
       throw CreateListenerException(

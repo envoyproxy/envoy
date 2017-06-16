@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/event/file_event.h"
+#include "envoy/event/process.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
@@ -20,6 +21,29 @@
 
 namespace Envoy {
 namespace Event {
+
+class OsSysCalls {
+public:
+  virtual ~OsSysCalls() {}
+
+  // Decomposed status from waitpid(), which makes testing/mocking easier
+  struct WaitpidStatus {
+    bool signalled_;  // WIFSIGNALED(status)
+    bool exited_;     // WIFEXITED(status)
+    int exit_status_; // WEXITSTATUS(status)
+  };
+
+  virtual pid_t fork() PURE;
+  virtual int execvp(const char* file, char* const argv[]) PURE;
+  virtual pid_t waitpid(pid_t pid, WaitpidStatus& status, int options) PURE;
+  virtual int kill(pid_t pid, int sig) PURE;
+  virtual void _exit(int status) PURE;
+  virtual int open(const char* pathname, int flags) PURE;
+  virtual int dup2(int oldfd, int newfd) PURE;
+  virtual int close(int fd) PURE;
+};
+
+typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;
 
 /**
  * Callback invoked when a dispatcher post() runs.
@@ -141,6 +165,22 @@ public:
    * @return SignalEventPtr a signal event that is owned by the caller.
    */
   virtual SignalEventPtr listenForSignal(int signal_num, SignalCb cb) PURE;
+
+  /**
+   * Run a child process.
+   *
+   * This should only be called on the single dispatcher in the process that listenForSignal()
+   * has been called on or else the behavior is undefined.
+   *
+   * @param args supplies the arguments for the command.  This vector will be directly translated
+   *             into the argv array of the child process.  The first element of the vector
+   *             is the program to execute and subsequent elements are the arguments.
+   * @param cb supplies the callback to invoke when the process terminates.  The callback
+   *            will not be invoked if the process is cancelled/killed.
+   * @return ChildProcessPtr a child process that is owned by the caller.
+   */
+  virtual ChildProcessPtr runProcess(const std::vector<std::string>& args,
+                                     ProcessTerminationCb cb) PURE;
 
   /**
    * Post a functor to the dispatcher. This is safe cross thread. The functor runs in the context

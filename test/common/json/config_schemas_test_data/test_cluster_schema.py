@@ -16,7 +16,8 @@ CLUSTER_BLOB = {
         "unhealthy_threshold": 2, 
         "healthy_threshold": 2, 
         "path": "/healthcheck", 
-        "service_name": "foo"
+        "service_name": "foo",
+        "command": ["commandname", "--someoption"]
     }, 
     "outlier_detection": {}
 }
@@ -36,6 +37,24 @@ def test(writer):
     writer.write_test_file(
         'UnsupportedFeature',
         schema='CLUSTER_SCHEMA',
+        data=blob,
+        throws=True,
+    )
+
+    blob = get_blob(CLUSTER_BLOB)['health_check']
+    blob['command'] = list()
+    writer.write_test_file(
+        'CommandMinimumListLength',
+        schema='CLUSTER_HEALTH_CHECK_SCHEMA',
+        data=blob,
+        throws=True,
+    )
+
+    blob = get_blob(CLUSTER_BLOB)['health_check']
+    blob['command'] = ['mycommand', 1]
+    writer.write_test_file(
+        'CommandElementType',
+        schema='CLUSTER_HEALTH_CHECK_SCHEMA',
         data=blob,
         throws=True,
     )

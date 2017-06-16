@@ -1309,7 +1309,7 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
     "properties" : {
       "type" : {
         "type" : "string",
-        "enum" : ["http", "redis", "tcp"]
+        "enum" : ["http", "redis", "tcp", "shell_command"]
       },
       "timeout_ms" : {
         "type" : "integer",
@@ -1345,7 +1345,14 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
-      "service_name" : {"type" : "string"}
+      "service_name" : {"type" : "string"},
+      "command" : {
+        "type" : "array",
+        "items" : {
+          "type" : "string"
+        },
+        "minItems" : 1
+      }
     },
     "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "healthy_threshold"],
     "additionalProperties" : false

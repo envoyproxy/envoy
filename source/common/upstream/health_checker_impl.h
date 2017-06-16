@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/event/process.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -413,6 +414,37 @@ private:
   }
 
   Redis::ConnPool::ClientFactory& client_factory_;
+};
+
+class ShellCommandHealthCheckerImpl : public HealthCheckerImplBase {
+public:
+  ShellCommandHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+                                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                                Runtime::RandomGenerator& random);
+
+private:
+  struct ShellCommandActiveHealthCheckSession : public ActiveHealthCheckSession {
+    ShellCommandActiveHealthCheckSession(ShellCommandHealthCheckerImpl& parent, HostSharedPtr host);
+
+    // ActiveHealthCheckSession
+    void onInterval() override;
+    void onTimeout() override;
+
+    ShellCommandHealthCheckerImpl& parent_;
+    Event::ChildProcessPtr process_;
+    std::vector<std::string> args_;
+  };
+
+  typedef std::unique_ptr<ShellCommandActiveHealthCheckSession>
+      ShellCommandActiveHealthCheckSessionPtr;
+
+  // HealthCheckerImplBase
+  ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
+    return ActiveHealthCheckSessionPtr{new ShellCommandActiveHealthCheckSession(*this, host)};
+  }
+
+  const std::vector<std::string> command_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Upstream

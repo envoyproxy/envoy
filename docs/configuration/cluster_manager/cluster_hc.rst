@@ -19,13 +19,14 @@ Health checking
     "send": [],
     "receive": [],
     "interval_jitter_ms": "...",
+    "command": [],
     "service_name": "..."
   }
 
 type
   *(required, string)* The type of health checking to perform. Currently supported types are
-  *http*, *redis*, and *tcp*. See the :ref:`architecture overview <arch_overview_health_checking>`
-  for more information.
+  *http*, *redis*, *tcp*, and *shell_command*. See the
+  :ref:`architecture overview <arch_overview_health_checking>` for more information.
 
 timeout_ms
   *(required, integer)* The time in milliseconds to wait for a health check response. If the
@@ -73,6 +74,26 @@ receive
 interval_jitter_ms
   *(optional, integer)* An optional jitter amount in millseconds. If specified, during every
   internal Envoy will add 0 to *interval_jitter_ms* milliseconds to the wait time.
+
+command
+  *(sometimes required, array)* This parameter is required if the type is *shell_command*. It
+  specifies the command name and arguments to execute for the health check.  An exit code
+  of zero means success, any other exit code, or exiting by signal, is a failure. '{' and '}' are
+  considered special characters, but the literal can be inserted with '{{' and '}}',
+  respectively. The following will be substituted in these strings:
+
+  *{address}*
+    *1.2.3.4:80* for IPv4, *[1234:5678::9]:443* for IPv6
+
+  *{ip}*
+    *1.2.3.4* for IPv4, *1234:5678::9* for IPv6
+
+  *{port}*
+    The port number
+
+  *{hostname}*
+    The hostname, if specified, or the value of *{ip}* if the hostname is not specified.
+
 
 .. _config_cluster_manager_cluster_hc_service_name:
 

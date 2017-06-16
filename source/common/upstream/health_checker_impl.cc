@@ -41,11 +41,14 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::Health
   case envoy::api::v2::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     return std::make_shared<RedisHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
                                                     Redis::ConnPool::ClientFactoryImpl::instance_);
+  case envoy::api::v2::HealthCheck::HealthCheckerCase::kShellCommandHealthCheck:
+    return std::make_shared<ShellCommandHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
+                                                           random);
   default:
     // TODO(htuch): This should be subsumed eventually by the constraint checking in #1308.
     throw EnvoyException("Health checker type not set");
   }
-}
+} // namespace Upstream
 
 const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
 
@@ -570,6 +573,46 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
   values[0].asString() = "PING";
   request_.type(Redis::RespType::Array);
   request_.asArray().swap(values);
+}
+
+ShellCommandHealthCheckerImpl::ShellCommandHealthCheckerImpl(
+    const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
+      command_(config.shell_command_health_check().command().begin(),
+               config.shell_command_health_check().command().end()),
+      dispatcher_(dispatcher) {}
+
+ShellCommandHealthCheckerImpl::ShellCommandActiveHealthCheckSession::
+    ShellCommandActiveHealthCheckSession(ShellCommandHealthCheckerImpl& parent, HostSharedPtr host)
+    : ActiveHealthCheckSession(parent, host), parent_(parent) {
+
+  const Network::Address::Ip* const ip = host->address()->ip();
+  const std::string address = host->address()->asString();
+  const std::string ip_str = (ip != nullptr) ? ip->addressAsString() : "";
+  const uint32_t port = (ip != nullptr) ? ip->port() : 0;
+  const std::string hostname = host->hostname().empty() ? ip_str : host->hostname();
+
+  for (const std::string& elt : parent.command_) {
+    args_.push_back(fmt::format(elt, fmt::arg("address", address), fmt::arg("ip", ip_str),
+                                fmt::arg("port", port), fmt::arg("hostname", hostname)));
+  }
+}
+
+void ShellCommandHealthCheckerImpl::ShellCommandActiveHealthCheckSession::onInterval() {
+  if (!process_) {
+    process_ = parent_.dispatcher_.runProcess(args_, [this](bool zero_exit_code) {
+      if (zero_exit_code) {
+        handleSuccess();
+      } else {
+        handleFailure(FailureType::Active);
+      }
+    });
+  }
+}
+
+void ShellCommandHealthCheckerImpl::ShellCommandActiveHealthCheckSession::onTimeout() {
+  process_.reset();
 }
 
 } // namespace Upstream

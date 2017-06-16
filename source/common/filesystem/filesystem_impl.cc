@@ -79,7 +79,7 @@ FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
 }
 
 void FileImpl::open() {
-  fd_ = os_sys_calls_.open(path_.c_str(), O_RDWR | O_APPEND | O_CREAT,
+  fd_ = os_sys_calls_.open(path_.c_str(), O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC,
                            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
   if (-1 == fd_) {
