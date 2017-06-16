@@ -40,7 +40,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
-      listen_socket_factory_(restarter_), listener_manager_(*this, listen_socket_factory_),
+      listen_socket_factory_(*this), listener_manager_(*this, listen_socket_factory_),
       dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
