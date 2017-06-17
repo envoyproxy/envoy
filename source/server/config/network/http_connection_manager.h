@@ -6,8 +6,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/server/filter_config.h"
 #include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
