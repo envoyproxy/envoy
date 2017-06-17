@@ -7,7 +7,6 @@
 #include <string>
 
 #include "envoy/http/filter.h"
-#include "envoy/server/instance.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
@@ -21,8 +20,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-enum class HttpFilterType { Decoder, Encoder, Both };
-
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
  */
@@ -30,16 +27,12 @@ class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::co
                                                  public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
-                                             Server::Instance& server) override;
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+                                             FactoryContext& context) override;
 
-  std::string name() override;
+  std::string name() override { return "http_connection_manager"; }
+  NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
-
-/**
- * Callback lambda used for dynamic HTTP filter chain construction.
- */
-typedef std::function<void(Http::FilterChainFactoryCallbacks&)> HttpFilterFactoryCb;
 
 /**
  * DEPRECATED - Implemented by each HTTP filter and registered via registerHttpFilterConfigFactory()
@@ -53,35 +46,6 @@ public:
                                                      const Json::Object& config,
                                                      const std::string& stat_prefix,
                                                      Server::Instance& server) PURE;
-};
-
-/**
- * Implemented by each HTTP filter and registered via registerNamedHttpFilterConfigFactory() or the
- * convenience class RegisterNamedHttpFilterConfigFactory.
- */
-class NamedHttpFilterConfigFactory {
-public:
-  virtual ~NamedHttpFilterConfigFactory() {}
-
-  /**
-  * Create a particular http filter factory implementation.  If the implementation is unable to
-  * produce a factory with the provided parameters, it should throw an EnvoyException in the case of
-  * general error or a Json::Exception if the json configuration is erroneous.  The returned
-  * callback should always be initialized.
-  * @param type supplies type of filter to initialize (decoder, encoder, or both)
-  * @param config supplies the general json configuration for the filter
-  * @param stat_prefix prefix for stat logging
-  * @param server supplies the server instance
-  */
-  virtual HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& config,
-                                                  const std::string& stat_prefix,
-                                                  Server::Instance& server) PURE;
-
-  /**
-  * Returns the identifying name for a particular implementation of an http filter produced by the
-  * factory.
-  */
-  virtual std::string name() PURE;
 };
 
 /**
@@ -106,7 +70,7 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::ConnectionManagerConfig,
                                     Json::Validator {
 public:
-  HttpConnectionManagerConfig(const Json::Object& config, Server::Instance& server);
+  HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -192,7 +156,7 @@ private:
 
   HttpFilterType stringToType(const std::string& type);
 
-  Server::Instance& server_;
+  FactoryContext& context_;
   std::list<HttpFilterFactoryCb> filter_factories_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;

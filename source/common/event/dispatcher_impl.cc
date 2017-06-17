@@ -40,7 +40,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     return;
   }
 
-  log_trace("clearing deferred deletion list (size={})", num_to_delete);
+  ENVOY_LOG(trace, "clearing deferred deletion list (size={})", num_to_delete);
 
   // Swap the current deletion vector so that if we do deferred delete while we are deleting, we
   // use the other vector. We will get another callback to delete that vector.
@@ -110,7 +110,7 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   current_to_delete_->emplace_back(std::move(to_delete));
-  log_trace("item added to deferred deletion list (size={})", current_to_delete_->size());
+  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
     deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
   }

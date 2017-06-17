@@ -2,9 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/instance.h"
-
-#include "server/config/network/http_connection_manager.h"
+#include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Server {
@@ -15,10 +13,11 @@ namespace Configuration {
  */
 class BufferFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& json_config,
+  HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                           const std::string& stats_prefix,
-                                          Server::Instance& server) override;
-  std::string name() override;
+                                          FactoryContext& context) override;
+  std::string name() override { return "buffer"; }
+  HttpFilterType type() override { return HttpFilterType::Decoder; }
 };
 
 } // Configuration

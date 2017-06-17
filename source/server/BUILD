@@ -26,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:configuration_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/common:assert_lib",

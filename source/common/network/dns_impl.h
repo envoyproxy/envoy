@@ -11,6 +11,7 @@
 #include "envoy/network/dns.h"
 
 #include "common/common/linked_object.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 
 #include "ares.h"
@@ -24,7 +25,7 @@ class DnsResolverImplPeer;
  * Implementation of DnsResolver that uses c-ares. All calls and callbacks are assumed to
  * happen on the thread that owns the creating dispatcher.
  */
-class DnsResolverImpl : public DnsResolver {
+class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
@@ -50,9 +51,10 @@ private:
     /**
      * c-ares ares_gethostbyname() query callback.
      * @param status return status of call to ares_gethostbyname.
+     * @param timeouts the number of times the request timed out.
      * @param hostent structure that stores information about a given host.
      */
-    void onAresHostCallback(int status, hostent* hostent);
+    void onAresHostCallback(int status, int timeouts, hostent* hostent);
     /**
      * wrapper function of call to ares_gethostbyname.
      * @param family currently AF_INET and AF_INET6 are supported.

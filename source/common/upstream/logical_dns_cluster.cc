@@ -55,7 +55,7 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 
 void LogicalDnsCluster::startResolve() {
   std::string dns_address = Network::Utility::hostFromTcpUrl(dns_url_);
-  log_debug("starting async DNS resolution for {}", dns_address);
+  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address);
   info_->stats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_->resolve(
@@ -63,7 +63,7 @@ void LogicalDnsCluster::startResolve() {
       [this, dns_address](
           std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
-        log_debug("async DNS resolution complete for {}", dns_address);
+        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
         if (!address_list.empty()) {

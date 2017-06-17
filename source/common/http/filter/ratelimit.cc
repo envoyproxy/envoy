@@ -117,9 +117,9 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
     break;
   case Envoy::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
-    Http::CodeUtility::ResponseStatInfo info{
-        config_->globalStore(), cluster_->statsScope(), EMPTY_STRING, *getTooManyRequestsHeader(),
-        true, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
+    Http::CodeUtility::ResponseStatInfo info{config_->scope(), cluster_->statsScope(), EMPTY_STRING,
+                                             *getTooManyRequestsHeader(), true, EMPTY_STRING,
+                                             EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
   }

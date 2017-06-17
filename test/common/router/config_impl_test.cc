@@ -1119,6 +1119,90 @@ TEST(RouteMatcherTest, Retry) {
                 .retryOn());
 }
 
+TEST(RouteMatcherTest, GrpcRetry) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "www2",
+          "retry_policy": {
+            "retry_on": "connect-failure"
+          }
+        },
+        {
+          "prefix": "/bar",
+          "cluster": "www2"
+        },
+        {
+          "prefix": "/",
+          "cluster": "www2",
+          "retry_policy": {
+            "per_try_timeout_ms" : 1000,
+            "num_retries": 3,
+            "retry_on": "5xx,deadline-exceeded,resource-exhausted"
+          }
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm, true);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
+  EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
+  EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .retryOn());
+
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                                                 ->routeEntry()
+                                                 ->retryPolicy()
+                                                 .perTryTimeout());
+  EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
+                RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED,
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+}
+
 TEST(RouteMatcherTest, TestBadDefaultConfig) {
   std::string json = R"EOF(
 {
@@ -1447,6 +1531,16 @@ TEST(RouteMatcherTest, WeightedClusters) {
     EXPECT_EQ("cluster1", config.route(headers, 115)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 445)->routeEntry()->clusterName());
     EXPECT_EQ("cluster3", config.route(headers, 560)->routeEntry()->clusterName());
+  }
+
+  // Make sure weighted cluster entries call through to the parent when needed.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+    const RouteEntry* route = config.route(headers, 115)->routeEntry();
+    EXPECT_EQ(nullptr, route->hashPolicy());
+    EXPECT_TRUE(route->opaqueConfig().empty());
+    EXPECT_FALSE(route->autoHostRewrite());
+    EXPECT_TRUE(route->includeVirtualHostRateLimits());
   }
 
   // Weighted Cluster with valid runtime values

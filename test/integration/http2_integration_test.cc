@@ -29,6 +29,14 @@ TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
 
 TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
 
+TEST_P(Http2IntegrationTest, InvalidContentLength) {
+  testInvalidContentLength(Http::CodecClient::Type::HTTP2);
+}
+
+TEST_P(Http2IntegrationTest, MultipleContentLengths) {
+  testMultipleContentLengths(Http::CodecClient::Type::HTTP2);
+}
+
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -90,6 +98,8 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP2); }
 
 TEST_P(Http2IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
+
+TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::TestHeaderMapImpl big_headers{

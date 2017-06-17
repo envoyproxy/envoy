@@ -28,6 +28,8 @@ public:
 
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }
+  bool reset() { return saw_reset_; }
+  Http::StreamResetReason reset_reason() { return reset_reason_; }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForBodyData(uint64_t size);
@@ -52,6 +54,7 @@ private:
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
   bool saw_reset_{};
+  Http::StreamResetReason reset_reason_{};
 };
 
 typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
@@ -171,6 +174,7 @@ public:
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
+  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
 
@@ -197,13 +201,20 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                        Http::CodecClient::Type type);
   void testTwoRequests(Http::CodecClient::Type type);
-  void testBadHttpRequest();
+  void testBadFirstline();
+  void testMissingDelimiter();
+  void testInvalidCharacterInFirstline();
+  void testLowVersion();
+  void testMissingContentLength();
   void testHttp10Request();
   void testNoHost();
   void testUpstreamProtocolError();
   void testBadPath();
+  void testInvalidContentLength(Http::CodecClient::Type type);
+  void testMultipleContentLengths(Http::CodecClient::Type type);
   void testDrainClose(Http::CodecClient::Type type);
   void testRetry(Http::CodecClient::Type type);
+  void testGrpcRetry();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

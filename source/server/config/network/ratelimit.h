@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "server/configuration_impl.h"
+#include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,11 +14,10 @@ namespace Configuration {
 class RateLimitConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type,
-                                             const Json::Object& json_config,
-                                             Server::Instance& server) override;
-
-  std::string name() override;
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
+                                             FactoryContext& context) override;
+  std::string name() override { return "ratelimit"; }
+  NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
 
 } // Configuration

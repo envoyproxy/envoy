@@ -30,6 +30,7 @@ public:
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
+  const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
@@ -92,6 +93,12 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
   } EnvoyRetryOnValues;
+
+  struct {
+    const std::string Cancelled{"cancelled"};
+    const std::string DeadlineExceeded{"deadline-exceeded"};
+    const std::string ResourceExhausted{"resource-exhausted"};
+  } EnvoyRetryOnGrpcValues;
 
   struct {
     const std::string _100Continue{"100-continue"};

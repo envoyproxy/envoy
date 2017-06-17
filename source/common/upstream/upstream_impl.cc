@@ -20,7 +20,6 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
-#include "common/network/dns_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
@@ -131,7 +130,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Utility::parseInternetAddressAndPort(resolver_addr));
     }
-    selected_dns_resolver = std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers);
+    selected_dns_resolver = dispatcher.createDnsResolver(resolvers);
   }
 
   if (string_type == "static") {
@@ -440,14 +439,14 @@ StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
 }
 
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
-  log_debug("starting async DNS resolution for {}", dns_address_);
+  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
-        log_debug("async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostSharedPtr> new_hosts;
@@ -464,7 +463,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         std::vector<HostSharedPtr> hosts_added;
         std::vector<HostSharedPtr> hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false)) {
-          log_debug("DNS hosts have changed for {}", dns_address_);
+          ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);
         }
 

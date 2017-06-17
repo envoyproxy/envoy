@@ -3,7 +3,12 @@
 #include <arpa/inet.h>
 
 #include "common/common/base64.h"
+#include "common/common/utility.h"
+#include "common/grpc/common.h"
+#include "common/http/filter_utility.h"
 #include "common/http/headers.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -11,10 +16,35 @@ namespace Grpc {
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
+// Supported gRPC-Web content-types.
+const std::unordered_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() const {
+  static const std::unordered_set<std::string>* types = new std::unordered_set<std::string>(
+      {Http::Headers::get().ContentTypeValues.GrpcWeb,
+       Http::Headers::get().ContentTypeValues.GrpcWebProto,
+       Http::Headers::get().ContentTypeValues.GrpcWebText,
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto});
+  return *types;
+}
+
+bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  if (content_type != nullptr) {
+    return gRpcWebContentTypes().count(content_type->value().c_str()) > 0;
+  }
+  return false;
+}
+
 // Implements StreamDecoderFilter.
-// TODO(fengli): Implements the subtypes of gRPC-Web content-type, like +proto, etc.
+// TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
+  if (!isGrpcWebRequest(headers)) {
+    // TODO(fengli): Return error response.
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  setupStatTracking(headers);
+
   if (content_type != nullptr &&
       (Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str() ||
        Http::Headers::get().ContentTypeValues.GrpcWebTextProto == content_type->value().c_str())) {
@@ -32,10 +62,9 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   }
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
-  headers.addStatic(Http::Headers::get().TE, Http::Headers::get().TEValues.Trailers);
+  headers.insertTE().value(Http::Headers::get().TEValues.Trailers);
   // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.addStatic(Http::Headers::get().GrpcAcceptEncoding,
-                    Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  headers.insertGrpcAcceptEncoding().value(Http::Headers::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -65,6 +94,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  if (do_stat_tracking_) {
+    chargeStat(headers);
+  }
   if (is_text_response_) {
     headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
@@ -104,6 +136,10 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+  if (do_stat_tracking_) {
+    chargeStat(trailers);
+  }
+
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
   // Trailers in the trailers frame are separated by CRLFs.
   Buffer::OwnedImpl temp;
@@ -128,6 +164,19 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
     encoder_callbacks_->addEncodedData(buffer);
   }
   return Http::FilterTrailersStatus::Continue;
+}
+
+void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
+  cluster_ = Http::FilterUtility::resolveClusterInfo(decoder_callbacks_, cm_);
+  if (!cluster_) {
+    return;
+  }
+  do_stat_tracking_ =
+      Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
+}
+
+void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
+  Common::chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_, headers.GrpcStatus());
 }
 
 } // namespace Grpc

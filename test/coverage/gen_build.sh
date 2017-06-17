@@ -41,17 +41,10 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "gcc_only_test",
-    srcs = ["gcc_only_test.cc"],
-    tags = ["manual"],
-    coverage = False,
-)
-
-envoy_cc_test(
     name = "coverage_tests",
     repository = "${REPOSITORY}",
     deps = [
-        ":gcc_only_test_lib", # gcov requires gcc
+        "${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib", # gcov requires gcc
 EOF
   for t in ${TARGETS}
   do

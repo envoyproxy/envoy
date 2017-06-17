@@ -37,11 +37,6 @@ public:
     return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, address)};
   }
 
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override {
-    return Network::DnsResolverSharedPtr{createDnsResolver_(resolvers)};
-  }
-
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return FileEventPtr{createFileEvent_(fd, cb, trigger, events)};
@@ -87,8 +82,8 @@ public:
   MOCK_METHOD2(createSslClientConnection_,
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
                                           Network::Address::InstanceConstSharedPtr address));
-  MOCK_METHOD1(createDnsResolver_,
-               Network::DnsResolver*(
+  MOCK_METHOD1(createDnsResolver,
+               Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
@@ -125,6 +120,15 @@ public:
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
 
   TimerCb callback_;
+};
+
+class MockFileEvent : public FileEvent {
+public:
+  MockFileEvent();
+  ~MockFileEvent();
+
+  MOCK_METHOD1(activate, void(uint32_t events));
+  MOCK_METHOD1(setEnabled, void(uint32_t events));
 };
 
 } // Event
