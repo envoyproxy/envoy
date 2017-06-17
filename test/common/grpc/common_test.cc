@@ -38,6 +38,23 @@ TEST(GrpcCommonTest, chargeStats) {
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
+
+  Http::TestHeaderMapImpl trailers;
+  Http::HeaderEntry& status = trailers.insertGrpcStatus();
+  status.value("0", 1);
+  Common::chargeStat(cluster, "grpc", "service", "method", &status);
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
+  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
+  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.total").value());
+
+  status.value("1", 1);
+  Common::chargeStat(cluster, "grpc", "service", "method", &status);
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.0").value());
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.1").value());
+  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.success").value());
+  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.failure").value());
+  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.total").value());
 }
 
 TEST(GrpcCommonTest, prepareHeaders) {

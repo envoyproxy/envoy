@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/dynamo/dynamo_filter.h"
 
 #include "server/config/network/client_ssl_auth.h"
@@ -381,10 +383,9 @@ TEST(NetworkFilterConfigTest, DeprecatedHttpFilterConfigFactoryTest) {
 }
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory>(),
-                            EnvoyException, "Attempted to register multiple "
-                                            "NamedNetworkFilterConfigFactory objects with name: "
-                                            "'client_ssl_auth'");
+  EXPECT_THROW_WITH_MESSAGE(
+      (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),
+      EnvoyException, "Double registration for name: 'client_ssl_auth'");
 }
 
 } // Configuration

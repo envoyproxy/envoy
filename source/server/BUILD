@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:filter_config_interface",
@@ -117,6 +118,7 @@ envoy_cc_library(
     hdrs = ["listener_manager_impl.h"],
     deps = [
         ":configuration_lib",
+        "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/json:config_schemas_lib",

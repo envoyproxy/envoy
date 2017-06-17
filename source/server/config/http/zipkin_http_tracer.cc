@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/zipkin_tracer_impl.h"
@@ -27,9 +29,9 @@ ZipkinHttpTracerFactory::createHttpTracer(const Json::Object& json_config, Serve
 std::string ZipkinHttpTracerFactory::name() { return "zipkin"; }
 
 /**
- * Static registration for the lightstep http tracer. @see RegisterHttpTracerFactory.
+ * Static registration for the lightstep http tracer. @see RegisterFactory.
  */
-static RegisterHttpTracerFactory<ZipkinHttpTracerFactory> register_;
+static Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory> register_;
 
 } // Configuration
 } // Server

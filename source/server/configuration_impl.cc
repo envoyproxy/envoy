@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -118,9 +119,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration, Instance& se
   Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
   // Now see if there is a factory that will accept the config.
-  auto search_it = httpTracerFactories().find(type);
-  if (search_it != httpTracerFactories().end()) {
-    http_tracer_ = search_it->second->createHttpTracer(*driver_config, server, *cluster_manager_);
+  HttpTracerFactory* factory = Registry::FactoryRegistry<HttpTracerFactory>::getFactory(type);
+  if (factory != nullptr) {
+    http_tracer_ = factory->createHttpTracer(*driver_config, server, *cluster_manager_);
   } else {
     throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
   }

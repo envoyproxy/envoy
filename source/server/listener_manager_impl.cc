@@ -1,5 +1,7 @@
 #include "server/listener_manager_impl.h"
 
+#include "envoy/registry/registry.h"
+
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 #include "common/network/listen_socket_impl.h"
@@ -73,11 +75,11 @@ ListenerImpl::ListenerImpl(Instance& server, ListenSocketFactory& factory, const
     }
 
     // Now see if there is a factory that will accept the config.
-    auto search_it = Configuration::MainImpl::namedFilterConfigFactories().find(string_name);
-    if (search_it != Configuration::MainImpl::namedFilterConfigFactories().end() &&
-        search_it->second->type() == type) {
-      Configuration::NetworkFilterFactoryCb callback =
-          search_it->second->createFilterFactory(*config, *this);
+    Configuration::NamedNetworkFilterConfigFactory* factory =
+        Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+            string_name);
+    if (factory != nullptr && factory->type() == type) {
+      Configuration::NetworkFilterFactoryCb callback = factory->createFilterFactory(*config, *this);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED

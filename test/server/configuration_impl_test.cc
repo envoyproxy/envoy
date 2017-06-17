@@ -246,7 +246,6 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   )EOF";
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(*loader, server_, cluster_manager_factory_),
                             EnvoyException, "No HttpTracerFactory found for type: invalid");

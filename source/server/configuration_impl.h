@@ -39,8 +39,8 @@ public:
 };
 
 /**
- * Implemented by each HttpTracer and registered via registerHttpTracerFactory() or
- * the convenience class RegisterHttpTracerFactory.
+ * Implemented by each HttpTracer and registered via Registry::registerFactory() or
+ * the convenience class RegisterFactory.
  */
 class HttpTracerFactory {
 public:
@@ -93,51 +93,10 @@ public:
   }
 
   /**
-   * Register an NamedNetworkFilterConfigFactory implementation as an option to create instances of
-   * NetworkFilterFactoryCb.
-   * @param factory the NamedNetworkFilterConfigFactory implementation
+   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
    */
-  static void registerNamedNetworkFilterConfigFactory(NamedNetworkFilterConfigFactory& factory) {
-    auto result = namedFilterConfigFactories_().emplace(std::make_pair(factory.name(), &factory));
-
-    // result is a pair whose second member is a boolean indicating, if false, that the key exists
-    // and that the value was not inserted.
-    if (!result.second) {
-      throw EnvoyException(fmt::format(
-          "Attempted to register multiple NamedNetworkFilterConfigFactory objects with name: '{}'",
-          factory.name()));
-    }
-  }
-
-  /**
-   * Register an HttpTracerFactory as an option to create instances of HttpTracers.
-   * @param factory the HttpTracerFactory implementation
-   */
-  static void registerHttpTracerFactory(HttpTracerFactory& factory) {
-    auto result = httpTracerFactories().emplace(std::make_pair(factory.name(), &factory));
-
-    // result is a pair whose second member is a boolean indicating, if false, that the key exists
-    // and that the value was not inserted.
-    if (!result.second) {
-      throw EnvoyException(
-          fmt::format("Attempted to register multiple HttpTracerFactory objects with name: '{}'",
-                      factory.name()));
-    }
-  }
-
-  /**
-   * @return a list of the currently registered NetworkConfigFactories. DEPRECATED.
-   */
-  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
+  static const std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
     return filterConfigFactories_();
-  }
-
-  /**
-   * @return a map of the currently registered NamedNetworkConfigFactories.
-   */
-  static const std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>&
-  namedFilterConfigFactories() {
-    return namedFilterConfigFactories_();
   }
 
   /**
@@ -184,26 +143,6 @@ private:
     return *filter_config_factories;
   }
 
-  /**
-   * Returns a map of the currently registered NamedNetworkConfigFactories.
-   */
-  static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>&
-  namedFilterConfigFactories_() {
-    static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>*
-        named_filter_config_factories =
-            new std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>;
-    return *named_filter_config_factories;
-  }
-
-  /**
-   * Returns a map of the currently registered HttpTracerFactories.
-   */
-  static std::unordered_map<std::string, HttpTracerFactory*>& httpTracerFactories() {
-    static std::unordered_map<std::string, HttpTracerFactory*>* http_tracer_factories =
-        new std::unordered_map<std::string, HttpTracerFactory*>;
-    return *http_tracer_factories;
-  }
-
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   Optional<std::string> statsd_tcp_cluster_name_;
@@ -230,37 +169,6 @@ public:
   RegisterNetworkFilterConfigFactory() {
     static T* instance = new T;
     MainImpl::registerNetworkFilterConfigFactory(*instance);
-  }
-};
-
-/**
- * @see NamedNetworkFilterConfigFactory.  An instantiation of this class registers a
- * NamedNetworkFilterConfigFactory implementation (T) so it can be used to create instances of
- * NetworkFilterFactoryCb.
- */
-template <class T> class RegisterNamedNetworkFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterNamedNetworkFilterConfigFactory() {
-    static T* instance = new T;
-    MainImpl::registerNamedNetworkFilterConfigFactory(*instance);
-  }
-};
-
-/**
- * @see HttpTracerFactory.  An instantiation of this class registers an HttpTracerFactory
- * implementation (T) so it can be used to create instances of HttpTracer.
- */
-template <class T> class RegisterHttpTracerFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterHttpTracerFactory() {
-    static T* instance = new T;
-    MainImpl::registerHttpTracerFactory(*instance);
   }
 };
 

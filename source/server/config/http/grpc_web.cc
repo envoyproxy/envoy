@@ -1,8 +1,8 @@
 #include "server/config/http/grpc_web.h"
 
-#include "common/grpc/grpc_web_filter.h"
+#include "envoy/registry/registry.h"
 
-#include "server/config/network/http_connection_manager.h"
+#include "common/grpc/grpc_web_filter.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,9 +18,9 @@ HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactory(const Json::Object&
 }
 
 /**
- * Static registration for the gRPC-Web filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the gRPC-Web filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<GrpcWebFilterConfig> register_;
+static Registry::RegisterFactory<GrpcWebFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // namespace Configuration
 } // namespace Server

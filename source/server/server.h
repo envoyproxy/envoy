@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/common/optional.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"

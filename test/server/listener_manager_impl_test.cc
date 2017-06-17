@@ -1,3 +1,5 @@
+#include "envoy/registry/registry.h"
+
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
 
@@ -169,7 +171,8 @@ public:
 };
 
 TEST_F(ListenerManagerImplTest, StatsScopeTest) {
-  Configuration::RegisterNamedNetworkFilterConfigFactory<TestStatsConfigFactory> registered;
+  Registry::RegisterFactory<TestStatsConfigFactory, Configuration::NamedNetworkFilterConfigFactory>
+      registered;
 
   std::string json = R"EOF(
   {
