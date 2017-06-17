@@ -7,6 +7,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
@@ -39,11 +40,10 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
 }
 
 /**
- * Static registration for the HTTP connection manager filter. @see
- * RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the HTTP connection manager filter.
  */
-static RegisterNamedNetworkFilterConfigFactory<HttpConnectionManagerFilterConfigFactory>
-    registered_;
+static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
+                                 NamedNetworkFilterConfigFactory> registered_;
 
 std::string
 HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
@@ -151,10 +151,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
-    auto search_it = namedFilterConfigFactories().find(string_name);
-    if (search_it != namedFilterConfigFactories().end() && search_it->second->type() == type) {
+    NamedHttpFilterConfigFactory* factory =
+        Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
+    if (factory != nullptr && factory->type() == type) {
       HttpFilterFactoryCb callback =
-          search_it->second->createFilterFactory(*config_object, stats_prefix_, context_);
+          factory->createFilterFactory(*config_object, stats_prefix_, context_);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED

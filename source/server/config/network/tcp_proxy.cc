@@ -3,10 +3,9 @@
 #include <string>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/filter/tcp_proxy.h"
-
-#include "server/configuration_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,9 +22,10 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Ob
 }
 
 /**
- * Static registration for the tcp_proxy filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the tcp_proxy filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
+static Registry::RegisterFactory<TcpProxyConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // Configuration
 } // Server
