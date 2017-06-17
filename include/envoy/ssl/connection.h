@@ -15,6 +15,11 @@ public:
   virtual ~Connection() {}
 
   /**
+   * @return whether the connection is Mutual TLS.
+   **/
+  virtual bool isMtls() PURE;
+
+  /**
    * @return the uri in the SAN feld of the local certificate. Returns "" if there is no local
    *         certificate, or no SAN field, or no uri.
    **/

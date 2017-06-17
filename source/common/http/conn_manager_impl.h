@@ -121,7 +121,13 @@ typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManager
 /**
  * Configuration for how to forward client certs.
  */
-enum class ForwardClientCertType { ForwardOnly, AppendForward, SanitizeSet, Sanitize, AlwaysForwardOnly };
+enum class ForwardClientCertType {
+  ForwardOnly,
+  AppendForward,
+  SanitizeSet,
+  Sanitize,
+  AlwaysForwardOnly
+};
 
 /**
  * Configuration for the fields of the current client cert to be forwarded.

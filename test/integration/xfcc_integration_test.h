@@ -19,9 +19,10 @@ class XfccIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   const std::string previous_xfcc_ =
-    "BY=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
+      "BY=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
   const std::string current_xfcc_by_hash_ =
-    "BY=spiffe://lyft.com/backend-team;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688";
+      "BY=spiffe://lyft.com/"
+      "backend-team;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688";
   const std::string client_san_ = "SAN=spiffe://lyft.com/frontend-team";
 
   XfccIntegrationTest() : BaseIntegrationTest(GetParam()) {}
@@ -35,16 +36,19 @@ public:
   void TearDown() override;
 
   Ssl::ServerContextPtr createUpstreamSslContext();
-  Ssl::ClientContextPtr createClientSslContext();
-  Network::ClientConnectionPtr makeSslClientConnection();
-  void testRequestAndResponseWithXfccHeader(
-      Network::ClientConnectionPtr&& conn, std::string expected_xfcc);
+  Ssl::ClientContextPtr createClientSslContext(bool mtls);
+  Network::ClientConnectionPtr makeClientConnection();
+  Network::ClientConnectionPtr makeTlsClientConnection();
+  Network::ClientConnectionPtr makeMtlsClientConnection();
+  void testRequestAndResponseWithXfccHeader(Network::ClientConnectionPtr&& conn,
+                                            std::string privous_xfcc, std::string expected_xfcc);
   void startTestServerWithXfccConfig(std::string config, std::string content);
 
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Ssl::ClientContextPtr client_ssl_ctx_;
+  Ssl::ClientContextPtr client_tls_ssl_ctx_;
+  Ssl::ClientContextPtr client_mtls_ssl_ctx_;
   Ssl::ServerContextPtr upstream_ssl_ctx_;
 };
 } // Xfcc

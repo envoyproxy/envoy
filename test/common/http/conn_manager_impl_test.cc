@@ -156,7 +156,9 @@ public:
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
-  const std::list<Http::ClientCertDetailsType> setClientCertDetails() override { return set_client_cert_details_; }
+  const std::list<Http::ClientCertDetailsType> setClientCertDetails() override {
+    return set_client_cert_details_;
+  }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }

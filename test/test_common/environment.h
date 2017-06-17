@@ -113,6 +113,7 @@ public:
    * @param port_map map from port name to port number.
    * @param version IP address version to substitute.
    * @return std::string path for the generated file.
+   * TODO(htuch): Switch to a single pass variable substitution.
    */
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
                                              Network::Address::IpVersion version);
@@ -124,6 +125,7 @@ public:
    * @param port_map map from port name to port number.
    * @param version IP address version to substitute.
    * @return std::string path for the generated file.
+   * TODO(htuch): Switch to a single pass variable substitution.
    */
   static std::string temporaryFileSubstitute(const std::string& path, const ParamMap& param_map,
                                              const PortMap& port_map,

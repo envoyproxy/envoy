@@ -132,9 +132,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
 
-
-  if (connection.ssl() || config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
-    std::string clientCertDetails = "";
+  if ((connection.ssl() && connection.ssl()->isMtls()) ||
+      config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
+    std::string clientCertDetails;
     if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||
         config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
       // In these cases, the client cert in the current hop should be set into the XFCC header.
@@ -155,23 +155,24 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
 
     switch (config.forwardClientCert()) {
-      case Http::ForwardClientCertType::ForwardOnly:
-      case Http::ForwardClientCertType::AlwaysForwardOnly:
-        break;
-      case Http::ForwardClientCertType::AppendForward:
-        // Get the Cert info.
-        if (!request_headers.ForwardedClientCert()->value().empty()) {
-            request_headers.ForwardedClientCert()->value().append(",", 1);
-        }
-        request_headers.ForwardedClientCert()->value().append(
-            clientCertDetails.c_str(), clientCertDetails.length());
-        break;
-      case Http::ForwardClientCertType::Sanitize:
-        request_headers.removeForwardedClientCert();
-        break;
-      case Http::ForwardClientCertType::SanitizeSet:
-        request_headers.removeForwardedClientCert();
+    case Http::ForwardClientCertType::ForwardOnly:
+    case Http::ForwardClientCertType::AlwaysForwardOnly:
+      break;
+    case Http::ForwardClientCertType::AppendForward:
+      // Get the Cert info.
+      if (request_headers.ForwardedClientCert() &&
+          !request_headers.ForwardedClientCert()->value().empty()) {
+        request_headers.ForwardedClientCert()->value().append(("," + clientCertDetails).c_str(),
+                                                              clientCertDetails.length() + 1);
+      } else {
         request_headers.insertForwardedClientCert().value(clientCertDetails);
+      }
+      break;
+    case Http::ForwardClientCertType::Sanitize:
+      request_headers.removeForwardedClientCert();
+      break;
+    case Http::ForwardClientCertType::SanitizeSet:
+      request_headers.insertForwardedClientCert().value(clientCertDetails);
     }
   } else {
     request_headers.removeForwardedClientCert();

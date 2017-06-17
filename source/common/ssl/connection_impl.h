@@ -24,9 +24,8 @@ public:
   Ssl::Connection* ssl() override { return this; }
 
   // Ssl::Connection
-  // std::string subjectLocalCertificate() override;
+  bool isMtls() override;
   std::string uriSanLocalCertificate() override;
-  // std::string subjectPeerCertificate() override;
   std::string sha256PeerCertificateDigest() override;
   std::string uriSanPeerCertificate() override;
 
