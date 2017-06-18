@@ -42,6 +42,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ip_tagging_filter_test",
+    srcs = ["ip_tagging_filter_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http/filter:fault_filter_lib",
+        "//source/common/http/filter:ip_tagging_filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
     deps = [
