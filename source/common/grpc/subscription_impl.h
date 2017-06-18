@@ -10,23 +10,25 @@
 namespace Envoy {
 namespace Grpc {
 
-template <class ResponseType, class ResourceType>
-class SubscriptionImpl : public Config::Subscription<ResponseType, ResourceType>,
-                         AsyncClientCallbacks<ResponseType> {
+template <class ResourceType>
+class SubscriptionImpl : public Config::Subscription<ResourceType>,
+                         AsyncClientCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   SubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                    const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                    const google::protobuf::MethodDescriptor& service_method)
-      : SubscriptionImpl(
-            node, std::unique_ptr<AsyncClientImpl<envoy::api::v2::DiscoveryRequest, ResponseType>>(
-                      new AsyncClientImpl<envoy::api::v2::DiscoveryRequest, ResponseType>(
-                          cm, remote_cluster_name)),
-            dispatcher, service_method) {}
+      : SubscriptionImpl(node, std::unique_ptr<AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                                               envoy::api::v2::DiscoveryResponse>>(
+                                   new AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                                       envoy::api::v2::DiscoveryResponse>(
+                                       cm, remote_cluster_name)),
+                         dispatcher, service_method) {}
 
-  SubscriptionImpl(
-      const envoy::api::v2::Node& node,
-      std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>> async_client,
-      Event::Dispatcher& dispatcher, const google::protobuf::MethodDescriptor& service_method)
+  SubscriptionImpl(const envoy::api::v2::Node& node,
+                   std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest,
+                                               envoy::api::v2::DiscoveryResponse>> async_client,
+                   Event::Dispatcher& dispatcher,
+                   const google::protobuf::MethodDescriptor& service_method)
       : async_client_(std::move(async_client)), service_method_(service_method),
         retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })) {
     request_.mutable_node()->CopyFrom(node);
@@ -78,8 +80,13 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
-    if (callbacks_->onConfigUpdate(message->resources())) {
+  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
+    google::protobuf::RepeatedPtrField<ResourceType> typed_resources;
+    for (auto& resource : message->resources()) {
+      auto* typed_resource = typed_resources.Add();
+      resource.UnpackTo(typed_resource);
+    }
+    if (callbacks_->onConfigUpdate(typed_resources)) {
       request_.set_version_info(message->version_info());
       // This effectively ACKs the accepted configuration.
       sendDiscoveryRequest();
@@ -101,7 +108,8 @@ public:
   const uint32_t RETRY_DELAY_MS = 5000;
 
 private:
-  std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest, ResponseType>> async_client_;
+  std::unique_ptr<AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+      async_client_;
   const google::protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   google::protobuf::RepeatedPtrField<std::string> resources_;
