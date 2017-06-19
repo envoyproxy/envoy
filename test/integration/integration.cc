@@ -980,15 +980,12 @@ void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
   big_headers.addViaCopy("big", std::string(60 * 1024, 'a'));
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions(
-      {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), type);
-      },
-       [&]() -> void {
-         std::string long_value(7500, 'x');
-         codec_client->startRequest(big_headers, *response);
-       },
-       [&]() -> void { codec_client->waitForDisconnect(); }});
+  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+                  [&]() -> void {
+                    std::string long_value(7500, 'x');
+                    codec_client->startRequest(big_headers, *response);
+                  },
+                  [&]() -> void { codec_client->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("431", response->headers().Status()->value().c_str());
