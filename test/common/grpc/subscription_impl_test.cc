@@ -23,14 +23,13 @@ namespace Envoy {
 namespace Grpc {
 
 template class AsyncClientStreamImpl<envoy::api::v2::DiscoveryRequest,
-                                     envoy::api::v2::EndpointDiscoveryResponse>;
+                                     envoy::api::v2::DiscoveryResponse>;
 
 namespace {
 
-typedef MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::EndpointDiscoveryResponse>
-    EdsMockAsyncClient;
-typedef SubscriptionImpl<envoy::api::v2::EndpointDiscoveryResponse,
-                         envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
+typedef MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
+    SubscriptionMockAsyncClient;
+typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
 // TODO(htuch): Move this to a common utility for tests that want proto
 // equality.
@@ -61,16 +60,16 @@ public:
   GrpcSubscriptionImplTest()
       : method_descriptor_(envoy::api::v2::EndpointDiscoveryService::descriptor()->FindMethodByName(
             "StreamEndpoints")),
-        async_client_(new EdsMockAsyncClient()), timer_(new Event::MockTimer()) {
+        async_client_(new SubscriptionMockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
           timer_cb_ = timer_cb;
           return timer_;
         }));
-    subscription_.reset(new EdsSubscriptionImpl(node_,
-                                                std::unique_ptr<EdsMockAsyncClient>(async_client_),
-                                                dispatcher_, *method_descriptor_));
+    subscription_.reset(
+        new EdsSubscriptionImpl(node_, std::unique_ptr<SubscriptionMockAsyncClient>(async_client_),
+                                dispatcher_, *method_descriptor_));
   }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
@@ -100,14 +99,16 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
                            bool accept) {
-    std::unique_ptr<envoy::api::v2::EndpointDiscoveryResponse> response(
-        new envoy::api::v2::EndpointDiscoveryResponse());
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+        new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);
+    google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
-      envoy::api::v2::ClusterLoadAssignment* load_assignment = response->add_resources();
+      envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
       load_assignment->set_cluster_name(cluster);
+      response->add_resources()->PackFrom(*load_assignment);
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources())))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
         .WillOnce(Return(accept));
     if (accept) {
       expectSendMessage(cluster_names, version);
@@ -117,7 +118,7 @@ public:
   }
 
   const google::protobuf::MethodDescriptor* method_descriptor_;
-  EdsMockAsyncClient* async_client_;
+  SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
