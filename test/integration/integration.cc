@@ -87,9 +87,8 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   }
 }
 
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
+void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
   saw_reset_ = true;
-  reset_reason_ = reason;
   if (waiting_for_reset_) {
     dispatcher_.exit();
   }
@@ -866,13 +865,6 @@ void BaseIntegrationTest::testLowVersion() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testMissingContentLength() {
-  std::string response;
-  sendRawHttpAndWaitForResponse("POST / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
-  EXPECT_EQ("HTTP/1.1 411 Length Required\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-            response);
-}
-
 void BaseIntegrationTest::testHttp10Request() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
@@ -913,64 +905,6 @@ void BaseIntegrationTest::testBadPath() {
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
-}
-
-void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
-                  [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "-1"}},
-                                               *response);
-                  },
-                  [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
-                    } else {
-                      response->waitForReset();
-                      codec_client->close();
-                    }
-                  }});
-
-  if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
-  } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
-  }
-}
-
-void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
-                  [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "3,2"}},
-                                               *response);
-                  },
-                  [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
-                    } else {
-                      response->waitForReset();
-                      codec_client->close();
-                    }
-                  }});
-
-  if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
-  } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
-  }
 }
 
 void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
