@@ -21,7 +21,7 @@ ProdListenSocketFactory::create(Network::Address::InstanceConstSharedPtr address
   // used for testing. First we try to get the socket from our parent if applicable.
   ASSERT(address->type() == Network::Address::Type::Ip);
   std::string addr = fmt::format("tcp://{}", address->asString());
-  int fd = restarter_.duplicateParentListenSocket(addr);
+  const int fd = restarter_.duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(info, "obtained socket for address {} from parent", addr);
     return Network::ListenSocketPtr{new Network::TcpListenSocket(fd, address)};

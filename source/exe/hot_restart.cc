@@ -313,7 +313,7 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(std::string(rpc.address_));
   for (const auto& listener : server_->listenerManager().listeners()) {
-    if (listener.get().socket().localAddress()->asString() == addr->asString()) {
+    if (*listener.get().socket().localAddress() == *addr) {
       reply.fd_ = listener.get().socket().fd();
       break;
     }

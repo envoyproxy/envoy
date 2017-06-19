@@ -139,9 +139,9 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectSharedPtr> listener_info = json->asObjectArray();
-  auto listener_info_it = listener_info.begin();
+  auto listener_info_it = listener_info.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
-  auto listener_it = listeners.begin();
+  auto listener_it = listeners.cbegin();
   for (; listener_info_it != listener_info.end() && listener_it != listeners.end();
        ++listener_info_it, ++listener_it) {
     EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),

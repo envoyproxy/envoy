@@ -39,13 +39,14 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return Network::Address::InstanceConstSharedPtr the address.
+   * @return Network::Address::InstanceConstSharedPtr the configured address for the listener. This
+   *         may be distinct to the bound address, e.g. if the port is zero.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
 
   /**
-   * @return Network::ListenSocket& the actul listen socket. The address of this socket may be
-   *         different from address() if for example the configured address binds to port 0.
+   * @return Network::ListenSocket& the actual listen socket. The address of this socket may be
+   *         different from address() if for example the configured address binds to port zero.
    */
   virtual Network::ListenSocket& socket() PURE;
 

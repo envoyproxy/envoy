@@ -281,9 +281,9 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  auto port_it = port_names.begin();
+  auto port_it = port_names.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
-  auto listener_it = listeners.begin();
+  auto listener_it = listeners.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
     registerPort(*port_it, listener_it->get().socket().localAddress()->ip()->port());
   }
