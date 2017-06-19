@@ -364,8 +364,9 @@ TEST_P(DnsImplTest, LocalLookup) {
   }
 
   if (GetParam() == Address::IpVersion::v6) {
-    std::string error_msg = "Synchronous DNS IPv6 localhost resolution failed. Please add ::1 "
-                            "localhost to /etc/hosts.";
+    const std::string error_msg =
+        "Synchronous DNS IPv6 localhost resolution failed. Please verify localhost resolves to ::1 "
+        "in /etc/hosts, since this misconfiguration is a common cause of these failures.";
     EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V6Only,
                                           [&](std::list<Address::InstanceConstSharedPtr>&& results)
                                               -> void { address_list = results; }))
