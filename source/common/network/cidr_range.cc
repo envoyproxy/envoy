@@ -78,24 +78,53 @@ IpVersion CidrRange::version() const {
   return IpVersion::v4;
 }
 
-bool CidrRange::isInRange(InstanceConstSharedPtr address) const {
-  if (address == nullptr) {
-    return false;
-  }
-
-  return isInRange(*address);
-}
-
 bool CidrRange::isInRange(const Instance& address) const {
-  if (length_ < 0 || address.type() != Type::Ip || address.ip()->version() != version()) {
+  if (address_ == nullptr || !isValid() || address.type() != Type::Ip ||
+      version() != address.ip()->version()) {
     return false;
   }
-  // Make a CidrRange from the address, of the same length as this. If the two ranges have
-  // are the same, then the address is in this range.
-  CidrRange other = create(address.ip()->addressAsString(), length_);
-  ASSERT(length() == other.length());
-  ASSERT(version() == other.version());
-  return *this == other;
+
+  // All addresses in range.
+  if (length_ == 0) {
+    return true;
+  }
+
+  switch (address.ip()->version()) {
+  case IpVersion::v4:
+    if (ntohl(address.ip()->ipv4()->address()) >> (32 - length_) ==
+        ntohl(ipv4()->address()) >> (32 - length_)) {
+      return true;
+    }
+    break;
+  case IpVersion::v6:
+    int length = length_;
+    // Loop through address bytes and compare. Address is in network byte order.
+    for (int i = 0; i < 16; i++) {
+      if (length == 0) {
+        return true;
+      } else if (length < 8) {
+        // Compare relevant bits.
+        if (address.ip()->ipv6()->address()[i] >> (8 - length) ==
+            ipv6()->address()[i] >> (8 - length)) {
+          return true;
+        } else {
+          break;
+        }
+      } else {
+        if (address.ip()->ipv6()->address()[i] == ipv6()->address()[i]) {
+          if (length == 8) {
+            return true;
+          } else {
+            length -= 8;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+    break;
+  }
+  return false;
 }
 
 std::string CidrRange::asString() const {
@@ -213,10 +242,6 @@ IpList::IpList(const std::vector<std::string>& subnets) {
 }
 
 bool IpList::contains(const Instance& address) const {
-  if (address.type() != Type::Ip) {
-    return false;
-  }
-
   for (const CidrRange& entry : ip_list_) {
     if (entry.isInRange(address)) {
       return true;

@@ -65,7 +65,6 @@ public:
    * @return true if the address argument is in the range of this object, false if not, including
              if the range is uninitialized or if the argument is not of the same IpVersion.
    */
-  bool isInRange(InstanceConstSharedPtr address) const;
   bool isInRange(const Instance& address) const;
 
   /**
