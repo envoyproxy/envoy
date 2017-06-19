@@ -60,7 +60,7 @@ void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {
     }
 
     http_response->body()->drain(5);
-    Buffer::ZeroCopyInputStreamImpl stream(*http_response->body());
+    Buffer::ZeroCopyInputStreamImpl stream(std::move(http_response->body()));
     if (!grpc_response_->ParseFromZeroCopyStream(&stream)) {
       throw Exception(Optional<uint64_t>(), "bad serialized body");
     }

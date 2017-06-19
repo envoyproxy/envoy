@@ -107,10 +107,10 @@ public:
       return;
     }
 
-    for (const auto& frame : decoded_frames_) {
+    for (auto& frame : decoded_frames_) {
       std::unique_ptr<ResponseType> response(new ResponseType());
       // TODO(htuch): Need to add support for compressed responses as well here.
-      Buffer::ZeroCopyInputStreamImpl stream(*frame.data_);
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
 
       if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
         streamError(Status::GrpcStatus::Internal);
