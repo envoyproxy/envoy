@@ -102,3 +102,13 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "subscription_lib",
+    hdrs = ["subscription_impl.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":async_client_lib",
+        "//include/envoy/config:subscription_interface",
+    ],
+)

@@ -14,8 +14,8 @@ namespace Grpc {
 template <class RequestType> class MockAsyncClientStream : public AsyncClientStream<RequestType> {
 public:
   MOCK_METHOD1_T(sendMessage, void(const RequestType& request));
-  MOCK_METHOD0_T(close, void());
-  MOCK_METHOD0_T(reset, void());
+  MOCK_METHOD0_T(closeStream, void());
+  MOCK_METHOD0_T(resetStream, void());
 };
 
 template <class ResponseType>
@@ -41,7 +41,7 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD4_T(start, AsyncClientStream<RequestType>*(
+  MOCK_METHOD3_T(start, AsyncClientStream<RequestType>*(
                             const google::protobuf::MethodDescriptor& service_method,
                             AsyncClientCallbacks<ResponseType>& callbacks,
                             const Optional<std::chrono::milliseconds>& timeout));

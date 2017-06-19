@@ -21,7 +21,11 @@ public:
   AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name)
       : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
 
-  ~AsyncClientImpl() override { ASSERT(active_streams_.empty()); }
+  ~AsyncClientImpl() override {
+    while (!active_streams_.empty()) {
+      active_streams_.front()->resetStream();
+    }
+  }
 
   // Grpc::AsyncClient
   AsyncClientStream<RequestType>*
@@ -152,9 +156,9 @@ public:
     stream_->sendData(*Common::serializeBody(request), false);
   }
 
-  void close() override { closeLocal(); }
+  void closeStream() override { closeLocal(); }
 
-  void reset() override {
+  void resetStream() override {
     // Both closeLocal() and closeRemote() might self-destruct the object. We don't use these below
     // to avoid sequencing issues.
     local_closed_ |= true;
@@ -167,7 +171,7 @@ public:
 private:
   void streamError(Status::GrpcStatus grpc_status) {
     callbacks_.onRemoteClose(grpc_status);
-    reset();
+    resetStream();
   }
 
   void cleanup() {

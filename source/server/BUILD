@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:filter_config_interface",

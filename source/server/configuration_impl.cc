@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -121,9 +122,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
   // Now see if there is a factory that will accept the config.
-  auto search_it = httpTracerFactories().find(type);
-  if (search_it != httpTracerFactories().end()) {
-    http_tracer_ = search_it->second->createHttpTracer(*driver_config, server_, *cluster_manager_);
+  HttpTracerFactory* factory = Registry::FactoryRegistry<HttpTracerFactory>::getFactory(type);
+  if (factory != nullptr) {
+    http_tracer_ = factory->createHttpTracer(*driver_config, server_, *cluster_manager_);
   } else {
     throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
   }
@@ -178,9 +179,10 @@ MainImpl::ListenerConfig::ListenerConfig(Instance& server, Json::Object& json)
     }
 
     // Now see if there is a factory that will accept the config.
-    auto search_it = namedFilterConfigFactories().find(string_name);
-    if (search_it != namedFilterConfigFactories().end() && search_it->second->type() == type) {
-      NetworkFilterFactoryCb callback = search_it->second->createFilterFactory(*config, *this);
+    NamedNetworkFilterConfigFactory* factory =
+        Registry::FactoryRegistry<NamedNetworkFilterConfigFactory>::getFactory(string_name);
+    if (factory != nullptr && factory->type() == type) {
+      NetworkFilterFactoryCb callback = factory->createFilterFactory(*config, *this);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED

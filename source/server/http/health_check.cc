@@ -6,6 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -52,9 +53,9 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Obj
 }
 
 /**
- * Static registration for the health check filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the health check filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<HealthCheckFilterConfig> register_;
+static Registry::RegisterFactory<HealthCheckFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server

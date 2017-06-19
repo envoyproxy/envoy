@@ -2,6 +2,8 @@
 #include <list>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/filter/echo.h"
 
 #include "server/configuration_impl.h"
@@ -472,7 +474,7 @@ public:
 };
 
 TEST_F(ConfigurationImplTest, StatsScopeTest) {
-  RegisterNamedNetworkFilterConfigFactory<TestStatsConfigFactory> registered;
+  Registry::RegisterFactory<TestStatsConfigFactory, NamedNetworkFilterConfigFactory> registered;
 
   std::string json = R"EOF(
   {
