@@ -15,8 +15,6 @@
 
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -98,6 +96,29 @@ public:
   MOCK_METHOD0(version, std::string());
 };
 
+class MockListenSocketFactory : public ListenSocketFactory {
+public:
+  MockListenSocketFactory();
+  ~MockListenSocketFactory();
+
+  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr address,
+                                  bool bind_to_port) override {
+    return Network::ListenSocketPtr{create_(address, bind_to_port)};
+  }
+
+  MOCK_METHOD2(create_, Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
+                                               bool bind_to_port));
+};
+
+class MockListenerManager : public ListenerManager {
+public:
+  MockListenerManager();
+  ~MockListenerManager();
+
+  MOCK_METHOD1(addListener, void(const Json::Object& json));
+  MOCK_METHOD0(listeners, std::list<std::reference_wrapper<Listener>>());
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();
@@ -119,12 +140,11 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(getListenSocketFd, int(const std::string& address));
-  MOCK_METHOD1(getListenSocketByIndex, Network::ListenSocket*(uint32_t index));
   MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
@@ -157,6 +177,7 @@ public:
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<MockListenerManager> listener_manager_;
 };
 
 namespace Configuration {
