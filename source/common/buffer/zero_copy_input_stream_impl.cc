@@ -6,9 +6,10 @@
 namespace Envoy {
 namespace Buffer {
 
-ZeroCopyInputStreamImpl::ZeroCopyInputStreamImpl() : buffer_(new Buffer::OwnedImpl){}
+ZeroCopyInputStreamImpl::ZeroCopyInputStreamImpl() : buffer_(new Buffer::OwnedImpl) {}
 
-ZeroCopyInputStreamImpl::ZeroCopyInputStreamImpl(Buffer::InstancePtr&& buffer) : buffer_(std::move(buffer)) {
+ZeroCopyInputStreamImpl::ZeroCopyInputStreamImpl(Buffer::InstancePtr&& buffer)
+    : buffer_(std::move(buffer)) {
   finish();
 }
 
@@ -52,7 +53,8 @@ void ZeroCopyInputStreamImpl::BackUp(int count) {
   // Preconditions for BackUp:
   // - The last method called must have been Next().
   // - count must be less than or equal to the size of the last buffer returned by Next().
-  // Due to preconditions above, it is save to just adjust position_ and byte_count_ here, and draining in Next().
+  // Due to preconditions above, it is save to just adjust position_ and byte_count_ here, and
+  // draining in Next().
   position_ -= count;
   byte_count_ -= count;
 }

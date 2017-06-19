@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+
 #include "google/protobuf/io/zero_copy_stream.h"
 
 namespace Envoy {
@@ -26,12 +27,13 @@ public:
   void finish() { finished_ = true; }
 
   // google::protobuf::io::ZeroCopyInputStream
-  // See https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.zero_copy_stream#ZeroCopyInputStream
+  // See
+  // https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.zero_copy_stream#ZeroCopyInputStream
   // for each methods details.
 
-  // Note the Next() will return true with no data until next data available if the stream is not finished.
-  // It is caller's responsibility to finish the stream or wrap with LimitingInputStream before passing to protobuf
-  // codes to avoid spin loop.
+  // Note the Next() will return true with no data until next data available if the stream is not
+  // finished. It is caller's responsibility to finish the stream or wrap with LimitingInputStream
+  // before passing to protobuf codes to avoid spin loop.
   virtual bool Next(const void** data, int* size) override;
   virtual void BackUp(int count) override;
   virtual bool Skip(int count) override; // Not implemented
