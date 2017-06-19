@@ -15,8 +15,7 @@ public:
       bool(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources));
 };
 
-template <class ResponseType, class ResourceType>
-class MockSubscription : public Subscription<ResponseType, ResourceType> {
+template <class ResourceType> class MockSubscription : public Subscription<ResourceType> {
 public:
   MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
                              SubscriptionCallbacks<ResourceType>& callbacks));

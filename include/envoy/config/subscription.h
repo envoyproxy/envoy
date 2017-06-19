@@ -27,14 +27,10 @@ public:
 
 /**
  * Common abstraction for subscribing to versioned config updates. This may be implemented via bidi
- * gRPC streams, periodic/long polling REST or inotify filesystem updates. Both ResponseType and
- * ResourceType are expected to be protobuf serializable objects. ResponseType must have two fields:
- * - bytes version_info
- * - repeated ResponseType resources
- * This typing corresponds to the stylized use of protobufs in the xDS subscription response
- * objects.
+ * gRPC streams, periodic/long polling REST or inotify filesystem updates. ResourceType is expected
+ * to be a protobuf serializable object.
  */
-template <class ResponseType, class ResourceType> class Subscription {
+template <class ResourceType> class Subscription {
 public:
   virtual ~Subscription() {}
 
