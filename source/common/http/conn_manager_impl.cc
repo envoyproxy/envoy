@@ -428,16 +428,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
   // header size. For HTTP/1.1 the entire headers data has be less than ~80K (hard coded in
-  // http_parser). For HTTP/2 we currently check if the incoming headers is less than ~63K. 63K
-  // is abritrary and is set because currently nghttp2 does not allow *sending* more than 64K of
-  // headers for reasons I don't understand so 63K is testable. However, since HTTP/1.1 can send us
-  // potentially 80K of headers, we can still die when we try to proxy to HTTP/2. We correctly
-  // handle this but to the rest of the code it looks like an upstream reset which will usually
-  // result in a 503. In order to have generally uniform behavior we also check total header size
-  // here and keep it under 60K. Ultimately it would be nice to bring this to a lower value but
-  // unclear if that is possible or not.
+  // http_parser). For HTTP/2 the default allowed header block length is 64k.
+  // In order to have generally uniform behavior we also check total header size here and keep it
+  // under 60K.  Ultimately it would be nice to have a configuration option ranging from the largest
+  // header size http_parser and nghttp2 will allow, down to 16k or 8k for
+  // envoy users who do not wish to proxy large headers.
   if (request_headers_->byteSize() > (60 * 1024)) {
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+    HeaderMapImpl headers{
+        {Headers::get().Status, std::to_string(enumToInt(Code::RequestHeaderFieldsTooLarge))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }

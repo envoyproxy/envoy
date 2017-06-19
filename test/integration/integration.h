@@ -208,6 +208,7 @@ protected:
   void testMissingContentLength();
   void testHttp10Request();
   void testNoHost();
+  void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
   void testInvalidContentLength(Http::CodecClient::Type type);

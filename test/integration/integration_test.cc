@@ -133,6 +133,10 @@ TEST_P(IntegrationTest, MultipleContentLengths) {
   testMultipleContentLengths(Http::CodecClient::Type::HTTP1);
 }
 
+TEST_P(IntegrationTest, OverlyLongHeaders) {
+  testOverlyLongHeaders(Http::CodecClient::Type::HTTP1);
+}
+
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
 TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
