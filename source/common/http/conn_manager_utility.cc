@@ -144,7 +144,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
       if (!connection.ssl()->sha256PeerCertificateDigest().empty()) {
         clientCertDetails += ";Hash=" + connection.ssl()->sha256PeerCertificateDigest();
       }
-      for (auto detail : config.setClientCertDetails()) {
+      for (auto detail : config.setCurrentClientCertDetails()) {
         if (detail == Http::ClientCertDetailsType::Subject) {
           // TODO. Get Cert Subject.
         } else if (detail == Http::ClientCertDetailsType::SAN) {

@@ -401,7 +401,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
@@ -416,7 +416,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{
@@ -442,7 +442,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
   std::list<Http::ClientCertDetailsType> details = std::list<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
-  ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(details));
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(Return(details));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -469,7 +469,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
   std::list<Http::ClientCertDetailsType> details = std::list<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
-  ON_CALL(config_, setClientCertDetails()).WillByDefault(Return(details));
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(Return(details));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -487,7 +487,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
@@ -503,7 +503,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{
@@ -519,7 +519,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
@@ -533,7 +533,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
-  ON_CALL(config_, setClientCertDetails())
+  ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{

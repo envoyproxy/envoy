@@ -112,7 +112,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 void XfccIntegrationTest::startTestServerWithXfccConfig(std::string fcc, std::string sccd) {
   TestEnvironment::ParamMap param_map;
   param_map["forward_client_cert"] = fcc;
-  param_map["set_client_cert_details"] = sccd;
+  param_map["set_current_client_cert_details"] = sccd;
   std::string config = TestEnvironment::temporaryFileSubstitute(
       "test/config/integration/server_xfcc.json", param_map, port_map_, version_);
   test_server_ = Ssl::MockRuntimeIntegrationTestServer::create(config, version_);

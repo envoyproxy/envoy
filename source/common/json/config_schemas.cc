@@ -318,7 +318,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "type" : "string",
           "enum" : ["forward_only", "append_forward", "sanitize", "sanitize_set", "always_forward_only", "always_append_forward"]
       },
-      "set_client_cert_details" : {
+      "set_current_client_cert_details" : {
           "type" : "array",
           "uniqueItems": true,
           "items" : {

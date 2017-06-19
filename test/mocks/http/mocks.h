@@ -91,7 +91,7 @@ public:
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
-  MOCK_METHOD0(setClientCertDetails, const std::list<Http::ClientCertDetailsType>());
+  MOCK_METHOD0(setCurrentClientCertDetails, const std::list<Http::ClientCertDetailsType>());
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
   MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());

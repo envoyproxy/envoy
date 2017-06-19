@@ -130,7 +130,8 @@ enum class ForwardClientCertType {
 };
 
 /**
- * Configuration for the fields of the current client cert to be forwarded.
+ * Configuration for the fields of the client cert, used for populating the current client cert
+ * information to the next hop.
  */
 enum class ClientCertDetailsType { Subject, SAN };
 
@@ -215,14 +216,15 @@ public:
   virtual bool useRemoteAddress() PURE;
 
   /**
-   * @return ForwardClientCertType the configuration of how to forward the client certs.
+   * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() PURE;
 
   /**
-   * @return ClientCertDetailsType the details of the client cert to forward to the next hop.
+   * @return list of ClientCertDetailsType the configuration of the current client cert's details to
+   * be forwarded.
    */
-  virtual const std::list<ClientCertDetailsType> setClientCertDetails() PURE;
+  virtual const std::list<ClientCertDetailsType> setCurrentClientCertDetails() PURE;
 
   /**
    * @return local address.

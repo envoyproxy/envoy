@@ -83,7 +83,7 @@
           { "type": "decoder", "name": "router", "config": {} }
         ],
         "forward_client_cert": "{{ forward_client_cert }}",
-        "set_client_cert_details": [ {{ set_client_cert_details }} ]
+        "set_current_client_cert_details": [ {{ set_current_client_cert_details }} ]
       }
     }]
   },
@@ -165,7 +165,7 @@
           { "type": "decoder", "name": "router", "config": {} }
         ],
         "forward_client_cert": "{{ forward_client_cert }}",
-        "set_client_cert_details": [ {{ set_client_cert_details }} ]
+        "set_current_client_cert_details": [ {{ set_current_client_cert_details }} ]
       }
     }]
   }],
