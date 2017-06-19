@@ -88,9 +88,9 @@ public:
     }
     if (callbacks_->onConfigUpdate(typed_resources)) {
       request_.set_version_info(message->version_info());
-      // This effectively ACKs the accepted configuration.
-      sendDiscoveryRequest();
     }
+    // This effectively ACK/NACKs the accepted configuration.
+    sendDiscoveryRequest();
   }
 
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
