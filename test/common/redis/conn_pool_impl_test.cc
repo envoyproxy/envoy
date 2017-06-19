@@ -198,12 +198,12 @@ TEST_F(RedisClientImplTest, FailAll) {
 
   onConnected();
 
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(503));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_CALL(outlier_detector_, putHttpResponseCode(503));
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
 }
@@ -251,6 +251,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void { throw ProtocolError("error"); }));
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(500));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -270,6 +271,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(503));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
@@ -289,6 +291,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(504));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -310,6 +313,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   onConnected();
 
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(504));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
