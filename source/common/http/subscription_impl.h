@@ -73,6 +73,8 @@ public:
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     if (callbacks_->onConfigUpdate(typed_resources)) {
       request_.set_version_info(message.version_info());
+    } else {
+      // TODO(htuch): Track stats and log failures.
     }
   }
 
