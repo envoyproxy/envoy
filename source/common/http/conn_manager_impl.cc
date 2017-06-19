@@ -428,7 +428,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
   // header size. For HTTP/1.1 the entire headers data has be less than ~80K (hard coded in
-  // http_parser). For HTTP/2 the default allowed header block length is 64k/
+  // http_parser). For HTTP/2 the default allowed header block length is 64k.
   // In order to have generally uniform behavior we also check total header size here and keep it
   // under 60K.  Ultimately it would be nice to have a configuration option ranging from the largest
   // header size http_parser and nghttp2 will allow, down to 16k or 8k for
