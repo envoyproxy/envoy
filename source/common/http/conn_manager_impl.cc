@@ -29,7 +29,7 @@
 #include "common/network/utility.h"
 
 #include "spdlog/spdlog.h"
-
+#include <iostream>
 namespace Envoy {
 namespace Http {
 
@@ -481,6 +481,36 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
+
+  if (!cached_route_.valid()) {
+    cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
+    ENVOY_STREAM_LOG(warn, "here1", *this);
+  }
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  ENVOY_STREAM_LOG(warn, "here2", *this);
+  bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
+  ENVOY_STREAM_LOG(warn, "here3", *this);
+
+  bool isWsConnection = ((request_headers_->Connection()->value() == "upgrade") &&
+                         (request_headers_->Upgrade()->value() == "websocket"));
+  ENVOY_STREAM_LOG(warn, "here4", *this);
+
+  if (isWsConnection && isWsRoute) {
+    // Create WsHandlerImpl
+  } else if (isWsConnection || isWsRoute) {
+    if (isWsConnection) {
+      // Allow WebSocket upgrades only if the corresponding route supports it
+      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+    } else {
+      // Do not allow normal connections on WebSocket routes
+      connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
+    }
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+    encodeHeaders(nullptr, headers, true);
+    ENVOY_STREAM_LOG(warn, "here5", *this);
+    return;
+  }
+
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 

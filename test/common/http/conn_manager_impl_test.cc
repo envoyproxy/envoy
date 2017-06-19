@@ -499,6 +499,58 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
 }
+#if 0
+TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
+  setup(false, "");
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, isWebSocket())
+      .WillByDefault(Return(false));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/foo"},
+                                                   {":connection", "Upgrade"},
+                                                   {":upgrade", "WebSocket"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+      }));
+
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool)
+                           -> void { EXPECT_STREQ("400", headers.Status()->value().c_str()); }));
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RejectNonWebSocketOnWebSocketRoute) {
+  setup(false, "");
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, isWebSocket())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+        HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+      }));
+
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool)
+                           -> void { EXPECT_STREQ("400", headers.Status()->value().c_str()); }));
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_non_ws_on_ws_route_.value());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+#endif
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");

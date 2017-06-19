@@ -100,18 +100,6 @@ TEST_F(RouterTest, RouteNotFound) {
   EXPECT_EQ(1UL, stats_store_.counter("test.no_route").value());
 }
 
-TEST_F(RouterTest, RejectWebSocketOnNonWebSocketRoute) {
-  ON_CALL(callbacks_.route_->route_entry_, isWebSocket()).WillByDefault(Return(false));
-  EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound));
-
-  Http::TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ(1UL, stats_store_.counter("test.ws_on_non_ws_route").value());
-}
-
 TEST_F(RouterTest, ClusterNotFound) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound));
