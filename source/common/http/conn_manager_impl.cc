@@ -437,7 +437,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // here and keep it under 60K. Ultimately it would be nice to bring this to a lower value but
   // unclear if that is possible or not.
   if (request_headers_->byteSize() > (60 * 1024)) {
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::RequestHeaderFieldsTooLarge))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }
