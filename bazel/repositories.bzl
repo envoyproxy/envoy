@@ -105,7 +105,11 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = "https://github.com/lyft/envoy-api.git",
-        commit = "803dd0a589fbca228be01b9f763d7617d9a2d0d8",
+        commit = "ecd521b1acf7e5c1ca3d2b0e9c3ad18a6cc5b530",
+    )
+    native.bind(
+        name = "envoy_base",
+        actual = "@envoy_api//api:base",
     )
     native.bind(
         name = "envoy_eds",

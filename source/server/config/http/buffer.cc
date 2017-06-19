@@ -4,10 +4,10 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/http/filter/buffer_filter.h"
 #include "common/json/config_schemas.h"
-
-#include "server/config/network/http_connection_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -29,9 +29,9 @@ HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& 
 }
 
 /**
- * Static registration for the buffer filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the buffer filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<BufferFilterConfig> register_;
+static Registry::RegisterFactory<BufferFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server

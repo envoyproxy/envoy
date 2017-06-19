@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:filter_config_interface",
@@ -36,7 +37,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
-        "//source/common/ssl:context_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/common/upstream:cluster_manager_lib",
@@ -113,12 +113,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "listener_manager_lib",
+    srcs = ["listener_manager_impl.cc"],
+    hdrs = ["listener_manager_impl.h"],
+    deps = [
+        ":configuration_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_validator_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
+        ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
         "//include/envoy/common:optional",
@@ -129,6 +147,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_macros",
@@ -139,10 +158,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/memory:stats_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/ssl:context_lib",
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:cluster_manager_lib",
@@ -176,10 +192,9 @@ envoy_cc_library(
         ":guarddog_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
-        "//include/envoy/server:configuration_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/api:api_lib",
         "//source/common/common:thread_lib",
-        "//source/common/network:listen_socket_lib",
     ],
 )

@@ -7,8 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -411,6 +411,12 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
         http_parser_pause(&parser_, 1);
       }
 
+    } else if (parser_.method == http_method::HTTP_POST ||
+               parser_.method == http_method::HTTP_PUT) {
+      // If there is no body present but a body is expected for this particular method,
+      // return an error to the user.
+      error_code_ = Http::Code::LengthRequired;
+      return -1;
     } else {
       deferred_end_stream_headers_ = std::move(headers);
     }
@@ -471,11 +477,13 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
 
 void ServerConnectionImpl::sendProtocolError() {
   // We do this here because we may get a protocol error before we have a logical stream. Higher
-  // layers can only operate on streams, so there is no coherent way to allow them to send a 400
+  // layers can only operate on streams, so there is no coherent way to allow them to send an error
   // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
   // to look more like HTTP/2 to higher layers.
   if (!active_request_ || !active_request_->response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response("HTTP/1.1 400 Bad Request\r\n"
+    Buffer::OwnedImpl bad_request_response("HTTP/1.1 " + std::to_string(enumToInt(error_code_)) +
+                                           " " + CodeUtility::toString(error_code_) +
+                                           "\r\n"
                                            "content-length: 0\r\n"
                                            "connection: close\r\n\r\n");
 

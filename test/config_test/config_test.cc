@@ -12,13 +12,13 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace Envoy {
 namespace ConfigTest {
 
 class ConfigTest {
@@ -35,14 +35,15 @@ public:
 
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
-    Server::Configuration::MainImpl main_config(server_, cluster_manager_factory_);
+    Server::Configuration::MainImpl main_config;
 
     ON_CALL(server_, clusterManager())
         .WillByDefault(
             Invoke([&]() -> Upstream::ClusterManager& { return main_config.clusterManager(); }));
+    ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
 
     try {
-      main_config.initialize(*config_json);
+      main_config.initialize(*config_json, server_, cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }
@@ -54,10 +55,11 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Server::TestOptionsImpl options_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
+  NiceMock<Server::MockListenSocketFactory> socket_factory_;
+  Server::ListenerManagerImpl listener_manager_{server_, socket_factory_};
 };
 
 uint32_t run(const std::string& directory) {
-
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, true)) {
     ConfigTest config(filename);

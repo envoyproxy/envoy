@@ -29,6 +29,14 @@ TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
 
 TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
 
+TEST_P(Http2IntegrationTest, InvalidContentLength) {
+  testInvalidContentLength(Http::CodecClient::Type::HTTP2);
+}
+
+TEST_P(Http2IntegrationTest, MultipleContentLengths) {
+  testMultipleContentLengths(Http::CodecClient::Type::HTTP2);
+}
+
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -108,25 +116,6 @@ TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
       },
        [&]() -> void { downstream_request = &codec_client->startRequest(big_headers, *response); },
        [&]() -> void { response->waitForReset(); }, [&]() -> void { codec_client->close(); }});
-}
-
-TEST_P(Http2IntegrationTest, MaxHeadersInConnectionManager) {
-  Http::TestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
-
-  big_headers.addViaCopy("big", std::string(60 * 1024, 'a'));
-
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void {
-    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-  },
-                  [&]() -> void { codec_client->makeHeaderOnlyRequest(big_headers, *response); },
-                  [&]() -> void { response->waitForEndStream(); },
-                  [&]() -> void { codec_client->close(); }});
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("400", response->headers().Status()->value().c_str());
 }
 
 TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {

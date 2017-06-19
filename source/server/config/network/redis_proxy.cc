@@ -3,12 +3,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/redis/codec_impl.h"
 #include "common/redis/command_splitter_impl.h"
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
-
-#include "server/configuration_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -34,9 +34,10 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
 }
 
 /**
- * Static registration for the redis filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the redis filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<RedisProxyFilterConfigFactory> registered_;
+static Registry::RegisterFactory<RedisProxyFilterConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // Configuration
 } // Server

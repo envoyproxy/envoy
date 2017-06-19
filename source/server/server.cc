@@ -19,7 +19,6 @@
 #include "common/common/version.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
-#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
 
@@ -41,7 +40,11 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
   } else {
     callback_ = callback;
     state_ = State::Initializing;
-    for (auto target : targets_) {
+    // Target::initialize(...) method can modify the list to remove the item currently
+    // being initialized, so we increment the iterator before calling initialize.
+    for (auto iter = targets_.begin(); iter != targets_.end();) {
+      Init::Target* target = *iter;
+      ++iter;
       target->initialize([this, target]() -> void {
         ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
         targets_.remove(target);
@@ -67,6 +70,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
+      listen_socket_factory_(restarter_), listener_manager_(*this, listen_socket_factory_),
       dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
@@ -145,25 +149,6 @@ void InstanceImpl::flushStats() {
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
-int InstanceImpl::getListenSocketFd(const std::string& address) {
-  Network::Address::InstanceConstSharedPtr addr = Network::Utility::resolveUrl(address);
-  for (const auto& entry : socket_map_) {
-    if (entry.second->localAddress()->asString() == addr->asString()) {
-      return entry.second->fd();
-    }
-  }
-
-  return -1;
-}
-
-Network::ListenSocket* InstanceImpl::getListenSocketByIndex(uint32_t index) {
-  if (index < config_->listeners().size()) {
-    auto it = std::next(config_->listeners().begin(), index);
-    return socket_map_[it->get()].get();
-  }
-  return nullptr;
-}
-
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
   info.num_connections_ = numConnections();
@@ -220,29 +205,9 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
-  Configuration::MainImpl* main_config =
-      new Configuration::MainImpl(*this, *cluster_manager_factory_);
+  Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json);
-
-  for (const Configuration::ListenerPtr& listener : config_->listeners()) {
-    // For each listener config we share a single TcpListenSocket among all threaded listeners.
-    // UdsListenerSockets are not managed and do not participate in hot restart as they are only
-    // used for testing.
-
-    // First we try to get the socket from our parent if applicable.
-
-    ASSERT(listener->address()->type() == Network::Address::Type::Ip);
-    std::string addr = fmt::format("tcp://{}", listener->address()->asString());
-    int fd = restarter_.duplicateParentListenSocket(addr);
-    if (fd != -1) {
-      ENVOY_LOG(info, "obtained socket for address {} from parent", addr);
-      socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->address()));
-    } else {
-      socket_map_[listener.get()].reset(
-          new Network::TcpListenSocket(listener->address(), listener->bindToPort()));
-    }
-  }
+  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
 
   // Setup signals.
   sigterm_ = handler_.dispatcher().listenForSignal(SIGTERM, [this]() -> void {
@@ -285,7 +250,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   ENVOY_LOG(warn, "all dependencies initialized. starting workers");
   for (const WorkerPtr& worker : workers_) {
     try {
-      worker->initializeConfiguration(*config_, socket_map_, *guard_dog_);
+      worker->initializeConfiguration(listener_manager_, *guard_dog_);
     } catch (const Network::CreateListenerException& e) {
       // It is possible that we fail to start listening on a port, even though we were able to
       // bind to it above. This happens when there is a race between two applications to listen

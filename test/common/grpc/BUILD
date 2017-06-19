@@ -83,6 +83,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "subscription_impl_test",
+    srcs = ["subscription_impl_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/grpc:subscription_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "transcoder_input_stream_test",
     srcs = ["transcoder_input_stream_test.cc"],
     deps = [
