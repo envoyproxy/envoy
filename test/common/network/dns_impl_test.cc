@@ -364,17 +364,19 @@ TEST_P(DnsImplTest, LocalLookup) {
   }
 
   if (GetParam() == Address::IpVersion::v6) {
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::Auto,
-                                          [&](std::list<Address::InstanceConstSharedPtr>&& results)
-                                              -> void { address_list = results; }));
-    EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
-    EXPECT_TRUE(hasAddress(address_list, "::1"));
-
+    std::string error_msg = "Synchronous DNS IPv6 localhost resolution failed. Please add ::1 "
+        "localhost to /etc/hosts.";
     EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V6Only,
                                           [&](std::list<Address::InstanceConstSharedPtr>&& results)
-                                              -> void { address_list = results; }));
-    EXPECT_TRUE(hasAddress(address_list, "::1"));
+                                              -> void { address_list = results; })) << error_msg;
+    EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
+
+    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::Auto,
+                                          [&](std::list<Address::InstanceConstSharedPtr>&& results)
+                                              -> void { address_list = results; })) << error_msg;
+    EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
+    EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
   }
 }
 
