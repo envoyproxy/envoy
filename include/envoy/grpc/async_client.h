@@ -29,13 +29,13 @@ public:
    * Close the stream locally. No further methods may be invoked on the
    * stream object, but callbacks may still be received until the stream is closed remotely.
    */
-  virtual void close() PURE;
+  virtual void closeStream() PURE;
 
   /**
    * Close the stream locally and remotely (as needed). No further methods may be invoked on the
    * stream object and no further callbacks will be invoked.
    */
-  virtual void reset() PURE;
+  virtual void resetStream() PURE;
 };
 
 /**

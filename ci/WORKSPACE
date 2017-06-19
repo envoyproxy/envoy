@@ -8,11 +8,12 @@ envoy_dependencies(
     skip_protobuf_bzl = True,
 )
 
-new_local_repository(
+local_repository(
     name = "protobuf_bzl",
     path = "/thirdparty/protobuf",
-    # We only want protobuf.bzl, so don't support building out of this repo.
-    build_file_content = "",
 )
 
 cc_configure()
+
+load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
+api_dependencies()
