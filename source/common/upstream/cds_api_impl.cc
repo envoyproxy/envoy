@@ -38,7 +38,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
 }
 
 void CdsApiImpl::createRequest(Http::Message& request) {
-  LOG(debug, "cds: starting request");
+  ENVOY_LOG(debug, "cds: starting request");
   stats_.update_attempt_.inc();
   request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
@@ -46,7 +46,7 @@ void CdsApiImpl::createRequest(Http::Message& request) {
 }
 
 void CdsApiImpl::parseResponse(const Http::Message& response) {
-  LOG(debug, "cds: parsing response");
+  ENVOY_LOG(debug, "cds: parsing response");
   Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> clusters = response_json->getObjectArray("clusters");
@@ -57,13 +57,13 @@ void CdsApiImpl::parseResponse(const Http::Message& response) {
     std::string cluster_name = cluster->getString("name");
     clusters_to_remove.erase(cluster_name);
     if (cm_.addOrUpdatePrimaryCluster(*cluster)) {
-      LOG(info, "cds: add/update cluster '{}'", cluster_name);
+      ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster_name);
     }
   }
 
   for (auto cluster : clusters_to_remove) {
     if (cm_.removePrimaryCluster(cluster.first)) {
-      LOG(info, "cds: remove cluster '{}'", cluster.first);
+      ENVOY_LOG(info, "cds: remove cluster '{}'", cluster.first);
     }
   }
 
@@ -80,9 +80,9 @@ void CdsApiImpl::onFetchComplete() {
 void CdsApiImpl::onFetchFailure(EnvoyException* e) {
   stats_.update_failure_.inc();
   if (e) {
-    LOG(warn, "cds: fetch failure: {}", e->what());
+    ENVOY_LOG(warn, "cds: fetch failure: {}", e->what());
   } else {
-    LOG(info, "cds: fetch failure: network error");
+    ENVOY_LOG(info, "cds: fetch failure: network error");
   }
 }
 

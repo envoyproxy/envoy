@@ -40,12 +40,14 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/http:filter_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -76,7 +78,9 @@ envoy_cc_library(
         ":codec_lib",
         ":common_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
+        "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],
 )
@@ -96,5 +100,15 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_lib",
+    hdrs = ["subscription_impl.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":async_client_lib",
+        "//include/envoy/config:subscription_interface",
     ],
 )

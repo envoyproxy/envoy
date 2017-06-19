@@ -39,8 +39,8 @@ public:
 };
 
 /**
- * Implemented by each HttpTracer and registered via registerHttpTracerFactory() or
- * the convenience class RegisterHttpTracerFactory.
+ * Implemented by each HttpTracer and registered via Registry::registerFactory() or
+ * the convenience class RegisterFactory.
  */
 class HttpTracerFactory {
 public:
@@ -83,61 +83,36 @@ public:
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
-  MainImpl(Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory_);
-
   /**
    * DEPRECATED - Register an NetworkFilterConfigFactory implementation as an option to create
    * instances of NetworkFilterFactoryCb.
    * @param factory the NetworkFilterConfigFactory implementation
    */
   static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
-    filterConfigFactories().push_back(&factory);
+    filterConfigFactories_().push_back(&factory);
   }
 
   /**
-   * Register an NamedNetworkFilterConfigFactory implementation as an option to create instances of
-   * NetworkFilterFactoryCb.
-   * @param factory the NamedNetworkFilterConfigFactory implementation
+   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
    */
-  static void registerNamedNetworkFilterConfigFactory(NamedNetworkFilterConfigFactory& factory) {
-    auto result = namedFilterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
-
-    // result is a pair whose second member is a boolean indicating, if false, that the key exists
-    // and that the value was not inserted.
-    if (!result.second) {
-      throw EnvoyException(fmt::format(
-          "Attempted to register multiple NamedNetworkFilterConfigFactory objects with name: '{}'",
-          factory.name()));
-    }
-  }
-
-  /**
-   * Register an HttpTracerFactory as an option to create instances of HttpTracers.
-   * @param factory the HttpTracerFactory implementation
-   */
-  static void registerHttpTracerFactory(HttpTracerFactory& factory) {
-    auto result = httpTracerFactories().emplace(std::make_pair(factory.name(), &factory));
-
-    // result is a pair whose second member is a boolean indicating, if false, that the key exists
-    // and that the value was not inserted.
-    if (!result.second) {
-      throw EnvoyException(
-          fmt::format("Attempted to register multiple HttpTracerFactory objects with name: '{}'",
-                      factory.name()));
-    }
+  static const std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
+    return filterConfigFactories_();
   }
 
   /**
    * Initialize the configuration. This happens here vs. the constructor because the initialization
-   * will call through the server to get the cluster manager so the server variable must be
-   * initialized.
+   * will call through the server into the config to get the cluster manager so the config object
+   * must be created already.
+   * @param json supplies the configuration JSON.
+   * @param server supplies the owning server.
+   * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const Json::Object& json);
+  void initialize(const Json::Object& json, Instance& server,
+                  Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
-  const std::list<ListenerPtr>& listeners() override;
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
   // TODO(hennna): DEPRECATED - statsdUdpPort() will be removed in 1.4.0
@@ -157,96 +132,19 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const Json::Object& tracing_configuration);
-
-  /**
-   * Maps JSON config to runtime config for a listener with network filter chain.
-   */
-  class ListenerConfig : public Listener,
-                         public FactoryContext,
-                         public Network::FilterChainFactory {
-  public:
-    ListenerConfig(Instance& server, Json::Object& json);
-
-    // Server::Configuration::Listener
-    Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    Network::Address::InstanceConstSharedPtr address() override { return address_; }
-    bool bindToPort() override { return bind_to_port_; }
-    Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
-    bool useProxyProto() override { return use_proxy_proto_; }
-    bool useOriginalDst() override { return use_original_dst_; }
-    uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
-    Stats::Scope& listenerScope() override { return *listener_scope_; }
-
-    // Server::Configuration::FactoryContext
-    AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
-    Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-    Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
-    DrainManager& drainManager() override { return server_.drainManager(); }
-    bool healthCheckFailed() override { return server_.healthCheckFailed(); }
-    Tracing::HttpTracer& httpTracer() override { return server_.httpTracer(); }
-    Init::Manager& initManager() override { return server_.initManager(); }
-    const LocalInfo::LocalInfo& localInfo() override { return server_.localInfo(); }
-    Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
-    RateLimit::ClientPtr
-    rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
-      return server_.rateLimitClient(timeout);
-    }
-    Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
-    Instance& server() override { return server_; }
-    Stats::Scope& scope() override { return *global_scope_; }
-    ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
-
-    // Network::FilterChainFactory
-    bool createFilterChain(Network::Connection& connection) override;
-
-  private:
-    Instance& server_;
-    Network::Address::InstanceConstSharedPtr address_;
-    bool bind_to_port_{};
-    Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
-    Stats::ScopePtr listener_scope_; // Stats with listener named scope.
-    Ssl::ServerContextPtr ssl_context_;
-    bool use_proxy_proto_{};
-    bool use_original_dst_{};
-    uint32_t per_connection_buffer_limit_bytes_{};
-    std::list<NetworkFilterFactoryCb> filter_factories_;
-  };
+  void initializeTracers(const Json::Object& tracing_configuration, Instance& server);
 
   /**
    * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
    */
-  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
+  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories_() {
     static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
         new std::list<NetworkFilterConfigFactory*>;
     return *filter_config_factories;
   }
 
-  /**
-   * Returns a map of the currently registered NamedNetworkConfigFactories.
-   */
-  static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>&
-  namedFilterConfigFactories() {
-    static std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>*
-        named_filter_config_factories =
-            new std::unordered_map<std::string, NamedNetworkFilterConfigFactory*>;
-    return *named_filter_config_factories;
-  }
-
-  /**
-   * Returns a map of the currently registered HttpTracerFactories.
-   */
-  static std::unordered_map<std::string, HttpTracerFactory*>& httpTracerFactories() {
-    static std::unordered_map<std::string, HttpTracerFactory*>* http_tracer_factories =
-        new std::unordered_map<std::string, HttpTracerFactory*>;
-    return *http_tracer_factories;
-  }
-
-  Instance& server_;
-  Upstream::ClusterManagerFactory& cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
-  std::list<ListenerPtr> listeners_;
   Optional<std::string> statsd_tcp_cluster_name_;
   Optional<uint32_t> statsd_udp_port_;
   Optional<std::string> statsd_udp_ip_address_;
@@ -271,37 +169,6 @@ public:
   RegisterNetworkFilterConfigFactory() {
     static T* instance = new T;
     MainImpl::registerNetworkFilterConfigFactory(*instance);
-  }
-};
-
-/**
- * @see NamedNetworkFilterConfigFactory.  An instantiation of this class registers a
- * NamedNetworkFilterConfigFactory implementation (T) so it can be used to create instances of
- * NetworkFilterFactoryCb.
- */
-template <class T> class RegisterNamedNetworkFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterNamedNetworkFilterConfigFactory() {
-    static T* instance = new T;
-    MainImpl::registerNamedNetworkFilterConfigFactory(*instance);
-  }
-};
-
-/**
- * @see HttpTracerFactory.  An instantiation of this class registers an HttpTracerFactory
- * implementation (T) so it can be used to create instances of HttpTracer.
- */
-template <class T> class RegisterHttpTracerFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterHttpTracerFactory() {
-    static T* instance = new T;
-    MainImpl::registerHttpTracerFactory(*instance);
   }
 };
 

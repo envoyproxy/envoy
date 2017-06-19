@@ -27,11 +27,13 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
     : options_(options), stats_store_(store),
       handler_(Api::ApiPtr{new Api::ValidationImpl(options.fileFlushIntervalMsec())}),
       local_info_(local_info),
-      access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
+      access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store),
+      listener_manager_(*this, *this) {
   try {
     initialize(options, component_factory);
   } catch (const EnvoyException& e) {
-    LOG(critical, "error initializing configuration '{}': {}", options.configPath(), e.what());
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+              e.what());
     thread_local_.shutdownThread();
     throw;
   }
@@ -56,10 +58,9 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo()));
 
-  Configuration::MainImpl* main_config =
-      new Configuration::MainImpl(*this, *cluster_manager_factory_);
+  Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json);
+  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
 
   clusterManager().setInitializedCb([this]()
                                         -> void { init_manager_.initialize([]() -> void {}); });

@@ -7,8 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -262,8 +262,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
 }
 
 void ConnectionImpl::completeLastHeader() {
-  CONN_LOG(trace, "completed header: key={} value={}", connection_, current_header_field_.c_str(),
-           current_header_value_.c_str());
+  ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
+                 current_header_field_.c_str(), current_header_value_.c_str());
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
@@ -276,7 +276,7 @@ void ConnectionImpl::completeLastHeader() {
 }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
-  CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
+  ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
 
   // Always unpause before dispatch.
   http_parser_pause(&parser_, 0);
@@ -293,7 +293,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
     dispatchSlice(nullptr, 0);
   }
 
-  CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
+  ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
 }
 
@@ -332,7 +332,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  CONN_LOG(trace, "headers complete", connection_);
+  ENVOY_CONN_LOG(trace, "headers complete", connection_);
   completeLastHeader();
   if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
@@ -411,6 +411,12 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
         http_parser_pause(&parser_, 1);
       }
 
+    } else if (parser_.method == http_method::HTTP_POST ||
+               parser_.method == http_method::HTTP_PUT) {
+      // If there is no body present but a body is expected for this particular method,
+      // return an error to the user.
+      error_code_ = Http::Code::LengthRequired;
+      return -1;
     } else {
       deferred_end_stream_headers_ = std::move(headers);
     }
@@ -436,7 +442,7 @@ void ServerConnectionImpl::onUrl(const char* data, size_t length) {
 void ServerConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_) {
-    CONN_LOG(trace, "body size={}", connection_, length);
+    ENVOY_CONN_LOG(trace, "body size={}", connection_, length);
     Buffer::OwnedImpl buffer(data, length);
     active_request_->request_decoder_->decodeData(buffer, false);
   }
@@ -444,7 +450,7 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
 
 void ServerConnectionImpl::onMessageComplete() {
   if (active_request_) {
-    CONN_LOG(trace, "message complete", connection_);
+    ENVOY_CONN_LOG(trace, "message complete", connection_);
     Buffer::OwnedImpl buffer;
     active_request_->remote_complete_ = true;
 
@@ -471,11 +477,13 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
 
 void ServerConnectionImpl::sendProtocolError() {
   // We do this here because we may get a protocol error before we have a logical stream. Higher
-  // layers can only operate on streams, so there is no coherent way to allow them to send a 400
+  // layers can only operate on streams, so there is no coherent way to allow them to send an error
   // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
   // to look more like HTTP/2 to higher layers.
   if (!active_request_ || !active_request_->response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response("HTTP/1.1 400 Bad Request\r\n"
+    Buffer::OwnedImpl bad_request_response("HTTP/1.1 " + std::to_string(enumToInt(error_code_)) +
+                                           " " + CodeUtility::toString(error_code_) +
+                                           "\r\n"
                                            "content-length: 0\r\n"
                                            "connection: close\r\n\r\n");
 

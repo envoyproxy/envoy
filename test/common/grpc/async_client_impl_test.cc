@@ -12,7 +12,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -43,26 +42,21 @@ typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
 
 class HelloworldStream : public MockAsyncClientCallbacks<helloworld::HelloReply> {
 public:
-  HelloworldStream() {
-    ON_CALL(http_stream_, reset()).WillByDefault(Invoke([this]() { http_callbacks_->onReset(); }));
+  HelloworldStream(Http::MockAsyncClientStream* http_stream) : http_stream_(http_stream) {
+    ON_CALL(*http_stream_, reset()).WillByDefault(Invoke([this]() { http_callbacks_->onReset(); }));
   }
 
-  ~HelloworldStream() {
-    if (grpc_stream_ != nullptr) {
-      EXPECT_CALL(http_stream_, reset());
-      grpc_stream_->reset();
-    }
-  }
+  ~HelloworldStream() { Mock::VerifyAndClear(http_stream_); }
 
   void sendRequest() {
     helloworld::HelloRequest request;
     request.set_name(HELLO_REQUEST);
 
     EXPECT_CALL(
-        http_stream_,
+        *http_stream_,
         sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), false));
     grpc_stream_->sendMessage(request);
-    Mock::VerifyAndClearExpectations(&http_stream_);
+    Mock::VerifyAndClearExpectations(http_stream_);
   }
 
   void sendServerInitialMetadata(TestMetadata& metadata) {
@@ -85,7 +79,7 @@ public:
 
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
     if (grpc_status != Status::GrpcStatus::Ok) {
-      EXPECT_CALL(http_stream_, reset());
+      EXPECT_CALL(*http_stream_, reset());
     }
     EXPECT_CALL(*this, onRemoteClose(grpc_status))
         .WillOnce(Invoke([this](Status::GrpcStatus grpc_status) {
@@ -118,15 +112,15 @@ public:
   }
 
   void closeStream() {
-    EXPECT_CALL(http_stream_, reset());
-    grpc_stream_->close();
+    EXPECT_CALL(*http_stream_, reset());
+    grpc_stream_->closeStream();
     clearStream();
   }
 
   void clearStream() { grpc_stream_ = nullptr; }
 
   Http::AsyncClient::StreamCallbacks* http_callbacks_{};
-  Http::MockAsyncClientStream http_stream_;
+  Http::MockAsyncClientStream* http_stream_;
   AsyncClientStream<helloworld::HelloRequest>* grpc_stream_{};
 };
 
@@ -139,8 +133,15 @@ public:
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
+  ~GrpcAsyncClientImplTest() {
+    for (auto* stream : dangling_streams_) {
+      EXPECT_CALL(*stream, reset());
+    }
+  }
+
   std::unique_ptr<HelloworldStream> createStream(TestMetadata& initial_metadata) {
-    std::unique_ptr<HelloworldStream> stream(new HelloworldStream());
+    http_streams_.emplace_back(new Http::MockAsyncClientStream());
+    std::unique_ptr<HelloworldStream> stream(new HelloworldStream(http_streams_.back().get()));
     std::vector<Http::LowerCaseString> keys;
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -160,15 +161,21 @@ public:
                                    const Optional<std::chrono::milliseconds>& timeout) {
           UNREFERENCED_PARAMETER(timeout);
           stream->http_callbacks_ = &callbacks;
-          return &stream->http_stream_;
+          return stream->http_stream_;
         }));
-    EXPECT_CALL(stream->http_stream_, sendHeaders(HeaderMapEqualRef(&headers), _));
+    EXPECT_CALL(*(stream->http_stream_), sendHeaders(HeaderMapEqualRef(&headers), _));
     stream->grpc_stream_ =
         grpc_client_->start(*method_descriptor_, *stream, Optional<std::chrono::milliseconds>());
     EXPECT_NE(stream->grpc_stream_, nullptr);
     return stream;
   }
 
+  void expectResetOn(HelloworldStream* stream) {
+    dangling_streams_.push_back(stream->http_stream_);
+  }
+
+  std::vector<Http::MockAsyncClientStream*> dangling_streams_;
+  std::vector<std::unique_ptr<Http::MockAsyncClientStream>> http_streams_;
   const google::protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -337,7 +344,8 @@ TEST_F(GrpcAsyncClientImplTest, ClientInitialMetadata) {
   TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
   };
-  createStream(initial_metadata);
+  auto stream = createStream(initial_metadata);
+  expectResetOn(stream.get());
 }
 
 // Validate that receiving server initial metadata works.
@@ -349,6 +357,7 @@ TEST_F(GrpcAsyncClientImplTest, ServerInitialMetadata) {
       {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
   };
   stream->sendServerInitialMetadata(initial_metadata);
+  expectResetOn(stream.get());
 }
 
 // Validate that receiving server trailing metadata works.
@@ -362,6 +371,7 @@ TEST_F(GrpcAsyncClientImplTest, ServerTrailingMetadata) {
       {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
   };
   stream->sendServerTrailers(Status::GrpcStatus::Ok, trailing_metadata);
+  expectResetOn(stream.get());
 }
 
 // Validate that a trailers-only response is handled.
@@ -407,9 +417,9 @@ TEST_F(GrpcAsyncClientImplTest, SendAfterRemoteClose) {
 TEST_F(GrpcAsyncClientImplTest, resetAfterCloseLocal) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  stream->grpc_stream_->close();
-  EXPECT_CALL(stream->http_stream_, reset());
-  stream->grpc_stream_->reset();
+  stream->grpc_stream_->closeStream();
+  EXPECT_CALL(*stream->http_stream_, reset());
+  stream->grpc_stream_->resetStream();
   stream->clearStream();
 }
 
@@ -418,8 +428,8 @@ TEST_F(GrpcAsyncClientImplTest, resetAfterCloseRemote) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
   stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
-  EXPECT_CALL(stream->http_stream_, reset());
-  stream->grpc_stream_->reset();
+  EXPECT_CALL(*stream->http_stream_, reset());
+  stream->grpc_stream_->resetStream();
   stream->clearStream();
 }
 

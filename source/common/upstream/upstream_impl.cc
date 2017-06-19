@@ -439,14 +439,14 @@ StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
 }
 
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
-  LOG(debug, "starting async DNS resolution for {}", dns_address_);
+  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
-        LOG(debug, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostSharedPtr> new_hosts;
@@ -463,7 +463,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         std::vector<HostSharedPtr> hosts_added;
         std::vector<HostSharedPtr> hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false)) {
-          LOG(debug, "DNS hosts have changed for {}", dns_address_);
+          ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);
         }
 

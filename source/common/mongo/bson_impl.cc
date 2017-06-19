@@ -361,11 +361,12 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     throw EnvoyException("invalid BSON message length");
   }
 
-  LOG(trace, "BSON document length: {} data length: {}", message_length, original_buffer_length);
+  ENVOY_LOG(trace, "BSON document length: {} data length: {}", message_length,
+            original_buffer_length);
 
   while (true) {
     uint64_t document_bytes_remaining = data.length() - (original_buffer_length - message_length);
-    LOG(trace, "BSON document bytes remaining: {}", document_bytes_remaining);
+    ENVOY_LOG(trace, "BSON document bytes remaining: {}", document_bytes_remaining);
     if (document_bytes_remaining == 1) {
       uint8_t last_byte = BufferHelper::removeByte(data);
       if (last_byte != 0) {
@@ -377,37 +378,37 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
 
     uint8_t element_type = BufferHelper::removeByte(data);
     std::string key = BufferHelper::removeCString(data);
-    LOG(trace, "BSON element type: {:#x} key: {}", element_type, key);
+    ENVOY_LOG(trace, "BSON element type: {:#x} key: {}", element_type, key);
     switch (static_cast<Field::Type>(element_type)) {
     case Field::Type::DOUBLE: {
       double value = BufferHelper::removeDouble(data);
-      LOG(trace, "BSON double: {}", value);
+      ENVOY_LOG(trace, "BSON double: {}", value);
       addDouble(key, value);
       break;
     }
 
     case Field::Type::STRING: {
       std::string value = BufferHelper::removeString(data);
-      LOG(trace, "BSON string: {}", value);
+      ENVOY_LOG(trace, "BSON string: {}", value);
       addString(key, std::move(value));
       break;
     }
 
     case Field::Type::DOCUMENT: {
-      LOG(trace, "BSON document");
+      ENVOY_LOG(trace, "BSON document");
       addDocument(key, DocumentImpl::create(data));
       break;
     }
 
     case Field::Type::ARRAY: {
-      LOG(trace, "BSON array");
+      ENVOY_LOG(trace, "BSON array");
       addArray(key, DocumentImpl::create(data));
       break;
     }
 
     case Field::Type::BINARY: {
       std::string value = BufferHelper::removeBinary(data);
-      LOG(trace, "BSON binary: {}", value);
+      ENVOY_LOG(trace, "BSON binary: {}", value);
       addBinary(key, std::move(value));
       break;
     }
@@ -421,20 +422,20 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
 
     case Field::Type::BOOLEAN: {
       bool value = BufferHelper::removeByte(data) != 0;
-      LOG(trace, "BSON boolean: {}", value);
+      ENVOY_LOG(trace, "BSON boolean: {}", value);
       addBoolean(key, value);
       break;
     }
 
     case Field::Type::DATETIME: {
       int64_t value = BufferHelper::removeInt64(data);
-      LOG(trace, "BSON datetime: {}", value);
+      ENVOY_LOG(trace, "BSON datetime: {}", value);
       addDatetime(key, value);
       break;
     }
 
     case Field::Type::NULL_VALUE: {
-      LOG(trace, "BSON null value");
+      ENVOY_LOG(trace, "BSON null value");
       addNull(key);
       break;
     }
@@ -443,28 +444,28 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
       Field::Regex value;
       value.pattern_ = BufferHelper::removeCString(data);
       value.options_ = BufferHelper::removeCString(data);
-      LOG(trace, "BSON regex pattern: {} options: {}", value.pattern_, value.options_);
+      ENVOY_LOG(trace, "BSON regex pattern: {} options: {}", value.pattern_, value.options_);
       addRegex(key, std::move(value));
       break;
     }
 
     case Field::Type::INT32: {
       int32_t value = BufferHelper::removeInt32(data);
-      LOG(trace, "BSON int32: {}", value);
+      ENVOY_LOG(trace, "BSON int32: {}", value);
       addInt32(key, value);
       break;
     }
 
     case Field::Type::TIMESTAMP: {
       int64_t value = BufferHelper::removeInt64(data);
-      LOG(trace, "BSON timestamp: {}", value);
+      ENVOY_LOG(trace, "BSON timestamp: {}", value);
       addTimestamp(key, value);
       break;
     }
 
     case Field::Type::INT64: {
       int64_t value = BufferHelper::removeInt64(data);
-      LOG(trace, "BSON int64: {}", value);
+      ENVOY_LOG(trace, "BSON int64: {}", value);
       addInt64(key, value);
       break;
     }
