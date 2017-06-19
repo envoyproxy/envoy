@@ -180,6 +180,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
+
+  // If this is a WebSocket upgrade, ensure that the backing route_entry supports WebSockets
+  if (headers.Upgrade() && headers.Upgrade()->value() == "websocket" &&
+      !route_entry_->isWebSocket()) {
+    config_.stats_.ws_on_non_ws_route_.inc();
+    ENVOY_STREAM_LOG(debug, "WebSocket upgrade received for a non-websocket route '{}'",
+                     *callbacks_, headers.Path()->value().c_str());
+
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
+    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
+        {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::BadRequest))}}};
+    callbacks_->encodeHeaders(std::move(response_headers), true);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();

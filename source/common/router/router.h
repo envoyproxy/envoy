@@ -27,6 +27,7 @@ namespace Router {
   COUNTER(no_route)                                                                                \
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
+  COUNTER(ws_on_non_ws_route)                                                                      \
   COUNTER(rq_total)
 // clang-format on
 
