@@ -21,6 +21,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Redis {
@@ -65,9 +66,12 @@ public:
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
+
     client_ = ClientImpl::create(host_, dispatcher_, EncoderPtr{encoder_}, *this, *config_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
+
+    ON_CALL(*host_, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   }
 
   void onConnected() {
@@ -79,6 +83,7 @@ public:
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* connect_or_op_timer_{new Event::MockTimer(&dispatcher_)};
+  Upstream::Outlier::MockDetectorHostSink outlier_detector_;
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
   DecoderCallbacks* callbacks_{};
@@ -198,6 +203,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
 
+  EXPECT_CALL(outlier_detector_, putHttpResponseCode(503));
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
 }
