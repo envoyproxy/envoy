@@ -414,8 +414,8 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     } else if ((parser_.method == http_method::HTTP_POST ||
                 parser_.method == http_method::HTTP_PUT) &&
                headers->ContentLength() == nullptr) {
-      // If there is no body present but a body is expected for this particular method,
-      // return an error to the user.
+      // If content length is not specified for certain methods and the request
+      // is not chunked encodided, return an error to the user.
       error_code_ = Http::Code::LengthRequired;
       return -1;
     } else {
