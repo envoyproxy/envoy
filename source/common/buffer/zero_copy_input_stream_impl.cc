@@ -53,8 +53,8 @@ void ZeroCopyInputStreamImpl::BackUp(int count) {
   // Preconditions for BackUp:
   // - The last method called must have been Next().
   // - count must be less than or equal to the size of the last buffer returned by Next().
-  // Due to preconditions above, it is save to just adjust position_ and byte_count_ here, and
-  // draining in Next().
+  // Due to preconditions above, it is safe to just adjust position_ and byte_count_ here, and
+  // drain in Next().
   position_ -= count;
   byte_count_ -= count;
 }
