@@ -17,6 +17,13 @@
 namespace Envoy {
 namespace Http {
 
+/**
+ * REST implementation of the API Subscription interface. This fetches the API via periodic polling
+ * with jitter (based on RestApiFetcher). The REST requests are POSTs of the JSON canonical
+ * representation of the DiscoveryRequest proto and the responses are in the form of the JSON
+ * canonical representation of DiscoveryResponse. This implementation is responsible for translating
+ * between the proto serializable objects in the Subscription API and the REST JSON representation.
+ */
 template <class ResourceType>
 class SubscriptionImpl : public RestApiFetcher, Config::Subscription<ResourceType> {
 public:
