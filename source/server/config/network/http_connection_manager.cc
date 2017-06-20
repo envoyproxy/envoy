@@ -91,7 +91,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   } else if (forward_client_cert == "append_forward") {
     forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
   } else if (forward_client_cert == "sanitize_set") {
-      forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
+    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
   } else if (forward_client_cert == "always_forward_only") {
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
   } else {

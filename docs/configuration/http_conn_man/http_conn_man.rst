@@ -184,15 +184,13 @@ forward_client_cert
   *(optional, string)* How to process and/or forward the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP header.
   Possible values are:
+
   1. **sanitize**: Do not send the XFCC header to the next hop. This is the default value.
-  2. **forward_only**: When the client connection is mTLS (Mutual TLS), forward the XFCC header in
-     the request.
-  3. **always_forward_only**: Always forward the XFCC header in the request, regardless of whether
-     the client connection is mTLS.
-  4. **append_forward**: When the client connection is mTLS, append the client certificate
-     information to the request's XFCC header and forward it.
-  5. **sanitize_set**: When the client connection is mTLS, reset the XFCC with the client
-     certificate information and send it to the next hop.
+  2. **forward_only**: When the client connection is mTLS (Mutual TLS), forward the XFCC header in the request.
+  3. **always_forward_only**: Always forward the XFCC header in the request, regardless of whether the client connection is mTLS.
+  4. **append_forward**: When the client connection is mTLS, append the client certificate information to the request's XFCC header and forward it.
+  5. **sanitize_set**: When the client connection is mTLS, reset the XFCC with the client certificate information and send it to the next hop.
+
   For the format of the XFCC header, please refer to
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert`.
 
