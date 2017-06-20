@@ -32,8 +32,8 @@ public:
   // for each method details.
 
   // Note Next() will return true with no data until more data is available if the stream is not
-  // finished. It is the caller's responsibility to finish the stream or wrap with LimitingInputStream
-  // before passing to protobuf code to avoid a spin loop.
+  // finished. It is the caller's responsibility to finish the stream or wrap with
+  // LimitingInputStream before passing to protobuf code to avoid a spin loop.
   virtual bool Next(const void** data, int* size) override;
   virtual void BackUp(int count) override;
   virtual bool Skip(int count) override; // Not implemented
