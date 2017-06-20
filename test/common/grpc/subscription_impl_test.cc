@@ -112,11 +112,15 @@ public:
         .WillOnce(Return(accept));
     if (accept) {
       expectSendMessage(cluster_names, version);
+      version_ = version;
+    } else {
+      expectSendMessage(cluster_names, version_);
     }
     subscription_->onReceiveMessage(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
+  std::string version_;
   const google::protobuf::MethodDescriptor* method_descriptor_;
   SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
