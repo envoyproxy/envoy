@@ -411,8 +411,9 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
         http_parser_pause(&parser_, 1);
       }
 
-    } else if (parser_.method == http_method::HTTP_POST ||
-               parser_.method == http_method::HTTP_PUT) {
+    } else if ((parser_.method == http_method::HTTP_POST ||
+                parser_.method == http_method::HTTP_PUT) &&
+               headers->ContentLength() == nullptr) {
       // If there is no body present but a body is expected for this particular method,
       // return an error to the user.
       error_code_ = Http::Code::LengthRequired;

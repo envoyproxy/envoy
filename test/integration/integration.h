@@ -211,6 +211,7 @@ protected:
   void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
+  void testValidZeroLengthContent(Http::CodecClient::Type type);
   void testInvalidContentLength(Http::CodecClient::Type type);
   void testMultipleContentLengths(Http::CodecClient::Type type);
   void testDrainClose(Http::CodecClient::Type type);
