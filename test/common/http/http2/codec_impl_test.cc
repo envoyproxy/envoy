@@ -65,10 +65,7 @@ public:
         server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
         request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
-    expectServerStream();
-  }
 
-  void expectServerStream() {
     EXPECT_CALL(server_callbacks_, newStream(_))
         .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
           response_encoder_ = &encoder;
@@ -240,33 +237,30 @@ class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   InSequence s;
 
-  // Do a basic request/response to flush settings.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_.encodeHeaders(request_headers, true);
-  TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
-  response_encoder_->encodeHeaders(response_headers, true);
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_.getStream().addCallbacks(client_stream_callbacks);
 
-  // Do a 2nd request, but pause server dispatch so we don't send window updates. This will
-  // result in a deferred reset, followed by a flush which will cause the stream to actually
-  // be reset.
+  // Do a request, but pause server dispatch so we don't send window updates. This will result in a
+  // deferred reset, followed by a pending frames flush which will cause the stream to actually
+  // be reset immediately since we are outside of dispatch context.
   ON_CALL(client_connection_, write(_))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
-  StreamEncoder& request_encoder2 = client_.newStream(response_decoder_);
-  request_encoder2.encodeHeaders(request_headers, false);
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_encoder_.encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
-  request_encoder2.encodeData(body, true);
-  request_encoder2.getStream().resetStream(StreamResetReason::LocalReset);
+  request_encoder_.encodeData(body, true);
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
+  request_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
 
   // Dispatch server. We expect to see some data.
-  expectServerStream();
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
         // Start a response inside the headers callback. This should not result in the client
-        // seeing any headers as the stream should already be reset on the other side.
+        // seeing any headers as the stream should already be reset on the other side, even though
+        // we don't know about it yet.
         TestHeaderMapImpl response_headers{{":status", "200"}};
         response_encoder_->encodeHeaders(response_headers, false);
       }));
