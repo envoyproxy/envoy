@@ -102,6 +102,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("9.255.255.255")));
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("0.0.0.0")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
+    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
   }
 
   {
@@ -126,6 +127,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001::")));
     EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
   }
 
   {
@@ -149,10 +151,9 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd:ef01:2340::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2340::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
   }
 
   {
@@ -164,10 +165,10 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2340::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2330::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd:ef00::")));
-    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd:ef00::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002::")));
   }
 }
 
