@@ -87,6 +87,7 @@ envoy_cc_library(
     hdrs = ["guarddog_impl.h"],
     deps = [
         ":watchdog_lib",
+        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
