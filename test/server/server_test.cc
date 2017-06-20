@@ -80,13 +80,7 @@ protected:
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(ServerInstanceImplTest, NoListenSocketFds) {
-  if (version_ == Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_.getListenSocketFd("tcp://255.255.255.255:80"), -1);
-  } else {
-    EXPECT_EQ(server_.getListenSocketFd("tcp://[ff00::]:80"), -1);
-  }
-}
+TEST_P(ServerInstanceImplTest, Create) {}
 
 } // Server
 } // Envoy

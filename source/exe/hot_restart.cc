@@ -16,6 +16,7 @@
 #include "envoy/server/options.h"
 
 #include "common/common/utility.h"
+#include "common/network/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -307,7 +308,17 @@ void HotRestartImpl::sendMessage(sockaddr_un& address, RpcBase& rpc) {
 
 void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
   RpcGetListenSocketReply reply;
-  reply.fd_ = server_->getListenSocketFd(std::string(rpc.address_));
+  reply.fd_ = -1;
+
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Utility::resolveUrl(std::string(rpc.address_));
+  for (const auto& listener : server_->listenerManager().listeners()) {
+    if (*listener.get().socket().localAddress() == *addr) {
+      reply.fd_ = listener.get().socket().fd();
+      break;
+    }
+  }
+
   if (reply.fd_ == -1) {
     // In this case there is no fd to duplicate so we just send a normal message.
     sendMessage(child_address_, reply);

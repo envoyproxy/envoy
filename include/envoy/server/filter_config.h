@@ -120,8 +120,8 @@ enum class NetworkFilterType { Read, Write, Both };
 typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
 
 /**
- * Implemented by each network filter and registered via registerNamedNetworkFilterConfigFactory()
- * or the convenience class RegisterNamedNetworkFilterConfigFactory.
+ * Implemented by each network filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
  */
 class NamedNetworkFilterConfigFactory {
 public:
@@ -164,8 +164,8 @@ enum class HttpFilterType { Decoder, Encoder, Both };
 typedef std::function<void(Http::FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
 
 /**
- * Implemented by each HTTP filter and registered via registerNamedHttpFilterConfigFactory() or the
- * convenience class RegisterNamedHttpFilterConfigFactory.
+ * Implemented by each HTTP filter and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
  */
 class NamedHttpFilterConfigFactory {
 public:

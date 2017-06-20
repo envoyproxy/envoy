@@ -3,11 +3,10 @@
 #include <string>
 
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/json/config_schemas.h"
 #include "common/mongo/proxy.h"
-
-#include "server/configuration_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -32,9 +31,10 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
 }
 
 /**
- * Static registration for the mongo filter. @see RegisterNamedNetworkFilterConfigFactory.
+ * Static registration for the mongo filter. @see RegisterFactory.
  */
-static RegisterNamedNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
+static Registry::RegisterFactory<MongoProxyFilterConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
 } // Configuration
 } // Server

@@ -87,9 +87,8 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   }
 }
 
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
+void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
   saw_reset_ = true;
-  reset_reason_ = reason;
   if (waiting_for_reset_) {
     dispatcher_.exit();
   }
@@ -281,11 +280,11 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
-  int index = 0;
-  for (const auto& it : port_names) {
-    Network::ListenSocket* listen_socket = test_server_->server().getListenSocketByIndex(index++);
-    RELEASE_ASSERT(listen_socket != nullptr);
-    registerPort(it, listen_socket->localAddress()->ip()->port());
+  auto port_it = port_names.cbegin();
+  auto listeners = test_server_->server().listenerManager().listeners();
+  auto listener_it = listeners.cbegin();
+  for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
+    registerPort(*port_it, listener_it->get().socket().localAddress()->ip()->port());
   }
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
@@ -856,7 +855,7 @@ void BaseIntegrationTest::testMissingDelimiter() {
 
 void BaseIntegrationTest::testInvalidCharacterInFirstline() {
   std::string response;
-  sendRawHttpAndWaitForResponse("GET /\t HTTP/1.1\r\nHost: host\r\n\r\n", &response);
+  sendRawHttpAndWaitForResponse("GE(T / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
@@ -864,13 +863,6 @@ void BaseIntegrationTest::testLowVersion() {
   std::string response;
   sendRawHttpAndWaitForResponse("GET / HTTP/0.8\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
-}
-
-void BaseIntegrationTest::testMissingContentLength() {
-  std::string response;
-  sendRawHttpAndWaitForResponse("POST / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
-  EXPECT_EQ("HTTP/1.1 411 Length Required\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-            response);
 }
 
 void BaseIntegrationTest::testHttp10Request() {
@@ -915,62 +907,22 @@ void BaseIntegrationTest::testBadPath() {
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type) {
+void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
+  Http::TestHeaderMapImpl big_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  big_headers.addViaCopy("big", std::string(60 * 1024, 'a'));
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "-1"}},
-                                               *response);
+                    std::string long_value(7500, 'x');
+                    codec_client->startRequest(big_headers, *response);
                   },
-                  [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
-                    } else {
-                      response->waitForReset();
-                      codec_client->close();
-                    }
-                  }});
+                  [&]() -> void { codec_client->waitForDisconnect(); }});
 
-  if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
-  } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
-  }
-}
-
-void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
-                  [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "3,2"}},
-                                               *response);
-                  },
-                  [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
-                    } else {
-                      response->waitForReset();
-                      codec_client->close();
-                    }
-                  }});
-
-  if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
-  } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
-  }
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("431", response->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testUpstreamProtocolError() {

@@ -30,6 +30,12 @@ MockDrainManager::~MockDrainManager() {}
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
+MockListenSocketFactory::MockListenSocketFactory() {}
+MockListenSocketFactory::~MockListenSocketFactory() {}
+
+MockListenerManager::MockListenerManager() {}
+MockListenerManager::~MockListenerManager() {}
+
 MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
@@ -48,6 +54,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
 }
 
 MockInstance::~MockInstance() {}

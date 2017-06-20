@@ -151,10 +151,12 @@ fault.http.delay.fixed_duration_ms
 *Note*, fault filter runtime settings for the specific downstream cluster
 override the default ones if present. The following are downstream specific
 runtime keys:
+
 * fault.http.<downstream-cluster>.abort.abort_percent
 * fault.http.<downstream-cluster>.abort.http_status
 * fault.http.<downstream-cluster>.delay.fixed_delay_percent
 * fault.http.<downstream-cluster>.delay.fixed_duration_ms
+
 Downstream cluster name is taken from
 :ref:`the HTTP x-envoy-downstream-service-cluster <config_http_conn_man_headers_downstream-service-cluster>`
 header. If the following settings are not found in the runtime it defaults to the global runtime settings

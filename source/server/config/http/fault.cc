@@ -2,10 +2,10 @@
 
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/http/filter/fault_filter.h"
 #include "common/json/config_schemas.h"
-
-#include "server/config/network/http_connection_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,9 +23,9 @@ HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(const Json::Object& j
 }
 
 /**
- * Static registration for the fault filter. @see RegisterNamedHttpFilterConfigFactory.
+ * Static registration for the fault filter. @see RegisterFactory.
  */
-static RegisterNamedHttpFilterConfigFactory<FaultFilterConfig> register_;
+static Registry::RegisterFactory<FaultFilterConfig, NamedHttpFilterConfigFactory> register_;
 
 } // Configuration
 } // Server
