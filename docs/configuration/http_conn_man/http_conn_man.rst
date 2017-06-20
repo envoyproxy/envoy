@@ -26,6 +26,8 @@ HTTP connection manager
       "drain_timeout_ms": "...",
       "access_log": [],
       "use_remote_address": "...",
+      "forward_client_cert": "...",
+      "set_current_client_cert": "...",
       "generate_request_id": "..."
     }
   }
@@ -177,6 +179,28 @@ use_remote_address
   :ref:`config_http_conn_man_headers_x-forwarded-for`,
   :ref:`config_http_conn_man_headers_x-envoy-internal`, and
   :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
+
+forward_client_cert
+  *(optional, string)* How to process and/or forward the
+  :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP header.
+  Possible values are:
+  1. **sanitize**: Do not send the XFCC header to the next hop. This is the default value.
+  2. **forward_only**: When the client connection is mTLS (Mutual TLS), forward the XFCC header in
+     the request.
+  3. **always_forward_only**: Always forward the XFCC header in the request, regardless of whether
+     the client connection is mTLS.
+  4. **append_forward**: When the client connection is mTLS, append the client certificate
+     information to the request's XFCC header and forward it.
+  5. **sanitize_set**: When the client connection is mTLS, reset the XFCC with the client
+     certificate information and send it to the next hop.
+  For the format of the XFCC header, please refer to
+  :ref:`config_http_conn_man_headers_x-forwarded-client-cert`.
+
+set_current_client_cert_details
+  *(optional, array)* A list of strings, possible values are *Subject* and *SAN*. This
+  specifies the fields in the client certificate to be forwarded, when *forward_client_cert* is
+  *append_forward* or *sanitize_set* and the client connection is mTLS. The `By` and `Hash` fields
+  in the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header are always set.
 
 generate_request_id
   *(optional, boolean)* Whether the connection manager will generate the
