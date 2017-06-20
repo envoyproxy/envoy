@@ -50,6 +50,7 @@ MockHostDescription::~MockHostDescription() {}
 
 MockHost::MockHost() {
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
 }
 
