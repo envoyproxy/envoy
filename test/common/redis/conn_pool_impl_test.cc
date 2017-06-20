@@ -123,10 +123,12 @@ TEST_F(RedisClientImplTest, Basic) {
       .WillOnce(Invoke([&](Buffer::Instance&) -> void {
         InSequence s;
         RespValuePtr response1(new RespValue());
+        EXPECT_CALL(outlier_detector_, putHttpResponseCode(200));
         EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
         callbacks_->onRespValue(std::move(response1));
 
         RespValuePtr response2(new RespValue());
+        EXPECT_CALL(outlier_detector_, putHttpResponseCode(200));
         EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
         EXPECT_CALL(*connect_or_op_timer_, disableTimer());
         callbacks_->onRespValue(std::move(response2));
@@ -164,11 +166,13 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void {
         InSequence s;
+
         RespValuePtr response1(new RespValue());
         EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
         callbacks_->onRespValue(std::move(response1));
 
         RespValuePtr response2(new RespValue());
+        EXPECT_CALL(outlier_detector_, putHttpResponseCode(200));
         EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
         EXPECT_CALL(*connect_or_op_timer_, disableTimer());
         callbacks_->onRespValue(std::move(response2));
