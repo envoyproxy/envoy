@@ -131,7 +131,6 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   if (!request.canceled_) {
-    host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
     request.callbacks_.onResponse(std::move(value));
   } else {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
@@ -143,6 +142,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   }
+
+  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
