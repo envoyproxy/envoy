@@ -100,16 +100,10 @@ bool CidrRange::isInRange(const Instance& address) const {
     int length = length_;
     // Loop through address bytes and compare. Address is in network byte order.
     for (int i = 0; i < 16; i++) {
-      if (length == 0) {
-        return true;
-      } else if (length < 8) {
+      if (length < 8) {
         // Compare relevant bits.
-        if (address.ip()->ipv6()->address()[i] >> (8 - length) ==
-            ipv6()->address()[i] >> (8 - length)) {
-          return true;
-        } else {
-          break;
-        }
+        return (address.ip()->ipv6()->address()[i] >> (8 - length) ==
+                ipv6()->address()[i] >> (8 - length));
       } else {
         if (address.ip()->ipv6()->address()[i] == ipv6()->address()[i]) {
           if (length == 8) {

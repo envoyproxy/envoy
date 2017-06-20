@@ -85,6 +85,92 @@ TEST(TruncateIpAddressAndLength, Various) {
   }
 }
 
+TEST(IsInRange, Various) {
+  {
+    CidrRange rng = CidrRange::create("foo");
+    EXPECT_FALSE(rng.isValid());
+    EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("10.255.255.255/0");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "0.0.0.0/0");
+    EXPECT_EQ(rng.length(), 0);
+    EXPECT_EQ(rng.version(), IpVersion::v4);
+    EXPECT_TRUE(rng.isInRange(Ipv4Instance("10.255.255.255")));
+    EXPECT_TRUE(rng.isInRange(Ipv4Instance("9.255.255.255")));
+    EXPECT_TRUE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("10.255.255.255/10");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "10.192.0.0/10");
+    EXPECT_EQ(rng.length(), 10);
+    EXPECT_EQ(rng.version(), IpVersion::v4);
+    EXPECT_TRUE(rng.isInRange(Ipv4Instance("10.255.255.255")));
+    EXPECT_FALSE(rng.isInRange(Ipv4Instance("9.255.255.255")));
+    EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("::/0");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "::/0");
+    EXPECT_EQ(rng.length(), 0);
+    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("::")));
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001::")));
+    EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("::1/128");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "::1/128");
+    EXPECT_EQ(rng.length(), 128);
+    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
+    EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/64");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2345::/64");
+    EXPECT_EQ(rng.length(), 64);
+    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::1")));
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd:ef01:2340::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
+  }
+
+  {
+    CidrRange rng = CidrRange::create("2001:abcd:ef01:2345:6789:abcd:ef01:234/60");
+    EXPECT_TRUE(rng.isValid());
+    EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2340::/60");
+    EXPECT_EQ(rng.length(), 60);
+    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
+    EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2340::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2330::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002:abcd:ef00::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2002::")));
+    EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
+  }
+}
+
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
