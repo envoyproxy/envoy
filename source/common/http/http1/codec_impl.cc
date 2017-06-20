@@ -411,13 +411,6 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
         http_parser_pause(&parser_, 1);
       }
 
-    } else if ((parser_.method == http_method::HTTP_POST ||
-                parser_.method == http_method::HTTP_PUT) &&
-               headers->ContentLength() == nullptr) {
-      // If content length is not specified for certain methods and the request
-      // is not chunked encodided, return an error to the user.
-      error_code_ = Http::Code::LengthRequired;
-      return -1;
     } else {
       deferred_end_stream_headers_ = std::move(headers);
     }

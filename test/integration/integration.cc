@@ -866,13 +866,6 @@ void BaseIntegrationTest::testLowVersion() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testMissingContentLength() {
-  std::string response;
-  sendRawHttpAndWaitForResponse("POST / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
-  EXPECT_EQ("HTTP/1.1 411 Length Required\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-            response);
-}
-
 void BaseIntegrationTest::testHttp10Request() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;

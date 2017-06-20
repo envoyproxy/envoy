@@ -205,7 +205,6 @@ protected:
   void testMissingDelimiter();
   void testInvalidCharacterInFirstline();
   void testLowVersion();
-  void testMissingContentLength();
   void testHttp10Request();
   void testNoHost();
   void testOverlyLongHeaders(Http::CodecClient::Type type);
