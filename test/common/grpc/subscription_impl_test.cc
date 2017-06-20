@@ -31,30 +31,6 @@ typedef MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::Discov
     SubscriptionMockAsyncClient;
 typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
-// TODO(htuch): Move this to a common utility for tests that want proto
-// equality.
-
-template <class ProtoType> bool protoEq(ProtoType lhs, ProtoType rhs) {
-  return lhs.GetTypeName() == rhs.GetTypeName() &&
-         lhs.SerializeAsString() == rhs.SerializeAsString();
-}
-
-MATCHER_P(ProtoEq, rhs, "") { return protoEq(arg, rhs); }
-
-MATCHER_P(RepeatedProtoEq, rhs, "") {
-  if (arg.size() != rhs.size()) {
-    return false;
-  }
-
-  for (int i = 0; i < arg.size(); ++i) {
-    if (!protoEq(arg[i], rhs[i])) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 class GrpcSubscriptionImplTest : public testing::Test {
 public:
   GrpcSubscriptionImplTest()
