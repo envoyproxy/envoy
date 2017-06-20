@@ -35,7 +35,7 @@ protected:
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
         mock_time_(0) {
     ON_CALL(time_source_, currentTime())
-        .WillByDefault(testing::Invoke([&]() {
+        .WillByDefault(testing::Invoke([this]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
   }
@@ -135,7 +135,7 @@ class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0), mock_time_(0) {
     ON_CALL(time_source_, currentTime())
-        .WillByDefault(testing::Invoke([&]() {
+        .WillByDefault(testing::Invoke([this]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
   }
@@ -170,7 +170,7 @@ TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
   ON_CALL(time_source_, currentTime())
-      .WillByDefault(testing::Invoke([&]() {
+      .WillByDefault(testing::Invoke([this]() {
         return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));
   GuardDogImpl gd(stats_store_, config_mega_, time_source_);
@@ -194,12 +194,15 @@ TEST_F(GuardDogMissTest, MissCountTest) {
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
   ON_CALL(time_source_, currentTime())
-      .WillByDefault(testing::Invoke([&]() {
+      .WillByDefault(testing::Invoke([this]() {
         return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));
   GuardDogImpl gd(stats_store_, config_miss_, time_source_);
   auto sometimes_pet_dog = gd.createWatchDog(0);
-  for (unsigned long i = 0; i < 3; i++) {
+  // These steps are executed once without ever touching the watchdog.
+  // Then the last step is to touch the watchdog and repeat the steps.
+  // This verifies that the behavior is reset back to baseline after a touch.
+  for (unsigned long i = 0; i < 2; i++) {
     EXPECT_EQ(i, stats_store_.counter("server.watchdog_miss").value());
     // This shouldn't be enough to increment the stat:
     mock_time_ += 499;
