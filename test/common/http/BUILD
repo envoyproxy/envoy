@@ -156,7 +156,6 @@ envoy_cc_test(
     ],
     deps = [
         "//include/envoy/http:async_client_interface",
-        "//source/common/common:base64_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",

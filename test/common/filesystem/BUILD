@@ -9,6 +9,19 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "subscription_impl_test",
+    srcs = ["subscription_impl_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/filesystem:subscription_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "filesystem_impl_test",
     srcs = ["filesystem_impl_test.cc"],
     deps = [
