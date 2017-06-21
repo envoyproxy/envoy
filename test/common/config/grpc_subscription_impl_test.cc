@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "common/grpc/subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -20,16 +20,18 @@ using testing::Return;
 using testing::Mock;
 
 namespace Envoy {
-namespace Grpc {
 
+namespace Grpc {
 template class AsyncClientStreamImpl<envoy::api::v2::DiscoveryRequest,
                                      envoy::api::v2::DiscoveryResponse>;
+} // namespace Grpc
 
+namespace Config {
 namespace {
 
-typedef MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
+typedef Grpc::MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
     SubscriptionMockAsyncClient;
-typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
+typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
 class GrpcSubscriptionImplTest : public testing::Test {
 public:
@@ -105,7 +107,7 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<EdsSubscriptionImpl> subscription_;
 };
 
@@ -171,7 +173,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
-  subscription_->onRemoteClose(Status::GrpcStatus::Canceled);
+  subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled);
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
@@ -179,5 +181,5 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 }
 
 } // namespace
-} // namespace Grpc
+} // namespace Config
 } // namespace Envoy

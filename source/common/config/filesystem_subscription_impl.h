@@ -12,16 +12,17 @@
 #include "google/protobuf/util/json_util.h"
 
 namespace Envoy {
-namespace Filesystem {
+namespace Config {
 
 /**
  * Filesystem inotify implementation of the API Subscription interface. This allows the API to be
  * consumed on filesystem changes to files containing the JSON canonical representation of
  * lists of ResourceType.
  */
-template <class ResourceType> class SubscriptionImpl : public Config::Subscription<ResourceType> {
+template <class ResourceType>
+class FilesystemSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
-  SubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path)
+  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path)
       : path_(path), watcher_(dispatcher.createFilesystemWatcher()) {}
 
   // Config::Subscription
@@ -30,7 +31,7 @@ public:
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
     callbacks_ = &callbacks;
-    watcher_->addWatch(path_, Watcher::Events::MovedTo, [this](uint32_t events) {
+    watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
       UNREFERENCED_PARAMETER(events);
       refresh();
     });
@@ -63,9 +64,9 @@ private:
   }
 
   const std::string path_;
-  std::unique_ptr<Watcher> watcher_;
+  std::unique_ptr<Filesystem::Watcher> watcher_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
 };
 
-} // namespace Filesystem
+} // namespace Config
 } // namespace Envoy

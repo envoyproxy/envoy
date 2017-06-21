@@ -1,9 +1,9 @@
 #include "envoy/http/async_client.h"
 
 #include "common/common/utility.h"
+#include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
-#include "common/http/subscription_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -21,10 +21,10 @@ using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
-namespace Http {
+namespace Config {
 namespace {
 
-typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
+typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
 class HttpSubscriptionImplTest : public testing::Test {
 public:
@@ -53,7 +53,7 @@ public:
   void expectSendMessage() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this](MessagePtr& request, AsyncClient::Callbacks& callbacks,
+        .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                                 const Optional<std::chrono::milliseconds>& timeout) {
           http_callbacks_ = &callbacks;
           UNREFERENCED_PARAMETER(timeout);
@@ -97,8 +97,8 @@ public:
     envoy::api::v2::DiscoveryResponse response_pb;
     EXPECT_EQ(google::protobuf::util::Status::OK,
               google::protobuf::util::JsonStringToMessage(response_json, &response_pb));
-    HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
-    MessagePtr message{new ResponseMessageImpl(std::move(response_headers))};
+    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body().reset(new Buffer::OwnedImpl(response_json));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
@@ -128,8 +128,8 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Runtime::MockRandomGenerator random_gen_;
-  MockAsyncClientRequest http_request_;
-  AsyncClient::Callbacks* http_callbacks_;
+  Http::MockAsyncClientRequest http_request_;
+  Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<EdsSubscriptionImpl> subscription_;
 };
@@ -193,8 +193,8 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
 // Validate that the client can recover from bad JSON responses.
 TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   startSubscription({"cluster0", "cluster1"});
-  HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
-  MessagePtr message{new ResponseMessageImpl(std::move(response_headers))};
+  Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+  Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
   message->body().reset(new Buffer::OwnedImpl(";!@#badjso n"));
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
@@ -205,5 +205,5 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
 }
 
 } // namespace
-} // namespace Http
+} // namespace Config
 } // namespace Envoy
