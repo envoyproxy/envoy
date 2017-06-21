@@ -2,6 +2,7 @@
 
 #include "envoy/grpc/async_client.h"
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/linked_object.h"
 #include "common/grpc/codec.h"
@@ -110,14 +111,12 @@ public:
       return;
     }
 
-    for (const auto& frame : decoded_frames_) {
+    for (auto& frame : decoded_frames_) {
       std::unique_ptr<ResponseType> response(new ResponseType());
-      // TODO(htuch): We can avoid linearizing the buffer here when Buffer::Instance implements
-      // protobuf ZeroCopyInputStream.
       // TODO(htuch): Need to add support for compressed responses as well here.
-      if (frame.flags_ != GRPC_FH_DEFAULT ||
-          !response->ParseFromArray(frame.data_->linearize(frame.data_->length()),
-                                    frame.data_->length())) {
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+
+      if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
         streamError(Status::GrpcStatus::Internal);
         return;
       }

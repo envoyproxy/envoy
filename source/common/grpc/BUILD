@@ -15,6 +15,7 @@ envoy_cc_library(
         ":codec_lib",
         ":common_lib",
         "//include/envoy/grpc:async_client_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
     ],
 )
@@ -94,6 +95,7 @@ envoy_cc_library(
         ":common_lib",
         "//include/envoy/grpc:rpc_channel_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
@@ -104,11 +106,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_lib",
-    hdrs = ["subscription_impl.h"],
-    external_deps = ["envoy_base"],
+    name = "transcoder_input_stream_lib",
+    srcs = ["transcoder_input_stream_impl.cc"],
+    hdrs = ["transcoder_input_stream_impl.h"],
+    external_deps = ["grpc_transcoding"],
     deps = [
-        ":async_client_lib",
-        "//include/envoy/config:subscription_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )

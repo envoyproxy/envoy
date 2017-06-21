@@ -24,6 +24,7 @@ envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
     deps = [
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
     ],
@@ -139,7 +140,6 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
-        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",

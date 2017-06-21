@@ -64,7 +64,7 @@ cluster
   to when a the downstream network connection matches the specified criteria.
 
 destination_ip_list
-  *(optional, array)*  An optional list of IPv4 subnets in the form "a.b.c.d/xx".
+  *(optional, array)*  An optional list of IP address subnets in the form "ip_address/xx".
   The criteria is satisfied if the destination IP address of the downstream connection is
   contained in at least one of the specified subnets.
   If the parameter is not specified or the list is empty, the destination IP address is ignored.
@@ -76,7 +76,8 @@ destination_ip_list
     [
       "192.168.3.0/24",
       "50.1.2.3/32",
-      "10.15.0.0/16"
+      "10.15.0.0/16",
+      "2001:abcd::/64"
     ]
 
 destination_ports
@@ -94,7 +95,7 @@ destination_ports
   }
 
 source_ip_list
-  *(optional, array)*  An optional list of IPv4 subnets in the form "a.b.c.d/xx".
+  *(optional, array)*  An optional list of IP address subnets in the form "ip_address/xx".
   The criteria is satisfied if the source IP address of the downstream connection is contained
   in at least one of the specified subnets. If the parameter is not specified or the list is empty,
   the source IP address is ignored. Example:
@@ -104,7 +105,8 @@ source_ip_list
     [
       "192.168.3.0/24",
       "50.1.2.3/32",
-      "10.15.0.0/16"
+      "10.15.0.0/16",
+      "2001:abcd::/64"
     ]
 
 source_ports

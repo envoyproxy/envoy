@@ -39,24 +39,37 @@ void GuardDogImpl::threadRoutine() {
     const auto now = time_source_.currentTime();
     bool seen_one_multi_timeout(false);
     std::lock_guard<std::mutex> guard(wd_lock_);
-    for (const auto& watched_dog : watched_dogs_) {
-      const auto delta = now - watched_dog->lastTouchTime();
+    for (auto& watched_dog : watched_dogs_) {
+      const auto ltt = watched_dog.dog_->lastTouchTime();
+      const auto delta = now - ltt;
+      if (watched_dog.last_alert_time_.valid() && watched_dog.last_alert_time_.value() < ltt) {
+        watched_dog.miss_alerted_ = false;
+        watched_dog.megamiss_alerted_ = false;
+      }
       if (delta > miss_timeout_) {
-        watchdog_miss_counter_.inc();
+        if (!watched_dog.miss_alerted_) {
+          watchdog_miss_counter_.inc();
+          watched_dog.last_alert_time_.value(ltt);
+          watched_dog.miss_alerted_ = true;
+        }
       }
       if (delta > megamiss_timeout_) {
-        watchdog_megamiss_counter_.inc();
+        if (!watched_dog.megamiss_alerted_) {
+          watchdog_megamiss_counter_.inc();
+          watched_dog.last_alert_time_.value(ltt);
+          watched_dog.megamiss_alerted_ = true;
+        }
       }
       if (killEnabled() && delta > kill_timeout_) {
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog->threadId()));
+                          watched_dog.dog_->threadId()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
         if (seen_one_multi_timeout) {
 
           PANIC(fmt::format(
               "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog->threadId()));
+              watched_dog.dog_->threadId()));
         } else {
           seen_one_multi_timeout = true;
         }
@@ -73,9 +86,11 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
   auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
       std::make_shared<WatchDogImpl>(thread_id, time_source_, wd_interval);
+  WatchedDog watched_dog;
+  watched_dog.dog_ = new_watchdog;
   {
     std::lock_guard<std::mutex> guard(wd_lock_);
-    watched_dogs_.push_back(new_watchdog);
+    watched_dogs_.push_back(watched_dog);
   }
   new_watchdog->touch();
   return new_watchdog;
@@ -83,7 +98,8 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
 
 void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
   std::lock_guard<std::mutex> guard(wd_lock_);
-  auto found_wd = std::find(watched_dogs_.begin(), watched_dogs_.end(), wd);
+  auto found_wd = std::find_if(watched_dogs_.begin(), watched_dogs_.end(),
+                               [&wd](const WatchedDog& d) -> bool { return d.dog_ == wd; });
   if (found_wd != watched_dogs_.end()) {
     watched_dogs_.erase(found_wd);
   } else {

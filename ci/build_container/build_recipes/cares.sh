@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=cares-1_12_0
+VERSION=cares-1_13_0
 
 wget -O c-ares-$VERSION.tar.gz https://github.com/c-ares/c-ares/archive/$VERSION.tar.gz
 tar xf c-ares-$VERSION.tar.gz
