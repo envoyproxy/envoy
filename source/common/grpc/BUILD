@@ -72,16 +72,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transcoder_input_stream_lib",
-    srcs = ["transcoder_input_stream_impl.cc"],
-    hdrs = ["transcoder_input_stream_impl.h"],
-    external_deps = ["protobuf", "grpc_transcoding"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "transcoding_filter_lib",
     srcs = ["transcoding_filter.cc"],
     hdrs = ["transcoding_filter.h"],

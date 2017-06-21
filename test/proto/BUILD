@@ -16,6 +16,10 @@ envoy_proto_library(
 envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
+    deps = [
+        "@googleapis//:http_api_protos",
+        "@protobuf_bzl//:cc_wkt_protos",
+    ],
 )
 
 genrule(

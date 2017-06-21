@@ -14,8 +14,8 @@
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
-#include "src/json_request_translator.h"
-#include "src/response_to_json_translator.h"
+#include "grpc_transcoding/json_request_translator.h"
+#include "grpc_transcoding/response_to_json_translator.h"
 
 using google::grpc::transcoding::JsonRequestTranslator;
 using google::grpc::transcoding::RequestInfo;
@@ -234,7 +234,7 @@ Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& head
     if (end_stream) {
       log().debug("header only request");
 
-      request_in_.Finish();
+      request_in_.finish();
 
       const auto& request_status = transcoder_->RequestStatus();
       if (!request_status.ok()) {
@@ -270,10 +270,10 @@ Http::FilterDataStatus TranscodingFilter::decodeData(Buffer::Instance& data,
   }
 
   if (transcoder_) {
-    request_in_.Move(data);
+    request_in_.move(data);
 
     if (end_stream) {
-      request_in_.Finish();
+      request_in_.finish();
     }
 
     ReadToBuffer(transcoder_->RequestOutput(), data);
@@ -296,7 +296,7 @@ Http::FilterDataStatus TranscodingFilter::decodeData(Buffer::Instance& data,
 Http::FilterTrailersStatus TranscodingFilter::decodeTrailers(Http::HeaderMap&) {
   log().debug("Transcoding::Instance::decodeTrailers");
   if (transcoder_) {
-    request_in_.Finish();
+    request_in_.finish();
 
     Buffer::OwnedImpl data;
     ReadToBuffer(transcoder_->RequestOutput(), data);
@@ -339,10 +339,10 @@ Http::FilterDataStatus TranscodingFilter::encodeData(Buffer::Instance& data,
   }
 
   if (transcoder_) {
-    response_in_.Move(data);
+    response_in_.move(data);
 
     if (end_stream) {
-      response_in_.Finish();
+      response_in_.finish();
     }
 
     ReadToBuffer(transcoder_->ResponseOutput(), data);
@@ -359,7 +359,7 @@ Http::FilterDataStatus TranscodingFilter::encodeData(Buffer::Instance& data,
 Http::FilterTrailersStatus TranscodingFilter::encodeTrailers(Http::HeaderMap& trailers) {
   log().debug("Transcoding::Instance::encodeTrailers");
   if (transcoder_) {
-    response_in_.Finish();
+    response_in_.finish();
 
     Buffer::OwnedImpl data;
     ReadToBuffer(transcoder_->ResponseOutput(), data);
