@@ -94,9 +94,10 @@ def checkFormatVisitor(arg, dir_name, names):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Check or fix file format.')
-  parser.add_argument('operation_type', type=str, help="specify if the run should 'check' or 'fix' format.")
+  parser.add_argument('operation_type', type=str, choices=['check', 'fix'],
+                      help="specify if the run should 'check' or 'fix' format.")
   parser.add_argument('target_path', type=str, nargs="?", default=".", help="specify the root directory"
-                                                                            "for the script to recurse over. Default '.'.")
+                                                                            " for the script to recurse over. Default '.'.")
   parser.add_argument('--add-excluded-prefixes', type=str, nargs="+", help="exclude additional prefixes.")
   args = parser.parse_args()
 
@@ -104,10 +105,6 @@ if __name__ == "__main__":
   target_path = args.target_path
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
-
-  if operation_type not in {"check", "fix"}:
-    parser.print_help()
-    sys.exit(1)
 
   if os.path.isfile(target_path):
     checkFormat("./" + target_path)
