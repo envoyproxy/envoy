@@ -21,6 +21,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "subscription_lib",
+    hdrs = ["subscription_impl.h"],
+    external_deps = ["protobuf"],
+    deps = [
+        ":filesystem_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:filesystem_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "watcher_lib",
     srcs = ["watcher_impl.cc"],
     hdrs = ["watcher_impl.h"],

@@ -101,12 +101,28 @@ TEST(TcpProxyConfigTest, Routes) {
             "cluster": "with_destination_ip_list"
           },
           {
-            "destination_ports": "1-1024,2048-4096,12345", 
+            "destination_ip_list": [
+              "::1/128",
+              "2001:abcd::/64"
+            ],
+            "cluster": "with_v6_destination"
+          },
+          {
+            "destination_ports": "1-1024,2048-4096,12345",
             "cluster": "with_destination_ports"
           },
-          {  
-            "source_ports": "23457,23459", 
+          {
+            "source_ports": "23457,23459",
             "cluster": "with_source_ports"
+          },
+          {
+            "destination_ip_list": [
+              "2002::/32"
+            ],
+            "source_ip_list": [
+              "2003::/64"
+            ],
+            "cluster": "with_v6_source_and_destination"
           },
           {
             "destination_ip_list": [
@@ -267,6 +283,43 @@ TEST(TcpProxyConfigTest, Routes) {
     Network::Address::Ipv4Instance local_address("10.0.0.0", 10000);
     EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
     Network::Address::Ipv4Instance remote_address("30.0.0.0", 20000);
+    EXPECT_CALL(connection, remoteAddress()).WillRepeatedly(ReturnRef(remote_address));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (::1/128)
+    NiceMock<Network::MockConnection> connection;
+    Network::Address::Ipv6Instance local_address("::1");
+    EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (2001:abcd/64")
+    NiceMock<Network::MockConnection> connection;
+    Network::Address::Ipv6Instance local_address("2001:abcd:0:0:1::");
+    EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip ("2002::/32") and source_ip ("2003::/64")
+    NiceMock<Network::MockConnection> connection;
+    Network::Address::Ipv6Instance local_address("2002:0:0:0:0:0::1");
+    EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+    Network::Address::Ipv6Instance remote_address("2003:0:0:0:0::5");
+    EXPECT_CALL(connection, remoteAddress()).WillRepeatedly(ReturnRef(remote_address));
+    EXPECT_EQ(std::string("with_v6_source_and_destination"),
+              config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall through
+    NiceMock<Network::MockConnection> connection;
+    Network::Address::Ipv6Instance local_address("2004::");
+    EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+    Network::Address::Ipv6Instance remote_address("::");
     EXPECT_CALL(connection, remoteAddress()).WillRepeatedly(ReturnRef(remote_address));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }

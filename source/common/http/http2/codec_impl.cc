@@ -206,10 +206,15 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   if (local_end_stream_ && !local_end_stream_sent_) {
     parent_.pending_deferred_reset_ = true;
     deferred_reset_.value(reason);
+    ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
   } else {
     resetStreamWorker(reason);
-    parent_.sendPendingFrames();
   }
+
+  // We must still call sendPendingFrames() in both the deferred and not deferred path. This forces
+  // the cleanup logic to run which will reset the stream in all cases if all data frames could not
+  // be sent.
+  parent_.sendPendingFrames();
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {

@@ -13,6 +13,7 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 
@@ -63,9 +64,9 @@ private:
   struct Route {
     Route(const Json::Object& config);
 
-    Network::IpList source_ips_;
+    Network::Address::IpList source_ips_;
     Network::PortRangeList source_port_ranges_;
-    Network::IpList destination_ips_;
+    Network::Address::IpList destination_ips_;
     Network::PortRangeList destination_port_ranges_;
     std::string cluster_name_;
   };

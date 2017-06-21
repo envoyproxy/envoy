@@ -1,6 +1,5 @@
 #include "envoy/http/async_client.h"
 
-#include "common/common/base64.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
@@ -87,9 +86,7 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
                            bool accept) {
-    std::string response_json = "{\"versionInfo\":\"" +
-                                Base64::encode(version.c_str(), version.size()) +
-                                "\",\"resources\":[";
+    std::string response_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
                        "envoy.api.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
@@ -111,7 +108,7 @@ public:
     EXPECT_CALL(*timer_, enableTimer(_));
     http_callbacks_->onSuccess(std::move(message));
     if (accept) {
-      version_ = Base64::encode(version.c_str(), version.size());
+      version_ = version;
     }
     request_in_progress_ = false;
   }

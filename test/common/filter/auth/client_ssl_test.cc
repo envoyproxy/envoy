@@ -49,7 +49,10 @@ public:
     {
       "auth_api_cluster": "vpn",
       "stat_prefix": "vpn",
-      "ip_white_list": [ "1.2.3.4/32" ]
+      "ip_white_list":
+        [ "1.2.3.4/32",
+          "2001:abcd::/64"
+        ]
     }
     )EOF";
 
@@ -186,8 +189,19 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 
+  // IPv6 White list case.
+  createAuthFilter();
+  Network::Address::Ipv6Instance remote_address3("2001:abcd::1");
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(remote_address3));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.update_success").value());
-  EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_ip_white_list").value());
+  EXPECT_EQ(2U, stats_store_.counter("auth.clientssl.vpn.auth_ip_white_list").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_match").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_no_match").value());
 

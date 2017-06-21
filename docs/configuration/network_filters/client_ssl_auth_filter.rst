@@ -43,7 +43,8 @@ ip_white_list
     [
       "192.168.3.0/24",
       "50.1.2.3/32",
-      "10.15.0.0/16"
+      "10.15.0.0/16",
+      "2001:abcd::/64"
     ]
 
 .. _config_network_filters_client_ssl_auth_stats:

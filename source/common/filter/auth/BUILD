@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
     ],
 )
