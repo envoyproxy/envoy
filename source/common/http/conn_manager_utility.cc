@@ -147,8 +147,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
       for (auto detail : config.setCurrentClientCertDetails()) {
         if (detail == Http::ClientCertDetailsType::Subject) {
           // TODO. Get Cert Subject.
+          clientCertDetails += ";Subject=" + connection.ssl()->subjectPeerCertificate();
         } else if (detail == Http::ClientCertDetailsType::SAN) {
-          // Currently, we only support a single SAN field.
+          // Currently, we only support a single SAN field with URI type.
           clientCertDetails += ";SAN=" + connection.ssl()->uriSanPeerCertificate();
         }
       }

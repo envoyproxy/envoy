@@ -222,7 +222,7 @@ bool ConnectionImpl::isMtls() {
 }
 
 std::string ConnectionImpl::uriSanLocalCertificate() {
-  // Not owned.
+  // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
     return "";
@@ -241,6 +241,17 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
   return Hex::encode(computed_hash);
+}
+
+std::string ConnectionImpl::subjectPeerCertificate() {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  subject_bio = BIO_new(BIO_s_file());
+  X509_NAME_print_ex(subject_bio, X509_get_subject_name(cert), 0, 0);
+  BIO_printf(subject_bio, "\n");
+  return "";
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {

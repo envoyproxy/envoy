@@ -27,6 +27,7 @@ public:
   bool isMtls() override;
   std::string uriSanLocalCertificate() override;
   std::string sha256PeerCertificateDigest() override;
+  std::string subjectPeerCertificate() override;
   std::string uriSanPeerCertificate() override;
 
 private:
