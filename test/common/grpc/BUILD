@@ -75,7 +75,12 @@ envoy_cc_test(
         "//source/common/grpc:transcoding_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/proto:bookstore_proto",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+    ],
+    data = [
+        "//test/proto:bookstore_proto_descriptor",
     ],
 )
 
