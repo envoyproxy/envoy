@@ -3,10 +3,11 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
-
-#include "common/grpc/transcoder_input_stream_impl.h"
-#include "common/common/logger.h"
 #include "envoy/json/json_object.h"
+
+#include "common/common/logger.h"
+#include "common/grpc/transcoder_input_stream_impl.h"
+
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/util/internal/type_info.h"
@@ -33,62 +34,53 @@ struct VariableBinding {
 };
 
 class TranscodingConfig : public Logger::Loggable<Logger::Id::config> {
- public:
+public:
   TranscodingConfig(const Json::Object& config);
 
-  google::protobuf::util::Status CreateTranscoder(
-      const Http::HeaderMap& headers,
-      google::protobuf::io::ZeroCopyInputStream* request_input,
-      google::grpc::transcoding::TranscoderInputStream* response_input,
-      std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-      const google::protobuf::MethodDescriptor*& method_descriptor);
+  google::protobuf::util::Status
+  CreateTranscoder(const Http::HeaderMap& headers,
+                   google::protobuf::io::ZeroCopyInputStream* request_input,
+                   google::grpc::transcoding::TranscoderInputStream* response_input,
+                   std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
+                   const google::protobuf::MethodDescriptor*& method_descriptor);
 
-  google::protobuf::util::Status MethodToRequestInfo(
-      const google::protobuf::MethodDescriptor* method,
-      google::grpc::transcoding::RequestInfo* info);
+  google::protobuf::util::Status
+  MethodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+                      google::grpc::transcoding::RequestInfo* info);
 
- private:
+private:
   google::protobuf::DescriptorPool descriptor_pool_;
-  google::grpc::transcoding::PathMatcherPtr<
-      const google::protobuf::MethodDescriptor*>
+  google::grpc::transcoding::PathMatcherPtr<const google::protobuf::MethodDescriptor*>
       path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
 typedef std::shared_ptr<TranscodingConfig> TranscodingConfigSharedPtr;
 
-class TranscodingFilter : public Http::StreamFilter,
-                          public Logger::Loggable<Logger::Id::http2> {
- public:
+class TranscodingFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
+public:
   TranscodingFilter(TranscodingConfig& config);
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
 
-  Http::FilterDataStatus decodeData(Buffer::Instance& data,
-                                    bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
 
-  void setDecoderFilterCallbacks(
-      Http::StreamDecoderFilterCallbacks& callbacks) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
 
-  Http::FilterDataStatus encodeData(Buffer::Instance& data,
-                                    bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
 
-  void setEncoderFilterCallbacks(
-      Http::StreamEncoderFilterCallbacks& callbacks) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   void onDestroy() override {}
 
- private:
-  bool ReadToBuffer(google::protobuf::io::ZeroCopyInputStream* stream,
-                    Buffer::Instance& data);
+private:
+  bool ReadToBuffer(google::protobuf::io::ZeroCopyInputStream* stream, Buffer::Instance& data);
 
   TranscodingConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
@@ -102,5 +94,5 @@ class TranscodingFilter : public Http::StreamFilter,
   bool error_{false};
 };
 
-}  // namespace Grpc
-}  // namespace Envoy
+} // namespace Grpc
+} // namespace Envoy

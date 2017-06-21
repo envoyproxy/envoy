@@ -75,15 +75,18 @@ envoy_cc_library(
     name = "transcoding_filter_lib",
     srcs = ["transcoding_filter.cc"],
     hdrs = ["transcoding_filter.h"],
-    external_deps = ["path_matcher", "grpc_transcoding"],
+    external_deps = [
+        "path_matcher",
+        "grpc_transcoding",
+    ],
     deps = [
         ":codec_lib",
         ":common_lib",
         ":transcoder_input_stream_lib",
-        "@googleapis//:http_api_protos",
         "//include/envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",
+        "@googleapis//:http_api_protos",
     ],
 )
 

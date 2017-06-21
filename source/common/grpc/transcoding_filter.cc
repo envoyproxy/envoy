@@ -1,13 +1,14 @@
-#include <common/http/headers.h>
 #include "common/grpc/transcoding_filter.h"
+
+#include "envoy/common/exception.h"
+#include "envoy/http/filter.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "envoy/common/exception.h"
-#include "envoy/http/filter.h"
+
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
 #include "google/protobuf/descriptor.h"
@@ -39,7 +40,7 @@ const std::string kTypeUrlPrefix{"type.googleapis.com"};
 // Transcoder implementation based on JsonRequestTranslator &
 // ResponseToJsonTranslator
 class TranscoderImpl : public Transcoder {
- public:
+public:
   // request_translator - a JsonRequestTranslator that does the request
   //                      translation
   // response_translator - a ResponseToJsonTranslator that does the response
@@ -52,13 +53,15 @@ class TranscoderImpl : public Transcoder {
         response_stream_(response_translator_->CreateInputStream()) {}
 
   // Transcoder implementation
-  ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() { return request_stream_.get(); }
+  ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() {
+    return request_stream_.get();
+  }
   Status RequestStatus() { return request_translator_->Output().Status(); }
 
   ZeroCopyInputStream* ResponseOutput() { return response_stream_.get(); }
   Status ResponseStatus() { return response_translator_->Status(); }
 
- private:
+private:
   std::unique_ptr<JsonRequestTranslator> request_translator_;
   std::unique_ptr<ResponseToJsonTranslator> response_translator_;
   std::unique_ptr<::google::grpc::transcoding::TranscoderInputStream> request_stream_;
@@ -70,8 +73,7 @@ class TranscoderImpl : public Transcoder {
 TranscodingConfig::TranscodingConfig(const Json::Object& config) {
   std::string proto_descriptor_file = config.getString("proto_descriptor");
   FileDescriptorSet descriptor_set;
-  if (!descriptor_set.ParseFromString(
-      Filesystem::fileReadToEnd(proto_descriptor_file))) {
+  if (!descriptor_set.ParseFromString(Filesystem::fileReadToEnd(proto_descriptor_file))) {
     throw EnvoyException("Unable to parse proto descriptor");
   }
 
@@ -81,15 +83,12 @@ TranscodingConfig::TranscodingConfig(const Json::Object& config) {
     }
   }
 
-  google::grpc::transcoding::PathMatcherBuilder<
-      const google::protobuf::MethodDescriptor*>
-      pmb;
+  google::grpc::transcoding::PathMatcherBuilder<const google::protobuf::MethodDescriptor*> pmb;
 
   for (const auto& service_name : config.getStringArray("services")) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
     if (service == nullptr) {
-      throw EnvoyException("Could not find '" + service_name +
-          "' in the proto descriptor");
+      throw EnvoyException("Could not find '" + service_name + "' in the proto descriptor");
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
@@ -100,27 +99,27 @@ TranscodingConfig::TranscodingConfig(const Json::Object& config) {
       log().debug(http_rule.DebugString());
 
       switch (http_rule.pattern_case()) {
-        case ::google::api::HttpRule::kGet:
-          pmb.Register("GET", http_rule.get(), http_rule.body(), method);
-          break;
-        case ::google::api::HttpRule::kPut:
-          pmb.Register("PUT", http_rule.put(), http_rule.body(), method);
-          break;
-        case ::google::api::HttpRule::kPost:
-          pmb.Register("POST", http_rule.post(), http_rule.body(), method);
-          break;
-        case ::google::api::HttpRule::kDelete:
-          pmb.Register("DELETE", http_rule.delete_(), http_rule.body(), method);
-          break;
-        case ::google::api::HttpRule::kPatch:
-          pmb.Register("PATCH", http_rule.patch(), http_rule.body(), method);
-          break;
-        case ::google::api::HttpRule::kCustom:
-          pmb.Register(http_rule.custom().kind(), http_rule.custom().path(),
-                       http_rule.body(), method);
-          break;
-        default:
-          break;
+      case ::google::api::HttpRule::kGet:
+        pmb.Register("GET", http_rule.get(), http_rule.body(), method);
+        break;
+      case ::google::api::HttpRule::kPut:
+        pmb.Register("PUT", http_rule.put(), http_rule.body(), method);
+        break;
+      case ::google::api::HttpRule::kPost:
+        pmb.Register("POST", http_rule.post(), http_rule.body(), method);
+        break;
+      case ::google::api::HttpRule::kDelete:
+        pmb.Register("DELETE", http_rule.delete_(), http_rule.body(), method);
+        break;
+      case ::google::api::HttpRule::kPatch:
+        pmb.Register("PATCH", http_rule.patch(), http_rule.body(), method);
+        break;
+      case ::google::api::HttpRule::kCustom:
+        pmb.Register(http_rule.custom().kind(), http_rule.custom().path(), http_rule.body(),
+                     method);
+        break;
+      default:
+        break;
       }
     }
   }
@@ -128,8 +127,7 @@ TranscodingConfig::TranscodingConfig(const Json::Object& config) {
   path_matcher_ = pmb.Build();
 
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(
-          kTypeUrlPrefix, &descriptor_pool_)));
+      google::protobuf::util::NewTypeResolverForDescriptorPool(kTypeUrlPrefix, &descriptor_pool_)));
 
   log().debug("transcoding filter loaded");
 }
@@ -151,11 +149,10 @@ Status TranscodingConfig::CreateTranscoder(
 
   RequestInfo request_info;
   std::vector<VariableBinding> variable_bidings;
-  method_descriptor = path_matcher_->Lookup(
-      method, path, args, &variable_bidings, &request_info.body_field_path);
+  method_descriptor =
+      path_matcher_->Lookup(method, path, args, &variable_bidings, &request_info.body_field_path);
   if (!method_descriptor) {
-    return Status(Code::NOT_FOUND,
-                  "Could not resolve " + path + " to a method");
+    return Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
   }
 
   auto status = MethodToRequestInfo(method_descriptor, &request_info);
@@ -165,8 +162,7 @@ Status TranscodingConfig::CreateTranscoder(
 
   for (const auto& binding : variable_bidings) {
     google::grpc::transcoding::RequestWeaver::BindingInfo resolved_binding;
-    auto status = type_helper_->ResolveFieldPath(*request_info.message_type,
-                                                 binding.field_path,
+    auto status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                                  &resolved_binding.field_path);
     if (!status.ok()) {
       return status;
@@ -180,38 +176,30 @@ Status TranscodingConfig::CreateTranscoder(
   }
 
   std::unique_ptr<JsonRequestTranslator> request_translator{
-      new JsonRequestTranslator(type_helper_->Resolver(), request_input,
-                                request_info,
+      new JsonRequestTranslator(type_helper_->Resolver(), request_input, request_info,
                                 method_descriptor->client_streaming(), true)};
 
-  auto response_type_url =
-      kTypeUrlPrefix + "/" + method_descriptor->output_type()->full_name();
+  auto response_type_url = kTypeUrlPrefix + "/" + method_descriptor->output_type()->full_name();
   std::unique_ptr<ResponseToJsonTranslator> response_translator{
       new ResponseToJsonTranslator(type_helper_->Resolver(), response_type_url,
-                                   method_descriptor->server_streaming(),
-                                   response_input)};
+                                   method_descriptor->server_streaming(), response_input)};
 
-  transcoder.reset(new TranscoderImpl(std::move(request_translator),
-                                      std::move(response_translator)));
+  transcoder.reset(
+      new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
   return Status::OK;
 }
 
-Status TranscodingConfig::MethodToRequestInfo(
-    const google::protobuf::MethodDescriptor* method,
-    google::grpc::transcoding::RequestInfo* info) {
-  auto request_type_url =
-      kTypeUrlPrefix + "/" + method->input_type()->full_name();
+Status TranscodingConfig::MethodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+                                              google::grpc::transcoding::RequestInfo* info) {
+  auto request_type_url = kTypeUrlPrefix + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
-    log().debug("Cannot resolve input-type: {}",
-                method->input_type()->full_name());
-    return Status(Code::NOT_FOUND, "Could not resolve type: " +
-        method->input_type()->full_name());
+    log().debug("Cannot resolve input-type: {}", method->input_type()->full_name());
+    return Status(Code::NOT_FOUND, "Could not resolve type: " + method->input_type()->full_name());
   }
 
   return Status::OK;
 }
-
 
 TranscodingFilter::TranscodingFilter(TranscodingConfig& config) : config_(config) {}
 
@@ -219,13 +207,12 @@ Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& head
                                                            bool end_stream) {
   log().debug("Transcoding::Instance::decodeHeaders");
 
-  auto status = config_.CreateTranscoder(headers, &request_in_, &response_in_,
-                                         transcoder_, method_);
+  auto status =
+      config_.CreateTranscoder(headers, &request_in_, &response_in_, transcoder_, method_);
   if (status.ok()) {
     headers.removeContentLength();
     headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
-    headers.insertPath().value("/" + method_->service()->full_name() + "/" +
-        method_->name());
+    headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
 
     headers.insertMethod().value(Http::Headers::get().MethodValues.Post);
 
@@ -240,9 +227,8 @@ Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& head
       if (!request_status.ok()) {
         log().debug("Transcoding request error " + request_status.ToString());
         error_ = true;
-        Http::Utility::sendLocalReply(
-            *decoder_callbacks_, Http::Code::BadRequest,
-            request_status.error_message().ToString());
+        Http::Utility::sendLocalReply(*decoder_callbacks_, Http::Code::BadRequest,
+                                      request_status.error_message().ToString());
 
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -261,8 +247,7 @@ Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& head
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus TranscodingFilter::decodeData(Buffer::Instance& data,
-                                                     bool end_stream) {
+Http::FilterDataStatus TranscodingFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   log().debug("Transcoding::Instance::decodeData");
 
   if (error_) {
@@ -309,8 +294,7 @@ Http::FilterTrailersStatus TranscodingFilter::decodeTrailers(Http::HeaderMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-void TranscodingFilter::setDecoderFilterCallbacks(
-    Http::StreamDecoderFilterCallbacks& callbacks) {
+void TranscodingFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 }
 
@@ -331,8 +315,7 @@ Http::FilterHeadersStatus TranscodingFilter::encodeHeaders(Http::HeaderMap& head
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus TranscodingFilter::encodeData(Buffer::Instance& data,
-                                                     bool end_stream) {
+Http::FilterDataStatus TranscodingFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   log().debug("Transcoding::Instance::encodeData");
   if (error_) {
     return Http::FilterDataStatus::Continue;
@@ -372,10 +355,8 @@ Http::FilterTrailersStatus TranscodingFilter::encodeTrailers(Http::HeaderMap& tr
       const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
       if (grpc_status_header) {
         uint64_t grpc_status_code;
-        if (!StringUtil::atoul(grpc_status_header->value().c_str(),
-                               grpc_status_code)) {
-          response_headers_->Status()->value(
-              enumToInt(Http::Code::ServiceUnavailable));
+        if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code)) {
+          response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
         }
         response_headers_->insertGrpcStatus().value(*grpc_status_header);
       }
@@ -386,16 +367,14 @@ Http::FilterTrailersStatus TranscodingFilter::encodeTrailers(Http::HeaderMap& tr
       }
 
       response_headers_->insertContentLength().value(
-          encoder_callbacks_->encodingBuffer()
-          ? encoder_callbacks_->encodingBuffer()->length()
-          : 0);
+          encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length()
+                                               : 0);
     }
   }
   return Http::FilterTrailersStatus::Continue;
 }
 
-void TranscodingFilter::setEncoderFilterCallbacks(
-    Http::StreamEncoderFilterCallbacks& callbacks) {
+void TranscodingFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   encoder_callbacks_ = &callbacks;
 }
 
@@ -413,6 +392,5 @@ bool TranscodingFilter::ReadToBuffer(google::protobuf::io::ZeroCopyInputStream* 
   return false;
 }
 
-
-}  // namespace Grpc
-}  // namespace Envoy
+} // namespace Grpc
+} // namespace Envoy

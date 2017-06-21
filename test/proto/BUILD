@@ -27,7 +27,7 @@ genrule(
     srcs = [
         "@googleapis//:http_api_protos_src",
         "@protobuf_bzl//:well_known_protos",
-        ":bookstore.proto"
+        ":bookstore.proto",
     ],
     outs = ["bookstore.descriptor"],
     cmd = """$(location //external:protoc) $(location :bookstore.proto) \
@@ -38,4 +38,3 @@ genrule(
     tools = ["//external:protoc"],
     visibility = ["//visibility:public"],
 )
-

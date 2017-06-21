@@ -71,6 +71,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transcoding_filter_test",
     srcs = ["transcoding_filter_test.cc"],
+    data = [
+        "//test/proto:bookstore_proto_descriptor",
+    ],
     deps = [
         "//source/common/grpc:transcoding_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -78,9 +81,6 @@ envoy_cc_test(
         "//test/proto:bookstore_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ],
-    data = [
-        "//test/proto:bookstore_proto_descriptor",
     ],
 )
 

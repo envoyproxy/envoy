@@ -14,9 +14,8 @@ namespace Configuration {
  * Config registration for the grpc transcoding filter. @see NamedHttpFilterConfigFactory.
  */
 class GrpcTranscodingFilterConfig : public NamedHttpFilterConfigFactory {
- public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object&,
-                                          const std::string&,
+public:
+  HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext& context) override;
   std::string name() override { return "grpc_transcoding"; };
   HttpFilterType type() override { return HttpFilterType::Both; }
