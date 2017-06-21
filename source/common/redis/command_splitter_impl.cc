@@ -147,9 +147,12 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   addHandler(scope, stat_prefix, "expire", all_to_one_handler_);
+  addHandler(scope, stat_prefix, "get", all_to_one_handler_);
   addHandler(scope, stat_prefix, "incr", all_to_one_handler_);
   addHandler(scope, stat_prefix, "incrby", all_to_one_handler_);
   addHandler(scope, stat_prefix, "mget", mget_handler_);
+  addHandler(scope, stat_prefix, "set", all_to_one_handler_);
+  addHandler(scope, stat_prefix, "setex", all_to_one_handler_);
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbacks& callbacks) {
