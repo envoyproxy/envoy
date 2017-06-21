@@ -95,3 +95,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "transcoder_input_stream_test",
+    srcs = ["transcoder_input_stream_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/grpc:transcoder_input_stream_lib",
+    ],
+)
