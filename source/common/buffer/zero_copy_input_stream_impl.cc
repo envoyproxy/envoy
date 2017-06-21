@@ -47,8 +47,8 @@ bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
 bool ZeroCopyInputStreamImpl::Skip(int) { NOT_IMPLEMENTED; }
 
 void ZeroCopyInputStreamImpl::BackUp(int count) {
-  ASSERT(count > 0);
-  ASSERT(uint64_t(count) < position_);
+  ASSERT(count >= 0);
+  ASSERT(uint64_t(count) <= position_);
 
   // Preconditions for BackUp:
   // - The last method called must have been Next().
