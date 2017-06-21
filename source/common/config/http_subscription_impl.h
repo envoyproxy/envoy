@@ -15,7 +15,7 @@
 #include "google/protobuf/util/json_util.h"
 
 namespace Envoy {
-namespace Http {
+namespace Config {
 
 /**
  * REST implementation of the API Subscription interface. This fetches the API via periodic polling
@@ -25,13 +25,13 @@ namespace Http {
  * between the proto serializable objects in the Subscription API and the REST JSON representation.
  */
 template <class ResourceType>
-class SubscriptionImpl : public RestApiFetcher, Config::Subscription<ResourceType> {
+class HttpSubscriptionImpl : public Http::RestApiFetcher, Config::Subscription<ResourceType> {
 public:
-  SubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
-                   const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                   Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
-                   const google::protobuf::MethodDescriptor& service_method)
-      : RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval) {
+  HttpSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
+                       const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
+                       Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
+                       const google::protobuf::MethodDescriptor& service_method)
+      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval) {
     request_.mutable_node()->CopyFrom(node);
     ASSERT(service_method.options().HasExtension(google::api::http));
     const auto& http_rule = service_method.options().GetExtension(google::api::http);
@@ -57,7 +57,7 @@ public:
   }
 
   // Http::RestApiFetcher
-  void createRequest(Message& request) override {
+  void createRequest(Http::Message& request) override {
     google::protobuf::util::JsonOptions json_options;
     std::string request_json;
     const auto status =
@@ -69,7 +69,7 @@ public:
     request.body().reset(new Buffer::OwnedImpl(request_json));
   }
 
-  void parseResponse(const Message& response) override {
+  void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
     const auto status =
         google::protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
@@ -99,5 +99,5 @@ private:
   envoy::api::v2::DiscoveryRequest request_;
 };
 
-} // namespace Http
+} // namespace Config
 } // namespace Envoy

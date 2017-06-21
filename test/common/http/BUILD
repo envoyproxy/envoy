@@ -148,27 +148,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "subscription_impl_test",
-    srcs = ["subscription_impl_test.cc"],
-    external_deps = [
-        "envoy_eds",
-        "protobuf",
-    ],
-    deps = [
-        "//include/envoy/http:async_client_interface",
-        "//source/common/common:utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:subscription_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     deps = [

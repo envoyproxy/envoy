@@ -1,7 +1,7 @@
 #include <fstream>
 
+#include "common/config/filesystem_subscription_impl.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/filesystem/subscription_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/test_common/environment.h"
@@ -15,10 +15,10 @@ using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
-namespace Filesystem {
+namespace Config {
 namespace {
 
-typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
+typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
 class FilesystemSubscriptionImplTest : public testing::Test {
 public:
@@ -115,5 +115,5 @@ TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
 }
 
 } // namespace
-} // namespace Grpc
+} // namespace Config
 } // namespace Envoy

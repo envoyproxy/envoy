@@ -106,17 +106,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "subscription_lib",
-    hdrs = ["subscription_impl.h"],
-    external_deps = ["envoy_base"],
-    deps = [
-        ":async_client_lib",
-        "//include/envoy/config:subscription_interface",
-        "//source/common/config:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "transcoder_input_stream_lib",
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],
