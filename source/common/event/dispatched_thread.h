@@ -11,8 +11,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/common/thread.h"
-
-#include "server/connection_handler_impl.h"
+#include "common/event/dispatcher_impl.h"
 
 namespace Envoy {
 namespace Event {
@@ -27,20 +26,18 @@ namespace Event {
  * special purpose thread that will issue or receive gRPC calls.
  *
  * These features are set up:
- *   1) ConnectionHandler/Dispatcher support:
+ *   1) Dispatcher support:
  *      open connections, open files, callback posting, timers, listen
  *   2) GuardDog deadlock monitoring
  *
  * These features are not:
  *   1) Thread local storage (we don't want runOnAllThreads callbacks to run on
  *      this thread).
- *   2) Listeners in the ConnectionHandler.
+ *   2) ConnectionHandler and listeners
  */
 class DispatchedThreadImpl : Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  DispatchedThreadImpl()
-      : handler_(new Envoy::Server::ConnectionHandlerImpl(
-            log(), Api::ApiPtr{new Api::Impl(std::chrono::milliseconds(1000))})) {}
+  DispatchedThreadImpl() : dispatcher_(new DispatcherImpl()) {}
 
   /**
    * Start the thread.
@@ -49,8 +46,7 @@ public:
    */
   void start(Envoy::Server::GuardDog& guard_dog);
 
-  Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
-  Network::ConnectionHandler& handler() { return *handler_; }
+  Dispatcher& dispatcher() { return *dispatcher_; }
 
   /**
    * Exit the dispatched thread.  Will block until the thread joins.
@@ -60,9 +56,9 @@ public:
 private:
   void threadRoutine(Envoy::Server::GuardDog& guard_dog);
 
-  Envoy::Server::ConnectionHandlerImplPtr handler_;
+  DispatcherPtr dispatcher_;
   Thread::ThreadPtr thread_;
-  Event::TimerPtr no_exit_timer_;
+  TimerPtr no_exit_timer_;
 };
 
 } // Event

@@ -76,6 +76,7 @@ envoy_cc_library(
         "event_pthreads",
     ],
     deps = [
+        ":dispatcher_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
@@ -84,7 +85,6 @@ envoy_cc_library(
         "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
-        "//source/server:connection_handler_lib",
         "//source/server:guarddog_lib",
     ],
 )
