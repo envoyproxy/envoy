@@ -177,7 +177,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
   COUNTER(upstream_cx_destroy_remote_with_active_rq)                                               \
-  COUNTER(upstream_cx_close_header)                                                                \
+  COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   GAUGE  (upstream_cx_rx_bytes_buffered)                                                           \
   COUNTER(upstream_cx_tx_bytes_total)                                                              \

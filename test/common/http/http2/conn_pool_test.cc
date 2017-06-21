@@ -400,6 +400,8 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
 }
 
 } // Http2
