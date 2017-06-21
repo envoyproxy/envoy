@@ -29,14 +29,6 @@ TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
 
 TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
 
-TEST_P(Http2IntegrationTest, InvalidContentLength) {
-  testInvalidContentLength(Http::CodecClient::Type::HTTP2);
-}
-
-TEST_P(Http2IntegrationTest, MultipleContentLengths) {
-  testMultipleContentLengths(Http::CodecClient::Type::HTTP2);
-}
-
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {

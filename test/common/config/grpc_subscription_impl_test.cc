@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "common/grpc/subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -20,40 +20,18 @@ using testing::Return;
 using testing::Mock;
 
 namespace Envoy {
-namespace Grpc {
 
+namespace Grpc {
 template class AsyncClientStreamImpl<envoy::api::v2::DiscoveryRequest,
                                      envoy::api::v2::DiscoveryResponse>;
+} // namespace Grpc
 
+namespace Config {
 namespace {
 
-typedef MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
+typedef Grpc::MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
     SubscriptionMockAsyncClient;
-typedef SubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
-
-// TODO(htuch): Move this to a common utility for tests that want proto
-// equality.
-
-template <class ProtoType> bool protoEq(ProtoType lhs, ProtoType rhs) {
-  return lhs.GetTypeName() == rhs.GetTypeName() &&
-         lhs.SerializeAsString() == rhs.SerializeAsString();
-}
-
-MATCHER_P(ProtoEq, rhs, "") { return protoEq(arg, rhs); }
-
-MATCHER_P(RepeatedProtoEq, rhs, "") {
-  if (arg.size() != rhs.size()) {
-    return false;
-  }
-
-  for (int i = 0; i < arg.size(); ++i) {
-    if (!protoEq(arg[i], rhs[i])) {
-      return false;
-    }
-  }
-
-  return true;
-}
+typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> EdsSubscriptionImpl;
 
 class GrpcSubscriptionImplTest : public testing::Test {
 public:
@@ -112,11 +90,15 @@ public:
         .WillOnce(Return(accept));
     if (accept) {
       expectSendMessage(cluster_names, version);
+      version_ = version;
+    } else {
+      expectSendMessage(cluster_names, version_);
     }
     subscription_->onReceiveMessage(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
+  std::string version_;
   const google::protobuf::MethodDescriptor* method_descriptor_;
   SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -125,7 +107,7 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<EdsSubscriptionImpl> subscription_;
 };
 
@@ -191,7 +173,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
-  subscription_->onRemoteClose(Status::GrpcStatus::Canceled);
+  subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled);
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
@@ -199,5 +181,5 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 }
 
 } // namespace
-} // namespace Grpc
+} // namespace Config
 } // namespace Envoy

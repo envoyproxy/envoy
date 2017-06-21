@@ -13,6 +13,7 @@
 
 #include "common/http/rest_api_fetcher.h"
 #include "common/json/json_loader.h"
+#include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -80,7 +81,7 @@ public:
                                 Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
-  const Network::IpList& ipWhiteList() { return ip_white_list_; }
+  const Network::Address::IpList& ipWhiteList() { return ip_white_list_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -97,7 +98,7 @@ private:
 
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
-  Network::IpList ip_white_list_;
+  Network::Address::IpList ip_white_list_;
   GlobalStats stats_;
 };
 

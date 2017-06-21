@@ -171,6 +171,7 @@ void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
 
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.client_);
+  host_->cluster().stats().upstream_cx_close_notify_.inc();
   if (&client == primary_client_.get()) {
     movePrimaryClientToDraining();
   }

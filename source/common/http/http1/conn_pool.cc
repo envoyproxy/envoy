@@ -236,7 +236,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
       0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
                                               Headers::get().ConnectionValues.Close.c_str())) {
     saw_close_header_ = true;
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_header_.inc();
+    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
   }
 
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);

@@ -25,65 +25,6 @@
 namespace Envoy {
 namespace Network {
 
-IpList::IpList(const std::vector<std::string>& subnets) {
-  for (const std::string& entry : subnets) {
-    std::vector<std::string> parts = StringUtil::split(entry, '/');
-    if (parts.size() != 2) {
-      throw EnvoyException(
-          fmt::format("invalid ipv4/mask combo '{}' (format is <ip>/<# mask bits>)", entry));
-    }
-
-    in_addr addr;
-    int rc = inet_pton(AF_INET, parts[0].c_str(), &addr);
-    if (1 != rc) {
-      throw EnvoyException(fmt::format("invalid ipv4/mask combo '{}' (invalid IP address)", entry));
-    }
-
-    // "0.0.0.0/0" is a valid subnet that contains all possible IPv4 addresses,
-    // so mask can be equal to 0
-    uint64_t mask;
-    if (!StringUtil::atoul(parts[1].c_str(), mask) || mask > 32) {
-      throw EnvoyException(
-          fmt::format("invalid ipv4/mask combo '{}' (mask bits must be <= 32)", entry));
-    }
-
-    Ipv4Entry list_entry;
-    list_entry.ipv4_address_ = ntohl(addr.s_addr);
-    // The 1ULL below makes sure that the RHS is computed as a 64-bit value, so that we do not
-    // over-shift to the left when mask = 0. The assignment to ipv4_mask_ then truncates
-    // the value back to 32 bits.
-    list_entry.ipv4_mask_ = ~((1ULL << (32 - mask)) - 1);
-
-    // Check to make sure applying the mask to the address equals the address. This can prevent
-    // user error.
-    if ((list_entry.ipv4_address_ & list_entry.ipv4_mask_) != list_entry.ipv4_address_) {
-      throw EnvoyException(
-          fmt::format("invalid ipv4/mask combo '{}' ((address & mask) != address)", entry));
-    }
-
-    ipv4_list_.push_back(list_entry);
-  }
-}
-
-bool IpList::contains(const Address::Instance& address) const {
-  if (address.type() != Address::Type::Ip) {
-    return false;
-  }
-
-  for (const Ipv4Entry& entry : ipv4_list_) {
-    // TODO(mattklein123): IPv6 support
-    if ((ntohl(address.ip()->ipv4()->address()) & entry.ipv4_mask_) == entry.ipv4_address_) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-IpList::IpList(const Json::Object& config, const std::string& member_name)
-    : IpList(config.hasObject(member_name) ? config.getStringArray(member_name)
-                                           : std::vector<std::string>()) {}
-
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 

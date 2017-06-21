@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=2.7.0
+VERSION=2.7.1
 
 wget -O http-parser-$VERSION.tar.gz https://github.com/nodejs/http-parser/archive/v$VERSION.tar.gz
 tar xf http-parser-$VERSION.tar.gz
