@@ -64,7 +64,6 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString WebSocket{"websocket"};
   const LowerCaseString XB3TraceId{"x-b3-traceid"};
   const LowerCaseString XB3SpanId{"x-b3-spanid"};
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
@@ -73,7 +72,12 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string Upgrade{"upgrade"};
   } ConnectionValues;
+
+  struct {
+    const std::string WebSocket{"websocket"};
+  } UpgradeValues;
 
   struct {
     const std::string Text{"text/plain"};

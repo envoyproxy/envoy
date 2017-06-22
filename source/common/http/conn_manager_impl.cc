@@ -29,7 +29,7 @@
 #include "common/network/utility.h"
 
 #include "spdlog/spdlog.h"
-#include <iostream>
+
 namespace Envoy {
 namespace Http {
 
@@ -482,21 +482,25 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
 
+  // HELP: Somehow, the call to route is setting  stopped_ = false, which is causing
+  // the assertion in commonContinue to fail [ ASSERT(stopped_); ]
   if (!cached_route_.valid()) {
     cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
-    ENVOY_STREAM_LOG(warn, "here1", *this);
   }
-  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-  ENVOY_STREAM_LOG(warn, "here2", *this);
-  bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
-  ENVOY_STREAM_LOG(warn, "here3", *this);
 
-  bool isWsConnection = ((request_headers_->Connection()->value() == "upgrade") &&
-                         (request_headers_->Upgrade()->value() == "websocket"));
-  ENVOY_STREAM_LOG(warn, "here4", *this);
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
+  bool isWsConnection = (request_headers_->Connection() && request_headers_->Upgrade() &&
+                         (0 == StringUtil::caseInsensitiveCompare(
+                                   request_headers_->Connection()->value().c_str(),
+                                   Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
+                         (0 == StringUtil::caseInsensitiveCompare(
+                                   request_headers_->Upgrade()->value().c_str(),
+                                   Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 
   if (isWsConnection && isWsRoute) {
-    // Create WsHandlerImpl
+    // TODO: Create WsHandlerImpl
+    ASSERT(false);
   } else if (isWsConnection || isWsRoute) {
     if (isWsConnection) {
       // Allow WebSocket upgrades only if the corresponding route supports it
@@ -507,7 +511,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
     encodeHeaders(nullptr, headers, true);
-    ENVOY_STREAM_LOG(warn, "here5", *this);
     return;
   }
 
