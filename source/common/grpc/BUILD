@@ -133,13 +133,3 @@ envoy_cc_library(
         "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "transcoder_input_stream_lib",
-    srcs = ["transcoder_input_stream_impl.cc"],
-    hdrs = ["transcoder_input_stream_impl.h"],
-    external_deps = ["grpc_transcoding"],
-    deps = [
-        "//source/common/buffer:zero_copy_input_stream_lib",
-    ],
-)

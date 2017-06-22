@@ -38,14 +38,14 @@ public:
   TranscodingConfig(const Json::Object& config);
 
   google::protobuf::util::Status
-  CreateTranscoder(const Http::HeaderMap& headers,
+  createTranscoder(const Http::HeaderMap& headers,
                    google::protobuf::io::ZeroCopyInputStream* request_input,
                    google::grpc::transcoding::TranscoderInputStream* response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const google::protobuf::MethodDescriptor*& method_descriptor);
 
   google::protobuf::util::Status
-  MethodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+  methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
                       google::grpc::transcoding::RequestInfo* info);
 
 private:
@@ -80,7 +80,7 @@ public:
   void onDestroy() override {}
 
 private:
-  bool ReadToBuffer(google::protobuf::io::ZeroCopyInputStream* stream, Buffer::Instance& data);
+  bool readToBuffer(google::protobuf::io::ZeroCopyInputStream* stream, Buffer::Instance& data);
 
   TranscodingConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
