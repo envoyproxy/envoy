@@ -404,7 +404,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
   ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
@@ -420,11 +420,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{
-      {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
@@ -445,11 +445,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(Return(details));
 
   TestHeaderMapImpl headers{
-      {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be,BY=test://foo.com/"
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be,By=test://foo.com/"
             "be;Hash=abcdefg;SAN=test://foo.com/fe",
             headers.get_("x-forwarded-client-cert"));
 }
@@ -475,11 +475,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(Return(details));
 
   TestHeaderMapImpl headers{
-      {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
             "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=test://foo.com/fe",
             headers.get_("x-forwarded-client-cert"));
 }
@@ -494,7 +494,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
   ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
@@ -511,11 +511,11 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{
-      {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
@@ -526,7 +526,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
   ON_CALL(config_, setCurrentClientCertDetails())
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "SAN=abc,BY=test"}};
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
@@ -541,11 +541,11 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
       .WillByDefault(Return(std::list<Http::ClientCertDetailsType>()));
 
   TestHeaderMapImpl headers{
-      {"x-forwarded-client-cert", "BY=test://foo.com/fe;SAN=test://bar.com/be"}};
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
 } // Http

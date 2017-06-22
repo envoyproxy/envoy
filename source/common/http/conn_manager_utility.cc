@@ -139,7 +139,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
         config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
       // In these cases, the client cert in the current hop should be set into the XFCC header.
       if (!connection.ssl()->uriSanLocalCertificate().empty()) {
-        clientCertDetails += "BY=" + connection.ssl()->uriSanLocalCertificate();
+        clientCertDetails += "By=" + connection.ssl()->uriSanLocalCertificate();
       }
       if (!connection.ssl()->sha256PeerCertificateDigest().empty()) {
         clientCertDetails += ";Hash=" + connection.ssl()->sha256PeerCertificateDigest();

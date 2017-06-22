@@ -19,9 +19,9 @@ class XfccIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   const std::string previous_xfcc_ =
-      "BY=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
+      "By=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
   const std::string current_xfcc_by_hash_ =
-      "BY=spiffe://lyft.com/"
+      "By=spiffe://lyft.com/"
       "backend-team;Hash=41f3165f5d86e4e964108956b6af297299896ef67b57442739872f52098dca21";
   const std::string client_subject_ = "Subject=\"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Lyft "
                                       "Frontend Team/emailAddress=frontend-team@lyft.com\"";
