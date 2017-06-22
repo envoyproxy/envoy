@@ -457,17 +457,20 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   // This test assumes the following scenario:
   // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
-  // also sends the XFCC
-  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
+  // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+  // calling foo.com/fe).
   Ssl::MockConnection ssl;
   ON_CALL(ssl, isMtls()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, subjectPeerCertificate())
+      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
   std::list<Http::ClientCertDetailsType> details = std::list<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(Return(details));
 
@@ -476,7 +479,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
                                                  random_, runtime_, local_info_);
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("BY=test://foo.com/be;Hash=abcdefg;SAN=test://foo.com/fe",
+  EXPECT_EQ("BY=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=test://foo.com/fe",
             headers.get_("x-forwarded-client-cert"));
 }
 

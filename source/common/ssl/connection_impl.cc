@@ -248,10 +248,7 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   if (!cert) {
     return "";
   }
-  subject_bio = BIO_new(BIO_s_file());
-  X509_NAME_print_ex(subject_bio, X509_get_subject_name(cert), 0, 0);
-  BIO_printf(subject_bio, "\n");
-  return "";
+  return std::string(X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0));
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {

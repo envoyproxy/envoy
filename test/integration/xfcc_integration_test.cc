@@ -189,10 +189,11 @@ TEST_P(XfccIntegrationTest, MtlsSanitize) {
   testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_, "");
 }
 
-TEST_P(XfccIntegrationTest, MtlsSanitizeSet) {
-  startTestServerWithXfccConfig("sanitize_set", "\"SAN\"");
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectSan) {
+  startTestServerWithXfccConfig("sanitize_set", "\"Subject\", \"SAN\"");
   testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
-                                       current_xfcc_by_hash_ + ";" + client_san_);
+                                       current_xfcc_by_hash_ + ";" + client_subject_ + ";" +
+                                           client_san_);
 }
 
 TEST_P(XfccIntegrationTest, MtlsAppendForward) {
@@ -201,11 +202,25 @@ TEST_P(XfccIntegrationTest, MtlsAppendForward) {
                                        previous_xfcc_ + "," + current_xfcc_by_hash_);
 }
 
+TEST_P(XfccIntegrationTest, MtlsAppendForwardSubject) {
+  startTestServerWithXfccConfig("append_forward", "\"Subject\"");
+  testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
+                                       previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" +
+                                           client_subject_);
+}
+
 TEST_P(XfccIntegrationTest, MtlsAppendForwardSan) {
   startTestServerWithXfccConfig("append_forward", "\"SAN\"");
   testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
                                        previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" +
                                            client_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectSan) {
+  startTestServerWithXfccConfig("append_forward", "\"Subject\", \"SAN\"");
+  testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
+                                       previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" +
+                                           client_subject_ + ";" + client_san_);
 }
 
 TEST_P(XfccIntegrationTest, MtlsAppendForwardSanPreviousXfccHeaderEmpty) {
