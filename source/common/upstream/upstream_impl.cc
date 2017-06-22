@@ -23,9 +23,9 @@
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
-#include "common/upstream/sds.h"
 
 #include "spdlog/spdlog.h"
 
@@ -147,7 +147,8 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
       throw EnvoyException("cannot create an sds cluster without an sds config");
     }
 
-    new_cluster.reset(new SdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+    // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
+    new_cluster.reset(new EdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
                                          sds_config.value(), local_info, cm, dispatcher, random));
   }
 

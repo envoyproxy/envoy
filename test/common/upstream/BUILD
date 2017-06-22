@@ -43,6 +43,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "eds_test",
+    srcs = ["eds_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/json:json_loader_lib",
+        "//source/common/upstream:eds_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     deps = [
@@ -167,7 +181,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:sds_lib",
+        "//source/common/upstream:eds_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
