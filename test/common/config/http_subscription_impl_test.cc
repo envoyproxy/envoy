@@ -1,5 +1,7 @@
 #include "test/common/config/http_subscription_test_harness.h"
 
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Config {
 namespace {

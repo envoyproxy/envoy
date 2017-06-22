@@ -1,7 +1,5 @@
 #pragma once
 
-#include "gtest/gtest.h"
-
 namespace Envoy {
 namespace Config {
 

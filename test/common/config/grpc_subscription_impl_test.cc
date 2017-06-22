@@ -1,5 +1,7 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
 
+#include "gtest/gtest.h"
+
 using testing::InSequence;
 
 namespace Envoy {
