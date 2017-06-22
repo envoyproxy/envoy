@@ -4,7 +4,6 @@
 
 namespace Envoy {
 namespace Config {
-namespace {
 
 /**
  * Interface for different Subscription implementation test harnesses. This has common functionality
@@ -45,6 +44,5 @@ public:
                                    const std::string& version, bool accept) PURE;
 };
 
-} // namespace
 } // namespace Config
 } // namespace Envoy
