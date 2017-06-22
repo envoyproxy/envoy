@@ -60,6 +60,17 @@ TEST_F(ZeroCopyInputStreamTest, BackUp) {
   EXPECT_EQ(4, stream_.ByteCount());
 }
 
+TEST_F(ZeroCopyInputStreamTest, BackUpFull) {
+  EXPECT_TRUE(stream_.Next(&data_, &size_));
+  EXPECT_EQ(4, size_);
+
+  stream_.BackUp(4);
+  EXPECT_TRUE(stream_.Next(&data_, &size_));
+  EXPECT_EQ(4, size_);
+  EXPECT_EQ(0, memcmp("abcd", data_, size_));
+  EXPECT_EQ(4, stream_.ByteCount());
+}
+
 TEST_F(ZeroCopyInputStreamTest, ByteCount) {
   EXPECT_EQ(0, stream_.ByteCount());
   EXPECT_TRUE(stream_.Next(&data_, &size_));
