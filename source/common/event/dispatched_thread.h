@@ -9,7 +9,6 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 
-#include "common/api/api_impl.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 
@@ -58,7 +57,6 @@ private:
 
   DispatcherPtr dispatcher_;
   Thread::ThreadPtr thread_;
-  TimerPtr no_exit_timer_;
 };
 
 } // Event
