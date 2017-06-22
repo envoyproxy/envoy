@@ -60,6 +60,20 @@ service Bookstore {
       delete: "/shelves/{shelf}/books/{book}"
     };
   }
+  rpc UpdateBook(UpdateBookRequest) returns (Book) {
+    option (google.api.http) = {
+      patch: "/shelves/{shelf}/books/{book.id}"
+      body: "book"
+    };
+  }
+  rpc BookstoreOptions(GetShelfRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      custom {
+        kind: "OPTIONS"
+        path: "/shelves/{shelf}"
+      }
+    };
+  }
 }
 
 // A shelf resource.
@@ -126,6 +140,14 @@ message GetBookRequest {
   int64 shelf = 1;
   // The ID of the book to retrieve.
   int64 book = 2;
+}
+
+// Request message for UpdateBook method
+message UpdateBookRequest {
+  // The ID of the shelf from which to retrieve a book.
+  int64 shelf = 1;
+  // A book resource to update on the shelf.
+  Book book = 2;
 }
 
 // Request message for DeleteBook method.

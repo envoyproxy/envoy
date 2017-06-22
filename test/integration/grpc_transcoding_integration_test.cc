@@ -179,16 +179,40 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryDelete) {
       "{}");
 }
 
+TEST_P(GrpcTranscodingIntegrationTest, UnaryPatch) {
+  testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
+      Http::TestHeaderMapImpl{
+          {":method", "PATCH"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
+      R"({"author" : "Leo Tolstoy", "title" : "War and Peace"})",
+      {R"(shelf: 456 book { id: 123 author: "Leo Tolstoy" title: "War and Peace" })"},
+      {R"(id: 123 author: "Leo Tolstoy" title: "War and Peace")"}, Status::OK,
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/json"},
+                              {"content-length", "59"},
+                              {"grpc-status", "0"}},
+      R"({"id":"123","author":"Leo Tolstoy","title":"War and Peace"})");
+}
+
+TEST_P(GrpcTranscodingIntegrationTest, UnaryCustom) {
+  testTranscoding<bookstore::GetShelfRequest, Empty>(
+      Http::TestHeaderMapImpl{
+          {":method", "OPTIONS"}, {":path", "/shelves/456"}, {":authority", "host"}},
+      "", {"shelf: 456"}, {""}, Status::OK,
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/json"},
+                              {"content-length", "2"},
+                              {"grpc-status", "0"}},
+      "{}");
+}
+
 TEST_P(GrpcTranscodingIntegrationTest, BindingAndBody) {
   testTranscoding<bookstore::CreateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
       R"({"author" : "Leo Tolstoy", "title" : "War and Peace"})",
       {R"(shelf: 1 book { author: "Leo Tolstoy" title: "War and Peace" })"},
-      {
-       R"(id: 3 author: "Leo Tolstoy" title: "War and Peace")",
-      },
-      Status::OK, Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      {R"(id: 3 author: "Leo Tolstoy" title: "War and Peace")"}, Status::OK,
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"({"id":"3","author":"Leo Tolstoy","title":"War and Peace"})");
 }
 
