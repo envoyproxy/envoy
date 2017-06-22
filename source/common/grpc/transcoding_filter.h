@@ -39,8 +39,8 @@ public:
 
   google::protobuf::util::Status
   createTranscoder(const Http::HeaderMap& headers,
-                   google::protobuf::io::ZeroCopyInputStream* request_input,
-                   google::grpc::transcoding::TranscoderInputStream* response_input,
+                   google::protobuf::io::ZeroCopyInputStream& request_input,
+                   google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const google::protobuf::MethodDescriptor*& method_descriptor);
 
@@ -61,26 +61,23 @@ class TranscodingFilter : public Http::StreamFilter, public Logger::Loggable<Log
 public:
   TranscodingFilter(TranscodingConfig& config);
 
+  // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
-
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
-
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
+  // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
-
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
-
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
+  // Http::StreamFilterBase
   void onDestroy() override {}
 
 private:
-  bool readToBuffer(google::protobuf::io::ZeroCopyInputStream* stream, Buffer::Instance& data);
+  bool readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
 
   TranscodingConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;

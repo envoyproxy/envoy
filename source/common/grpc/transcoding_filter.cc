@@ -133,8 +133,8 @@ TranscodingConfig::TranscodingConfig(const Json::Object& config) {
 }
 
 Status TranscodingConfig::createTranscoder(
-    const Http::HeaderMap& headers, ZeroCopyInputStream* request_input,
-    google::grpc::transcoding::TranscoderInputStream* response_input,
+    const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
+    google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder,
     const google::protobuf::MethodDescriptor*& method_descriptor) {
   const std::string method = headers.Method()->value().c_str();
@@ -155,7 +155,7 @@ Status TranscodingConfig::createTranscoder(
     return Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
   }
 
-  Status status = MethodToRequestInfo(method_descriptor, &request_info);
+  Status status = methodToRequestInfo(method_descriptor, &request_info);
   if (!status.ok()) {
     return status;
   }
@@ -174,21 +174,21 @@ Status TranscodingConfig::createTranscoder(
   }
 
   std::unique_ptr<JsonRequestTranslator> request_translator{
-      new JsonRequestTranslator(type_helper_->Resolver(), request_input, request_info,
+      new JsonRequestTranslator(type_helper_->Resolver(), &request_input, request_info,
                                 method_descriptor->client_streaming(), true)};
 
   const auto response_type_url =
       kTypeUrlPrefix + "/" + method_descriptor->output_type()->full_name();
   std::unique_ptr<ResponseToJsonTranslator> response_translator{
       new ResponseToJsonTranslator(type_helper_->Resolver(), response_type_url,
-                                   method_descriptor->server_streaming(), response_input)};
+                                   method_descriptor->server_streaming(), &response_input)};
 
   transcoder.reset(
       new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
   return Status::OK;
 }
 
-Status TranscodingConfig::MethodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+Status TranscodingConfig::methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
                                               google::grpc::transcoding::RequestInfo* info) {
   auto request_type_url = kTypeUrlPrefix + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
@@ -205,7 +205,7 @@ TranscodingFilter::TranscodingFilter(TranscodingConfig& config) : config_(config
 Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& headers,
                                                            bool end_stream) {
   const auto status =
-      config_.createTranscoder(headers, &request_in_, &response_in_, transcoder_, method_);
+      config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
   if (status.ok()) {
     headers.removeContentLength();
     headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
@@ -229,7 +229,7 @@ Http::FilterHeadersStatus TranscodingFilter::decodeHeaders(Http::HeaderMap& head
       }
 
       Buffer::OwnedImpl data;
-      ReadToBuffer(transcoder_->RequestOutput(), data);
+      readToBuffer(*transcoder_->RequestOutput(), data);
 
       if (data.length()) {
         decoder_callbacks_->addDecodedData(data);
@@ -252,7 +252,7 @@ Http::FilterDataStatus TranscodingFilter::decodeData(Buffer::Instance& data, boo
       request_in_.finish();
     }
 
-    ReadToBuffer(transcoder_->RequestOutput(), data);
+    readToBuffer(*transcoder_->RequestOutput(), data);
 
     const auto& request_status = transcoder_->RequestStatus();
 
@@ -274,7 +274,7 @@ Http::FilterTrailersStatus TranscodingFilter::decodeTrailers(Http::HeaderMap&) {
     request_in_.finish();
 
     Buffer::OwnedImpl data;
-    ReadToBuffer(transcoder_->RequestOutput(), data);
+    readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length()) {
       decoder_callbacks_->addDecodedData(data);
@@ -316,7 +316,7 @@ Http::FilterDataStatus TranscodingFilter::encodeData(Buffer::Instance& data, boo
       response_in_.finish();
     }
 
-    ReadToBuffer(transcoder_->ResponseOutput(), data);
+    readToBuffer(*transcoder_->ResponseOutput(), data);
 
     if (!method_->server_streaming()) {
       return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -332,7 +332,7 @@ Http::FilterTrailersStatus TranscodingFilter::encodeTrailers(Http::HeaderMap& tr
     response_in_.finish();
 
     Buffer::OwnedImpl data;
-    ReadToBuffer(transcoder_->ResponseOutput(), data);
+    readToBuffer(*transcoder_->ResponseOutput(), data);
 
     if (data.length()) {
       encoder_callbacks_->addEncodedData(data);
@@ -366,11 +366,11 @@ void TranscodingFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallb
 }
 
 // TODO(lizan): Incorporate watermarks to bound buffer sizes
-bool TranscodingFilter::ReadToBuffer(google::protobuf::io::ZeroCopyInputStream* stream,
+bool TranscodingFilter::readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream,
                                      Buffer::Instance& data) {
   const void* out;
   int size;
-  while (stream->Next(&out, &size)) {
+  while (stream.Next(&out, &size)) {
     data.add(out, size);
 
     if (size == 0) {
