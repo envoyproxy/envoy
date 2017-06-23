@@ -75,6 +75,8 @@ class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Http::RestApiFetcher,
                                    Logger::Loggable<Logger::Id::router> {
 public:
+  ~RdsRouteConfigProviderImpl();
+
   // Init::Target
   void initialize(std::function<void()> callback) override {
     initialize_callback_ = callback;

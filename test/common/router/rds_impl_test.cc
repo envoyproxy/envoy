@@ -131,6 +131,15 @@ TEST_F(RdsImplTest, UnknownCluster) {
                EnvoyException);
 }
 
+TEST_F(RdsImplTest, DestroyDuringInitialize) {
+  InSequence s;
+
+  setup();
+  EXPECT_CALL(init_manager_.initialized_, ready());
+  EXPECT_CALL(request_, cancel());
+  rds_.reset();
+}
+
 TEST_F(RdsImplTest, Basic) {
   InSequence s;
 
