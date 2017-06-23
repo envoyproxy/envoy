@@ -37,11 +37,6 @@ void Worker::initializeConfiguration(ListenerManager& listener_manager, GuardDog
     }
   }
 
-  // This is just a hack to prevent the event loop from exiting until we tell it to. By default it
-  // exits if there are no pending events.
-  no_exit_timer_ = handler_->dispatcher().createTimer([this]() -> void { onNoExitTimer(); });
-  onNoExitTimer();
-
   thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
 }
 
@@ -52,11 +47,6 @@ void Worker::exit() {
     handler_->dispatcher().exit();
     thread_->join();
   }
-}
-
-void Worker::onNoExitTimer() {
-  no_exit_timer_->enableTimer(
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)));
 }
 
 void Worker::threadRoutine(GuardDog& guard_dog) {
@@ -73,7 +63,6 @@ void Worker::threadRoutine(GuardDog& guard_dog) {
   // list.
   handler_->closeConnections();
   tls_.shutdownThread();
-  no_exit_timer_.reset();
   watchdog.reset();
   handler_.reset();
 }

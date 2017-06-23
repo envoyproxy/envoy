@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
+#include "common/http/codes.h"
 #include "common/json/config_schemas.h"
 
 namespace Envoy {
@@ -68,11 +70,13 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
+  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::GatewayTimeout));
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
   } else {
     host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   }
+
   connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -80,6 +84,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
+    host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::InternalServerError));
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -91,6 +96,7 @@ void ClientImpl::onEvent(uint32_t events) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (events & Network::ConnectionEvent::RemoteClose) {
+        host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
       if (events & Network::ConnectionEvent::LocalClose) {
@@ -136,6 +142,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   }
+
+  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
