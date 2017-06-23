@@ -119,11 +119,11 @@ struct InstanceStats {
 };
 
 /**
- * Struct definition for supported commands and how to handle them
+ * Supported commands and how to handle them
  */
 struct Commands {
   /**
-   * Gets the set of commands which hash to a single server
+   * @return commands which hash to a single server
    */
   static const std::vector<std::string>& allToOneCommands() {
     static std::vector<std::string>* commands =
