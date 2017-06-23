@@ -118,6 +118,14 @@ struct InstanceStats {
   ALL_COMMAND_SPLITTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Struct definition for supported commands and how to handle them
+ */
+struct Commands {
+  static const std::list<std::string> all_to_one;
+  // TODO(danielhochman): mget, mset, del definition
+};
+
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
