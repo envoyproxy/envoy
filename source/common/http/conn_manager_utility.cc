@@ -132,7 +132,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
 
-  if ((connection.ssl() && connection.ssl()->isMtls()) ||
+  if ((connection.ssl() && connection.ssl()->peerCertificatePresented()) ||
       config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
     std::string clientCertDetails;
     if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||

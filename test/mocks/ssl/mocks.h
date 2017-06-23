@@ -38,7 +38,7 @@ public:
   MockConnection();
   ~MockConnection();
 
-  MOCK_METHOD0(isMtls, bool());
+  MOCK_METHOD0(peerCertificatePresented, bool());
   MOCK_METHOD0(uriSanLocalCertificate, std::string());
   MOCK_METHOD0(sha256PeerCertificateDigest, std::string());
   MOCK_METHOD0(subjectPeerCertificate, std::string());

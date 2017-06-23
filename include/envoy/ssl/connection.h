@@ -17,7 +17,7 @@ public:
   /**
    * @return whether the connection is Mutual TLS.
    **/
-  virtual bool isMtls() PURE;
+  virtual bool peerCertificatePresented() PURE;
 
   /**
    * @return the uri in the SAN feld of the local certificate. Returns "" if there is no local

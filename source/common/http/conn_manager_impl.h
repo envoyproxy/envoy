@@ -224,7 +224,7 @@ public:
    * @return list of ClientCertDetailsType the configuration of the current client cert's details to
    * be forwarded.
    */
-  virtual const std::list<ClientCertDetailsType> setCurrentClientCertDetails() PURE;
+  virtual const std::list<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
 
   /**
    * @return local address.

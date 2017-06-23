@@ -214,8 +214,9 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
-bool ConnectionImpl::isMtls() {
-  if (SSL_get_peer_certificate(ssl_.get())) {
+bool ConnectionImpl::peerCertificatePresented() {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (cert) {
     return true;
   }
   return false;

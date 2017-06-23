@@ -92,7 +92,7 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
-  const std::list<Http::ClientCertDetailsType> setCurrentClientCertDetails() override {
+  const std::list<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {

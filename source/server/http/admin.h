@@ -71,7 +71,7 @@ public:
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }
-  const std::list<Http::ClientCertDetailsType> setCurrentClientCertDetails() override {
+  const std::list<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override;
