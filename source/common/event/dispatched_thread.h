@@ -33,6 +33,8 @@ namespace Event {
  *   1) Thread local storage (we don't want runOnAllThreads callbacks to run on
  *      this thread).
  *   2) ConnectionHandler and listeners
+ *
+ * TODO(dnoe): Worker should probably be refactored to leverage this.
  */
 class DispatchedThreadImpl : Logger::Loggable<Envoy::Logger::Id::main> {
 public:
