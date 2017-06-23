@@ -101,6 +101,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "init_manager_lib",
+    srcs = ["init_manager_impl.cc"],
+    hdrs = ["init_manager_impl.h"],
+    deps = [
+        "//include/envoy/init:init_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "options_lib",
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
@@ -137,6 +147,7 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
+        ":init_manager_lib",
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
