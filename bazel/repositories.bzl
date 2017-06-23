@@ -1,4 +1,5 @@
 load(":target_recipes.bzl", "TARGET_RECIPES")
+load(":repository_locations.bzl", "REPO_LOCATIONS")
 
 def _repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
@@ -44,7 +45,7 @@ py_library(
 """
     native.new_git_repository(
         name = "jinja2_git",
-        remote = "https://github.com/pallets/jinja.git",
+        remote = REPO_LOCATIONS["jinja2"],
         tag = "2.9.6",
         build_file_content = BUILD,
     )
@@ -59,7 +60,7 @@ py_library(
 """
     native.new_git_repository(
         name = "markupsafe_git",
-        remote = "https://github.com/pallets/markupsafe.git",
+        remote = REPO_LOCATIONS["markupsafe"],
         tag = "1.0",
         build_file_content = BUILD,
     )
@@ -83,7 +84,7 @@ def python_deps(skip_targets):
 def cc_grpc_httpjson_transcoding_dep():
     native.git_repository(
         name = "grpc_httpjson_transcoding",
-        remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding.git",
+        remote = REPO_LOCATIONS["grpc_transcoding"],
         commit = "3a90dfd2e7300e8dd60b74f0f4085f2a0bfc499e",
     )
 
@@ -104,7 +105,7 @@ def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
         name = "envoy_api",
-        remote = "https://github.com/lyft/envoy-api.git",
+        remote = REPO_LOCATIONS["envoy_api"],
         commit = "ecd521b1acf7e5c1ca3d2b0e9c3ad18a6cc5b530",
     )
     native.bind(
@@ -126,7 +127,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
             # https://github.com/htuch/protobuf/tree/v3.2.0-default-shell-env, which is the 3.2.0
             # release with the above mentioned PR cherry picked.
             commit = "d490587268931da78c942a6372ef57bb53db80da",
-            remote = "https://github.com/htuch/protobuf.git",
+            remote = REPO_LOCATIONS["protobuf"],
         )
     native.bind(
         name = "cc_wkt_protos",
