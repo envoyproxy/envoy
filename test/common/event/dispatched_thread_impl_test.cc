@@ -12,17 +12,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::NiceMock;
 
+namespace Envoy {
 namespace Event {
 
 class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000), guard_dog_(fakestats_, config_, time_source_) {}
-  virtual ~DispatchedThreadTest() {}
 
   void SetUp() { thread_.start(guard_dog_); }
   NiceMock<Server::Configuration::MockMain> config_;

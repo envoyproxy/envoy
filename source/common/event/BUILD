@@ -78,11 +78,6 @@ envoy_cc_library(
     deps = [
         ":dispatcher_lib",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/server:configuration_interface",
-        "//source/common/api:api_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/server:guarddog_lib",
