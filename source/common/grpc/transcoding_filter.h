@@ -20,10 +20,13 @@
 namespace Envoy {
 namespace Grpc {
 
-// VariableBinding specifies a value for a single field in the request message.
-// When transcoding HTTP/REST/JSON to gRPC/proto the request message is
-// constructed using the HTTP body and the variable bindings (specified through
-// request url).
+/** VariableBinding specifies a value for a single field in the request message.
+ * When transcoding HTTP/REST/JSON to gRPC/proto the request message is
+ * constructed using the HTTP body and the variable bindings (specified through
+ * request url).
+ * See https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
+ * for details of variable binding.
+ */
 struct VariableBinding {
   // The location of the field in the protobuf message, where the value
   // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
@@ -33,10 +36,26 @@ struct VariableBinding {
   std::string value;
 };
 
+/**
+ * Global configuration for the gRPC transcoding filter. Factory for the Transcoder interface.
+ */
 class TranscodingConfig : public Logger::Loggable<Logger::Id::config> {
 public:
+  /**
+   * constructor that loads protobuf descriptors from the file specified in the JSON config.
+   * and construct a path matcher for HTTP path bindings.
+   */
   TranscodingConfig(const Json::Object& config);
 
+  /**
+   * Create an instance of Transcoder interface based on incoming request
+   * @param headers headers received from decoder
+   * @param request_input a ZeroCopyInputStream reading from downstream request body
+   * @param response_input a TranscoderInputStream reading from upstream response body
+   * @param transcoder output parameter for the instance of Transcoder interface
+   * @param method_descriptor output parameter for the method looked up from config
+   * @return status whether the Transcoder instance are successfully created or not
+   */
   google::protobuf::util::Status
   createTranscoder(const Http::HeaderMap& headers,
                    google::protobuf::io::ZeroCopyInputStream& request_input,
@@ -44,6 +63,9 @@ public:
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const google::protobuf::MethodDescriptor*& method_descriptor);
 
+  /**
+   * Convert method descriptor to RequestInfo that needed for transcoding library
+   */
   google::protobuf::util::Status
   methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
                       google::grpc::transcoding::RequestInfo* info);
