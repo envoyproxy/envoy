@@ -118,13 +118,12 @@ public:
   /**
    * Set the downstream address
    */
-  virtual void downStreamAddress(std::string address) PURE;
+  virtual void setDownstreamAddress(std::string address) PURE;
 
   /**
    * Get the down stream address.
    */
-  virtual std::string downStreamAddress() const PURE;
-
+  virtual const std::string& getDownstreamAddress() const PURE;
 };
 
 /**
@@ -175,7 +174,7 @@ public:
                              const RequestInfo& request_info) const PURE;
 };
 
-typedef std::shared_ptr<Formatter> FormatterPtr;
+typedef std::unique_ptr<Formatter> FormatterPtr;
 
 } // namespace AccessLog
 } // namespace Http

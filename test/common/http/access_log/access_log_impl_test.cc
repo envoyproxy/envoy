@@ -66,8 +66,8 @@ public:
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   std::string downstream_address_;
-  void downStreamAddress(std::string address) override {downstream_address_= address;}
-  std::string downStreamAddress() const override {return downstream_address_;}
+  void setDownstreamAddress(std::string address) override { downstream_address_ = address; }
+  const std::string& getDownstreamAddress() const override { return downstream_address_; }
 
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};

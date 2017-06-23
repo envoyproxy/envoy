@@ -9,10 +9,10 @@
 #include <string>
 
 #include "envoy/common/optional.h"
+#include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/resource_manager.h"
-#include "envoy/http/access_log.h"
 
 namespace Envoy {
 namespace Router {
@@ -193,7 +193,8 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    */
-  virtual void finalizeRequestHeaders(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo) const PURE;
+  virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
+                                      Http::AccessLog::RequestInfo& requestInfo) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

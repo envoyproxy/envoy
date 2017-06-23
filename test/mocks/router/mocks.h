@@ -149,7 +149,8 @@ public:
 
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
-  MOCK_CONST_METHOD2(finalizeRequestHeaders, void(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo));
+  MOCK_CONST_METHOD2(finalizeRequestHeaders,
+                     void(Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());

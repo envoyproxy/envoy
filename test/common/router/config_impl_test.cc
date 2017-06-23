@@ -6,10 +6,10 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/json/json_loader.h"
-#include "common/router/config_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
+#include "common/router/config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -33,7 +33,6 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
                                           const std::string& method) {
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
-
 
 TEST(RouteMatcherTest, TestRoutes) {
   std::string json = R"EOF(
@@ -2036,7 +2035,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 }
 
 TEST(CustomRequestHeadersTest, AddNewHeader) {
-	std::string json = R"EOF(
+  std::string json = R"EOF(
 	{
   "virtual_hosts": [
     {
@@ -2129,28 +2128,26 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   ]
 }
 	  )EOF";
-	Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-	NiceMock<Runtime::MockLoader> runtime;
-	NiceMock<Upstream::MockClusterManager> cm;
-	NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-	ConfigImpl config(*loader, runtime, cm, true);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
+  ConfigImpl config(*loader, runtime, cm, true);
 
-
-	// Request header manipulation testing.
-	{
-		{
-			Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-			ON_CALL(requestInfo, downStreamAddress()).WillByDefault(Return("127.0.0.1"));
-			const RouteEntry* route = config.route(headers, 0)->routeEntry();
-			route->finalizeRequestHeaders(headers, requestInfo);
-			EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
-		}
-	}
-
+  // Request header manipulation testing.
+  {
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+      ON_CALL(requestInfo, getDownstreamAddress()).WillByDefault(ReturnRef("127.0.0.1"));
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers, requestInfo);
+      EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
+    }
+  }
 }
 
 TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
-	std::string json = R"EOF(
+  std::string json = R"EOF(
 	{
   "virtual_hosts": [
     {
@@ -2243,12 +2240,11 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   ]
 }
 	  )EOF";
-	Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-	NiceMock<Runtime::MockLoader> runtime;
-	NiceMock<Upstream::MockClusterManager> cm;
-	NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-	EXPECT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
-
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
+  EXPECT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
 }
 
 } // Router

@@ -46,12 +46,12 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  void downStreamAddress(std::string address) override {downstream_address_ = address;}
+  void setDownstreamAddress(std::string address) override { downstream_address_ = address; }
 
-    /**
-     * Get the down stream address.
-     */
-   std::string downStreamAddress() const override {return downstream_address_;};
+  /**
+   * Get the down stream address.
+   */
+  const std::string& getDownstreamAddress() const override { return downstream_address_; };
 
   Protocol protocol_;
   const SystemTime start_time_;

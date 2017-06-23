@@ -145,7 +145,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
 void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host) {
-  Http::HeaderMapImpl 	fake_response_headers{
+  Http::HeaderMapImpl fake_response_headers{
       {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
   chargeUpstreamCode(fake_response_headers, upstream_host);
 }
@@ -236,7 +236,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
-  callbacks_->requestInfo().downStreamAddress(callbacks_->downstreamAddress());
+  callbacks_->requestInfo().setDownstreamAddress(callbacks_->downstreamAddress());
   log().debug("downstream address: '{}'\n", callbacks_->downstreamAddress());
   route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
