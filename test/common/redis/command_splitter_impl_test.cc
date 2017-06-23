@@ -196,7 +196,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerTest,
                         RedisAllParamsToOneServerCommandHandlerTest,
-                        testing::ValuesIn(Commands::all_to_one));
+                        testing::ValuesIn(Commands::allToOneCommands()));
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerMixedCaseTests,
                         RedisAllParamsToOneServerCommandHandlerTest,

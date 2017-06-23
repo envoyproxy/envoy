@@ -122,8 +122,15 @@ struct InstanceStats {
  * Struct definition for supported commands and how to handle them
  */
 struct Commands {
-  static const std::list<std::string> all_to_one;
-  // TODO(danielhochman): mget, mset, del definition
+  /**
+   * Gets the set of commands which hash to a single server
+   */
+  static std::vector<std::string>& allToOneCommands() {
+    static std::vector<std::string>* commands =
+        new std::vector<std::string>{"expire", "get", "incr", "incrby", "set", "setex"};
+    return *commands;
+  }
+  // TODO(danielhochman): static vector of commands that hash to multiple servers: mget, mset, del
 };
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {

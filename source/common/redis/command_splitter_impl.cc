@@ -13,9 +13,6 @@ namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 
-const std::list<std::string> Commands::all_to_one = {"expire", "get", "incr",
-                                                     "incrby", "set", "setex"};
-
 RespValuePtr Utility::makeError(const std::string& error) {
   RespValuePtr response(new RespValue());
   response->type(RespType::Error);
@@ -149,7 +146,7 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       mget_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
-  for (std::string command : Commands::all_to_one) {
+  for (std::string command : Commands::allToOneCommands()) {
     addHandler(scope, stat_prefix, command, all_to_one_handler_);
   }
 
