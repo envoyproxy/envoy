@@ -125,7 +125,7 @@ struct Commands {
   /**
    * Gets the set of commands which hash to a single server
    */
-  static std::vector<std::string>& allToOneCommands() {
+  static const std::vector<std::string>& allToOneCommands() {
     static std::vector<std::string>* commands =
         new std::vector<std::string>{"expire", "get", "incr", "incrby", "set", "setex"};
     return *commands;
