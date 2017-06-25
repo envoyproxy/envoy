@@ -74,6 +74,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "options_interface",
     hdrs = ["options.h"],
+    deps = [
+        "//include/envoy/network:address_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "worker_interface",
+    hdrs = ["worker.h"],
+    deps = [
+        "//include/envoy/server:guarddog_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -107,6 +118,7 @@ envoy_cc_library(
     hdrs = ["listener_manager.h"],
     deps = [
         ":filter_config_interface",
+        ":guarddog_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",

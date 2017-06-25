@@ -1,4 +1,4 @@
-#include "server/worker.h"
+#include "server/worker_impl.h"
 
 #include <chrono>
 
@@ -13,34 +13,45 @@
 namespace Envoy {
 namespace Server {
 
-Worker::Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_interval_msec)
+WorkerPtr ProdWorkerFactory::createWorker() {
+  return WorkerPtr{new WorkerImpl(tls_, options_.fileFlushIntervalMsec())};
+}
+
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls,
+                       std::chrono::milliseconds file_flush_interval_msec)
     : tls_(tls), handler_(new ConnectionHandlerImpl(
                      log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
   tls_.registerThread(handler_->dispatcher(), false);
 }
 
-Worker::~Worker() {}
-
-void Worker::initializeConfiguration(ListenerManager& listener_manager, GuardDog& guard_dog) {
-  for (Listener& listener : listener_manager.listeners()) {
-    const Network::ListenerOptions listener_options = {
-        .bind_to_port_ = listener.bindToPort(),
-        .use_proxy_proto_ = listener.useProxyProto(),
-        .use_original_dst_ = listener.useOriginalDst(),
-        .per_connection_buffer_limit_bytes_ = listener.perConnectionBufferLimitBytes()};
-    if (listener.sslContext()) {
-      handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
-                               listener.socket(), listener.listenerScope(), listener_options);
-    } else {
-      handler_->addListener(listener.filterChainFactory(), listener.socket(),
-                            listener.listenerScope(), listener_options);
-    }
+void WorkerImpl::addListener(Listener& listener) {
+  const Network::ListenerOptions listener_options = {.bind_to_port_ = listener.bindToPort(),
+                                                     .use_proxy_proto_ = listener.useProxyProto(),
+                                                     .use_original_dst_ = listener.useOriginalDst(),
+                                                     .per_connection_buffer_limit_bytes_ =
+                                                         listener.perConnectionBufferLimitBytes()};
+  if (listener.sslContext()) {
+    handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
+                             listener.socket(), listener.listenerScope(), listener_options);
+  } else {
+    handler_->addListener(listener.filterChainFactory(), listener.socket(),
+                          listener.listenerScope(), listener_options);
   }
+}
 
+uint64_t WorkerImpl::numConnections() {
+  uint64_t ret = 0;
+  if (handler_) {
+    ret = handler_->numConnections();
+  }
+  return ret;
+}
+
+void WorkerImpl::start(GuardDog& guard_dog) {
   thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
 }
 
-void Worker::exit() {
+void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
   // is happening, so we might not yet have a thread.
   if (thread_) {
@@ -49,7 +60,11 @@ void Worker::exit() {
   }
 }
 
-void Worker::threadRoutine(GuardDog& guard_dog) {
+void WorkerImpl::stopListeners() {
+  handler_->dispatcher().post([this]() -> void { handler_->closeListeners(); });
+}
+
+void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(info, "worker entering dispatch loop");
   auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(handler_->dispatcher());

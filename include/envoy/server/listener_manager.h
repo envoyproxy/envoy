@@ -4,6 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/guarddog.h"
 #include "envoy/ssl/context.h"
 
 namespace Envoy {
@@ -100,7 +101,7 @@ public:
 typedef std::unique_ptr<Listener> ListenerPtr;
 
 /**
- * A manager for all listeners.
+ * A manager for all listeners and all threaded connection handling workers.
  */
 class ListenerManager {
 public:
@@ -117,6 +118,29 @@ public:
    * @return std::list<std::reference_wrapper<Listener>> a list of the currently loaded listeners.
    */
   virtual std::list<std::reference_wrapper<Listener>> listeners() PURE;
+
+  /**
+   * @return uint64_t the total number of connections owned by all listeners across all workers.
+   */
+  virtual uint64_t numConnections() PURE;
+
+  /**
+   * Start all workers accepting new connections on all added listeners.
+   * @param guard_dog supplies the guard dog to use for thread watching.
+   */
+  virtual void startWorkers(GuardDog& guard_dog) PURE;
+
+  /**
+   * Stop all listeners from accepting new connections without actually removing any of them. This
+   * is used for server draining.
+   */
+  virtual void stopListeners() PURE;
+
+  /**
+   * Stop all threaded workers from running. When this routine returns all worker threads will
+   * have exited.
+   */
+  virtual void stopWorkers() PURE;
 };
 
 } // Server

@@ -22,7 +22,6 @@
 #include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
-#include "server/worker.h"
 
 namespace Envoy {
 namespace Server {
@@ -48,7 +47,8 @@ bool validateConfig(Options& options, ComponentFactory& component_factory,
  */
 class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public Instance,
-                           public ListenerComponentFactory {
+                           public ListenerComponentFactory,
+                           public WorkerFactory {
 public:
   ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
                      Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -96,6 +96,13 @@ public:
   Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
+    // validation mock.
+    return nullptr;
+  }
+
+  // Server::WorkerFactory
+  WorkerPtr createWorker() override {
+    // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
   }
