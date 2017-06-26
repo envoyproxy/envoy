@@ -21,9 +21,9 @@ void RpcChannelImpl::cancel() {
   onComplete();
 }
 
-void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::RpcController*,
-                                const proto::Message* grpc_request, proto::Message* grpc_response,
-                                proto::Closure*) {
+void RpcChannelImpl::CallMethod(const ::google::protobuf::MethodDescriptor* method, ::google::protobuf::RpcController*,
+                                const ::google::protobuf::Message* grpc_request, ::google::protobuf::Message* grpc_response,
+                                ::google::protobuf::Closure*) {
   ASSERT(!http_request_ && !grpc_method_ && !grpc_response_);
   grpc_method_ = method;
   grpc_response_ = grpc_response;

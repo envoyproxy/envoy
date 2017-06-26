@@ -35,15 +35,15 @@ public:
 
   ~RpcChannelImpl() { ASSERT(!http_request_ && !grpc_method_ && !grpc_response_); }
 
-  static Buffer::InstancePtr serializeBody(const proto::Message& message);
+  static Buffer::InstancePtr serializeBody(const ::google::protobuf::Message& message);
 
   // Grpc::RpcChannel
   void cancel() override;
 
-  // proto::RpcChannel
-  void CallMethod(const proto::MethodDescriptor* method, proto::RpcController* controller,
-                  const proto::Message* grpc_request, proto::Message* grpc_response,
-                  proto::Closure* done_callback) override;
+  // ::google::protobuf::RpcChannel
+  void CallMethod(const ::google::protobuf::MethodDescriptor* method, ::google::protobuf::RpcController* controller,
+                  const ::google::protobuf::Message* grpc_request, ::google::protobuf::Message* grpc_response,
+                  ::google::protobuf::Closure* done_callback) override;
 
 private:
   void incStat(bool success);
@@ -58,8 +58,8 @@ private:
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::AsyncClient::Request* http_request_{};
-  const proto::MethodDescriptor* grpc_method_{};
-  proto::Message* grpc_response_{};
+  const ::google::protobuf::MethodDescriptor* grpc_method_{};
+  ::google::protobuf::Message* grpc_response_{};
   RpcChannelCallbacks& callbacks_;
   Optional<std::chrono::milliseconds> timeout_;
 };
