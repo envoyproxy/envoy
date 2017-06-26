@@ -29,8 +29,8 @@ typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubsc
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness()
-      : method_descriptor_(envoy::api::v2::EndpointDiscoveryService::descriptor()->FindMethodByName(
-            "FetchEndpoints")),
+      : method_descriptor_(google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_))
