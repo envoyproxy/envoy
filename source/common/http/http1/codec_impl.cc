@@ -475,10 +475,9 @@ void ServerConnectionImpl::sendProtocolError() {
   // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
   // to look more like HTTP/2 to higher layers.
   if (!active_request_ || !active_request_->response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response(fmt::format(
-        "HTTP/1.1 {} {}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-        std::to_string(enumToInt(error_code_)),
-        CodeUtility::toString(error_code_)));
+    Buffer::OwnedImpl bad_request_response(
+        fmt::format("HTTP/1.1 {} {}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+                    std::to_string(enumToInt(error_code_)), CodeUtility::toString(error_code_)));
 
     connection_.write(bad_request_response);
   }
