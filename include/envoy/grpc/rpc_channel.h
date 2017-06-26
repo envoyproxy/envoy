@@ -41,11 +41,12 @@ public:
 };
 
 /**
- * A single active grpc request arbiter. This interface derives from ::google::protobuf::RpcChannel. When
- * mocking, CallMethod() can be overriden to accept the response message and the mock constructor
- * can accept a RequestCallbacks object. An RpcChannel should be passed to the constructor of an RPC
- * stub generated via protoc using the "option cc_generic_services = true;" option. It can be used
- * for multiple service calls, but not concurrently.
+ * A single active grpc request arbiter. This interface derives from
+ * ::google::protobuf::RpcChannel. When mocking, CallMethod() can be overriden to accept the
+ * response message and the mock constructor can accept a RequestCallbacks object. An RpcChannel
+ * should be passed to the constructor of an RPC stub generated via protoc using the "option
+ * cc_generic_services = true;" option. It can be used for multiple service calls, but not
+ * concurrently.
  * DEPRECATED: See https://github.com/lyft/envoy/issues/1102
  */
 class RpcChannel : public ::google::protobuf::RpcChannel {

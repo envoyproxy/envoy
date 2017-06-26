@@ -41,8 +41,10 @@ public:
   void cancel() override;
 
   // ::google::protobuf::RpcChannel
-  void CallMethod(const ::google::protobuf::MethodDescriptor* method, ::google::protobuf::RpcController* controller,
-                  const ::google::protobuf::Message* grpc_request, ::google::protobuf::Message* grpc_response,
+  void CallMethod(const ::google::protobuf::MethodDescriptor* method,
+                  ::google::protobuf::RpcController* controller,
+                  const ::google::protobuf::Message* grpc_request,
+                  ::google::protobuf::Message* grpc_response,
                   ::google::protobuf::Closure* done_callback) override;
 
 private:
