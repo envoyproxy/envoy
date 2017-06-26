@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 
 #include "http_parser.h"
@@ -149,6 +150,7 @@ protected:
   Network::Connection& connection_;
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
+  Http::Code error_code_{Http::Code::BadRequest};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
