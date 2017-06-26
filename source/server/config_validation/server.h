@@ -88,7 +88,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
   // Server::ListenerComponentFactory
-  std::list<Configuration::NetworkFilterFactoryCb>
+  std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
                           Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createFilterFactoryList_(filters, *this, context);

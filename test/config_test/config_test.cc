@@ -45,7 +45,7 @@ public:
         .WillByDefault(
             Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
                        Server::Configuration::FactoryContext& context)
-                       -> std::list<Server::Configuration::NetworkFilterFactoryCb> {
+                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
                          return Server::ProdListenerComponentFactory::createFilterFactoryList_(
                              filters, server_, context);
                        }));

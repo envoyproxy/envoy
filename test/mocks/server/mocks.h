@@ -106,7 +106,7 @@ public:
     return Network::ListenSocketPtr{createListenSocket_(address, bind_to_port)};
   }
 
-  MOCK_METHOD2(createFilterFactoryList, std::list<Configuration::NetworkFilterFactoryCb>(
+  MOCK_METHOD2(createFilterFactoryList, std::vector<Configuration::NetworkFilterFactoryCb>(
                                             const std::vector<Json::ObjectSharedPtr>& filters,
                                             Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket_,

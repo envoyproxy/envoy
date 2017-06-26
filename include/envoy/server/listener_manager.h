@@ -29,9 +29,9 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the JSON configuration.
    * @param context supplies the factory creation context.
-   * @return std::list<Configuration::NetworkFilterFactoryCb> the list of filter factories.
+   * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
    */
-  virtual std::list<Configuration::NetworkFilterFactoryCb>
+  virtual std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
                           Configuration::FactoryContext& context) PURE;
 };

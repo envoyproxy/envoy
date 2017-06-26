@@ -23,12 +23,12 @@ public:
   /**
    * Static worker for createFilterFactoryList() that can be used directly in tests.
    */
-  static std::list<Configuration::NetworkFilterFactoryCb>
+  static std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList_(const std::vector<Json::ObjectSharedPtr>& filters,
                            Server::Instance& server, Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
-  std::list<Configuration::NetworkFilterFactoryCb>
+  std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, server_, context);
@@ -95,7 +95,7 @@ private:
   const bool use_proxy_proto_{};
   const bool use_original_dst_{};
   const uint32_t per_connection_buffer_limit_bytes_{};
-  std::list<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
 };
 
 /**

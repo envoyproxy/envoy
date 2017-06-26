@@ -13,14 +13,14 @@
 namespace Envoy {
 namespace Server {
 
-std::list<Configuration::NetworkFilterFactoryCb>
+std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createFilterFactoryList_(
     const std::vector<Json::ObjectSharedPtr>& filters, Server::Instance& server,
     Configuration::FactoryContext& context) {
-  std::list<Configuration::NetworkFilterFactoryCb> ret;
+  std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (size_t i = 0; i < filters.size(); i++) {
-    std::string string_type = filters[i]->getString("type");
-    std::string string_name = filters[i]->getString("name");
+    const std::string string_type = filters[i]->getString("type");
+    const std::string string_name = filters[i]->getString("name");
     Json::ObjectSharedPtr config = filters[i]->getObject("config");
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    type: {}", string_type);
@@ -76,7 +76,7 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   // UdsListenerSockets are not managed and do not participate in hot restart as they are only
   // used for testing. First we try to get the socket from our parent if applicable.
   ASSERT(address->type() == Network::Address::Type::Ip);
-  std::string addr = fmt::format("tcp://{}", address->asString());
+  const std::string addr = fmt::format("tcp://{}", address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(info, "obtained socket for address {} from parent", addr);
