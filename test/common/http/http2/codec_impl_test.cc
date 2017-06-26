@@ -15,14 +15,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
-
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
@@ -69,7 +69,7 @@ public:
     EXPECT_CALL(server_callbacks_, newStream(_))
         .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
           response_encoder_ = &encoder;
-          encoder.getStream().addCallbacks(callbacks_);
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
         }));
   }
@@ -98,7 +98,7 @@ public:
   StreamEncoder& request_encoder_;
   MockStreamDecoder request_decoder_;
   StreamEncoder* response_encoder_{};
-  MockStreamCallbacks callbacks_;
+  MockStreamCallbacks server_stream_callbacks_;
 };
 
 TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
@@ -168,7 +168,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 
   MockStreamCallbacks callbacks;
   request_encoder_.getStream().addCallbacks(callbacks);
-  EXPECT_CALL(callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 }
@@ -232,42 +232,96 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
-TEST_P(Http2CodecImplTest, DeferredReset) {
+class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
+
+TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   InSequence s;
 
-  // Buffer server data so we can make sure we don't get any window updates.
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_.getStream().addCallbacks(client_stream_callbacks);
+
+  // Do a request, but pause server dispatch so we don't send window updates. This will result in a
+  // deferred reset, followed by a pending frames flush which will cause the stream to actually
+  // be reset immediately since we are outside of dispatch context.
   ON_CALL(client_connection_, write(_))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
-
-  // This will send a request that is bigger than the initial window size. When we then reset it,
-  // after attempting to flush we should reset the stream and drop the data we could not send.
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_.encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   request_encoder_.encodeData(body, true);
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
   request_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
 
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  // Dispatch server. We expect to see some data.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        // Start a response inside the headers callback. This should not result in the client
+        // seeing any headers as the stream should already be reset on the other side, even though
+        // we don't know about it yet.
+        TestHeaderMapImpl response_headers{{":status", "200"}};
+        response_encoder_->encodeHeaders(response_headers, false);
+      }));
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  EXPECT_CALL(callbacks_, onResetStream(StreamResetReason::RemoteReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset));
+
+  setupDefaultConnectionMocks();
   server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
-// we seperate default/edge cases here to avoid combinatorial explosion
+TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
+  InSequence s;
 
-#define HTTP2SETTINGS_DEFAULT_COMBIME                                                              \
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_.encodeHeaders(request_headers, false);
+
+  // In this case we do the same thing as DeferredResetClient but on the server side.
+  ON_CALL(server_connection_, write(_))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data) -> void { client_wrapper_.buffer_.add(data); }));
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  response_encoder_->encodeData(body, true);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
+  response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_.getStream().addCallbacks(client_stream_callbacks);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset));
+  setupDefaultConnectionMocks();
+  client_wrapper_.dispatch(Buffer::OwnedImpl(), client_);
+}
+
+// Deferred reset tests use only small windows so that we can test certain conditions.
+#define HTTP2SETTINGS_DEFERRED_RESET_COMBINE                                                       \
+  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
+                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
+                     ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
+                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
+
+INSTANTIATE_TEST_CASE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
+                        ::testing::Combine(HTTP2SETTINGS_DEFERRED_RESET_COMBINE,
+                                           HTTP2SETTINGS_DEFERRED_RESET_COMBINE));
+
+// we seperate default/edge cases here to avoid combinatorial explosion
+#define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBIME,
-                                           HTTP2SETTINGS_DEFAULT_COMBIME));
+                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                           HTTP2SETTINGS_DEFAULT_COMBINE));
 
-#define HTTP2SETTINGS_EDGE_COMBIME                                                                 \
+#define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
       ::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE), \
       ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                                 \
@@ -278,7 +332,7 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
-                        ::testing::Combine(HTTP2SETTINGS_EDGE_COMBIME, HTTP2SETTINGS_EDGE_COMBIME));
+                        ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

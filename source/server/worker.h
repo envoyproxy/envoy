@@ -37,7 +37,6 @@ private:
 
   ThreadLocal::Instance& tls_;
   ConnectionHandlerImplPtr handler_;
-  Event::TimerPtr no_exit_timer_;
   Thread::ThreadPtr thread_;
 };
 

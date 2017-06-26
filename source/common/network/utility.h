@@ -3,36 +3,12 @@
 #include <cstdint>
 #include <list>
 #include <string>
-#include <vector>
 
-#include "envoy/json/json_object.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Network {
-
-/**
- * Utility class for keeping a list of IPV4 addresses and masks, and then determining whether an
- * IP address is in the address/mask list.
- */
-class IpList {
-public:
-  IpList(const std::vector<std::string>& subnets);
-  IpList(const Json::Object& config, const std::string& member_name);
-  IpList(){};
-
-  bool contains(const Address::Instance& address) const;
-  bool empty() const { return ipv4_list_.empty(); }
-
-private:
-  struct Ipv4Entry {
-    uint32_t ipv4_address_;
-    uint32_t ipv4_mask_;
-  };
-
-  std::vector<Ipv4Entry> ipv4_list_;
-};
 
 /**
  * Utility class to represent TCP/UDP port range

@@ -87,6 +87,7 @@ envoy_cc_library(
     hdrs = ["guarddog_impl.h"],
     deps = [
         ":watchdog_lib",
+        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
@@ -96,6 +97,16 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "init_manager_lib",
+    srcs = ["init_manager_impl.cc"],
+    hdrs = ["init_manager_impl.h"],
+    deps = [
+        "//include/envoy/init:init_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -136,6 +147,7 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
+        ":init_manager_lib",
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
