@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 
 #include "common/common/logger.h"
@@ -10,19 +11,33 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Prod implementation of ListenSocketFactory that creates real sockets and attempts to fetch
- * sockets from the parent process via the hot restarter.
+ * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
+ * sockets from the parent process via the hot restarter. The filter factory list is created from
+ * statically registered filters.
  */
-class ProdListenSocketFactory : public ListenSocketFactory, Logger::Loggable<Logger::Id::config> {
+class ProdListenerComponentFactory : public ListenerComponentFactory,
+                                     Logger::Loggable<Logger::Id::config> {
 public:
-  ProdListenSocketFactory(HotRestart& restarter) : restarter_(restarter) {}
+  ProdListenerComponentFactory(Instance& server) : server_(server) {}
+
+  /**
+   * Static worker for createFilterFactoryList() that can be used directly in tests.
+   */
+  static std::vector<Configuration::NetworkFilterFactoryCb>
+  createFilterFactoryList_(const std::vector<Json::ObjectSharedPtr>& filters,
+                           Server::Instance& server, Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
-  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr address,
-                                  bool bind_to_port) override;
+  std::vector<Configuration::NetworkFilterFactoryCb>
+  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+                          Configuration::FactoryContext& context) override {
+    return createFilterFactoryList_(filters, server_, context);
+  }
+  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              bool bind_to_port) override;
 
 private:
-  HotRestart& restarter_;
+  Instance& server_;
 };
 
 /**
@@ -34,7 +49,7 @@ class ListenerImpl : public Listener,
                      Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerImpl(Instance& server, ListenSocketFactory& factory, const Json::Object& json);
+  ListenerImpl(Instance& server, ListenerComponentFactory& factory, const Json::Object& json);
 
   // Server::Listener
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
@@ -80,7 +95,7 @@ private:
   const bool use_proxy_proto_{};
   const bool use_original_dst_{};
   const uint32_t per_connection_buffer_limit_bytes_{};
-  std::list<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
 };
 
 /**
@@ -88,7 +103,7 @@ private:
  */
 class ListenerManagerImpl : public ListenerManager {
 public:
-  ListenerManagerImpl(Instance& server, ListenSocketFactory& factory)
+  ListenerManagerImpl(Instance& server, ListenerComponentFactory& factory)
       : server_(server), factory_(factory) {}
 
   // Server::ListenerManager
@@ -97,7 +112,7 @@ public:
 
 private:
   Instance& server_;
-  ListenSocketFactory& factory_;
+  ListenerComponentFactory& factory_;
   std::list<ListenerPtr> listeners_;
 };
 

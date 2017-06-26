@@ -146,7 +146,7 @@ private:
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  ProdListenSocketFactory listen_socket_factory_;
+  ProdListenerComponentFactory listen_component_factory_;
   ListenerManagerImpl listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
