@@ -20,6 +20,8 @@ public:
 private:
   enum class State { NotInitialized, Initializing, Initialized };
 
+  void initializeTarget(Init::Target& target);
+
   std::list<Init::Target*> targets_;
   State state_{State::NotInitialized};
   std::function<void()> callback_;

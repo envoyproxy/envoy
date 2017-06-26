@@ -172,6 +172,57 @@ TEST(IsInRange, Various) {
   }
 }
 
+TEST(CidrRangeTest, OperatorIsEqual) {
+  {
+    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = CidrRange::create("192.168.0.0/16");
+    EXPECT_FALSE(rng1 == rng2);
+  }
+
+  {
+    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = CidrRange::create("192.168.0.0/8");
+    EXPECT_TRUE(rng1 == rng2);
+  }
+
+  {
+    CidrRange rng1 = CidrRange::create("192.0.0.0/8");
+    CidrRange rng2 = CidrRange::create("2001::/8");
+    EXPECT_FALSE(rng1 == rng2);
+  }
+
+  {
+    CidrRange rng1 = CidrRange::create("2002::/16");
+    CidrRange rng2 = CidrRange::create("2001::/16");
+    EXPECT_FALSE(rng1 == rng2);
+  }
+
+  {
+    CidrRange rng1 = CidrRange::create("2002::/16");
+    CidrRange rng2 = CidrRange::create("192.168.0.1/16");
+    EXPECT_FALSE(rng1 == rng2);
+  }
+
+  {
+    CidrRange rng1 = CidrRange::create("2002::/16");
+    CidrRange rng2 = CidrRange::create("2002::1/16");
+    EXPECT_TRUE(rng1 == rng2);
+  }
+}
+
+TEST(CidrRangeTest, InvalidCidrRange) {
+  CidrRange rng1 = CidrRange::create("foo");
+  EXPECT_EQ(nullptr, rng1.ipv4());
+  EXPECT_EQ(nullptr, rng1.ipv6());
+  EXPECT_EQ(IpVersion::v4, rng1.version());
+  EXPECT_EQ("/-1", rng1.asString());
+  // Not equal due to invalid CidrRange.
+  EXPECT_FALSE(rng1 == rng1);
+
+  CidrRange rng2 = CidrRange::create("192.0.0.0/8");
+  EXPECT_FALSE(rng1 == rng2);
+}
+
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.

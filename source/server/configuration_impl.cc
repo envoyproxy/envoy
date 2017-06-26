@@ -25,7 +25,7 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::list<NetworkFilterFactoryCb>& factories) {
+                                          const std::vector<NetworkFilterFactoryCb>& factories) {
   for (const NetworkFilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }

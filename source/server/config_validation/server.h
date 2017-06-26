@@ -48,7 +48,7 @@ bool validateConfig(Options& options, ComponentFactory& component_factory,
  */
 class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public Instance,
-                           public ListenSocketFactory {
+                           public ListenerComponentFactory {
 public:
   ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
                      Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -87,8 +87,14 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
-  // Server::ListenSocketFactory
-  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr, bool) override {
+  // Server::ListenerComponentFactory
+  std::vector<Configuration::NetworkFilterFactoryCb>
+  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+                          Configuration::FactoryContext& context) override {
+    return ProdListenerComponentFactory::createFilterFactoryList_(filters, *this, context);
+  }
+  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
+                                              bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;

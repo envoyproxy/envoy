@@ -3,17 +3,18 @@
 #include "envoy/json/json_object.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/ssl/context.h"
 
 namespace Envoy {
 namespace Server {
 
 /**
- * Factory for creating listen sockets.
+ * Factory for creating listener components.
  */
-class ListenSocketFactory {
+class ListenerComponentFactory {
 public:
-  virtual ~ListenSocketFactory() {}
+  virtual ~ListenerComponentFactory() {}
 
   /**
    * Creates a socket.
@@ -21,8 +22,18 @@ public:
    * @param bind_to_port supplies whether to actually bind the socket.
    * @return Network::ListenSocketPtr an initialized and potentially bound socket.
    */
-  virtual Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr address,
-                                          bool bind_to_port) PURE;
+  virtual Network::ListenSocketPtr
+  createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) PURE;
+
+  /**
+   * Creates a list of filter factories.
+   * @param filters supplies the JSON configuration.
+   * @param context supplies the factory creation context.
+   * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
+   */
+  virtual std::vector<Configuration::NetworkFilterFactoryCb>
+  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+                          Configuration::FactoryContext& context) PURE;
 };
 
 /**
