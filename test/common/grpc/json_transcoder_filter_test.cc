@@ -1,7 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/grpc/transcoding_filter.h"
+#include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -29,9 +29,9 @@ using google::protobuf::util::error::Code;
 namespace Envoy {
 namespace Grpc {
 
-class GrpcHttpJsonTranscodingFilterTest : public testing::Test {
+class GrpcJsonTranscoderFilterTest : public testing::Test {
 public:
-  GrpcHttpJsonTranscodingFilterTest() : config_(*bookstoreJson()), filter_(config_) {
+  GrpcJsonTranscoderFilterTest() : config_(*bookstoreJson()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -44,13 +44,13 @@ public:
     return Json::Factory::loadFromString(json_string);
   }
 
-  TranscodingConfig config_;
-  TranscodingFilter filter_;
+  JsonTranscoderConfig config_;
+  JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-TEST_F(GrpcHttpJsonTranscodingFilterTest, NoTranscoding) {
+TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":method", "POST"},
                                           {":path", "/grpc.service/UnknownGrpcMethod"}};
@@ -63,7 +63,7 @@ TEST_F(GrpcHttpJsonTranscodingFilterTest, NoTranscoding) {
   EXPECT_EQ(expected_request_headers, request_headers);
 }
 
-TEST_F(GrpcHttpJsonTranscodingFilterTest, TranscodingUnaryPost) {
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::TestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
 
@@ -118,7 +118,7 @@ TEST_F(GrpcHttpJsonTranscodingFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
-TEST_F(GrpcHttpJsonTranscodingFilterTest, TranscodingUnaryError) {
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
   Http::TestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
 

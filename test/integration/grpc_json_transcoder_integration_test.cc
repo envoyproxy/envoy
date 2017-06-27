@@ -20,17 +20,17 @@ using google::protobuf::TextFormat;
 
 namespace Envoy {
 
-class GrpcTranscodingIntegrationTest : public BaseIntegrationTest,
+class GrpcJsonTranscoderIntegrationTest : public BaseIntegrationTest,
                                        public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  GrpcTranscodingIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  GrpcJsonTranscoderIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**
    * Global initializer for all integration tests.
    */
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_grpc_transcoding.json", {"http"});
+    createTestServer("test/config/integration/server_grpc_json_transcoder.json", {"http"});
   }
 
   /**
@@ -127,10 +127,10 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, GrpcTranscodingIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryPost) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/shelf"},
@@ -145,7 +145,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryPost) {
       R"({"id":"20","theme":"Children"})");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryGet) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
       "", {""}, {R"(shelves { id: 20 theme: "Children" }
@@ -157,7 +157,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryGet) {
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryGetError) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
@@ -167,7 +167,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryGetError) {
       "");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryDelete) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
   testTranscoding<bookstore::DeleteBookRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "DELETE"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
@@ -179,7 +179,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryDelete) {
       "{}");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryPatch) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
   testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "PATCH"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
@@ -193,7 +193,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryPatch) {
       R"({"id":"123","author":"Leo Tolstoy","title":"War and Peace"})");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, UnaryCustom) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryCustom) {
   testTranscoding<bookstore::GetShelfRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"}, {":path", "/shelves/456"}, {":authority", "host"}},
@@ -205,7 +205,7 @@ TEST_P(GrpcTranscodingIntegrationTest, UnaryCustom) {
       "{}");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, BindingAndBody) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
   testTranscoding<bookstore::CreateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -216,7 +216,7 @@ TEST_P(GrpcTranscodingIntegrationTest, BindingAndBody) {
       R"({"id":"3","author":"Leo Tolstoy","title":"War and Peace"})");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, ServerStreamingGet) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -227,7 +227,7 @@ TEST_P(GrpcTranscodingIntegrationTest, ServerStreamingGet) {
       R"(,{"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"}])");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, StreamingPost) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/bulk/shelves"}, {":authority", "host"}},
@@ -262,7 +262,7 @@ TEST_P(GrpcTranscodingIntegrationTest, StreamingPost) {
       R"(,{"id":"8","theme":"Mystery"}])");
 }
 
-TEST_P(GrpcTranscodingIntegrationTest, InvalidJson) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
       R"(INVALID_JSON)", {}, {}, Status::OK,

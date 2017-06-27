@@ -20,7 +20,8 @@
 namespace Envoy {
 namespace Grpc {
 
-/** VariableBinding specifies a value for a single field in the request message.
+/**
+ * VariableBinding specifies a value for a single field in the request message.
  * When transcoding HTTP/REST/JSON to gRPC/proto the request message is
  * constructed using the HTTP body and the variable bindings (specified through
  * request url).
@@ -37,15 +38,15 @@ struct VariableBinding {
 };
 
 /**
- * Global configuration for the gRPC transcoding filter. Factory for the Transcoder interface.
+ * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */
-class TranscodingConfig : public Logger::Loggable<Logger::Id::config> {
+class JsonTranscoderConfig : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * constructor that loads protobuf descriptors from the file specified in the JSON config.
    * and construct a path matcher for HTTP path bindings.
    */
-  TranscodingConfig(const Json::Object& config);
+  JsonTranscoderConfig(const Json::Object& config);
 
   /**
    * Create an instance of Transcoder interface based on incoming request
@@ -77,11 +78,14 @@ private:
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
-typedef std::shared_ptr<TranscodingConfig> TranscodingConfigSharedPtr;
+typedef std::shared_ptr<JsonTranscoderConfig> TranscodingConfigSharedPtr;
 
-class TranscodingFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
+/**
+ * The filter instance for gRPC JSON transcoder.
+ */
+class JsonTranscoderFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
 public:
-  TranscodingFilter(TranscodingConfig& config);
+  JsonTranscoderFilter(JsonTranscoderConfig& config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -101,7 +105,7 @@ public:
 private:
   bool readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
 
-  TranscodingConfig& config_;
+  JsonTranscoderConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
   TranscoderInputStreamImpl response_in_;

@@ -11,13 +11,13 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the grpc transcoding filter. @see NamedHttpFilterConfigFactory.
+ * Config registration for the gRPC JSON transcoder filter. @see NamedHttpFilterConfigFactory.
  */
-class GrpcTranscodingFilterConfig : public NamedHttpFilterConfigFactory {
+class GrpcJsonTranscoderFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext& context) override;
-  std::string name() override { return "grpc_transcoding"; };
+  std::string name() override { return "grpc_json_transcoder"; };
   HttpFilterType type() override { return HttpFilterType::Both; }
 };
 

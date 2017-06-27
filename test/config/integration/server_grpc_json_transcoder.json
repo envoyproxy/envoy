@@ -47,7 +47,7 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "grpc_transcoding",
+          { "type": "both", "name": "grpc_json_transcoder",
             "config": {
               "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
               "services": ["bookstore.Bookstore"]

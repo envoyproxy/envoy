@@ -72,9 +72,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transcoding_filter_lib",
-    srcs = ["transcoding_filter.cc"],
-    hdrs = ["transcoding_filter.h"],
+    name = "json_transcoder_filter_lib",
+    srcs = ["json_transcoder_filter.cc"],
+    hdrs = ["json_transcoder_filter.h"],
     external_deps = [
         "path_matcher",
         "grpc_transcoding",
