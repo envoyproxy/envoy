@@ -1,5 +1,5 @@
 diff --git a/../../bazel/tools/cpp/unix_cc_configure.bzl b/unix_cc_configure.bzl
-index fbbbdf57d..dcd9f6077 100644
+index fbbbdf57d..9702dbe6b 100644
 --- a/../../bazel/tools/cpp/unix_cc_configure.bzl
 +++ b/unix_cc_configure.bzl
 @@ -1,3 +1,11 @@
@@ -23,6 +23,15 @@ index fbbbdf57d..dcd9f6077 100644
      "escape_string",
      "get_env_var",
      "which",
+@@ -160,7 +168,7 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
+       "builtin_sysroot": "",
+       "compiler": escape_string(get_env_var(repository_ctx, "BAZEL_COMPILER", "compiler", False)),
+       "host_system_name": escape_string(get_env_var(repository_ctx, "BAZEL_HOST_SYSTEM", "local", False)),
+-      "needsPic": True,
++      "needsPic": False,
+       "supports_gold_linker": supports_gold_linker,
+       "supports_incremental_linker": False,
+       "supports_fission": False,
 @@ -174,7 +182,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
            "-std=c++0x",
        ] + _escaped_cplus_include_paths(repository_ctx),
