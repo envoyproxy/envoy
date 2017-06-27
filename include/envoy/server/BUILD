@@ -90,7 +90,6 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":drain_manager_interface",
-        ":instance_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
@@ -107,6 +106,7 @@ envoy_cc_library(
     name = "listener_manager_interface",
     hdrs = ["listener_manager.h"],
     deps = [
+        ":filter_config_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",

@@ -8,7 +8,6 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 

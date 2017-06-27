@@ -96,18 +96,22 @@ public:
   MOCK_METHOD0(version, std::string());
 };
 
-class MockListenSocketFactory : public ListenSocketFactory {
+class MockListenerComponentFactory : public ListenerComponentFactory {
 public:
-  MockListenSocketFactory();
-  ~MockListenSocketFactory();
+  MockListenerComponentFactory();
+  ~MockListenerComponentFactory();
 
-  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr address,
-                                  bool bind_to_port) override {
-    return Network::ListenSocketPtr{create_(address, bind_to_port)};
+  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              bool bind_to_port) override {
+    return Network::ListenSocketPtr{createListenSocket_(address, bind_to_port)};
   }
 
-  MOCK_METHOD2(create_, Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
-                                               bool bind_to_port));
+  MOCK_METHOD2(createFilterFactoryList, std::vector<Configuration::NetworkFilterFactoryCb>(
+                                            const std::vector<Json::ObjectSharedPtr>& filters,
+                                            Configuration::FactoryContext& context));
+  MOCK_METHOD2(createListenSocket_,
+               Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
+                                      bool bind_to_port));
 };
 
 class MockListenerManager : public ListenerManager {
@@ -189,7 +193,6 @@ public:
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
-  MOCK_METHOD0(listeners, std::list<ListenerPtr>&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
   MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());

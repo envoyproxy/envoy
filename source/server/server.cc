@@ -32,36 +32,6 @@
 namespace Envoy {
 namespace Server {
 
-void InitManagerImpl::initialize(std::function<void()> callback) {
-  ASSERT(state_ == State::NotInitialized);
-  if (targets_.empty()) {
-    callback();
-    state_ = State::Initialized;
-  } else {
-    callback_ = callback;
-    state_ = State::Initializing;
-    // Target::initialize(...) method can modify the list to remove the item currently
-    // being initialized, so we increment the iterator before calling initialize.
-    for (auto iter = targets_.begin(); iter != targets_.end();) {
-      Init::Target* target = *iter;
-      ++iter;
-      target->initialize([this, target]() -> void {
-        ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
-        targets_.remove(target);
-        if (targets_.empty()) {
-          state_ = State::Initialized;
-          callback_();
-        }
-      });
-    }
-  }
-}
-
-void InitManagerImpl::registerTarget(Init::Target& target) {
-  ASSERT(state_ == State::NotInitialized);
-  targets_.push_back(&target);
-}
-
 InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
                            Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
@@ -70,7 +40,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
-      listen_socket_factory_(restarter_), listener_manager_(*this, listen_socket_factory_),
+      listen_component_factory_(*this), listener_manager_(*this, listen_component_factory_),
       dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 

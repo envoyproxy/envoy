@@ -140,6 +140,23 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Success) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
+TEST_P(RedisAllParamsToOneServerCommandHandlerTest, SuccessMultipleArgs) {
+  InSequence s;
+
+  RespValue request;
+  makeBulkStringArray(request, {GetParam(), "hello", "123", "world"});
+  makeRequest("hello", request);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+};
+
 TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Fail) {
   InSequence s;
 
@@ -179,7 +196,11 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerTest,
                         RedisAllParamsToOneServerCommandHandlerTest,
-                        testing::Values("incr", "INCR", "inCrBY", "EXPIRE"));
+                        testing::ValuesIn(Commands::allToOneCommands()));
+
+INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerMixedCaseTests,
+                        RedisAllParamsToOneServerCommandHandlerTest,
+                        testing::Values("INCR", "inCrBY"));
 
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
 public:

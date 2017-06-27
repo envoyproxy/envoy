@@ -30,8 +30,8 @@ MockDrainManager::~MockDrainManager() {}
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
-MockListenSocketFactory::MockListenSocketFactory() {}
-MockListenSocketFactory::~MockListenSocketFactory() {}
+MockListenerComponentFactory::MockListenerComponentFactory() {}
+MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}

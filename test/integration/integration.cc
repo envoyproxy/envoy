@@ -87,8 +87,9 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   }
 }
 
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
+void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
   saw_reset_ = true;
+  reset_reason_ = reason;
   if (waiting_for_reset_) {
     dispatcher_.exit();
   }
@@ -905,6 +906,97 @@ void BaseIntegrationTest::testBadPath() {
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void BaseIntegrationTest::testValidZeroLengthContent(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeHttpConnectionPtr fake_upstream_connection;
+  FakeStreamPtr request;
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+       [&]() -> void {
+         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                     {":path", "/test/long/url"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"},
+                                                                     {"content-length", "0"}},
+                                             *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void {
+         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+       },
+       [&]() -> void { response->waitForEndStream(); },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
+void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+                  [&]() -> void {
+                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                       {":path", "/test/long/url"},
+                                                                       {":authority", "host"},
+                                                                       {"content-length", "-1"}},
+                                               *response);
+                  },
+                  [&]() -> void {
+                    if (type == Http::CodecClient::Type::HTTP1) {
+                      codec_client->waitForDisconnect();
+                    } else {
+                      response->waitForReset();
+                      codec_client->close();
+                    }
+                  }});
+
+  if (type == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+  }
+}
+
+void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+                  [&]() -> void {
+                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                       {":path", "/test/long/url"},
+                                                                       {":authority", "host"},
+                                                                       {"content-length", "3,2"}},
+                                               *response);
+                  },
+                  [&]() -> void {
+                    if (type == Http::CodecClient::Type::HTTP1) {
+                      codec_client->waitForDisconnect();
+                    } else {
+                      response->waitForReset();
+                      codec_client->close();
+                    }
+                  }});
+
+  if (type == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+  }
 }
 
 void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {

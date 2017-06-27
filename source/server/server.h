@@ -23,6 +23,7 @@
 
 #include "server/connection_handler_impl.h"
 #include "server/http/admin.h"
+#include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
@@ -77,24 +78,6 @@ public:
    * integration tests where a mock runtime is not needed.
    */
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
-};
-
-/**
- * Implementation of Init::Manager for use during post cluster manager init / pre listening.
- */
-class InitManagerImpl : public Init::Manager {
-public:
-  void initialize(std::function<void()> callback);
-
-  // Init::Manager
-  void registerTarget(Init::Target& target) override;
-
-private:
-  enum class State { NotInitialized, Initializing, Initialized };
-
-  std::list<Init::Target*> targets_;
-  State state_{State::NotInitialized};
-  std::function<void()> callback_;
 };
 
 /**
@@ -163,7 +146,7 @@ private:
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  ProdListenSocketFactory listen_socket_factory_;
+  ProdListenerComponentFactory listen_component_factory_;
   ListenerManagerImpl listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;

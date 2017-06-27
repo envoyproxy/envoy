@@ -146,9 +146,11 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       mget_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
-  addHandler(scope, stat_prefix, "expire", all_to_one_handler_);
-  addHandler(scope, stat_prefix, "incr", all_to_one_handler_);
-  addHandler(scope, stat_prefix, "incrby", all_to_one_handler_);
+  for (const std::string& command : Commands::allToOneCommands()) {
+    addHandler(scope, stat_prefix, command, all_to_one_handler_);
+  }
+
+  // TODO(danielhochman): support for other multi-shard operations (del, mset)
   addHandler(scope, stat_prefix, "mget", mget_handler_);
 }
 
