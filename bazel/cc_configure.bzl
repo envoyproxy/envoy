@@ -4,10 +4,7 @@
 # * https://github.com/bazelbuild/bazel/issues/2840
 # * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 #
-# This file is modified to use a forked version .bzl in its load statements and
-# to remove Windows/OS X setup. Additional work will be required to support
-# these removed platforms. It also generates empty.cc in the repository
-# context, which is a checked-in file for Bazel's cc_configure.bzl.
+# See cc_configure.bzl.diff for the changes made in this fork.
 
 # Copyright 2016 The Bazel Authors. All rights reserved.
 #

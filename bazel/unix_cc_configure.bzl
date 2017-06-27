@@ -4,10 +4,7 @@
 # * https://github.com/bazelbuild/bazel/issues/2840
 # * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 #
-# Specifically, for #2840 we replace gcc with g++ invocations (and CC with CXX) and remove the
-# mandatory -lstdc++ link. In the future, we can simplify our --build-id story resulting from #2805,
-# but there's some additional work necessary to plumb in the actual git hash.
-# This file is modified to use a forked version .bzl in its load statements.
+# See unix_cc_configure.bzl.diff for the changes made in this fork.
 
 # pylint: disable=g-bad-file-header
 # Copyright 2016 The Bazel Authors. All rights reserved.

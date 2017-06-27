@@ -1,3 +1,11 @@
+# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
+# local modifications to deal with known issues in Bazel 0.5.2:
+#
+# * https://github.com/bazelbuild/bazel/issues/2840
+# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
+#
+# See lib_cc_configure.bzl.diff for the changes made in this fork.
+
 # pylint: disable=g-bad-file-header
 # Copyright 2016 The Bazel Authors. All rights reserved.
 #
