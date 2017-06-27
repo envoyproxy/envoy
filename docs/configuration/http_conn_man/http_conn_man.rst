@@ -181,7 +181,7 @@ use_remote_address
   :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
 
 forward_client_cert
-  *(optional, string)* How to process and/or forward the
+  *(optional, string)* How to handle the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP header.
   Possible values are:
 
@@ -198,8 +198,8 @@ set_current_client_cert_details
   *(optional, array)* A list of strings, possible values are *Subject* and *SAN*. This field is
   valid only when *forward_client_cert* is *append_forward* or *sanitize_set* and the client
   connection is mTLS. It specifies the fields in the client certificate to be forwarded. Note that
-  the `By` and `Hash` fields in the :ref:`config_http_conn_man_headers_x-forwarded-client-cert`
-  header are always set.
+  in the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header, `Hash` is always set,
+  and `By` is always set when the client certificate presents the SAN value.
 
 generate_request_id
   *(optional, boolean)* Whether the connection manager will generate the
