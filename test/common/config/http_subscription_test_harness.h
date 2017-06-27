@@ -111,7 +111,7 @@ public:
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb)))).WillOnce(Return(accept));
+                        response_pb)))).WillOnce(ThrowOnRejectedConfig(accept));
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_));
     http_callbacks_->onSuccess(std::move(message));

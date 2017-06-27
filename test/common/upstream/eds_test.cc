@@ -50,18 +50,18 @@ TEST_F(EdsTest, OnWrongNameConfigUpdate) {
   google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
-  EXPECT_FALSE(cluster_->onConfigUpdate(resources));
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
 }
 
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
 TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
-  EXPECT_FALSE(cluster_->onConfigUpdate(resources));
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
-  EXPECT_FALSE(cluster_->onConfigUpdate(resources));
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
 }
 
 } // Upstream

@@ -26,7 +26,7 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
   // Config::SubscriptionCallbacks
-  bool onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(const ResourceVector& resources) override;
 
 private:
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;

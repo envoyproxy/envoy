@@ -53,11 +53,8 @@ private:
         return;
       }
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
-      if (callbacks_->onConfigUpdate(typed_resources)) {
-        // TODO(htuch): Add some notion of current version for every API in stats/admin.
-      } else {
-        // TODO(htuch): Track stats and log failures.
-      }
+      callbacks_->onConfigUpdate(typed_resources);
+      // TODO(htuch): Add some notion of current version for every API in stats/admin.
     } catch (const EnvoyException& ex) {
       // TODO(htuch): Track stats and log failures.
     }

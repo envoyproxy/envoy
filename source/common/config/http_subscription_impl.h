@@ -78,9 +78,10 @@ public:
       return;
     }
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
-    if (callbacks_->onConfigUpdate(typed_resources)) {
+    try {
+      callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message.version_info());
-    } else {
+    } catch (const EnvoyException& e) {
       // TODO(htuch): Track stats and log failures.
     }
   }

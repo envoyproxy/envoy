@@ -1,5 +1,7 @@
 #include "common/upstream/eds.h"
 
+#include "envoy/common/exception.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"
@@ -22,16 +24,15 @@ EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
 
 void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }
 
-bool EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
   if (resources.size() != 1) {
-    ENVOY_LOG(warn, "Unexpected EDS resource length: {}", resources.size());
-    return false;
+    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
-    ENVOY_LOG(warn, "Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name());
-    return false;
+    throw EnvoyException(
+        fmt::format("Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
@@ -94,7 +95,6 @@ bool EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     initialize_callback_();
     initialize_callback_ = nullptr;
   }
-  return true;
 }
 
 } // Upstream

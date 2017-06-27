@@ -66,7 +66,7 @@ public:
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb)))).WillOnce(Return(accept));
+                        response_pb)))).WillOnce(ThrowOnRejectedConfig(accept));
     updateFile(file_json);
   }
 

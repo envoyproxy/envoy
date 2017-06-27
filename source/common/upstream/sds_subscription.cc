@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -57,13 +59,12 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     locality_lb_endpoints->mutable_lb_endpoints()->Swap(&it.second);
   }
 
-  const bool success = callbacks_->onConfigUpdate(resources);
-  // EdsClusterImpl only rejects if we have the wrong cluster name for a
-  // ClusterLoadAssignment. We only provide well formed protos with the correct
-  // cluster name in this adapter.
-  ASSERT(success);
-  UNREFERENCED_PARAMETER(success);
-  stats_.update_success_.inc();
+  try {
+    callbacks_->onConfigUpdate(resources);
+    stats_.update_success_.inc();
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): Track stats and log failures.
+  }
 }
 
 void SdsSubscription::onFetchFailure(EnvoyException* e) {

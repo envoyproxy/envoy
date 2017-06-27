@@ -80,7 +80,7 @@ public:
       response->add_resources()->PackFrom(*load_assignment);
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
-        .WillOnce(Return(accept));
+        .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage(cluster_names, version);
       version_ = version;
