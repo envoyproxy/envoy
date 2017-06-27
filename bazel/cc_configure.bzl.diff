@@ -1,23 +1,20 @@
 diff --git a/../../bazel/tools/cpp/cc_configure.bzl b/cc_configure.bzl
-index 79fb8ba65..0f395ad6e 100644
+index 79fb8ba65..2994005c8 100644
 --- a/../../bazel/tools/cpp/cc_configure.bzl
 +++ b/cc_configure.bzl
-@@ -1,3 +1,14 @@
+@@ -1,3 +1,11 @@
 +# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
 +# local modifications to deal with known issues in Bazel 0.5.2:
 +#
 +# * https://github.com/bazelbuild/bazel/issues/2840
 +# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 +#
-+# This file is modified to use a forked version .bzl in its load statements and
-+# to remove Windows/OS X setup. Additional work will be required to support
-+# these removed platforms. It also generates empty.cc in the repository
-+# context, which is a checked-in file for Bazel's cc_configure.bzl.
++# See cc_configure.bzl.diff for the changes made in this fork.
 +
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
  # Licensed under the Apache License, Version 2.0 (the "License");
-@@ -13,25 +24,19 @@
+@@ -13,25 +21,19 @@
  # limitations under the License.
  """Rules for configuring the C++ toolchain (experimental)."""
  

@@ -1,23 +1,20 @@
 diff --git a/../../bazel/tools/cpp/unix_cc_configure.bzl b/unix_cc_configure.bzl
-index fbbbdf57d..c7b99065d 100644
+index fbbbdf57d..dcd9f6077 100644
 --- a/../../bazel/tools/cpp/unix_cc_configure.bzl
 +++ b/unix_cc_configure.bzl
-@@ -1,3 +1,14 @@
+@@ -1,3 +1,11 @@
 +# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
 +# local modifications to deal with known issues in Bazel 0.5.2:
 +#
 +# * https://github.com/bazelbuild/bazel/issues/2840
 +# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 +#
-+# Specifically, for #2840 we replace gcc with g++ invocations (and CC with CXX) and remove the
-+# mandatory -lstdc++ link. In the future, we can simplify our --build-id story resulting from #2805,
-+# but there's some additional work necessary to plumb in the actual git hash.
-+# This file is modified to use a forked version .bzl in its load statements.
++# See unix_cc_configure.bzl.diff for the changes made in this fork.
 +
  # pylint: disable=g-bad-file-header
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
-@@ -16,7 +27,7 @@
+@@ -16,7 +24,7 @@
  
  
  load(
@@ -26,7 +23,7 @@ index fbbbdf57d..c7b99065d 100644
      "escape_string",
      "get_env_var",
      "which",
-@@ -174,7 +185,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
+@@ -174,7 +182,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
            "-std=c++0x",
        ] + _escaped_cplus_include_paths(repository_ctx),
        "linker_flag": [
@@ -34,7 +31,7 @@ index fbbbdf57d..c7b99065d 100644
            "-lm",  # Some systems expect -lm in addition to -lstdc++
            # Anticipated future default.
        ] + (
-@@ -332,8 +342,8 @@ def _coverage_feature(darwin):
+@@ -332,8 +339,8 @@ def _coverage_feature(darwin):
  
  def find_cc(repository_ctx):
    """Find the C++ compiler. Doesn't %-escape the result."""
@@ -45,7 +42,7 @@ index fbbbdf57d..c7b99065d 100644
    cc_paren = ""
    if cc_environ != None:
      cc_environ = cc_environ.strip()
-@@ -346,7 +356,7 @@ def find_cc(repository_ctx):
+@@ -346,7 +353,7 @@ def find_cc(repository_ctx):
    cc = repository_ctx.which(cc_name)
    if cc == None:
      fail(
