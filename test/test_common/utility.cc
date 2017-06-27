@@ -64,6 +64,24 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   return output;
 }
 
+Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
+  for (auto counter : store.counters()) {
+    if (counter->name() == name) {
+      return counter;
+    }
+  }
+  return nullptr;
+}
+
+Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
+  for (auto gauge : store.gauges()) {
+    if (gauge->name() == name) {
+      return gauge;
+    }
+  }
+  return nullptr;
+}
+
 std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;
