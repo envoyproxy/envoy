@@ -126,8 +126,9 @@ struct Commands {
    * @return commands which hash to a single server
    */
   static const std::vector<std::string>& allToOneCommands() {
+    // TODO(danielhochman): DEL should hash to multiple servers and is only added for testing single key deletes
     static const std::vector<std::string>* commands = new std::vector<std::string>{
-        "decr", "decrby", "delete", "expire", "get", "getset", "incr", "incrby", "set", "setex"};
+        "decr", "decrby", "del", "expire", "get", "getset", "incr", "incrby", "set", "setex"};
     return *commands;
   }
   // TODO(danielhochman): static vector of commands that hash to multiple servers: mget, mset, del
