@@ -24,6 +24,13 @@ public:
    *        requests.
    */
   virtual void onConfigUpdate(const ResourceVector& resources) PURE;
+
+  /**
+   * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
+   * invokes an exception.
+   * @param e supplies any exception data on why the fetch failed. May be nullptr.
+   */
+  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
 };
 
 /**
