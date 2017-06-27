@@ -136,7 +136,7 @@ Some examples of the XFCC header are:
 2. ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;SAN=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;SAN=http://frontend.lyft.com``
 
 How Envoy processes XFCC is specified by the
-:ref:`forward_client_cert<config_http_conn_man_forard_client_cert>` and the
+:ref:`forward_client_cert<config_http_conn_man_forward_client_cert>` and the
 :ref:`set_current_client_cert_details<config_http_conn_man_set_current_client_cert_details>` HTTP
 connection manager options. If *forward_client_cert* is unset, the XFCC header will be sanitized by
 default.
