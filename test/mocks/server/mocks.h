@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/ssl/context_manager_impl.h"
@@ -96,18 +97,22 @@ public:
   MOCK_METHOD0(version, std::string());
 };
 
-class MockListenSocketFactory : public ListenSocketFactory {
+class MockListenerComponentFactory : public ListenerComponentFactory {
 public:
-  MockListenSocketFactory();
-  ~MockListenSocketFactory();
+  MockListenerComponentFactory();
+  ~MockListenerComponentFactory();
 
-  Network::ListenSocketPtr create(Network::Address::InstanceConstSharedPtr address,
-                                  bool bind_to_port) override {
-    return Network::ListenSocketPtr{create_(address, bind_to_port)};
+  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              bool bind_to_port) override {
+    return Network::ListenSocketPtr{createListenSocket_(address, bind_to_port)};
   }
 
-  MOCK_METHOD2(create_, Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
-                                               bool bind_to_port));
+  MOCK_METHOD2(createFilterFactoryList, std::vector<Configuration::NetworkFilterFactoryCb>(
+                                            const std::vector<Json::ObjectSharedPtr>& filters,
+                                            Configuration::FactoryContext& context));
+  MOCK_METHOD2(createListenSocket_,
+               Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
+                                      bool bind_to_port));
 };
 
 class MockListenerManager : public ListenerManager {
@@ -117,6 +122,20 @@ public:
 
   MOCK_METHOD1(addListener, void(const Json::Object& json));
   MOCK_METHOD0(listeners, std::list<std::reference_wrapper<Listener>>());
+  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
+  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD0(stopWorkers, void());
+};
+
+class MockWorkerFactory : public WorkerFactory {
+public:
+  MockWorkerFactory();
+  ~MockWorkerFactory();
+
+  WorkerPtr createWorker() override { return WorkerPtr{createWorker_()}; }
+
+  MOCK_METHOD0(createWorker_, Worker*());
 };
 
 class MockInstance : public Instance {
@@ -189,7 +208,6 @@ public:
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
-  MOCK_METHOD0(listeners, std::list<ListenerPtr>&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
   MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());

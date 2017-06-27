@@ -64,8 +64,10 @@ public:
 
   MOCK_METHOD0(cancel, void());
   MOCK_METHOD5(CallMethod,
-               void(const proto::MethodDescriptor* method, proto::RpcController* controller,
-                    const proto::Message* request, proto::Message* response, proto::Closure* done));
+               void(const ::google::protobuf::MethodDescriptor* method,
+                    ::google::protobuf::RpcController* controller,
+                    const ::google::protobuf::Message* request,
+                    ::google::protobuf::Message* response, ::google::protobuf::Closure* done));
 };
 
 } // Grpc

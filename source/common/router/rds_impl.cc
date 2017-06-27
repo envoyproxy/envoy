@@ -71,6 +71,11 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
            });
 }
 
+RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
+  // If we get destroyed during initialization, make sure we signal that we "initialized".
+  onFetchComplete();
+}
+
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_.getTyped<ThreadLocalConfig>(tls_slot_).config_;
 }

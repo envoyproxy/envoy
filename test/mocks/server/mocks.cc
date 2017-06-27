@@ -30,11 +30,14 @@ MockDrainManager::~MockDrainManager() {}
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
-MockListenSocketFactory::MockListenSocketFactory() {}
-MockListenSocketFactory::~MockListenSocketFactory() {}
+MockListenerComponentFactory::MockListenerComponentFactory() {}
+MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
+
+MockWorkerFactory::MockWorkerFactory() {}
+MockWorkerFactory::~MockWorkerFactory() {}
 
 MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));

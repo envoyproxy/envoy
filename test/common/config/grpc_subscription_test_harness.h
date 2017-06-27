@@ -29,8 +29,8 @@ typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubsc
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   GrpcSubscriptionTestHarness()
-      : method_descriptor_(envoy::api::v2::EndpointDiscoveryService::descriptor()->FindMethodByName(
-            "StreamEndpoints")),
+      : method_descriptor_(google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new SubscriptionMockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_))

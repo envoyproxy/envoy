@@ -12,7 +12,6 @@
 namespace Envoy {
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
-
 public:
   void deprecatedLogMessage() {
     log_trace("fake message");
@@ -29,8 +28,8 @@ public:
   }
 
 private:
-  Envoy::Network::MockConnection connection_;
-  Envoy::Http::MockStreamDecoderFilterCallbacks stream_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
 };
 
 TEST(Logger, All) {

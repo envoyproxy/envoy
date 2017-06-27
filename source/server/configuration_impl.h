@@ -75,7 +75,7 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::list<NetworkFilterFactoryCb>& factories);
+                               const std::vector<NetworkFilterFactoryCb>& factories);
 };
 
 /**

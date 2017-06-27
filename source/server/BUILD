@@ -101,6 +101,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "init_manager_lib",
+    srcs = ["init_manager_impl.cc"],
+    hdrs = ["init_manager_impl.h"],
+    deps = [
+        "//include/envoy/init:init_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "options_lib",
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
@@ -122,6 +132,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server:worker_interface",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
         "//source/common/network:listen_socket_lib",
@@ -137,6 +148,8 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
+        ":guarddog_lib",
+        ":init_manager_lib",
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
@@ -162,7 +175,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
-        "//source/common/upstream:cluster_manager_lib",
         "//source/server/http:admin_lib",
     ],
 )
@@ -186,14 +198,17 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "worker_lib",
-    srcs = ["worker.cc"],
-    hdrs = ["worker.h"],
+    srcs = ["worker_impl.cc"],
+    hdrs = ["worker_impl.h"],
     deps = [
         ":connection_handler_lib",
-        ":guarddog_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/server:configuration_interface",
+        "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server:options_interface",
+        "//include/envoy/server:worker_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/api:api_lib",
         "//source/common/common:thread_lib",

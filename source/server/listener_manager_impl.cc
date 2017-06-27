@@ -13,15 +13,71 @@
 namespace Envoy {
 namespace Server {
 
+std::vector<Configuration::NetworkFilterFactoryCb>
+ProdListenerComponentFactory::createFilterFactoryList_(
+    const std::vector<Json::ObjectSharedPtr>& filters, Server::Instance& server,
+    Configuration::FactoryContext& context) {
+  std::vector<Configuration::NetworkFilterFactoryCb> ret;
+  for (size_t i = 0; i < filters.size(); i++) {
+    const std::string string_type = filters[i]->getString("type");
+    const std::string string_name = filters[i]->getString("name");
+    Json::ObjectSharedPtr config = filters[i]->getObject("config");
+    ENVOY_LOG(info, "  filter #{}:", i);
+    ENVOY_LOG(info, "    type: {}", string_type);
+    ENVOY_LOG(info, "    name: {}", string_name);
+
+    // Map filter type string to enum.
+    Configuration::NetworkFilterType type;
+    if (string_type == "read") {
+      type = Configuration::NetworkFilterType::Read;
+    } else if (string_type == "write") {
+      type = Configuration::NetworkFilterType::Write;
+    } else {
+      ASSERT(string_type == "both");
+      type = Configuration::NetworkFilterType::Both;
+    }
+
+    // Now see if there is a factory that will accept the config.
+    Configuration::NamedNetworkFilterConfigFactory* factory =
+        Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+            string_name);
+    if (factory != nullptr && factory->type() == type) {
+      Configuration::NetworkFilterFactoryCb callback =
+          factory->createFilterFactory(*config, context);
+      ret.push_back(callback);
+    } else {
+      // DEPRECATED
+      // This name wasn't found in the named map, so search in the deprecated list registry.
+      bool found_filter = false;
+      for (Configuration::NetworkFilterConfigFactory* config_factory :
+           Configuration::MainImpl::filterConfigFactories()) {
+        Configuration::NetworkFilterFactoryCb callback =
+            config_factory->tryCreateFilterFactory(type, string_name, *config, server);
+        if (callback) {
+          ret.push_back(callback);
+          found_filter = true;
+          break;
+        }
+      }
+
+      if (!found_filter) {
+        throw EnvoyException(
+            fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
+      }
+    }
+  }
+  return ret;
+}
+
 Network::ListenSocketPtr
-ProdListenSocketFactory::create(Network::Address::InstanceConstSharedPtr address,
-                                bool bind_to_port) {
+ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                                 bool bind_to_port) {
   // For each listener config we share a single TcpListenSocket among all threaded listeners.
   // UdsListenerSockets are not managed and do not participate in hot restart as they are only
   // used for testing. First we try to get the socket from our parent if applicable.
   ASSERT(address->type() == Network::Address::Type::Ip);
-  std::string addr = fmt::format("tcp://{}", address->asString());
-  const int fd = restarter_.duplicateParentListenSocket(addr);
+  const std::string addr = fmt::format("tcp://{}", address->asString());
+  const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(info, "obtained socket for address {} from parent", addr);
     return Network::ListenSocketPtr{new Network::TcpListenSocket(fd, address)};
@@ -30,7 +86,8 @@ ProdListenSocketFactory::create(Network::Address::InstanceConstSharedPtr address
   }
 }
 
-ListenerImpl::ListenerImpl(Instance& server, ListenSocketFactory& factory, const Json::Object& json)
+ListenerImpl::ListenerImpl(Instance& server, ListenerComponentFactory& factory,
+                           const Json::Object& json)
     : Json::Validator(json, Json::Schema::LISTENER_SCHEMA), server_(server),
       address_(Network::Utility::resolveUrl(json.getString("address"))),
       global_scope_(server.stats().createScope("")),
@@ -54,60 +111,21 @@ ListenerImpl::ListenerImpl(Instance& server, ListenSocketFactory& factory, const
         server.sslContextManager().createSslServerContext(*listener_scope_, context_config);
   }
 
-  std::vector<Json::ObjectSharedPtr> filters = json.getObjectArray("filters");
-  for (size_t i = 0; i < filters.size(); i++) {
-    std::string string_type = filters[i]->getString("type");
-    std::string string_name = filters[i]->getString("name");
-    Json::ObjectSharedPtr config = filters[i]->getObject("config");
-    ENVOY_LOG(info, "  filter #{}:", i);
-    ENVOY_LOG(info, "    type: {}", string_type);
-    ENVOY_LOG(info, "    name: {}", string_name);
-
-    // Map filter type string to enum.
-    Configuration::NetworkFilterType type;
-    if (string_type == "read") {
-      type = Configuration::NetworkFilterType::Read;
-    } else if (string_type == "write") {
-      type = Configuration::NetworkFilterType::Write;
-    } else {
-      ASSERT(string_type == "both");
-      type = Configuration::NetworkFilterType::Both;
-    }
-
-    // Now see if there is a factory that will accept the config.
-    Configuration::NamedNetworkFilterConfigFactory* factory =
-        Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-            string_name);
-    if (factory != nullptr && factory->type() == type) {
-      Configuration::NetworkFilterFactoryCb callback = factory->createFilterFactory(*config, *this);
-      filter_factories_.push_back(callback);
-    } else {
-      // DEPRECATED
-      // This name wasn't found in the named map, so search in the deprecated list registry.
-      bool found_filter = false;
-      for (Configuration::NetworkFilterConfigFactory* config_factory :
-           Configuration::MainImpl::filterConfigFactories()) {
-        Configuration::NetworkFilterFactoryCb callback =
-            config_factory->tryCreateFilterFactory(type, string_name, *config, server);
-        if (callback) {
-          filter_factories_.push_back(callback);
-          found_filter = true;
-          break;
-        }
-      }
-
-      if (!found_filter) {
-        throw EnvoyException(
-            fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
-      }
-    }
-  }
-
-  socket_ = factory.create(address_, bind_to_port_);
+  filter_factories_ = factory.createFilterFactoryList(json.getObjectArray("filters"), *this);
+  socket_ = factory.createListenSocket(address_, bind_to_port_);
 }
 
 bool ListenerImpl::createFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
+}
+
+ListenerManagerImpl::ListenerManagerImpl(Instance& server,
+                                         ListenerComponentFactory& listener_factory,
+                                         WorkerFactory& worker_factory)
+    : server_(server), factory_(listener_factory) {
+  for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
+    workers_.emplace_back(worker_factory.createWorker());
+  }
 }
 
 void ListenerManagerImpl::addListener(const Json::Object& json) {
@@ -120,6 +138,36 @@ std::list<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
     ret.emplace_back(*listener);
   }
   return ret;
+}
+
+uint64_t ListenerManagerImpl::numConnections() {
+  uint64_t num_connections = 0;
+  for (const auto& worker : workers_) {
+    num_connections += worker->numConnections();
+  }
+
+  return num_connections;
+}
+
+void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
+  for (const auto& worker : workers_) {
+    for (const auto& listener : listeners_) {
+      worker->addListener(*listener);
+    }
+    worker->start(guard_dog);
+  }
+}
+
+void ListenerManagerImpl::stopListeners() {
+  for (const auto& worker : workers_) {
+    worker->stopListeners();
+  }
+}
+
+void ListenerManagerImpl::stopWorkers() {
+  for (const auto& worker : workers_) {
+    worker->stop();
+  }
 }
 
 } // Server

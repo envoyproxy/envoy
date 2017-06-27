@@ -8,6 +8,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -41,6 +42,22 @@ public:
    * @return std::string the converted string.
    */
   static std::string bufferToString(const Buffer::Instance& buffer);
+
+  /**
+   * Find a counter in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
+   */
+  static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
+
+  /**
+   * Find a gauge in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
+   */
+  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

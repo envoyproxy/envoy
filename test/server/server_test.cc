@@ -1,55 +1,14 @@
 #include "server/server.h"
 
 #include "test/integration/server.h"
-#include "test/mocks/common.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-
 namespace Server {
-
-TEST(InitManagerImplTest, NoTargets) {
-  InitManagerImpl manager;
-  ReadyWatcher initialized;
-
-  EXPECT_CALL(initialized, ready());
-  manager.initialize([&]() -> void { initialized.ready(); });
-}
-
-TEST(InitManagerImplTest, Targets) {
-  InSequence s;
-  InitManagerImpl manager;
-  Init::MockTarget target;
-  ReadyWatcher initialized;
-
-  manager.registerTarget(target);
-  EXPECT_CALL(target, initialize(_));
-  manager.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_CALL(initialized, ready());
-  target.callback_();
-}
-
-TEST(InitManagerImplTest, TargetRemoveWhile) {
-  InSequence s;
-  InitManagerImpl manager;
-  Init::MockTarget target1;
-  ReadyWatcher initialized;
-
-  manager.registerTarget(target1);
-  EXPECT_CALL(target1, initialize(_))
-      .WillOnce(Invoke([](std::function<void()> callback) -> void { callback(); }));
-  EXPECT_CALL(initialized, ready());
-  manager.initialize([&]() -> void { initialized.ready(); });
-}
 
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -80,7 +39,9 @@ protected:
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(ServerInstanceImplTest, Create) {}
+TEST_P(ServerInstanceImplTest, Stats) {
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
+}
 
 } // Server
 } // Envoy

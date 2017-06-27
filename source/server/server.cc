@@ -25,42 +25,11 @@
 #include "server/configuration_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
-#include "server/worker.h"
 
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
-
-void InitManagerImpl::initialize(std::function<void()> callback) {
-  ASSERT(state_ == State::NotInitialized);
-  if (targets_.empty()) {
-    callback();
-    state_ = State::Initialized;
-  } else {
-    callback_ = callback;
-    state_ = State::Initializing;
-    // Target::initialize(...) method can modify the list to remove the item currently
-    // being initialized, so we increment the iterator before calling initialize.
-    for (auto iter = targets_.begin(); iter != targets_.end();) {
-      Init::Target* target = *iter;
-      ++iter;
-      target->initialize([this, target]() -> void {
-        ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
-        targets_.remove(target);
-        if (targets_.empty()) {
-          state_ = State::Initialized;
-          callback_();
-        }
-      });
-    }
-  }
-}
-
-void InitManagerImpl::registerTarget(Init::Target& target) {
-  ASSERT(state_ == State::NotInitialized);
-  targets_.push_back(&target);
-}
 
 InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
                            Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
@@ -70,7 +39,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
-      listen_socket_factory_(restarter_), listener_manager_(*this, listen_socket_factory_),
+      listener_component_factory_(*this), worker_factory_(thread_local_, options_),
       dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
@@ -103,11 +72,7 @@ Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); 
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(warn, "closing and draining listeners");
-  for (const auto& worker : workers_) {
-    Worker& worker_ref = *worker;
-    worker->dispatcher().post([&worker_ref]() -> void { worker_ref.handler()->closeListeners(); });
-  }
-
+  listener_manager_->stopListeners();
   drain_manager_->startDrainSequence();
 }
 
@@ -181,9 +146,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   loadServerFlags(initial_config.flagsPath());
 
   // Workers get created first so they register for thread local updates.
-  for (uint32_t i = 0; i < std::max(1U, options.concurrency()); i++) {
-    workers_.emplace_back(new Worker(thread_local_, options.fileFlushIntervalMsec()));
-  }
+  listener_manager_.reset(
+      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_));
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -235,7 +199,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_.reset(
-      new Server::GuardDogImpl(*admin_scope_, *config_, ProdMonotonicTimeSource::instance_));
+      new Server::GuardDogImpl(stats_store_, *config_, ProdMonotonicTimeSource::instance_));
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -248,18 +212,16 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
 void InstanceImpl::startWorkers(TestHooks& hooks) {
   ENVOY_LOG(warn, "all dependencies initialized. starting workers");
-  for (const WorkerPtr& worker : workers_) {
-    try {
-      worker->initializeConfiguration(listener_manager_, *guard_dog_);
-    } catch (const Network::CreateListenerException& e) {
-      // It is possible that we fail to start listening on a port, even though we were able to
-      // bind to it above. This happens when there is a race between two applications to listen
-      // on the same port. In general if we can't initialize the worker configuration just print
-      // the error and exit cleanly without crashing.
-      ENVOY_LOG(critical, "shutting down due to error initializing worker configuration: {}",
-                e.what());
-      shutdown();
-    }
+  try {
+    listener_manager_->startWorkers(*guard_dog_);
+  } catch (const Network::CreateListenerException& e) {
+    // It is possible that we fail to start listening on a port, even though we were able to
+    // bind to it above. This happens when there is a race between two applications to listen
+    // on the same port. In general if we can't initialize the worker configuration just print
+    // the error and exit cleanly without crashing.
+    ENVOY_LOG(critical, "shutting down due to error initializing worker configuration: {}",
+              e.what());
+    shutdown();
   }
 
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
@@ -326,16 +288,7 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
   }
 }
 
-uint64_t InstanceImpl::numConnections() {
-  uint64_t num_connections = 0;
-  for (const auto& worker : workers_) {
-    if (worker->handler()) {
-      num_connections += worker->handler()->numConnections();
-    }
-  }
-
-  return num_connections;
-}
+uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
 void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
@@ -350,10 +303,8 @@ void InstanceImpl::run() {
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
 
-  // Shutdown all the listeners now that the main dispatch loop is done.
-  for (const WorkerPtr& worker : workers_) {
-    worker->exit();
-  }
+  // Shutdown all the workers now that the main dispatch loop is done.
+  listener_manager_->stopWorkers();
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {

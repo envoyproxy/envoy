@@ -41,6 +41,14 @@ public:
         .WillByDefault(
             Invoke([&]() -> Upstream::ClusterManager& { return main_config.clusterManager(); }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
+    ON_CALL(component_factory_, createFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
+                       Server::Configuration::FactoryContext& context)
+                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
+                         return Server::ProdListenerComponentFactory::createFilterFactoryList_(
+                             filters, server_, context);
+                       }));
 
     try {
       main_config.initialize(*config_json, server_, cluster_manager_factory_);
@@ -55,8 +63,9 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Server::TestOptionsImpl options_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
-  NiceMock<Server::MockListenSocketFactory> socket_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, socket_factory_};
+  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  NiceMock<Server::MockWorkerFactory> worker_factory_;
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
 };
 
 uint32_t run(const std::string& directory) {

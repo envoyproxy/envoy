@@ -52,5 +52,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

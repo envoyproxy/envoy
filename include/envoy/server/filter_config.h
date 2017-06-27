@@ -10,12 +10,15 @@
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/drain_manager.h"
-#include "envoy/server/instance.h" // TODO(mattklein123): Remove post 1.4.0
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
 namespace Server {
+
+class Instance; // TODO(mattklein123): Remove post 1.4.0. Forward declare to avoid circular
+                // includes.
+
 namespace Configuration {
 
 /**
