@@ -268,6 +268,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
@@ -302,6 +303,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 

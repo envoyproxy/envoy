@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/ssl/context_manager_impl.h"
@@ -121,6 +122,20 @@ public:
 
   MOCK_METHOD1(addListener, void(const Json::Object& json));
   MOCK_METHOD0(listeners, std::list<std::reference_wrapper<Listener>>());
+  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
+  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD0(stopWorkers, void());
+};
+
+class MockWorkerFactory : public WorkerFactory {
+public:
+  MockWorkerFactory();
+  ~MockWorkerFactory();
+
+  WorkerPtr createWorker() override { return WorkerPtr{createWorker_()}; }
+
+  MOCK_METHOD0(createWorker_, Worker*());
 };
 
 class MockInstance : public Instance {

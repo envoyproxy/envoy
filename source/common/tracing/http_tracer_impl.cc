@@ -152,7 +152,7 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
   span.setTag("response_size", std::to_string(request_info_.bytesSent()));
   span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info_));
 
-  if (request_info_.responseCode().valid() &&
+  if (!request_info_.responseCode().valid() ||
       Http::CodeUtility::is5xx(request_info_.responseCode().value())) {
     span.setTag("error", "true");
   }

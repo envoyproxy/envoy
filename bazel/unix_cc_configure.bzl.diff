@@ -1,0 +1,62 @@
+diff --git a/../../bazel/tools/cpp/unix_cc_configure.bzl b/unix_cc_configure.bzl
+index fbbbdf57d..9702dbe6b 100644
+--- a/../../bazel/tools/cpp/unix_cc_configure.bzl
++++ b/unix_cc_configure.bzl
+@@ -1,3 +1,11 @@
++# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
++# local modifications to deal with known issues in Bazel 0.5.2:
++#
++# * https://github.com/bazelbuild/bazel/issues/2840
++# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
++#
++# See unix_cc_configure.bzl.diff for the changes made in this fork.
++
+ # pylint: disable=g-bad-file-header
+ # Copyright 2016 The Bazel Authors. All rights reserved.
+ #
+@@ -16,7 +24,7 @@
+ 
+ 
+ load(
+-    "@bazel_tools//tools/cpp:lib_cc_configure.bzl",
++    "//bazel:lib_cc_configure.bzl",
+     "escape_string",
+     "get_env_var",
+     "which",
+@@ -160,7 +168,7 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
+       "builtin_sysroot": "",
+       "compiler": escape_string(get_env_var(repository_ctx, "BAZEL_COMPILER", "compiler", False)),
+       "host_system_name": escape_string(get_env_var(repository_ctx, "BAZEL_HOST_SYSTEM", "local", False)),
+-      "needsPic": True,
++      "needsPic": False,
+       "supports_gold_linker": supports_gold_linker,
+       "supports_incremental_linker": False,
+       "supports_fission": False,
+@@ -174,7 +182,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
+           "-std=c++0x",
+       ] + _escaped_cplus_include_paths(repository_ctx),
+       "linker_flag": [
+-          "-lstdc++",
+           "-lm",  # Some systems expect -lm in addition to -lstdc++
+           # Anticipated future default.
+       ] + (
+@@ -332,8 +339,8 @@ def _coverage_feature(darwin):
+ 
+ def find_cc(repository_ctx):
+   """Find the C++ compiler. Doesn't %-escape the result."""
+-  cc_name = "gcc"
+-  cc_environ = repository_ctx.os.environ.get("CC")
++  cc_name = "g++"
++  cc_environ = repository_ctx.os.environ.get("CXX")
+   cc_paren = ""
+   if cc_environ != None:
+     cc_environ = cc_environ.strip()
+@@ -346,7 +353,7 @@ def find_cc(repository_ctx):
+   cc = repository_ctx.which(cc_name)
+   if cc == None:
+     fail(
+-        ("Cannot find gcc or CC%s, either correct your path or set the CC"
++        ("Cannot find g++ or CXX%s, either correct your path or set the CXX"
+          + " environment variable") % cc_paren)
+   return cc
+ 

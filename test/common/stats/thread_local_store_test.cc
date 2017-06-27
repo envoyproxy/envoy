@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -74,24 +75,6 @@ public:
     EXPECT_CALL(*this, alloc("stats.overflow"));
     store_.reset(new ThreadLocalStoreImpl(*this));
     store_->addSink(sink_);
-  }
-
-  CounterSharedPtr findCounter(const std::string& name) {
-    for (auto counter : store_->counters()) {
-      if (counter->name() == name) {
-        return counter;
-      }
-    }
-    return nullptr;
-  }
-
-  GaugeSharedPtr findGauge(const std::string& name) {
-    for (auto gauge : store_->gauges()) {
-      if (gauge->name() == name) {
-        return gauge;
-      }
-    }
-    return nullptr;
   }
 
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
@@ -317,10 +300,10 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->gauge("g2");
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(3L, findCounter("c1").use_count());
-  EXPECT_EQ(3L, findGauge("g1").use_count());
-  EXPECT_EQ(2L, findCounter("c2").use_count());
-  EXPECT_EQ(2L, findGauge("g2").use_count());
+  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
+  EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
   tls_.shutdownThread();
 

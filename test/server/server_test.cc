@@ -39,7 +39,9 @@ protected:
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(ServerInstanceImplTest, Create) {}
+TEST_P(ServerInstanceImplTest, Stats) {
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
+}
 
 } // Server
 } // Envoy

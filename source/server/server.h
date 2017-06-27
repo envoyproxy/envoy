@@ -10,6 +10,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
+#include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
@@ -26,7 +27,7 @@
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/test_hooks.h"
-#include "server/worker.h"
+#include "server/worker_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -108,7 +109,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
-  ListenerManager& listenerManager() override { return listener_manager_; }
+  ListenerManager& listenerManager() override { return *listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
@@ -146,10 +147,10 @@ private:
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  ProdListenerComponentFactory listen_component_factory_;
-  ListenerManagerImpl listener_manager_;
+  ProdListenerComponentFactory listener_component_factory_;
+  ProdWorkerFactory worker_factory_;
+  std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
-  std::list<WorkerPtr> workers_;
   Stats::ScopePtr admin_scope_;
   std::unique_ptr<AdminImpl> admin_;
   Event::SignalEventPtr sigterm_;
