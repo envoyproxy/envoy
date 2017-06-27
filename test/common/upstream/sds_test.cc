@@ -8,7 +8,7 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
-#include "common/upstream/sds.h"
+#include "common/upstream/eds.h"
 
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -49,7 +49,7 @@ protected:
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";
-    cluster_.reset(new SdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
+    cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
                                       local_info_, cm_, dispatcher_, random_));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
@@ -99,7 +99,7 @@ protected:
   SdsConfig sds_config_;
   MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  std::unique_ptr<SdsClusterImpl> cluster_;
+  std::unique_ptr<EdsClusterImpl> cluster_;
   Event::MockTimer* timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   ReadyWatcher membership_updated_;

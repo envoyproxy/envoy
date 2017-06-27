@@ -1,45 +1,49 @@
-#include "common/upstream/sds.h"
+#include "common/upstream/eds.h"
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "envoy/common/exception.h"
 
-#include "common/http/headers.h"
-#include "common/json/config_schemas.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/upstream/sds_subscription.h"
 
 namespace Envoy {
 namespace Upstream {
 
-SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                const SdsConfig& sds_config, const LocalInfo::LocalInfo& local_info,
                                ClusterManager& cm, Event::Dispatcher& dispatcher,
                                Runtime::RandomGenerator& random)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
-      RestApiFetcher(cm, sds_config.sds_cluster_name_, dispatcher, random,
-                     sds_config.refresh_delay_),
-      local_info_(local_info), service_name_(config.getString("service_name")) {}
+    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager), local_info_(local_info),
+      cluster_name_(config.getString("service_name")) {
+  // TODO(htuch): This is where the v2 Subscription implementations will be constructed based on
+  // config. Today, we just reuse the v1 SDS config and an adapter Subscription to the v1 REST JSON
+  // API.
+  subscription_.reset(new SdsSubscription(info_->stats(), sds_config, cm, dispatcher, random));
+}
 
-void SdsClusterImpl::parseResponse(const Http::Message& response) {
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response.bodyAsString());
-  json->validateSchema(Json::Schema::SDS_SCHEMA);
+void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }
+
+void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
-  for (const Json::ObjectSharedPtr& host : json->getObjectArray("hosts")) {
-    bool canary = false;
-    uint32_t weight = 1;
-    std::string zone = "";
-    if (host->hasObject("tags")) {
-      canary = host->getObject("tags")->getBoolean("canary", canary);
-      weight = host->getObject("tags")->getInteger("load_balancing_weight", weight);
-      zone = host->getObject("tags")->getString("az", zone);
-    }
+  if (resources.size() != 1) {
+    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
+  }
+  const auto& cluster_load_assignment = resources[0];
+  if (cluster_load_assignment.cluster_name() != cluster_name_) {
+    throw EnvoyException(
+        fmt::format("Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name()));
+  }
+  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    const std::string& zone = locality_lb_endpoint.locality().zone();
 
-    new_hosts.emplace_back(new HostImpl(
-        info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
-                       host->getString("ip_address"), host->getInteger("port"))},
-        canary, weight, zone));
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      new_hosts.emplace_back(new HostImpl(
+          info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+                         lb_endpoint.endpoint().address().socket_address().ip_address(),
+                         lb_endpoint.endpoint().address().socket_address().port().value())},
+          lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
+    }
   }
 
   HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(hosts()));
@@ -47,7 +51,7 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "sds hosts changed for cluster: {} ({})", info_->name(), hosts().size());
+    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(), hosts().size());
     HostListsSharedPtr per_zone(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
@@ -85,29 +89,19 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
     }
   }
 
-  info_->stats().update_success_.inc();
-}
-
-void SdsClusterImpl::onFetchFailure(EnvoyException* e) {
-  ENVOY_LOG(debug, "sds refresh failure for cluster: {}", info_->name());
-  info_->stats().update_failure_.inc();
-  if (e) {
-    ENVOY_LOG(warn, "sds parsing error: {}", e->what());
-  }
-}
-
-void SdsClusterImpl::createRequest(Http::Message& message) {
-  ENVOY_LOG(debug, "starting sds refresh for cluster: {}", info_->name());
-  info_->stats().update_attempt_.inc();
-
-  message.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
-  message.headers().insertPath().value("/v1/registration/" + service_name_);
-}
-
-void SdsClusterImpl::onFetchComplete() {
-  ENVOY_LOG(debug, "sds refresh complete for cluster: {}", info_->name());
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
+  runInitializeCallbackIfAny();
+}
+
+void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
+  UNREFERENCED_PARAMETER(e);
+  // We need to allow server startup to continue, even if we have a bad
+  // config.
+  runInitializeCallbackIfAny();
+}
+
+void EdsClusterImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_ && pending_health_checks_ == 0) {
     initialize_callback_();
     initialize_callback_ = nullptr;

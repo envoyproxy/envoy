@@ -75,21 +75,24 @@ public:
         google::protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
     if (status != google::protobuf::util::Status::OK) {
       // TODO(htuch): Track stats and log failures.
+      callbacks_->onConfigUpdateFailed(nullptr);
       return;
     }
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
-    if (callbacks_->onConfigUpdate(typed_resources)) {
+    try {
+      callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message.version_info());
-    } else {
+    } catch (const EnvoyException& e) {
       // TODO(htuch): Track stats and log failures.
+      callbacks_->onConfigUpdateFailed(&e);
     }
   }
 
   void onFetchComplete() override {}
 
-  void onFetchFailure(EnvoyException* e) override {
+  void onFetchFailure(const EnvoyException* e) override {
     // TODO(htuch): Track stats and log failures.
-    UNREFERENCED_PARAMETER(e);
+    callbacks_->onConfigUpdateFailed(e);
   }
 
 private:

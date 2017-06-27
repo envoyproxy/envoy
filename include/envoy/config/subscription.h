@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "google/protobuf/repeated_field.h"
@@ -19,10 +20,18 @@ public:
   /**
    * Called when a configuration update is received.
    * @param resources vector of fetched resources corresponding to the configuration update.
-   * @return bool indicating whether the new configuration is accepted. Accepted configurations have
-   *         their version_info reflected in subsequent requests.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
    */
-  virtual bool onConfigUpdate(const ResourceVector& resources) PURE;
+  virtual void onConfigUpdate(const ResourceVector& resources) PURE;
+
+  /**
+   * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
+   * invokes an exception.
+   * @param e supplies any exception data on why the fetch failed. May be nullptr.
+   */
+  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
 };
 
 /**

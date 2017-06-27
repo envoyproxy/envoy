@@ -42,6 +42,7 @@ public:
     stream_ = async_client_->start(service_method_, *this, Optional<std::chrono::milliseconds>());
     if (stream_ == nullptr) {
       // TODO(htuch): Track stats and log failures.
+      callbacks_->onConfigUpdateFailed(nullptr);
       setRetryTimer();
       return;
     }
@@ -84,8 +85,12 @@ public:
 
   void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
-    if (callbacks_->onConfigUpdate(typed_resources)) {
+    try {
+      callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message->version_info());
+    } catch (const EnvoyException& e) {
+      // TODO(htuch): Track stats and log failures.
+      callbacks_->onConfigUpdateFailed(&e);
     }
     // This effectively ACK/NACKs the accepted configuration.
     sendDiscoveryRequest();
@@ -98,6 +103,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status) override {
     // TODO(htuch): Track stats and log failures.
     UNREFERENCED_PARAMETER(status);
+    callbacks_->onConfigUpdateFailed(nullptr);
     stream_ = nullptr;
     setRetryTimer();
   }

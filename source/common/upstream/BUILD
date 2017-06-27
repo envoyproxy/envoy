@@ -33,12 +33,12 @@ envoy_cc_library(
         ":cds_api_lib",
         ":load_balancer_lib",
         ":ring_hash_lb_lib",
-        ":sds_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:shadow_writer_lib",
+        "//source/common/upstream:upstream_lib",
     ],
 )
 
@@ -157,24 +158,33 @@ envoy_cc_library(
     ],
 )
 
-# Placeholder that just links API protos for now.
 envoy_cc_library(
     name = "eds_lib",
+    srcs = ["eds.cc"],
+    hdrs = ["eds.h"],
     external_deps = ["envoy_eds"],
+    deps = [
+        ":sds_subscription_lib",
+        ":upstream_includes",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+    ],
 )
 
 envoy_cc_library(
-    name = "sds_lib",
-    srcs = ["sds.cc"],
-    hdrs = ["sds.h"],
+    name = "sds_subscription_lib",
+    srcs = ["sds_subscription.cc"],
+    hdrs = ["sds_subscription.h"],
+    external_deps = ["envoy_eds"],
     deps = [
-        ":upstream_includes",
-        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )
 
@@ -182,9 +192,9 @@ envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     deps = [
+        ":eds_lib",
         ":health_checker_lib",
         ":logical_dns_cluster_lib",
-        ":sds_lib",
         ":upstream_includes",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

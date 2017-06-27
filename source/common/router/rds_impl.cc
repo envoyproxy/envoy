@@ -116,7 +116,7 @@ void RdsRouteConfigProviderImpl::onFetchComplete() {
   }
 }
 
-void RdsRouteConfigProviderImpl::onFetchFailure(EnvoyException* e) {
+void RdsRouteConfigProviderImpl::onFetchFailure(const EnvoyException* e) {
   stats_.update_failure_.inc();
   if (e) {
     ENVOY_LOG(warn, "rds: fetch failure: {}", e->what());

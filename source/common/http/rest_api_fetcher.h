@@ -47,7 +47,7 @@ protected:
    * This will be called if the fetch fails (either due to non-200 response, network error, etc.).
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onFetchFailure(EnvoyException* e) PURE;
+  virtual void onFetchFailure(const EnvoyException* e) PURE;
 
 protected:
   const std::string remote_cluster_name_;
