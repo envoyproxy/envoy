@@ -13,6 +13,7 @@ public:
   MOCK_METHOD1_T(
       onConfigUpdate,
       void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources));
+  MOCK_METHOD1_T(onConfigUpdateFailed, void(const EnvoyException* e));
 };
 
 template <class ResourceType> class MockSubscription : public Subscription<ResourceType> {

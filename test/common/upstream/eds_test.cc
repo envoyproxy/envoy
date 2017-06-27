@@ -53,6 +53,7 @@ TEST_F(EdsTest, OnWrongNameConfigUpdate) {
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
   EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
 }
 
@@ -63,6 +64,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
   EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
   // Too many.
   initialized = false;
@@ -72,6 +74,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
 }
 

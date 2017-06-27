@@ -12,6 +12,7 @@ class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness,
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
   startSubscription({"cluster0", "cluster1"});
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   updateFile(";!@#badjso n");
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
 }

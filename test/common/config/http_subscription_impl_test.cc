@@ -13,6 +13,7 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   timerTick();
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
@@ -26,6 +27,7 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   message->body().reset(new Buffer::OwnedImpl(";!@#badjso n"));
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onSuccess(std::move(message));
   request_in_progress_ = false;
   timerTick();

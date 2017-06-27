@@ -27,6 +27,7 @@ public:
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:
   void runInitializeCallbackIfAny();

@@ -50,13 +50,15 @@ private:
       const auto status = google::protobuf::util::JsonStringToMessage(json, &message);
       if (status != google::protobuf::util::Status::OK) {
         // TODO(htuch): Track stats and log failures.
+        callbacks_->onConfigUpdateFailed(nullptr);
         return;
       }
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       callbacks_->onConfigUpdate(typed_resources);
       // TODO(htuch): Add some notion of current version for every API in stats/admin.
-    } catch (const EnvoyException& ex) {
+    } catch (const EnvoyException& e) {
       // TODO(htuch): Track stats and log failures.
+      callbacks_->onConfigUpdateFailed(&e);
     }
   }
 

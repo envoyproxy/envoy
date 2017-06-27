@@ -59,15 +59,12 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     locality_lb_endpoints->mutable_lb_endpoints()->Swap(&it.second);
   }
 
-  try {
-    callbacks_->onConfigUpdate(resources);
-    stats_.update_success_.inc();
-  } catch (const EnvoyException& e) {
-    // TODO(htuch): Track stats and log failures.
-  }
+  callbacks_->onConfigUpdate(resources);
+  stats_.update_success_.inc();
 }
 
 void SdsSubscription::onFetchFailure(EnvoyException* e) {
+  callbacks_->onConfigUpdateFailed(e);
   ENVOY_LOG(debug, "sds refresh failure for cluster: {}", cluster_name_);
   stats_.update_failure_.inc();
   if (e) {

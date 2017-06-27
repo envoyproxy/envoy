@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "google/protobuf/repeated_field.h"

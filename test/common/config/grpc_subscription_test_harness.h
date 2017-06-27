@@ -86,6 +86,7 @@ public:
       version_ = version;
     } else {
       expectSendMessage(cluster_names, version_);
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }
     subscription_->onReceiveMessage(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
