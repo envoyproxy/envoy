@@ -64,7 +64,8 @@ public:
   Server::TestOptionsImpl options_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_};
+  NiceMock<Server::MockWorkerFactory> worker_factory_;
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
 };
 
 uint32_t run(const std::string& directory) {

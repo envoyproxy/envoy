@@ -3,6 +3,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_validator.h"
@@ -103,17 +104,22 @@ private:
  */
 class ListenerManagerImpl : public ListenerManager {
 public:
-  ListenerManagerImpl(Instance& server, ListenerComponentFactory& factory)
-      : server_(server), factory_(factory) {}
+  ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
+                      WorkerFactory& worker_factory);
 
   // Server::ListenerManager
   void addListener(const Json::Object& json) override;
   std::list<std::reference_wrapper<Listener>> listeners() override;
+  uint64_t numConnections() override;
+  void startWorkers(GuardDog& guard_dog) override;
+  void stopListeners() override;
+  void stopWorkers() override;
 
 private:
   Instance& server_;
   ListenerComponentFactory& factory_;
   std::list<ListenerPtr> listeners_;
+  std::list<WorkerPtr> workers_;
 };
 
 } // Server
