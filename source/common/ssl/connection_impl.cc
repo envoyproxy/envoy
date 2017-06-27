@@ -249,7 +249,10 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   if (!cert) {
     return "";
   }
-  return std::string(X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0));
+  char* buf = X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0);
+  std::string subject(buf);
+  OPENSSL_free(buf);
+  return subject;
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {

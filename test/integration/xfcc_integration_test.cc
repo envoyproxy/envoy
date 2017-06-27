@@ -38,8 +38,8 @@ void XfccIntegrationTest::SetUp() {
 
 void XfccIntegrationTest::TearDown() {
   test_server_.reset();
-  client_tls_ssl_ctx_.reset();
   client_mtls_ssl_ctx_.reset();
+  client_tls_ssl_ctx_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
   context_manager_.reset();
@@ -75,7 +75,6 @@ Ssl::ClientContextPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
 }
 
 Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
-  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   std::string json = R"EOF(
 {
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem",
@@ -85,6 +84,7 @@ Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   Ssl::ContextConfigImpl cfg(*loader);
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
@@ -196,6 +196,7 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectSan) {
                                            client_san_);
 }
 
+/*
 TEST_P(XfccIntegrationTest, MtlsAppendForward) {
   startTestServerWithXfccConfig("append_forward", "");
   testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
@@ -254,5 +255,6 @@ TEST_P(XfccIntegrationTest, NonTlsEnforceSanitize) {
   startTestServerWithXfccConfig("forward_only", "");
   testRequestAndResponseWithXfccHeader(makeClientConnection(), previous_xfcc_, "");
 }
+*/
 } // Xfcc
 } // Envoy

@@ -142,14 +142,25 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
         clientCertDetails += "By=" + connection.ssl()->uriSanLocalCertificate();
       }
       if (!connection.ssl()->sha256PeerCertificateDigest().empty()) {
-        clientCertDetails += ";Hash=" + connection.ssl()->sha256PeerCertificateDigest();
+        if (!clientCertDetails.empty()) {
+          clientCertDetails += ";";
+        }
+        clientCertDetails += "Hash=" + connection.ssl()->sha256PeerCertificateDigest();
       }
       for (auto detail : config.setCurrentClientCertDetails()) {
-        if (detail == Http::ClientCertDetailsType::Subject) {
-          clientCertDetails += ";Subject=\"" + connection.ssl()->subjectPeerCertificate() + "\"";
-        } else if (detail == Http::ClientCertDetailsType::SAN) {
+        switch (detail) {
+        case Http::ClientCertDetailsType::Subject:
+          if (!clientCertDetails.empty()) {
+            clientCertDetails += ";";
+          }
+          clientCertDetails += "Subject=\"" + connection.ssl()->subjectPeerCertificate() + "\"";
+          break;
+        case Http::ClientCertDetailsType::SAN:
+          if (!clientCertDetails.empty()) {
+            clientCertDetails += ";";
+          }
           // Currently, we only support a single SAN field with URI type.
-          clientCertDetails += ";SAN=" + connection.ssl()->uriSanPeerCertificate();
+          clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
         }
       }
     }

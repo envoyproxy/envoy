@@ -99,7 +99,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("set_current_client_cert_details")) {
-    for (const std::string detail : config.getStringArray("set_current_client_cert_details")) {
+    for (const std::string& detail : config.getStringArray("set_current_client_cert_details")) {
       if (detail == "Subject") {
         set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
       } else {
