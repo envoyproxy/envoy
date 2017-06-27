@@ -77,7 +77,7 @@ void CdsApiImpl::onFetchComplete() {
   }
 }
 
-void CdsApiImpl::onFetchFailure(EnvoyException* e) {
+void CdsApiImpl::onFetchFailure(const EnvoyException* e) {
   stats_.update_failure_.inc();
   if (e) {
     ENVOY_LOG(warn, "cds: fetch failure: {}", e->what());

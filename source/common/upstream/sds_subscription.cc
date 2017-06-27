@@ -63,7 +63,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   stats_.update_success_.inc();
 }
 
-void SdsSubscription::onFetchFailure(EnvoyException* e) {
+void SdsSubscription::onFetchFailure(const EnvoyException* e) {
   callbacks_->onConfigUpdateFailed(e);
   ENVOY_LOG(debug, "sds refresh failure for cluster: {}", cluster_name_);
   stats_.update_failure_.inc();

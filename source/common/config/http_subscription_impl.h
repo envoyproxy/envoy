@@ -90,7 +90,7 @@ public:
 
   void onFetchComplete() override {}
 
-  void onFetchFailure(EnvoyException* e) override {
+  void onFetchFailure(const EnvoyException* e) override {
     // TODO(htuch): Track stats and log failures.
     callbacks_->onConfigUpdateFailed(e);
   }

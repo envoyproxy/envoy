@@ -48,7 +48,7 @@ private:
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override;
-  void onFetchFailure(EnvoyException* e) override;
+  void onFetchFailure(const EnvoyException* e) override;
 
   std::string cluster_name_;
   Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>* callbacks_;
