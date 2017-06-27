@@ -106,7 +106,7 @@ x-envoy-ip-tags
 
 This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
 
-.. _config_http_conn_man_headers_x-forwarded-for:
+.. _config_http_conn_man_headers_x-forwarded-client-cert:
 
 x-forwarded-client-cert
 -----------------------
@@ -140,6 +140,8 @@ How Envoy processes XFCC is specified by the
 :ref:`set_current_client_cert_details<config_http_conn_man_set_current_client_cert_details>` HTTP
 connection manager options. If *forward_client_cert* is unset, the XFCC header will be sanitized by
 default.
+
+.. _config_http_conn_man_headers_x-forwarded-for:
 
 x-forwarded-for
 ---------------

@@ -180,6 +180,8 @@ use_remote_address
   :ref:`config_http_conn_man_headers_x-envoy-internal`, and
   :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
 
+.. _config_http_conn_man_forward_client_cert:
+
 forward_client_cert
   *(optional, string)* How to handle the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP header.
@@ -193,6 +195,8 @@ forward_client_cert
 
   For the format of the XFCC header, please refer to
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert`.
+
+.. _config_http_conn_man_set_current_client_cert_details:
 
 set_current_client_cert_details
   *(optional, array)* A list of strings, possible values are *Subject* and *SAN*. This field is
