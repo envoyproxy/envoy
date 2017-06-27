@@ -28,7 +28,7 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
       handler_(Api::ApiPtr{new Api::ValidationImpl(options.fileFlushIntervalMsec())}),
       local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store),
-      listener_manager_(*this, *this) {
+      listener_manager_(*this, *this, *this) {
   try {
     initialize(options, component_factory);
   } catch (const EnvoyException& e) {

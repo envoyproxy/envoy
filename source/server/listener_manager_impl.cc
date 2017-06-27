@@ -119,6 +119,15 @@ bool ListenerImpl::createFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
+ListenerManagerImpl::ListenerManagerImpl(Instance& server,
+                                         ListenerComponentFactory& listener_factory,
+                                         WorkerFactory& worker_factory)
+    : server_(server), factory_(listener_factory) {
+  for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
+    workers_.emplace_back(worker_factory.createWorker());
+  }
+}
+
 void ListenerManagerImpl::addListener(const Json::Object& json) {
   listeners_.emplace_back(new ListenerImpl(server_, factory_, json));
 }
@@ -129,6 +138,36 @@ std::list<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
     ret.emplace_back(*listener);
   }
   return ret;
+}
+
+uint64_t ListenerManagerImpl::numConnections() {
+  uint64_t num_connections = 0;
+  for (const auto& worker : workers_) {
+    num_connections += worker->numConnections();
+  }
+
+  return num_connections;
+}
+
+void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
+  for (const auto& worker : workers_) {
+    for (const auto& listener : listeners_) {
+      worker->addListener(*listener);
+    }
+    worker->start(guard_dog);
+  }
+}
+
+void ListenerManagerImpl::stopListeners() {
+  for (const auto& worker : workers_) {
+    worker->stopListeners();
+  }
+}
+
+void ListenerManagerImpl::stopWorkers() {
+  for (const auto& worker : workers_) {
+    worker->stop();
+  }
 }
 
 } // Server

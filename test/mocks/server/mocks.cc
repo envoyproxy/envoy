@@ -36,6 +36,9 @@ MockListenerComponentFactory::~MockListenerComponentFactory() {}
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
+MockWorkerFactory::MockWorkerFactory() {}
+MockWorkerFactory::~MockWorkerFactory() {}
+
 MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
