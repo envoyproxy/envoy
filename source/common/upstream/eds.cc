@@ -27,10 +27,16 @@ void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this)
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
   if (resources.size() != 1) {
+    // We need to allow server startup to continue, even if we have a bad
+    // config.
+    runInitializeCallbackIfAny();
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
+    // We need to allow server startup to continue, even if we have a bad
+    // config.
+    runInitializeCallbackIfAny();
     throw EnvoyException(
         fmt::format("Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name()));
   }
@@ -91,6 +97,10 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
+  runInitializeCallbackIfAny();
+}
+
+void EdsClusterImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_ && pending_health_checks_ == 0) {
     initialize_callback_();
     initialize_callback_ = nullptr;
