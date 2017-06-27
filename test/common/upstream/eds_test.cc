@@ -38,7 +38,7 @@ protected:
   Ssl::MockContextManager ssl_context_manager_;
   SdsConfig sds_config_;
   MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<EdsClusterImpl> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -46,10 +46,21 @@ protected:
 };
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
-TEST_F(EdsTest, OnWrongConfigUpdate) {
+TEST_F(EdsTest, OnWrongNameConfigUpdate) {
   google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
+  EXPECT_FALSE(cluster_->onConfigUpdate(resources));
+}
+
+// Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
+TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
+  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  EXPECT_FALSE(cluster_->onConfigUpdate(resources));
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
   EXPECT_FALSE(cluster_->onConfigUpdate(resources));
 }
 

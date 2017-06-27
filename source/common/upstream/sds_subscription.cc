@@ -62,7 +62,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   // ClusterLoadAssignment. We only provide well formed protos with the correct
   // cluster name in this adapter.
   ASSERT(success);
-  (void)success;
+  UNREFERENCED_PARAMETER(success);
   stats_.update_success_.inc();
 }
 

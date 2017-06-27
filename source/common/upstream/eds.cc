@@ -24,22 +24,24 @@ void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this)
 
 bool EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
-  for (const auto& cluster_load_assignment : resources) {
-    if (cluster_load_assignment.cluster_name() != cluster_name_) {
-      ENVOY_LOG(warn, "Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name());
-      return false;
-    }
+  if (resources.size() != 1) {
+    ENVOY_LOG(warn, "Unexpected EDS resource length: {}", resources.size());
+    return false;
+  }
+  const auto& cluster_load_assignment = resources[0];
+  if (cluster_load_assignment.cluster_name() != cluster_name_) {
+    ENVOY_LOG(warn, "Unexpected EDS cluster: {}", cluster_load_assignment.cluster_name());
+    return false;
+  }
+  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    const std::string& zone = locality_lb_endpoint.locality().zone();
 
-    for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-      const std::string& zone = locality_lb_endpoint.locality().zone();
-
-      for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-        new_hosts.emplace_back(new HostImpl(
-            info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
-                           lb_endpoint.endpoint().address().socket_address().ip_address(),
-                           lb_endpoint.endpoint().address().socket_address().port().value())},
-            lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
-      }
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      new_hosts.emplace_back(new HostImpl(
+          info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+                         lb_endpoint.endpoint().address().socket_address().ip_address(),
+                         lb_endpoint.endpoint().address().socket_address().port().value())},
+          lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 
