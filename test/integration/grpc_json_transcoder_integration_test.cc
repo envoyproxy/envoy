@@ -20,8 +20,9 @@ using google::protobuf::TextFormat;
 
 namespace Envoy {
 
-class GrpcJsonTranscoderIntegrationTest : public BaseIntegrationTest,
-                                       public testing::TestWithParam<Network::Address::IpVersion> {
+class GrpcJsonTranscoderIntegrationTest
+    : public BaseIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   GrpcJsonTranscoderIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**

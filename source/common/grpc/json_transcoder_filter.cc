@@ -91,7 +91,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   for (const auto& service_name : config.getStringArray("services")) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
     if (service == nullptr) {
-      throw EnvoyException("transcoding_filter: Could not find '" + service_name + "' in the proto descriptor");
+      throw EnvoyException("transcoding_filter: Could not find '" + service_name +
+                           "' in the proto descriptor");
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
@@ -187,7 +188,7 @@ Status JsonTranscoderConfig::createTranscoder(
 }
 
 Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
-                                              google::grpc::transcoding::RequestInfo* info) {
+                                                 google::grpc::transcoding::RequestInfo* info) {
   auto request_type_url = TypeUrlPrefix + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
@@ -201,7 +202,7 @@ Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodD
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& headers,
-                                                           bool end_stream) {
+                                                              bool end_stream) {
   const auto status =
       config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
 
@@ -286,12 +287,13 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::HeaderMap&
   return Http::FilterTrailersStatus::Continue;
 }
 
-void JsonTranscoderFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+void JsonTranscoderFilter::setDecoderFilterCallbacks(
+    Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 }
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
-                                                           bool end_stream) {
+                                                              bool end_stream) {
   if (error_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -367,18 +369,18 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   }
 
   response_headers_->insertContentLength().value(
-      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length()
-                                           : 0);
+      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   return Http::FilterTrailersStatus::Continue;
 }
 
-void JsonTranscoderFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
+void JsonTranscoderFilter::setEncoderFilterCallbacks(
+    Http::StreamEncoderFilterCallbacks& callbacks) {
   encoder_callbacks_ = &callbacks;
 }
 
 // TODO(lizan): Incorporate watermarks to bound buffer sizes
 bool JsonTranscoderFilter::readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream,
-                                     Buffer::Instance& data) {
+                                        Buffer::Instance& data) {
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {

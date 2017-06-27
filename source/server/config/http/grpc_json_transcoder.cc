@@ -10,8 +10,9 @@ namespace Configuration {
 
 HttpFilterFactoryCb
 GrpcJsonTranscoderFilterConfig::createFilterFactory(const Json::Object& config_json,
-                                                 const std::string&, FactoryContext&) {
-  Grpc::TranscodingConfigSharedPtr config = std::make_shared<Grpc::JsonTranscoderConfig>(config_json);
+                                                    const std::string&, FactoryContext&) {
+  Grpc::TranscodingConfigSharedPtr config =
+      std::make_shared<Grpc::JsonTranscoderConfig>(config_json);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Grpc::JsonTranscoderFilter(*config)});
