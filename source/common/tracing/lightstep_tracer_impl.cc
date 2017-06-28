@@ -38,7 +38,7 @@ void LightStepSpan::injectContext(Http::HeaderMap& request_headers) {
 
 SpanPtr LightStepSpan::spawnChild(const std::string& name, SystemTime start_time) {
   lightstep::Span ls_span = tracer_.StartSpan(
-      name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time, steady_time)});
+      name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time)});
   return SpanPtr{new LightStepSpan(ls_span, tracer_)};
 }
 
@@ -64,7 +64,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   }
 }
 
-bool LightStepRecorder::FlushWithTimeout(lightstep::SystemDuration) {
+bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
   // Note: We don't expect this to be called, since the Tracer
   // reference is private to its LightStepSink.
   return true;
@@ -137,7 +137,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
 }
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
-                                   const std::string& operation_name, SystemTime start_time, MonotonicTime steady_time) {
+                                   const std::string& operation_name, SystemTime start_time) {
   lightstep::Tracer& tracer = *tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
   LightStepSpanPtr active_span;
 
@@ -152,11 +152,11 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
         lightstep::CarrierFormat::LightStepBinaryCarrier, lightstep::ProtoReader(ctx));
     lightstep::Span ls_span =
         tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
-                                          lightstep::StartTimestamp(start_time, steady_time)});
+                                          lightstep::StartTimestamp(start_time)});
     active_span.reset(new LightStepSpan(ls_span, tracer));
   } else {
     lightstep::Span ls_span =
-        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time, steady_time)});
+        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)});
     active_span.reset(new LightStepSpan(ls_span, tracer));
   }
 

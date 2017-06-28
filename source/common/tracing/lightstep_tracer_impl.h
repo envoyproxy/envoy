@@ -60,7 +60,7 @@ public:
 
   // Tracer::TracingDriver
   SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
-                    SystemTime start_time, MonotonicTime steady_time) override;
+                    SystemTime start_time) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
@@ -93,7 +93,7 @@ public:
 
   // lightstep::Recorder
   void RecordSpan(lightstep::collector::Span&& span) override;
-  bool FlushWithTimeout(lightstep::SystemDuration) override;
+  bool FlushWithTimeout(lightstep::Duration) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&&) override;
