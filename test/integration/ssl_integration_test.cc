@@ -37,10 +37,10 @@ void SslIntegrationTest::SetUp() {
                                                version_),
       version_);
   registerTestServerPorts({"http"});
-  client_ssl_ctx_plain_ = createClientSslContext(false, false, context_manager_.get());
-  client_ssl_ctx_alpn_ = createClientSslContext(true, false, context_manager_.get());
-  client_ssl_ctx_san_ = createClientSslContext(false, true, context_manager_.get());
-  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true, context_manager_.get());
+  client_ssl_ctx_plain_ = createClientSslContext(false, false, *context_manager_);
+  client_ssl_ctx_alpn_ = createClientSslContext(true, false, *context_manager_);
+  client_ssl_ctx_san_ = createClientSslContext(false, true, *context_manager_);
+  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true, *context_manager_);
 }
 
 void SslIntegrationTest::TearDown() {

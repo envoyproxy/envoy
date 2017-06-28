@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Ssl {
 
-ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager* context_manager);
+ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& context_manager);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(Network::Address::IpVersion version,
                                                        int port);

@@ -73,7 +73,7 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
       [&]() -> void {
         Network::Address::InstanceConstSharedPtr address =
             Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
-        context = Ssl::createClientSslContext(false, false, context_manager.get());
+        context = Ssl::createClientSslContext(false, false, *context_manager);
         ssl_client = dispatcher_->createSslClientConnection(*context, address);
       },
       // Set up the initial REST response for the ssl_auth filter to avoid the async client doing

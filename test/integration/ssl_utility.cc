@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Ssl {
 
-ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager* context_manager) {
+ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& context_manager) {
   std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
@@ -58,7 +58,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager* con
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  return context_manager->createSslClientContext(*client_stats_store, cfg);
+  return context_manager.createSslClientContext(*client_stats_store, cfg);
 }
 
 Network::Address::InstanceConstSharedPtr getSslAddress(Network::Address::IpVersion version,
