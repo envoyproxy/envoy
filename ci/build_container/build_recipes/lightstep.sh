@@ -2,9 +2,9 @@
 
 set -e
 
-VERSION=0.36
+VERSION=0.38.0
 
-wget -O lightstep-tracer-cpp-$VERSION.tar.gz https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v${VERSION//./_}/lightstep-tracer-cpp-$VERSION.tar.gz
+wget -O lightstep-tracer-cpp-$VERSION.tar.gz https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v${VERSION:0:1}_${VERSION:2:2}/lightstep-tracer-cpp-$VERSION.tar.gz
 tar xf lightstep-tracer-cpp-$VERSION.tar.gz
 cd lightstep-tracer-cpp-$VERSION
 # Added for legacy compatibility, should not be needed in new build recipes.
