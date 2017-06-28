@@ -103,7 +103,7 @@ void RawConnectionDriver::run() { dispatcher_->run(Event::Dispatcher::RunType::B
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 
-WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher* dispatcher)
+WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
 Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
@@ -111,7 +111,7 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
   data.drain(data.length());
   if (!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) {
     data_to_wait_for_.clear();
-    dispatcher_->exit();
+    dispatcher_.exit();
   }
 
   return Network::FilterStatus::StopIteration;

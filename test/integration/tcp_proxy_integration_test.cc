@@ -107,7 +107,7 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
       // Now send data downstream and make sure it arrives.
       [&]() -> void {
         std::shared_ptr<WaitForPayloadReader> payload_reader(
-            new WaitForPayloadReader(dispatcher_.get()));
+            new WaitForPayloadReader(*dispatcher_));
         ssl_client->addReadFilter(payload_reader);
         fake_upstream_connection->write("world");
         payload_reader->set_data_to_wait_for("world");

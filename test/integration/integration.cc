@@ -178,7 +178,7 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
                                            Network::Address::IpVersion version)
-    : payload_reader_(new WaitForPayloadReader(&dispatcher)),
+    : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));

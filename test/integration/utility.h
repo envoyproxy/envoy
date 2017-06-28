@@ -124,7 +124,7 @@ private:
 // A read filter which waits for a given data then stops the dispatcher loop.
 class WaitForPayloadReader : public Network::ReadFilterBaseImpl {
 public:
-  WaitForPayloadReader(Event::Dispatcher* dispatcher);
+  WaitForPayloadReader(Event::Dispatcher& dispatcher);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -133,7 +133,7 @@ public:
   const std::string& data() { return data_; }
 
 private:
-  Event::Dispatcher* dispatcher_;
+  Event::Dispatcher& dispatcher_;
   std::string data_to_wait_for_;
   std::string data_;
 };
