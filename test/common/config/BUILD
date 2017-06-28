@@ -85,6 +85,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "subscription_factory_test",
+    srcs = ["subscription_factory_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/config:subscription_factory_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
     deps = [
@@ -98,4 +113,14 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "subscription_test_harness",
     srcs = ["subscription_test_harness.h"],
+)
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/config:utility_lib",
+        "//test/mocks/local_info:local_info_mocks",
+    ],
 )

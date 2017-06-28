@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/local_info/local_info.h"
+#include "envoy/upstream/cluster_manager.h"
+
 #include "api/base.pb.h"
 
 namespace Envoy {
@@ -25,6 +28,27 @@ public:
     }
     return typed_resources;
   }
+
+  /**
+   * Extract refresh_delay as a std::chrono::milliseconds from envoy::api::v2::ApiConfigSource.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
+
+  /**
+   * Convert LocalInfo::LocalInfo to v2 envoy::api::v2::Node identifier.
+   * @param local_info source LocalInfo::LocalInfo.
+   * @param node destination envoy::api::Node.
+   */
+  static void localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node* node);
+
+  /**
+   * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
+   * @param sds_config source v1 SdsConfig.
+   * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
+   */
+  static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
+                                   envoy::api::v2::ConfigSource* eds_config);
 };
 
 } // Config

@@ -46,7 +46,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "subscription_factory_lib",
+    hdrs = ["subscription_factory.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":filesystem_subscription_lib",
+        ":grpc_subscription_lib",
+        ":http_subscription_lib",
+        ":utility_lib",
+        "//include/envoy/config:subscription_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
+    srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = ["envoy_base"],
+    deps = ["//include/envoy/upstream:cluster_manager_interface"],
 )

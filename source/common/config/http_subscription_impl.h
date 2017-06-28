@@ -25,7 +25,8 @@ namespace Config {
  * between the proto serializable objects in the Subscription API and the REST JSON representation.
  */
 template <class ResourceType>
-class HttpSubscriptionImpl : public Http::RestApiFetcher, Config::Subscription<ResourceType> {
+class HttpSubscriptionImpl : public Http::RestApiFetcher,
+                             public Config::Subscription<ResourceType> {
 public:
   HttpSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,

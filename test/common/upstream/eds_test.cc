@@ -1,3 +1,4 @@
+#include "common/config/utility.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/eds.h"
 
@@ -15,7 +16,7 @@ namespace Upstream {
 
 class EdsTest : public testing::Test {
 protected:
-  EdsTest() : sds_config_{"sds", std::chrono::milliseconds(30000)} {
+  EdsTest() {
     std::string raw_config = R"EOF(
     {
       "name": "name",
@@ -27,16 +28,17 @@ protected:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
-
+    Config::Utility::sdsConfigToEdsConfig(SdsConfig{"eds", std::chrono::milliseconds(30000)},
+                                          &eds_config_);
     local_info_.zone_name_ = "us-east-1a";
-    cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
+    cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, eds_config_,
                                       local_info_, cm_, dispatcher_, random_));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  SdsConfig sds_config_;
+  envoy::api::v2::ConfigSource eds_config_;
   MockClusterManager cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<EdsClusterImpl> cluster_;
