@@ -316,7 +316,14 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "use_remote_address" : {"type" : "boolean"},
       "forward_client_cert" : {
           "type" : "string",
-          "enum" : ["forward_only", "append_forward", "sanitize", "sanitize_set", "always_forward_only", "always_append_forward"]
+          "enum" : [
+            "forward_only",
+            "append_forward",
+            "sanitize",
+            "sanitize_set",
+            "always_forward_only",
+            "always_append_forward"
+          ]
       },
       "set_current_client_cert_details" : {
           "type" : "array",

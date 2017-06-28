@@ -71,7 +71,7 @@ public:
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }
-  const std::list<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
+  const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override;
@@ -139,7 +139,7 @@ private:
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
-  std::list<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
 };
 
 /**

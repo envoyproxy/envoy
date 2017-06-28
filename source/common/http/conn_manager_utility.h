@@ -34,6 +34,10 @@ private:
   //       runtime rules. If runtime rules are used, we use true randomness which is slower but
   //       provides behavior that most consumers would expect.
   static std::atomic<uint64_t> next_stream_id_;
+
+  static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
+                                      Network::Connection& connection,
+                                      ConnectionManagerConfig& config);
 };
 
 } // Http

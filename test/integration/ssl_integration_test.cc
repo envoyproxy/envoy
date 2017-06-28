@@ -15,8 +15,9 @@
 #include "integration.h"
 #include "utility.h"
 
-namespace Envoy {
 using testing::Return;
+
+namespace Envoy {
 
 namespace Ssl {
 

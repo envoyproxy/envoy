@@ -156,7 +156,7 @@ public:
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
-  const std::list<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
+  const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
@@ -181,7 +181,7 @@ public:
   Network::Address::Ipv4Instance remote_address_{"0.0.0.0"};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
-  std::list<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;

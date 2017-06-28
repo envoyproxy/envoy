@@ -196,7 +196,6 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectSan) {
                                            client_san_);
 }
 
-/*
 TEST_P(XfccIntegrationTest, MtlsAppendForward) {
   startTestServerWithXfccConfig("append_forward", "");
   testRequestAndResponseWithXfccHeader(makeMtlsClientConnection(), previous_xfcc_,
@@ -255,6 +254,5 @@ TEST_P(XfccIntegrationTest, NonTlsEnforceSanitize) {
   startTestServerWithXfccConfig("forward_only", "");
   testRequestAndResponseWithXfccHeader(makeClientConnection(), previous_xfcc_, "");
 }
-*/
 } // Xfcc
 } // Envoy

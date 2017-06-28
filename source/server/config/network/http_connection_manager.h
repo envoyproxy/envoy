@@ -92,7 +92,7 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
-  const std::list<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
+  const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
@@ -135,7 +135,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   bool use_remote_address_{};
   Http::ForwardClientCertType forward_client_cert_;
-  std::list<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   std::string server_name_;
