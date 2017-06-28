@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -41,6 +43,12 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string> cluster_names,
                                    const std::string& version, bool accept) PURE;
 };
+
+ACTION_P(ThrowOnRejectedConfig, accept) {
+  if (!accept) {
+    throw EnvoyException("bad config");
+  }
+}
 
 } // namespace Config
 } // namespace Envoy

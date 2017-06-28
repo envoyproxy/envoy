@@ -94,7 +94,7 @@ private:
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override {}
-  void onFetchFailure(EnvoyException* e) override;
+  void onFetchFailure(const EnvoyException* e) override;
 
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
