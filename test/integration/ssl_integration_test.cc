@@ -18,7 +18,6 @@
 using testing::Return;
 
 namespace Envoy {
-
 namespace Ssl {
 
 void SslIntegrationTest::SetUp() {

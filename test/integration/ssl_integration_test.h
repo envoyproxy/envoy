@@ -13,7 +13,6 @@
 using testing::NiceMock;
 
 namespace Envoy {
-
 namespace Ssl {
 
 class MockRuntimeIntegrationTestServer : public IntegrationTestServer {

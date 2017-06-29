@@ -5,6 +5,7 @@
 #include <string>
 
 #include "common/common/empty_string.h"
+#include "common/common/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -137,64 +138,62 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_headers,
                                                        Network::Connection& connection,
                                                        ConnectionManagerConfig& config) {
-  if (config.forwardClientCert() != Http::ForwardClientCertType::AlwaysForwardOnly &&
+  // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
+  if (config.forwardClientCert() == Http::ForwardClientCertType::AlwaysForwardOnly) {
+    return;
+  }
+  // When Sanitize is set, or the connection is not mutual TLS, remove the XFCC header.
+  if (config.forwardClientCert() == Http::ForwardClientCertType::Sanitize ||
       !(connection.ssl() && connection.ssl()->peerCertificatePresented())) {
     request_headers.removeForwardedClientCert();
     return;
   }
-  std::string clientCertDetails;
+
+  // When ForwardOnly is set, always forward the XFCC header without modification.
+  if (config.forwardClientCert() == Http::ForwardClientCertType::ForwardOnly) {
+    return;
+  }
+
+  // TODO(myidpt): Handle the special characters in By and SAN fields.
+  std::vector<std::string> client_cert_details;
+  // When AppendForward or SanitizeSet is set, the client certificate information should be set into
+  // the XFCC header.
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||
       config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
-    // In these cases, the client cert in the current hop should be set into the XFCC header.
     if (!connection.ssl()->uriSanLocalCertificate().empty()) {
-      clientCertDetails += "By=" + connection.ssl()->uriSanLocalCertificate();
+      client_cert_details.push_back("By=" + connection.ssl()->uriSanLocalCertificate());
     }
     if (!connection.ssl()->sha256PeerCertificateDigest().empty()) {
-      if (!clientCertDetails.empty()) {
-        clientCertDetails += ";";
-      }
-      clientCertDetails += "Hash=" + connection.ssl()->sha256PeerCertificateDigest();
+      client_cert_details.push_back("Hash=" + connection.ssl()->sha256PeerCertificateDigest());
     }
-    for (auto detail : config.setCurrentClientCertDetails()) {
+    for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
       case Http::ClientCertDetailsType::Subject:
-        if (!clientCertDetails.empty()) {
-          clientCertDetails += ";";
-        }
         // The "Subject" key still exists even if the subject is empty.
-        clientCertDetails += "Subject=\"" + connection.ssl()->subjectPeerCertificate() + "\"";
+        client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
+                                      "\"");
         break;
       case Http::ClientCertDetailsType::SAN:
-        if (!clientCertDetails.empty()) {
-          clientCertDetails += ";";
-        }
         // Currently, we only support a single SAN field with URI type.
         // The "SAN" key still exists even if the SAN is empty.
-        clientCertDetails += "SAN=" + connection.ssl()->uriSanPeerCertificate();
+        client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
       }
     }
   }
 
-  switch (config.forwardClientCert()) {
-  case Http::ForwardClientCertType::ForwardOnly:
-  case Http::ForwardClientCertType::AlwaysForwardOnly:
-    break;
-  case Http::ForwardClientCertType::AppendForward:
-    // Get the Cert info.
+  std::string client_cert_details_str = StringUtil::join(client_cert_details, ";");
+  if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
     if (request_headers.ForwardedClientCert() &&
         !request_headers.ForwardedClientCert()->value().empty()) {
-      request_headers.ForwardedClientCert()->value().append(("," + clientCertDetails).c_str(),
-                                                            clientCertDetails.length() + 1);
+      request_headers.ForwardedClientCert()->value().append(("," + client_cert_details_str).c_str(),
+                                                            client_cert_details_str.length() + 1);
     } else {
-      request_headers.insertForwardedClientCert().value(clientCertDetails);
+      request_headers.insertForwardedClientCert().value(client_cert_details_str);
     }
-    break;
-  case Http::ForwardClientCertType::Sanitize:
-    request_headers.removeForwardedClientCert();
-    break;
-  case Http::ForwardClientCertType::SanitizeSet:
-    request_headers.insertForwardedClientCert().value(clientCertDetails);
+  } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
+    request_headers.insertForwardedClientCert().value(client_cert_details_str);
   }
+  // It should never reach here.
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,

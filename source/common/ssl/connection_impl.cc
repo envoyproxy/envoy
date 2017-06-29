@@ -216,10 +216,7 @@ void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
 bool ConnectionImpl::peerCertificatePresented() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (cert) {
-    return true;
-  }
-  return false;
+  return cert.get();
 }
 
 std::string ConnectionImpl::uriSanLocalCertificate() {

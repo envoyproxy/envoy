@@ -124,6 +124,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
+// TODO(htuch): Switch to a single pass variable substitution.
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
                                                      const ParamMap& param_map,
                                                      const PortMap& port_map,

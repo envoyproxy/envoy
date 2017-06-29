@@ -121,7 +121,8 @@ information as an XFCC element, to the end of the request's XFCC header after a 
 
 Each XFCC element is a semicolon ";" separated string. Each substring is a key-value pair, grouped
 together by an equals ("=") sign. The keys are case-insensitive, the values are case-sensitive. If
-",", ";" or "=" appear in a value, the value should be double-quoted.
+",", ";" or "=" appear in a value, the value should be double-quoted. Double-quotes in the value
+should be replaced by backslash-double-quote (\").
 
 The following keys are supported:
 

@@ -19,7 +19,6 @@
 #include "utility.h"
 
 namespace Envoy {
-
 namespace Xfcc {
 
 void XfccIntegrationTest::SetUp() {

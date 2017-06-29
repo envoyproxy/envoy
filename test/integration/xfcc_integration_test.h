@@ -11,8 +11,8 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
-namespace Envoy {
 
+namespace Envoy {
 namespace Xfcc {
 
 class XfccIntegrationTest : public BaseIntegrationTest,

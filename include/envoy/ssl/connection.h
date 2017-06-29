@@ -15,7 +15,7 @@ public:
   virtual ~Connection() {}
 
   /**
-   * @return whether the connection is Mutual TLS.
+   * @return whether the peer certificate is presented.
    **/
   virtual bool peerCertificatePresented() PURE;
 
@@ -27,7 +27,7 @@ public:
 
   /**
    * @return the SHA256 digest of the peer certificate. Returns "" if there is no peer certificate
-   *         which can happen in the case of server side connections.
+   *         which can happen in TLS (non mTLS) connections.
    */
   virtual std::string sha256PeerCertificateDigest() PURE;
 

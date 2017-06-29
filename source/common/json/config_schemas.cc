@@ -321,8 +321,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "append_forward",
             "sanitize",
             "sanitize_set",
-            "always_forward_only",
-            "always_append_forward"
+            "always_forward_only"
           ]
       },
       "set_current_client_cert_details" : {
