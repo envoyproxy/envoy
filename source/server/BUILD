@@ -48,7 +48,6 @@ envoy_cc_library(
     srcs = ["connection_handler_impl.cc"],
     hdrs = ["connection_handler_impl.h"],
     deps = [
-        "//include/envoy/api:api_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -60,9 +59,6 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:listen_socket_lib",
-        "//source/common/network:listener_lib",
     ],
 )
 
@@ -202,15 +198,14 @@ envoy_cc_library(
     hdrs = ["worker_impl.h"],
     deps = [
         ":connection_handler_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:listener_manager_interface",
-        "//include/envoy/server:options_interface",
         "//include/envoy/server:worker_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "//source/common/api:api_lib",
         "//source/common/common:thread_lib",
     ],
 )

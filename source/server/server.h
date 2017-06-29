@@ -22,7 +22,6 @@
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
-#include "server/connection_handler_impl.h"
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
@@ -96,10 +95,10 @@ public:
 
   // Server::Instance
   Admin& admin() override { return *admin_; }
-  Api::Api& api() override { return handler_.api(); }
+  Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
-  Event::Dispatcher& dispatcher() override { return handler_.dispatcher(); }
+  Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   bool draining() override { return drain_manager_->draining(); }
   void drainListeners() override;
@@ -143,7 +142,9 @@ private:
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;
-  ConnectionHandlerImpl handler_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;

@@ -3,29 +3,29 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/api/api.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/options.h"
 #include "envoy/server/worker.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/logger.h"
 #include "common/common/thread.h"
-
-#include "server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 class ProdWorkerFactory : public WorkerFactory {
 public:
-  ProdWorkerFactory(ThreadLocal::Instance& tls, Options& options) : tls_(tls), options_(options) {}
+  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api) : tls_(tls), api_(api) {}
 
   // Server::WorkerFactory
   WorkerPtr createWorker() override;
 
 private:
   ThreadLocal::Instance& tls_;
-  Options& options_;
+  Api::Api& api_;
 };
 
 /**
@@ -33,7 +33,7 @@ private:
  */
 class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
-  WorkerImpl(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_interval_msec);
+  WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispatcher);
 
   // Server::Worker
   void addListener(Listener& listener) override;
@@ -46,7 +46,8 @@ private:
   void threadRoutine(GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;
-  ConnectionHandlerImplPtr handler_;
+  Event::DispatcherPtr dispatcher_;
+  Network::ConnectionHandlerPtr handler_;
   Thread::ThreadPtr thread_;
 };
 

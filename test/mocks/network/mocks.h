@@ -212,6 +212,8 @@ class MockListener : public Listener {
 public:
   MockListener();
   ~MockListener();
+
+  MOCK_METHOD0(socket, const ListenSocket&());
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -229,7 +231,8 @@ public:
                     const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
-  MOCK_METHOD0(closeListeners, void());
+  MOCK_METHOD1(removeListener, void(Network::ListenSocket&));
+  MOCK_METHOD0(stopListeners, void());
 };
 
 } // Network

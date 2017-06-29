@@ -5,7 +5,6 @@
 #include <list>
 #include <memory>
 
-#include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
@@ -16,11 +15,12 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
-#include "common/network/listen_socket_impl.h"
 
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+namespace Server {
+
 // clang-format off
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, TIMER)                                                  \
   COUNTER(downstream_cx_total)                                                                     \
@@ -28,8 +28,6 @@ namespace Envoy {
   GAUGE  (downstream_cx_active)                                                                    \
   TIMER  (downstream_cx_length_ms)
 // clang-format on
-
-namespace Server {
 
 /**
  * Wrapper struct for listener stats. @see stats_macros.h
@@ -44,34 +42,25 @@ struct ListenerStats {
  */
 class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
 public:
-  ConnectionHandlerImpl(spdlog::logger& logger, Api::ApiPtr&& api);
-  ~ConnectionHandlerImpl();
-
-  Api::Api& api() { return *api_; }
-  Event::Dispatcher& dispatcher() { return *dispatcher_; }
-
-  /**
-   * Close and destroy all connections.
-   */
-  void closeConnections();
+  ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher);
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
-
   void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
                    Stats::Scope& scope, const Network::ListenerOptions& listener_options) override;
-
   void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Stats::Scope& scope,
                       const Network::ListenerOptions& listener_options) override;
-
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
-
-  void closeListeners() override;
+  void removeListener(Network::ListenSocket& socket) override;
+  void stopListeners() override;
 
 private:
+  struct ActiveConnection;
+  typedef std::unique_ptr<ActiveConnection> ActiveConnectionPtr;
+
   /**
-   * Wrapper for an active listener owned by this worker.
+   * Wrapper for an active listener owned by this handler.
    */
   struct ActiveListener : public Network::ListenerCallbacks {
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
@@ -81,16 +70,25 @@ private:
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                    Network::FilterChainFactory& factory, Stats::Scope& scope);
 
+    ~ActiveListener();
+
     /**
      * Fires when a new connection is received from the listener.
      * @param new_connection supplies the connection to take control of.
      */
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
 
+    /**
+     * Remove and destroy an active connection.
+     * @param connection supplies the connection to remove.
+     */
+    void removeConnection(ActiveConnection& connection);
+
     ConnectionHandlerImpl& parent_;
     Network::FilterChainFactory& factory_;
     Network::ListenerPtr listener_;
     ListenerStats stats_;
+    std::list<ActiveConnectionPtr> connections_;
   };
 
   struct SslActiveListener : public ActiveListener {
@@ -102,13 +100,12 @@ private:
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
 
   /**
-   * Wrapper for an active connection owned by this worker.
+   * Wrapper for an active connection owned by this handler.
    */
   struct ActiveConnection : LinkedObject<ActiveConnection>,
                             public Event::DeferredDeletable,
                             public Network::ConnectionCallbacks {
-    ActiveConnection(ConnectionHandlerImpl& parent, Network::ConnectionPtr&& new_connection,
-                     ListenerStats& stats);
+    ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection);
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks
@@ -116,35 +113,22 @@ private:
       // Any event leads to destruction of the connection.
       if (event == Network::ConnectionEvent::LocalClose ||
           event == Network::ConnectionEvent::RemoteClose) {
-        parent_.removeConnection(*this);
+        listener_.removeConnection(*this);
       }
     }
 
-    ConnectionHandlerImpl& parent_;
+    ActiveListener& listener_;
     Network::ConnectionPtr connection_;
-    ListenerStats& stats_;
     Stats::TimespanPtr conn_length_;
   };
-
-  typedef std::unique_ptr<ActiveConnection> ActiveConnectionPtr;
-
-  /**
-   * Remove and destroy an active connection.
-   * @param connection supplies the connection to remove.
-   */
-  void removeConnection(ActiveConnection& connection);
 
   static ListenerStats generateStats(Stats::Scope& scope);
 
   spdlog::logger& logger_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
+  Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
-  std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
 };
-
-typedef std::unique_ptr<ConnectionHandlerImpl> ConnectionHandlerImplPtr;
 
 } // Server
 } // Envoy

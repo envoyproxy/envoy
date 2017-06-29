@@ -57,7 +57,12 @@ public:
  */
 class Listener {
 public:
-  virtual ~Listener(){};
+  virtual ~Listener() {}
+
+  /**
+   * @return the socket the listener is listening on.
+   */
+  virtual const ListenSocket& socket() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

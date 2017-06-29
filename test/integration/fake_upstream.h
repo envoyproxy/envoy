@@ -7,8 +7,10 @@
 #include <mutex>
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 
@@ -17,8 +19,6 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/stats_impl.h"
-
-#include "server/connection_handler_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -225,7 +225,9 @@ private:
   std::mutex lock_;
   std::condition_variable new_connection_event_;
   Stats::IsolatedStoreImpl stats_store_;
-  Server::ConnectionHandlerImpl handler_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };

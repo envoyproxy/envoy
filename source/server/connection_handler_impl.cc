@@ -4,18 +4,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/listener_impl.h"
-
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Server {
 
-ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Api::ApiPtr&& api)
-    : logger_(logger), api_(std::move(api)), dispatcher_(api_->allocateDispatcher()) {}
-
-ConnectionHandlerImpl::~ConnectionHandlerImpl() { closeConnections(); }
+ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
+    : logger_(logger), dispatcher_(dispatcher) {}
 
 void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         Network::ListenSocket& socket, Stats::Scope& scope,
@@ -33,34 +26,37 @@ void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
   listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
-void ConnectionHandlerImpl::closeConnections() {
-  while (!connections_.empty()) {
-    connections_.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+void ConnectionHandlerImpl::removeListener(Network::ListenSocket& socket) {
+  for (auto listener = listeners_.begin(); listener != listeners_.end(); ++listener) {
+    if (&listener->second->listener_->socket() == &socket) {
+      listeners_.erase(listener);
+      break;
+    }
   }
-
-  dispatcher_->clearDeferredDeleteList();
 }
 
-void ConnectionHandlerImpl::closeListeners() {
+void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
     listener.second->listener_.reset();
   }
 }
 
-void ConnectionHandlerImpl::removeConnection(ActiveConnection& connection) {
-  ENVOY_CONN_LOG_TO_LOGGER(logger_, info, "adding to cleanup list", *connection.connection_);
+void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& connection) {
+  ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, info, "adding to cleanup list",
+                           *connection.connection_);
   ActiveConnectionPtr removed = connection.removeFromList(connections_);
-  dispatcher_->deferredDelete(std::move(removed));
-  num_connections_--;
+  parent_.dispatcher_.deferredDelete(std::move(removed));
+  ASSERT(parent_.num_connections_ > 0);
+  parent_.num_connections_--;
 }
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(
     ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
     Network::FilterChainFactory& factory, Stats::Scope& scope,
     const Network::ListenerOptions& listener_options)
-    : ActiveListener(parent, parent.dispatcher_->createListener(parent, socket, *this, scope,
-                                                                listener_options),
-                     factory, scope) {}
+    : ActiveListener(
+          parent, parent.dispatcher_.createListener(parent, socket, *this, scope, listener_options),
+          factory, scope) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
@@ -70,12 +66,20 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
   listener_ = std::move(listener);
 }
 
+ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
+  while (!connections_.empty()) {
+    connections_.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  parent_.dispatcher_.clearDeferredDeleteList();
+}
+
 ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
     ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
     Network::FilterChainFactory& factory, Stats::Scope& scope,
     const Network::ListenerOptions& listener_options)
-    : ActiveListener(parent, parent.dispatcher_->createSslListener(parent, ssl_ctx, socket, *this,
-                                                                   scope, listener_options),
+    : ActiveListener(parent, parent.dispatcher_.createSslListener(parent, ssl_ctx, socket, *this,
+                                                                  scope, listener_options),
                      factory, scope) {}
 
 Network::Listener*
@@ -118,30 +122,28 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
                                *new_connection);
       new_connection->close(Network::ConnectionCloseType::NoFlush);
     } else {
-      ActiveConnectionPtr active_connection(
-          new ActiveConnection(parent_, std::move(new_connection), stats_));
-      active_connection->moveIntoList(std::move(active_connection), parent_.connections_);
+      ActiveConnectionPtr active_connection(new ActiveConnection(*this, std::move(new_connection)));
+      active_connection->moveIntoList(std::move(active_connection), connections_);
       parent_.num_connections_++;
     }
   }
 }
 
-ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ConnectionHandlerImpl& parent,
-                                                          Network::ConnectionPtr&& new_connection,
-                                                          ListenerStats& stats)
-    : parent_(parent), connection_(std::move(new_connection)), stats_(stats),
-      conn_length_(stats_.downstream_cx_length_ms_.allocateSpan()) {
+ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
+                                                          Network::ConnectionPtr&& new_connection)
+    : listener_(listener), connection_(std::move(new_connection)),
+      conn_length_(listener_.stats_.downstream_cx_length_ms_.allocateSpan()) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
   connection_->addConnectionCallbacks(*this);
-  stats_.downstream_cx_total_.inc();
-  stats_.downstream_cx_active_.inc();
+  listener_.stats_.downstream_cx_total_.inc();
+  listener_.stats_.downstream_cx_active_.inc();
 }
 
 ConnectionHandlerImpl::ActiveConnection::~ActiveConnection() {
-  stats_.downstream_cx_active_.dec();
-  stats_.downstream_cx_destroy_.inc();
+  listener_.stats_.downstream_cx_active_.dec();
+  listener_.stats_.downstream_cx_destroy_.inc();
   conn_length_->complete();
 }
 

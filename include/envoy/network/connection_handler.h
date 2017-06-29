@@ -52,9 +52,16 @@ public:
   virtual Network::Listener* findListenerByAddress(const Network::Address::Instance& address) PURE;
 
   /**
-   * Close and destroy all listeners.
+   * Remove a listener using the listen socket reference as a key. All connections owned by the
+   * listener will be closed.
+   * @param socket supplies the socket to use in the listener search.
    */
-  virtual void closeListeners() PURE;
+  virtual void removeListener(Network::ListenSocket& socket) PURE;
+
+  /**
+   * Stop all listeners. This will not close any connections and is used for draining.
+   */
+  virtual void stopListeners() PURE;
 };
 
 typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
