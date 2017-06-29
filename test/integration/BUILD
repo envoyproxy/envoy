@@ -215,6 +215,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "xfcc_integration_test",
+    srcs = [
+        "ssl_integration_test.h",
+        "xfcc_integration_test.cc",
+        "xfcc_integration_test.h",
+    ],
+    data = [
+        "//test/config/integration:server_xfcc.json",
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
         "uds_integration_test.cc",

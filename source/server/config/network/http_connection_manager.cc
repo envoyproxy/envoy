@@ -84,6 +84,31 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     use_remote_address_ = config.getBoolean("use_remote_address");
   }
 
+  const std::string forward_client_cert = config.getString("forward_client_cert", "sanitize");
+  if (forward_client_cert == "forward_only") {
+    forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
+  } else if (forward_client_cert == "append_forward") {
+    forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
+  } else if (forward_client_cert == "sanitize_set") {
+    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
+  } else if (forward_client_cert == "always_forward_only") {
+    forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
+  } else {
+    ASSERT(forward_client_cert == "sanitize");
+    forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
+  }
+
+  if (config.hasObject("set_current_client_cert_details")) {
+    for (const std::string& detail : config.getStringArray("set_current_client_cert_details")) {
+      if (detail == "Subject") {
+        set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
+      } else {
+        ASSERT(detail == "SAN");
+        set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
+      }
+    }
+  }
+
   if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
     user_agent_.value(context_.localInfo().clusterName());
   }

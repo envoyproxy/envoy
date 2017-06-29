@@ -24,12 +24,16 @@ public:
   Ssl::Connection* ssl() override { return this; }
 
   // Ssl::Connection
+  bool peerCertificatePresented() override;
+  std::string uriSanLocalCertificate() override;
   std::string sha256PeerCertificateDigest() override;
+  std::string subjectPeerCertificate() override;
   std::string uriSanPeerCertificate() override;
 
 private:
   PostIoAction doHandshake();
   void drainErrorQueue();
+  std::string getUriSanFromCertificate(X509* cert);
 
   // Network::ConnectionImpl
   void closeSocket(uint32_t close_type) override;
