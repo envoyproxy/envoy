@@ -155,6 +155,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   }
 
   // TODO(myidpt): Handle the special characters in By and SAN fields.
+  // TODO: Optimize client_cert_details based on perf analysis (direct string appending may be more
+  // preferable).
   std::vector<std::string> client_cert_details;
   // When AppendForward or SanitizeSet is set, the client certificate information should be set into
   // the XFCC header.
@@ -192,8 +194,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     }
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
+  } else {
+    NOT_REACHED;
   }
-  // It should never reach here.
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
