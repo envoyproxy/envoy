@@ -128,7 +128,7 @@ The following keys are supported:
 
 1. ``By`` The Subject Alternative Name (SAN) of the current proxy's certificate.
 2. ``Hash`` The SHA 256 diguest of the current client certificate.
-3. ``SAN`` The SAN field (URI type) of the current client certificate. There can be multiple SANs.
+3. ``SAN`` The SAN field (URI type) of the current client certificate.
 4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 
 Some examples of the XFCC header are:
