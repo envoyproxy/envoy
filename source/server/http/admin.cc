@@ -113,9 +113,9 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
   if (outlier_detector) {
-    response.add(fmt::format("{}::outlier::success_rate_average::{}", cluster_name,
+    response.add(fmt::format("{}::outlier::success_rate_average::{}\n", cluster_name,
                              outlier_detector->successRateAverage()));
-    response.add(fmt::format("{}::outlier::success_rate_ejection_threshold::{}", cluster_name,
+    response.add(fmt::format("{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
                              outlier_detector->successRateEjectionThreshold()));
   }
 }

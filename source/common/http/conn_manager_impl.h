@@ -119,6 +119,23 @@ struct TracingConnectionManagerConfig {
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
 
 /**
+ * Configuration for how to forward client certs.
+ */
+enum class ForwardClientCertType {
+  ForwardOnly,
+  AppendForward,
+  SanitizeSet,
+  Sanitize,
+  AlwaysForwardOnly
+};
+
+/**
+ * Configuration for the fields of the client cert, used for populating the current client cert
+ * information to the next hop.
+ */
+enum class ClientCertDetailsType { Subject, SAN };
+
+/**
  * Abstract configuration for the connection manager.
  */
 class ConnectionManagerConfig {
@@ -197,6 +214,17 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return ForwardClientCertType the configuration of how to forward the client cert information.
+   */
+  virtual ForwardClientCertType forwardClientCert() PURE;
+
+  /**
+   * @return vector of ClientCertDetailsType the configuration of the current client cert's details
+   * to be forwarded.
+   */
+  virtual const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
 
   /**
    * @return local address.
