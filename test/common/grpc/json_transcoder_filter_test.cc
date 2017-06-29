@@ -37,11 +37,13 @@ public:
   }
 
   const Json::ObjectSharedPtr bookstoreJson() {
-    std::string descriptor_path = TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
-    std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
-                              "\","
-                              "\"services\": [\"bookstore.Bookstore\"]}";
+    std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
+                              "\",\"services\": [\"bookstore.Bookstore\"]}";
     return Json::Factory::loadFromString(json_string);
+  }
+
+  const std::string bookstoreDescriptorPath() {
+    return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
   JsonTranscoderConfig config_;
@@ -49,6 +51,33 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
+
+TEST_F(GrpcJsonTranscoderFilterTest, BadConfig) {
+
+  const Json::ObjectSharedPtr unknown_service =
+      Json::Factory::loadFromString("{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
+                                    "\",\"services\": [\"grpc.service.UnknownService\"]}");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      JsonTranscoderConfig config(*unknown_service), EnvoyException,
+      "transcoding_filter: Could not find 'grpc.service.UnknownService' in the proto descriptor");
+
+  const Json::ObjectSharedPtr bad_descriptor = Json::Factory::loadFromString(
+      "{\"proto_descriptor\": \"" +
+      TestEnvironment::runfilesPath("test/proto/bookstore_bad.descriptor") +
+      "\",\"services\": [\"bookstore.Bookstore\"]}");
+
+  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*bad_descriptor), EnvoyException,
+                            "transcoding_filter: Unable to build proto descriptor pool");
+
+  const Json::ObjectSharedPtr not_descriptor = Json::Factory::loadFromString(
+      "{\"proto_descriptor\": \"" +
+          TestEnvironment::runfilesPath("test/proto/bookstore.proto") +
+          "\",\"services\": [\"bookstore.Bookstore\"]}");
+
+  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*not_descriptor), EnvoyException,
+                            "transcoding_filter: Unable to parse proto descriptor");
+}
 
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -61,6 +90,25 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(expected_request_headers, request_headers);
+
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, false));
+  EXPECT_EQ(2, request_data.length());
+
+  Http::TestHeaderMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
+  EXPECT_EQ(expected_request_headers, request_headers);
+
+  Buffer::OwnedImpl response_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_data, false));
+  EXPECT_EQ(2, response_data.length());
+
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
+  Http::TestHeaderMapImpl expected_response_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(expected_response_trailers, response_trailers);
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {

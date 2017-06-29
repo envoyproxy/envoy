@@ -35,7 +35,7 @@ namespace Grpc {
 
 namespace {
 
-const std::string TypeUrlPrefix{"type.googleapis.com"};
+const std::string TYPE_URL_PREFIX{"type.googleapis.com"};
 
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
@@ -81,7 +81,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
 
   for (const auto& file : descriptor_set.file()) {
     if (descriptor_pool_.BuildFile(file) == nullptr) {
-      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+      throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
     }
   }
 
@@ -128,7 +128,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   path_matcher_ = pmb.Build();
 
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(TypeUrlPrefix, &descriptor_pool_)));
+      google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX, &descriptor_pool_)));
 }
 
 Status JsonTranscoderConfig::createTranscoder(
@@ -177,7 +177,7 @@ Status JsonTranscoderConfig::createTranscoder(
                                 method_descriptor->client_streaming(), true)};
 
   const auto response_type_url =
-      TypeUrlPrefix + "/" + method_descriptor->output_type()->full_name();
+      TYPE_URL_PREFIX + "/" + method_descriptor->output_type()->full_name();
   std::unique_ptr<ResponseToJsonTranslator> response_translator{
       new ResponseToJsonTranslator(type_helper_->Resolver(), response_type_url,
                                    method_descriptor->server_streaming(), &response_input)};
@@ -189,7 +189,7 @@ Status JsonTranscoderConfig::createTranscoder(
 
 Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
                                                  google::grpc::transcoding::RequestInfo* info) {
-  auto request_type_url = TypeUrlPrefix + "/" + method->input_type()->full_name();
+  auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());

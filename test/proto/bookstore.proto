@@ -47,7 +47,7 @@ service Bookstore {
   // Creates a new book.
   rpc CreateBook(CreateBookRequest) returns (Book) {
     option (google.api.http) = {
-      post: "/shelves/{shelf}/books"
+      put: "/shelves/{shelf}/books"
       body: "book"
     };
   }

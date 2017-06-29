@@ -161,7 +161,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
+          {":method", "GET"}, {":path", "/shelves/100?"}, {":authority", "host"}},
       "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
       Http::TestHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 100 Not Found"}},
@@ -209,7 +209,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryCustom) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
   testTranscoding<bookstore::CreateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
-          {":method", "POST"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+          {":method", "PUT"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
       R"({"author" : "Leo Tolstoy", "title" : "War and Peace"})",
       {R"(shelf: 1 book { author: "Leo Tolstoy" title: "War and Peace" })"},
       {R"(id: 3 author: "Leo Tolstoy" title: "War and Peace")"}, Status::OK,
