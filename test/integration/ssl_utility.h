@@ -8,7 +8,7 @@ namespace Ssl {
 
 ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& context_manager);
 
-Network::Address::InstanceConstSharedPtr getSslAddress(Network::Address::IpVersion version,
+Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);
 
 } // Ssl

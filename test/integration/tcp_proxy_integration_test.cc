@@ -10,10 +10,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Test proxying data in both directions, and that all data is flushed properly
+// when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
@@ -37,6 +40,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   EXPECT_EQ("world", tcp_client->data());
 }
 
+// Test proxying data in both directions, and that all data is flushed properly
+// when the client disconnects.
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
@@ -59,6 +64,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   });
 }
 
+// Test proxying data in both directions with envoy doing TCP and TLS
+// termination.
 TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
@@ -122,4 +129,5 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
   });
 }
 
+} // namespace
 } // Envoy

@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Ssl {
 
 ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& context_manager) {
-  std::string json_plain = R"EOF(
+  const std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
@@ -21,7 +21,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
 }
 )EOF";
 
-  std::string json_alpn = R"EOF(
+  const std::string json_alpn = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
@@ -30,7 +30,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
 }
 )EOF";
 
-  std::string json_san = R"EOF(
+  const std::string json_san = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
@@ -39,7 +39,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
 }
 )EOF";
 
-  std::string json_alpn_san = R"EOF(
+  const std::string json_alpn_san = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
@@ -61,7 +61,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
   return context_manager.createSslClientContext(*client_stats_store, cfg);
 }
 
-Network::Address::InstanceConstSharedPtr getSslAddress(Network::Address::IpVersion version,
+Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {
   std::string url =
       "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
