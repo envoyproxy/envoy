@@ -106,7 +106,23 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 
-// TODO(htuch): add test for gRPC.
+TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
+  api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cm_.async_client_, start(_, _)).WillOnce(Return(&stream));
+  Http::TestHeaderMapImpl headers{{":method", "POST"},
+                                  {":path","/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints"},
+                                  {":authority","eds_cluster"},
+                                  {"content-type", "application/grpc"}};
+  EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
+  subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+}
+
 
 } // namespace Config
 } // namespace Envoy
