@@ -29,11 +29,11 @@ public:
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
    * @param scope supplies the stats scope to use for listener specific stats.
-   * @param opaque_id supplies an opaque key that can be used to stop or remove the listener.
+   * @param listener_tag supplies an opaque tag that can be used to stop or remove the listener.
    * @param listener_options listener configuration options.
    */
   virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                           Stats::Scope& scope, uint64_t opaque_id,
+                           Stats::Scope& scope, uint64_t listener_tag,
                            const Network::ListenerOptions& listener_options) PURE;
 
   /**
@@ -41,12 +41,12 @@ public:
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
    * @param scope supplies the stats scope to use for listener specific stats.
-   * @param opaque_id supplies an opaque key that can be used to stop or remove the listener.
+   * @param listener_tag supplies an opaque tag that can be used to stop or remove the listener.
    * @param listener_options listener configuration options.
    */
   virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
                               Network::ListenSocket& socket, Stats::Scope& scope,
-                              uint64_t opaque_id,
+                              uint64_t listener_tag,
                               const Network::ListenerOptions& listener_options) PURE;
 
   /**
@@ -58,18 +58,18 @@ public:
   virtual Network::Listener* findListenerByAddress(const Network::Address::Instance& address) PURE;
 
   /**
-   * Remove listeners using the opaque id as a key. All connections owned by the removed listeners
-   * will be closed.
-   * @param opaque_id supplies the id passed to addListener().
+   * Remove listeners using the listener tag as a key. All connections owned by the removed
+   * listeners will be closed.
+   * @param listener_tag supplies the tag passed to addListener().
    */
-  virtual void removeListeners(uint64_t opaque_id) PURE;
+  virtual void removeListeners(uint64_t listener_tag) PURE;
 
   /**
-   * Stop listeners using the opaque id as a key. This will not close any connections and is used
+   * Stop listeners using the listener tag as a key. This will not close any connections and is used
    * for draining.
-   * @param opaque_id supplies the id passed to addListener().
+   * @param listener_tag supplies the tag passed to addListener().
    */
-  virtual void stopListeners(uint64_t opaque_id) PURE;
+  virtual void stopListeners(uint64_t listener_tag) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.

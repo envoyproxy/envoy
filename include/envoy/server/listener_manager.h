@@ -37,9 +37,9 @@ public:
                           Configuration::FactoryContext& context) PURE;
 
   /**
-   * @return uint64_t an opaque ID usable for connection handler tracking.
+   * @return uint64_t a listener tag usable for connection handler tracking.
    */
-  virtual uint64_t nextOpaqueId() PURE;
+  virtual uint64_t nextListenerTag() PURE;
 };
 
 /**
@@ -103,9 +103,9 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return uint64_t the opaque ID the listener should use for connection handler tracking.
+   * @return uint64_t the tag the listener should use for connection handler tracking.
    */
-  virtual uint64_t opaqueId() PURE;
+  virtual uint64_t listenerTag() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

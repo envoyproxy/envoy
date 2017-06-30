@@ -224,16 +224,16 @@ public:
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD5(addListener,
                void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    Stats::Scope& scope, uint64_t opaque_id,
+                    Stats::Scope& scope, uint64_t listener_tag,
                     const Network::ListenerOptions& listener_options));
   MOCK_METHOD6(addSslListener,
                void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                    Network::ListenSocket& socket, Stats::Scope& scope, uint64_t opaque_id,
+                    Network::ListenSocket& socket, Stats::Scope& scope, uint64_t listener_tag,
                     const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
-  MOCK_METHOD1(removeListeners, void(uint64_t opaque_id));
-  MOCK_METHOD1(stopListeners, void(uint64_t opaque_id));
+  MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
+  MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
 };
 

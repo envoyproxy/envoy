@@ -32,11 +32,11 @@ void WorkerImpl::addListener(Listener& listener) {
                                                          listener.perConnectionBufferLimitBytes()};
   if (listener.sslContext()) {
     handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
-                             listener.socket(), listener.listenerScope(), listener.opaqueId(),
+                             listener.socket(), listener.listenerScope(), listener.listenerTag(),
                              listener_options);
   } else {
     handler_->addListener(listener.filterChainFactory(), listener.socket(),
-                          listener.listenerScope(), listener.opaqueId(), listener_options);
+                          listener.listenerScope(), listener.listenerTag(), listener_options);
   }
 }
 

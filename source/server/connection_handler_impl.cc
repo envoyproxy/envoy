@@ -12,26 +12,26 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Disp
 
 void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         Network::ListenSocket& socket, Stats::Scope& scope,
-                                        uint64_t opaque_id,
+                                        uint64_t listener_tag,
                                         const Network::ListenerOptions& listener_options) {
   ActiveListenerPtr l(
-      new ActiveListener(*this, socket, factory, scope, opaque_id, listener_options));
+      new ActiveListener(*this, socket, factory, scope, listener_tag, listener_options));
   listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
                                            Ssl::ServerContext& ssl_ctx,
                                            Network::ListenSocket& socket, Stats::Scope& scope,
-                                           uint64_t opaque_id,
+                                           uint64_t listener_tag,
                                            const Network::ListenerOptions& listener_options) {
-  ActiveListenerPtr l(
-      new SslActiveListener(*this, ssl_ctx, socket, factory, scope, opaque_id, listener_options));
+  ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, scope, listener_tag,
+                                            listener_options));
   listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
-void ConnectionHandlerImpl::removeListeners(uint64_t opaque_id) {
+void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   for (auto listener = listeners_.begin(); listener != listeners_.end();) {
-    if (listener->second->opaque_id_ == opaque_id) {
+    if (listener->second->listener_tag_ == listener_tag) {
       listener = listeners_.erase(listener);
     } else {
       ++listener;
@@ -39,9 +39,9 @@ void ConnectionHandlerImpl::removeListeners(uint64_t opaque_id) {
   }
 }
 
-void ConnectionHandlerImpl::stopListeners(uint64_t opaque_id) {
+void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   for (auto& listener : listeners_) {
-    if (listener.second->opaque_id_ == opaque_id) {
+    if (listener.second->listener_tag_ == listener_tag) {
       listener.second->listener_.reset();
     }
   }
@@ -64,18 +64,18 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(
     ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
-    Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t opaque_id,
+    Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t listener_tag,
     const Network::ListenerOptions& listener_options)
     : ActiveListener(
           parent, parent.dispatcher_.createListener(parent, socket, *this, scope, listener_options),
-          factory, scope, opaque_id) {}
+          factory, scope, listener_tag) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
                                                       Network::FilterChainFactory& factory,
-                                                      Stats::Scope& scope, uint64_t opaque_id)
+                                                      Stats::Scope& scope, uint64_t listener_tag)
     : parent_(parent), factory_(factory), listener_(std::move(listener)),
-      stats_(generateStats(scope)), opaque_id_(opaque_id) {}
+      stats_(generateStats(scope)), listener_tag_(listener_tag) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   while (!connections_.empty()) {
@@ -87,11 +87,11 @@ ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
 
 ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
     ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-    Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t opaque_id,
+    Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t listener_tag,
     const Network::ListenerOptions& listener_options)
     : ActiveListener(parent, parent.dispatcher_.createSslListener(parent, ssl_ctx, socket, *this,
                                                                   scope, listener_options),
-                     factory, scope, opaque_id) {}
+                     factory, scope, listener_tag) {}
 
 Network::Listener*
 ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& address) {

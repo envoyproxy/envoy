@@ -98,7 +98,7 @@ public:
     // validation mock.
     return nullptr;
   }
-  uint64_t nextOpaqueId() override { return 0; }
+  uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
   WorkerPtr createWorker() override {

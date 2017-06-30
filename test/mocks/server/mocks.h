@@ -113,7 +113,7 @@ public:
   MOCK_METHOD2(createListenSocket_,
                Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
                                       bool bind_to_port));
-  MOCK_METHOD0(nextOpaqueId, uint64_t());
+  MOCK_METHOD0(nextListenerTag, uint64_t());
 };
 
 class MockListenerManager : public ListenerManager {

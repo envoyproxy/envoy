@@ -47,14 +47,14 @@ public:
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
   void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   Stats::Scope& scope, uint64_t opaque_id,
+                   Stats::Scope& scope, uint64_t listener_tag,
                    const Network::ListenerOptions& listener_options) override;
   void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, Stats::Scope& scope, uint64_t opaque_id,
+                      Network::ListenSocket& socket, Stats::Scope& scope, uint64_t listener_tag,
                       const Network::ListenerOptions& listener_options) override;
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
-  void removeListeners(uint64_t opaque_id) override;
-  void stopListeners(uint64_t opaque_id) override;
+  void removeListeners(uint64_t listener_tag) override;
+  void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
 
 private:
@@ -66,11 +66,12 @@ private:
    */
   struct ActiveListener : public Network::ListenerCallbacks {
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
-                   Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t opaque_id,
+                   Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t listener_tag,
                    const Network::ListenerOptions& listener_options);
 
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                   Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t opaque_id);
+                   Network::FilterChainFactory& factory, Stats::Scope& scope,
+                   uint64_t listener_tag);
 
     ~ActiveListener();
 
@@ -91,13 +92,13 @@ private:
     Network::ListenerPtr listener_;
     ListenerStats stats_;
     std::list<ActiveConnectionPtr> connections_;
-    const uint64_t opaque_id_;
+    const uint64_t listener_tag_;
   };
 
   struct SslActiveListener : public ActiveListener {
     SslActiveListener(ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      Stats::Scope& scope, uint64_t opaque_id,
+                      Stats::Scope& scope, uint64_t listener_tag,
                       const Network::ListenerOptions& listener_options);
   };
 
