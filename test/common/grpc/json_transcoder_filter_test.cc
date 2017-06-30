@@ -46,6 +46,7 @@ public:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
+  //TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -71,9 +72,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, BadConfig) {
                             "transcoding_filter: Unable to build proto descriptor pool");
 
   const Json::ObjectSharedPtr not_descriptor = Json::Factory::loadFromString(
-      "{\"proto_descriptor\": \"" +
-          TestEnvironment::runfilesPath("test/proto/bookstore.proto") +
-          "\",\"services\": [\"bookstore.Bookstore\"]}");
+      "{\"proto_descriptor\": \"" + TestEnvironment::runfilesPath("test/proto/bookstore.proto") +
+      "\",\"services\": [\"bookstore.Bookstore\"]}");
 
   EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*not_descriptor), EnvoyException,
                             "transcoding_filter: Unable to parse proto descriptor");

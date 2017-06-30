@@ -30,11 +30,11 @@ envoy_proto_descriptor(
     srcs = [
         "bookstore.proto",
     ],
+    out = "bookstore.descriptor",
     external_deps = [
         "http_api_protos",
         "well_known_protos",
     ],
-    out = "bookstore.descriptor",
     protocopts = ["--include_imports"],
 )
 
@@ -43,9 +43,9 @@ envoy_proto_descriptor(
     srcs = [
         "bookstore.proto",
     ],
+    out = "bookstore_bad.descriptor",
     external_deps = [
         "http_api_protos",
         "well_known_protos",
     ],
-    out = "bookstore_bad.descriptor",
 )

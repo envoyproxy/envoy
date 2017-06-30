@@ -128,7 +128,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   path_matcher_ = pmb.Build();
 
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX, &descriptor_pool_)));
+      google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX,
+                                                               &descriptor_pool_)));
 }
 
 Status JsonTranscoderConfig::createTranscoder(
