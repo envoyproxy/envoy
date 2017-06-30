@@ -29,7 +29,7 @@ protected:
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
     Config::Utility::sdsConfigToEdsConfig(SdsConfig{"eds", std::chrono::milliseconds(30000)},
-                                          &eds_config_);
+                                          eds_config_);
     local_info_.zone_name_ = "us-east-1a";
     cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, eds_config_,
                                       local_info_, cm_, dispatcher_, random_));

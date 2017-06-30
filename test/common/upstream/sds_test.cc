@@ -50,7 +50,7 @@ protected:
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
     Config::Utility::sdsConfigToEdsConfig(SdsConfig{"sds", std::chrono::milliseconds(30000)},
-                                          &eds_config_);
+                                          eds_config_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";

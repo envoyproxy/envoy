@@ -29,15 +29,17 @@ public:
    *        service description).
    */
   template <class ResourceType>
-  static Subscription<ResourceType>*
+  static std::unique_ptr<Subscription<ResourceType>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config,
                                const envoy::api::v2::Node& node, Event::Dispatcher& dispatcher,
                                Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
                                std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
                                const std::string& rest_method, const std::string& grpc_method) {
+    std::unique_ptr<Subscription<ResourceType>> result;
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath:
-      return new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path());
+      result.reset(new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path()));
+      break;
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& api_config_source = config.api_config_source();
       if (api_config_source.cluster_name().size() != 1) {
@@ -48,16 +50,19 @@ public:
       const auto& cluster_name = api_config_source.cluster_name()[0];
       switch (api_config_source.api_type()) {
       case envoy::api::v2::ApiConfigSource::REST_LEGACY:
-        return rest_legacy_constructor();
+        result.reset(rest_legacy_constructor());
+        break;
       case envoy::api::v2::ApiConfigSource::REST:
-        return new HttpSubscriptionImpl<ResourceType>(
+        result.reset(new HttpSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method));
+            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method)));
+        break;
       case envoy::api::v2::ApiConfigSource::GRPC:
-        return new GrpcSubscriptionImpl<ResourceType>(
+        result.reset(new GrpcSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher,
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method));
+            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method)));
+        break;
       default:
         NOT_REACHED;
       }
@@ -66,7 +71,7 @@ public:
     default:
       throw EnvoyException("Missing config source specifier in envoy::api::v2::ConfigSource");
     }
-    return nullptr;
+    return result;
   }
 };
 

@@ -28,14 +28,13 @@ public:
 
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config) {
-    return std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>(
-        SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
-            config, node_, dispatcher_, cm_, random_,
-            [this]() -> Subscription<envoy::api::v2::ClusterLoadAssignment>* {
-              return legacy_subscription_.release();
-            },
-            "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints"));
+    return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
+        config, node_, dispatcher_, cm_, random_,
+        [this]() -> Subscription<envoy::api::v2::ClusterLoadAssignment>* {
+          return legacy_subscription_.release();
+        },
+        "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
   }
 
   envoy::api::v2::Node node_;
@@ -115,14 +114,14 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cm_.async_client_, start(_, _)).WillOnce(Return(&stream));
-  Http::TestHeaderMapImpl headers{{":method", "POST"},
-                                  {":path","/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints"},
-                                  {":authority","eds_cluster"},
-                                  {"content-type", "application/grpc"}};
+  Http::TestHeaderMapImpl headers{
+      {":method", "POST"},
+      {":path", "/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints"},
+      {":authority", "eds_cluster"},
+      {"content-type", "application/grpc"}};
   EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
-
 
 } // namespace Config
 } // namespace Envoy

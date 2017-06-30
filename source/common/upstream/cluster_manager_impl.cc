@@ -580,7 +580,7 @@ ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterM
                                            Outlier::EventLoggerSharedPtr outlier_event_logger) {
   Optional<envoy::api::v2::ConfigSource> eds_config((envoy::api::v2::ConfigSource()));
   if (sds_config.valid()) {
-    Config::Utility::sdsConfigToEdsConfig(sds_config.value(), &eds_config.value());
+    Config::Utility::sdsConfigToEdsConfig(sds_config.value(), eds_config.value());
   }
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, eds_config, local_info_,

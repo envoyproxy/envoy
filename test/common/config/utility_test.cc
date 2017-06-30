@@ -44,7 +44,7 @@ TEST(UtilityTest, LocalInfoToNode) {
   std::string foo_zone("foo_zone");
   EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(foo_zone));
   envoy::api::v2::Node node;
-  Utility::localInfoToNode(local_info, &node);
+  Utility::localInfoToNode(local_info, node);
   EXPECT_EQ("foo_id", node.id());
   EXPECT_EQ("foo_zone", node.locality().zone());
 }
@@ -52,7 +52,7 @@ TEST(UtilityTest, LocalInfoToNode) {
 TEST(UtilityTest, SdsConfigToEdsConfig) {
   Upstream::SdsConfig sds_config{"sds", std::chrono::milliseconds(30000)};
   envoy::api::v2::ConfigSource config;
-  Utility::sdsConfigToEdsConfig(sds_config, &config);
+  Utility::sdsConfigToEdsConfig(sds_config, config);
   EXPECT_TRUE(config.has_api_config_source());
   const auto& api_config_source = config.api_config_source();
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST_LEGACY, api_config_source.api_type());
