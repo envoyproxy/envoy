@@ -35,7 +35,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
   "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
 }
 )EOF";
 
@@ -45,7 +45,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
   "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
   "alpn_protocols": "h2,http/1.1",
-  "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
 }
 )EOF";
 

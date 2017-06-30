@@ -30,6 +30,10 @@ public:
                                     const Router::Config& route_config);
 
 private:
+  static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
+                                      Network::Connection& connection,
+                                      ConnectionManagerConfig& config);
+
   // NOTE: This is used for stable randomness in the case where the route table does not use any
   //       runtime rules. If runtime rules are used, we use true randomness which is slower but
   //       provides behavior that most consumers would expect.

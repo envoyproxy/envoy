@@ -10,9 +10,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 
+namespace Envoy {
 namespace Ssl {
 
 class MockRuntimeIntegrationTestServer : public IntegrationTestServer {

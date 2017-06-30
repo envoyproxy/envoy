@@ -16,6 +16,7 @@ exports_files([
     "server_ssl.json",
     "server_uds.json",
     "tcp_proxy.json",
+    "server_xfcc.json",
 ])
 
 filegroup(

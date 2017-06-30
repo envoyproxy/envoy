@@ -15,14 +15,31 @@ public:
   virtual ~Connection() {}
 
   /**
+   * @return whether the peer certificate is presented.
+   **/
+  virtual bool peerCertificatePresented() PURE;
+
+  /**
+   * @return the URI in the SAN feld of the local certificate. Returns "" if there is no local
+   *         certificate, or no SAN field, or no URI.
+   **/
+  virtual std::string uriSanLocalCertificate() PURE;
+
+  /**
    * @return the SHA256 digest of the peer certificate. Returns "" if there is no peer certificate
-   *         which can happen in the case of server side connections.
+   *         which can happen in TLS (non mTLS) connections.
    */
   virtual std::string sha256PeerCertificateDigest() PURE;
 
   /**
-   * @return the uri in the SAN field of the peer certificate. Returns "" if there is no peer
-   *         certificate, or no SAN field, or no uri.
+   * @return the subject field of the peer certificate. Returns "" if there is no peer certificate,
+   *         or no subject.
+   **/
+  virtual std::string subjectPeerCertificate() PURE;
+
+  /**
+   * @return the URI in the SAN field of the peer certificate. Returns "" if there is no peer
+   *         certificate, or no SAN field, or no URI.
    **/
   virtual std::string uriSanPeerCertificate() PURE;
 };
