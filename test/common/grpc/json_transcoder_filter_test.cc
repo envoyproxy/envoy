@@ -46,7 +46,7 @@ public:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
-  //TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
+  // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
