@@ -314,6 +314,24 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         }
       },
       "use_remote_address" : {"type" : "boolean"},
+      "forward_client_cert" : {
+          "type" : "string",
+          "enum" : [
+            "forward_only",
+            "append_forward",
+            "sanitize",
+            "sanitize_set",
+            "always_forward_only"
+          ]
+      },
+      "set_current_client_cert_details" : {
+          "type" : "array",
+          "uniqueItems": true,
+          "items" : {
+              "type" : "string",
+              "enum" : ["Subject", "SAN"]
+          }
+      },
       "generate_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "filters"],

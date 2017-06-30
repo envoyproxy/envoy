@@ -15,6 +15,8 @@ class TestEnvironment {
 public:
   typedef std::unordered_map<std::string, uint32_t> PortMap;
 
+  typedef std::unordered_map<std::string, std::string> ParamMap;
+
   /**
    * Initialize command-line options for later access by tests in getOptions().
    * @param argc number of command-line args.
@@ -113,6 +115,18 @@ public:
    * @return std::string path for the generated file.
    */
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
+                                             Network::Address::IpVersion version);
+  /**
+   * Substitue ports, paths, and IP loopback addressses in a JSON file in the
+   * private writable test temporary directory.
+   * @param path path prefix for the input file with port and path templates.
+   * @param param_map map from parameter name to values.
+   * @param port_map map from port name to port number.
+   * @param version IP address version to substitute.
+   * @return std::string path for the generated file.
+   */
+  static std::string temporaryFileSubstitute(const std::string& path, const ParamMap& param_map,
+                                             const PortMap& port_map,
                                              Network::Address::IpVersion version);
 
   /**

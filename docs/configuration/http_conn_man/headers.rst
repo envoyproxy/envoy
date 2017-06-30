@@ -106,6 +106,42 @@ x-envoy-ip-tags
 
 This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
 
+.. _config_http_conn_man_headers_x-forwarded-client-cert:
+
+x-forwarded-client-cert
+-----------------------
+
+*x-forwarded-clinet-cert* (XFCC) is a proxy header which indicates certificate information of part
+or all of the clients or proxies that a request has flowed through, on its way from the client to the
+server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the reqeust.
+
+The XFCC header value is a comma (",") separated string. Each substring is an XFCC element, which
+holds information added by a single proxy. A proxy can append the current client certificate
+information as an XFCC element, to the end of the request's XFCC header after a comma.
+
+Each XFCC element is a semicolon ";" separated string. Each substring is a key-value pair, grouped
+together by an equals ("=") sign. The keys are case-insensitive, the values are case-sensitive. If
+",", ";" or "=" appear in a value, the value should be double-quoted. Double-quotes in the value
+should be replaced by backslash-double-quote (\").
+
+The following keys are supported:
+
+1. ``By`` The Subject Alternative Name (SAN) of the current proxy's certificate.
+2. ``Hash`` The SHA 256 diguest of the current client certificate.
+3. ``SAN`` The SAN field (URI type) of the current client certificate.
+4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
+
+Some examples of the XFCC header are:
+
+1. ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";SAN=http://testclient.lyft.com``
+2. ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;SAN=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;SAN=http://frontend.lyft.com``
+
+How Envoy processes XFCC is specified by the
+:ref:`forward_client_cert<config_http_conn_man_forward_client_cert>` and the
+:ref:`set_current_client_cert_details<config_http_conn_man_set_current_client_cert_details>` HTTP
+connection manager options. If *forward_client_cert* is unset, the XFCC header will be sanitized by
+default.
+
 .. _config_http_conn_man_headers_x-forwarded-for:
 
 x-forwarded-for

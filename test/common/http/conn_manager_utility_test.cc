@@ -11,6 +11,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -392,6 +393,216 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, route_config_);
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+  // also sends the XFCC
+  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be,By=test://foo.com/"
+            "be;Hash=abcdefg;SAN=test://foo.com/fe",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+  // also sends the XFCC
+  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(""));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;Hash=xyz;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;Hash=xyz;SAN=test://bar.com/be,"
+            "Hash=abcdefg;SAN=test://foo.com/fe",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+  // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+  // calling foo.com/fe).
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, subjectPeerCertificate())
+      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::Subject);
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=test://foo.com/fe",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
+  // This test assumes the following scenario:
+  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+  // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+  // calling foo.com/fe).
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
+  EXPECT_CALL(ssl, subjectPeerCertificate())
+      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return(""));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::Subject);
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
+  // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
+  // always_forward_only works regardless whether the connection is TLS/mTLS.
+  Ssl::MockConnection ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
+  // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
+  ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
+  // always_forward_only works regardless whether the connection is TLS/mTLS.
+  ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
+  std::vector<Http::ClientCertDetailsType> details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
 } // Http

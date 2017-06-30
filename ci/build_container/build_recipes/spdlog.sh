@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=0.11.0
+VERSION=0.13.0
 
 wget -O spdlog-$VERSION.tar.gz https://github.com/gabime/spdlog/archive/v$VERSION.tar.gz
 tar xf spdlog-$VERSION.tar.gz
