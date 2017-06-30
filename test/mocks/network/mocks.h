@@ -213,7 +213,7 @@ public:
   MockListener();
   ~MockListener();
 
-  MOCK_METHOD0(socket, const ListenSocket&());
+  MOCK_METHOD0(onDestroy, void());
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -222,16 +222,18 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD4(addListener,
+  MOCK_METHOD5(addListener,
                void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    Stats::Scope& scope, const Network::ListenerOptions& listener_options));
-  MOCK_METHOD5(addSslListener,
+                    Stats::Scope& scope, uint64_t opaque_id,
+                    const Network::ListenerOptions& listener_options));
+  MOCK_METHOD6(addSslListener,
                void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                    Network::ListenSocket& socket, Stats::Scope& scope,
+                    Network::ListenSocket& socket, Stats::Scope& scope, uint64_t opaque_id,
                     const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
-  MOCK_METHOD1(removeListener, void(Network::ListenSocket&));
+  MOCK_METHOD1(removeListeners, void(uint64_t opaque_id));
+  MOCK_METHOD1(stopListeners, void(uint64_t opaque_id));
   MOCK_METHOD0(stopListeners, void());
 };
 

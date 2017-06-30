@@ -31,8 +31,10 @@ public:
   virtual void newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
                              Address::InstanceConstSharedPtr local_address);
 
-  // Network::Listener
-  const ListenSocket& socket() override { return socket_; }
+  /**
+   * @return the socket supplied to the listener at construction time
+   */
+  ListenSocket& socket() { return socket_; }
 
 protected:
   virtual Address::InstanceConstSharedPtr getOriginalDst(int fd);

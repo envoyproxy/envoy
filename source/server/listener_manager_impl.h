@@ -36,9 +36,11 @@ public:
   }
   Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port) override;
+  uint64_t nextOpaqueId() override { return next_opaque_id_++; }
 
 private:
   Instance& server_;
+  uint64_t next_opaque_id_{};
 };
 
 /**
@@ -62,6 +64,7 @@ public:
   bool useOriginalDst() override { return use_original_dst_; }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
+  uint64_t opaqueId() override { return opaque_id_; }
 
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
@@ -97,6 +100,7 @@ private:
   const bool use_original_dst_{};
   const uint32_t per_connection_buffer_limit_bytes_{};
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  const uint64_t opaque_id_;
 };
 
 /**

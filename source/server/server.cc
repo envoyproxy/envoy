@@ -141,7 +141,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
                              initial_config.admin().address(), *this));
 
   admin_scope_ = stats_store_.createScope("listener.admin.");
-  handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
+  handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_, 0,
                         Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());

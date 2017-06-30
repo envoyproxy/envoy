@@ -125,7 +125,7 @@ MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(
 MockListenSocket::~MockListenSocket() {}
 
 MockListener::MockListener() {}
-MockListener::~MockListener() {}
+MockListener::~MockListener() { onDestroy(); }
 
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}

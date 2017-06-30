@@ -17,8 +17,11 @@ namespace Network {
  */
 class ConnectionHandler {
 public:
-  virtual ~ConnectionHandler(){};
+  virtual ~ConnectionHandler() {}
 
+  /**
+   * @return uint64_t the number of active connections owned by the handler.
+   */
   virtual uint64_t numConnections() PURE;
 
   /**
@@ -26,10 +29,11 @@ public:
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
    * @param scope supplies the stats scope to use for listener specific stats.
+   * @param opaque_id supplies an opaque key that can be used to stop or remove the listener.
    * @param listener_options listener configuration options.
    */
   virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                           Stats::Scope& scope,
+                           Stats::Scope& scope, uint64_t opaque_id,
                            const Network::ListenerOptions& listener_options) PURE;
 
   /**
@@ -37,10 +41,12 @@ public:
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
    * @param scope supplies the stats scope to use for listener specific stats.
+   * @param opaque_id supplies an opaque key that can be used to stop or remove the listener.
    * @param listener_options listener configuration options.
    */
   virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
                               Network::ListenSocket& socket, Stats::Scope& scope,
+                              uint64_t opaque_id,
                               const Network::ListenerOptions& listener_options) PURE;
 
   /**
@@ -52,11 +58,18 @@ public:
   virtual Network::Listener* findListenerByAddress(const Network::Address::Instance& address) PURE;
 
   /**
-   * Remove a listener using the listen socket reference as a key. All connections owned by the
-   * listener will be closed.
-   * @param socket supplies the socket to use in the listener search.
+   * Remove listeners using the opaque id as a key. All connections owned by the removed listeners
+   * will be closed.
+   * @param opaque_id supplies the id passed to addListener().
    */
-  virtual void removeListener(Network::ListenSocket& socket) PURE;
+  virtual void removeListeners(uint64_t opaque_id) PURE;
+
+  /**
+   * Stop listeners using the opaque id as a key. This will not close any connections and is used
+   * for draining.
+   * @param opaque_id supplies the id passed to addListener().
+   */
+  virtual void stopListeners(uint64_t opaque_id) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
