@@ -258,14 +258,14 @@ def _proto_header(proto_path):
   return None
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, srcs = [], deps = []):
+def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
     internal_name = name + "_internal"
     cc_proto_library(
         name = internal_name,
         srcs = srcs,
         default_runtime = "//external:protobuf",
         protoc = "//external:protoc",
-        deps = deps,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         linkstatic = 1,
     )
     # We can't use include_prefix directly in cc_proto_library, since it

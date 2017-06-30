@@ -209,6 +209,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
       config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
 
   if (!status.ok()) {
+    // If transcoder couldn't be created, it might be a normal gRPC request, so the filter will
+    // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -236,7 +238,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->RequestOutput(), data);
 
-    if (data.length()) {
+    if (data.length() > 0) {
       decoder_callbacks_->addDecodedData(data);
     }
   }

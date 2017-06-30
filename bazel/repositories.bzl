@@ -120,6 +120,10 @@ def envoy_api_deps(skip_targets):
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
     )
+    native.bind(
+        name = "http_api_protos_genproto",
+        actual = "@googleapis//:http_api_protos_genproto",
+    )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
     if not skip_protobuf_bzl:
