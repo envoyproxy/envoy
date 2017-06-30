@@ -12,7 +12,8 @@ and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to 
 Configure gRPC-JSON transcoder
 ------------------------------
 
-The filter config for the filter need the descriptor file, and the services you want to enable.
+The filter config for the filter requires the descriptor file as well as a list of the gRPC 
+services to be transcoded.
 
 .. code-block:: json
 
@@ -26,11 +27,11 @@ The filter config for the filter need the descriptor file, and the services you 
   }
 
 proto_descriptors
-  *(required, string)* Supplies binary protobuf descriptor set for the gRPC services.
-  The descriptor set have to include all types that are used in the services. Make sure to use
-  ``--include_import`` option for ``protoc``.
+  *(required, string)* Supplies the binary protobuf descriptor set for the gRPC services.
+  The descriptor set has to include all of the types that are used in the services. Make sure 
+  to use the ``--include_import`` option for ``protoc``.
 
-  To generate protobuf descriptor set for the gRPC service, you'll also need to clone the
+  To generate a protobuf descriptor set for the gRPC service, you'll also need to clone the
   googleapis repository from Github before running protoc, as you'll need annotations.proto
   in your include path.
 
