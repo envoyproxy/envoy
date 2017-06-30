@@ -278,3 +278,30 @@ def envoy_proto_library(name, srcs = [], deps = []):
         deps = [internal_name],
         linkstatic = 1,
     )
+
+# Envoy proto descriptor targets should be specified with this function.
+# This is used for testing only.
+def envoy_proto_descriptor(name, out, srcs = [], protocopts = [], external_deps = []):
+    input_files = ["$(location " + src + ")" for src in srcs]
+    include_paths = [".", PACKAGE_NAME]
+
+    if "http_api_protos" in external_deps:
+        srcs.append("@googleapis//:http_api_protos_src")
+        include_paths.append("external/googleapis")
+
+    if "well_known_protos" in external_deps:
+        srcs.append("@protobuf_bzl//:well_known_protos")
+        include_paths.append("external/protobuf_bzl/src")
+
+    options = protocopts[:]
+    options.extend(["-I" + include_path for include_path in include_paths])
+    options.append("--descriptor_set_out=$@")
+
+    cmd = "$(location //external:protoc) " + " ".join(options + input_files)
+    native.genrule(
+        name = name,
+        srcs = srcs,
+        outs = [out],
+        cmd = cmd,
+        tools = ["//external:protoc"],
+    )

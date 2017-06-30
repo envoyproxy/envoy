@@ -27,10 +27,10 @@ The filter config for the filter need the descriptor file, and the services you 
 
 proto_descriptors
   *(required, string)* Supplies binary protobuf descriptor set for the gRPC services.
-  The descriptor set have to include all types that are used in the services. Make sure use
+  The descriptor set have to include all types that are used in the services. Make sure to use
   ``--include_import`` option for ``protoc``.
 
-  To generate protobuf descriptor set for the gRPC service, You'll also need to clone the
+  To generate protobuf descriptor set for the gRPC service, you'll also need to clone the
   googleapis repository from Github before running protoc, as you'll need annotations.proto
   in your include path.
 
