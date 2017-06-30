@@ -461,6 +461,37 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
+  // If this is a websocket upgrade request, check if the corresponding route supports Websockets.
+  if (!cached_route_.valid()) {
+    cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
+  }
+
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
+  bool isWsConnection = (request_headers_->Connection() && request_headers_->Upgrade() &&
+                         (0 == StringUtil::caseInsensitiveCompare(
+                                   request_headers_->Connection()->value().c_str(),
+                                   Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
+                         (0 == StringUtil::caseInsensitiveCompare(
+                                   request_headers_->Upgrade()->value().c_str(),
+                                   Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+
+  if (isWsConnection && isWsRoute) {
+    // TODO: Create WsHandlerImpl
+    ASSERT(false);
+  } else if (isWsConnection || isWsRoute) {
+    if (isWsConnection) {
+      // Do not allow WebSocket upgrades if the route does not support it.
+      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+    } else {
+      // Do not allow normal connections on WebSocket routes.
+      connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
+    }
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+    encodeHeaders(nullptr, headers, true);
+    return;
+  }
+
   ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
@@ -481,39 +512,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
-
-  // HELP: Somehow, the call to route is setting  stopped_ = false, which is causing
-  // the assertion in commonContinue to fail [ ASSERT(stopped_); ]
-  if (!cached_route_.valid()) {
-    cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
-  }
-
-  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-  bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
-  bool isWsConnection = (request_headers_->Connection() && request_headers_->Upgrade() &&
-                         (0 == StringUtil::caseInsensitiveCompare(
-                                   request_headers_->Connection()->value().c_str(),
-                                   Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
-                         (0 == StringUtil::caseInsensitiveCompare(
-                                   request_headers_->Upgrade()->value().c_str(),
-                                   Http::Headers::get().UpgradeValues.WebSocket.c_str())));
-
-  if (isWsConnection && isWsRoute) {
-    // TODO: Create WsHandlerImpl
-    ASSERT(false);
-  } else if (isWsConnection || isWsRoute) {
-    if (isWsConnection) {
-      // Allow WebSocket upgrades only if the corresponding route supports it
-      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-    } else {
-      // Do not allow normal connections on WebSocket routes
-      connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
-    }
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
-  }
-
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
