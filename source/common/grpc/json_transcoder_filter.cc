@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -119,7 +120,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
         pmb.Register(http_rule.custom().kind(), http_rule.custom().path(), http_rule.body(),
                      method);
         break;
-      default:
+      default: // ::google::api::HttpRule::PATTEN_NOT_SET
         break;
       }
     }
@@ -243,9 +244,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (error_) {
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
+  ASSERT(!error_);
 
   if (!transcoder_) {
     return Http::FilterDataStatus::Continue;
@@ -273,6 +272,8 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 }
 
 Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::HeaderMap&) {
+  ASSERT(!error_);
+
   if (!transcoder_) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -295,11 +296,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (error_) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (!transcoder_) {
+  if (error_ || !transcoder_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -312,11 +309,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (error_) {
-    return Http::FilterDataStatus::Continue;
-  }
-
-  if (!transcoder_) {
+  if (error_ || !transcoder_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -337,7 +330,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
 }
 
 Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap& trailers) {
-  if (!transcoder_) {
+  if (error_ || !transcoder_) {
     return Http::FilterTrailersStatus::Continue;
   }
 
