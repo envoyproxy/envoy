@@ -69,6 +69,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "json_transcoder_filter_test",
+    srcs = ["json_transcoder_filter_test.cc"],
+    data = [
+        "//test/proto:bookstore.proto",
+        "//test/proto:bookstore_proto_descriptor",
+        "//test/proto:bookstore_proto_descriptor_bad",
+    ],
+    deps = [
+        "//source/common/grpc:json_transcoder_filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/proto:bookstore_proto",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "rpc_channel_impl_test",
     srcs = ["rpc_channel_impl_test.cc"],
     deps = [
