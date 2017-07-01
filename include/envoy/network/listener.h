@@ -57,7 +57,7 @@ public:
  */
 class Listener {
 public:
-  virtual ~Listener(){};
+  virtual ~Listener() {}
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

@@ -7,21 +7,21 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/api/api_impl.h"
 #include "common/common/thread.h"
+
+#include "server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 WorkerPtr ProdWorkerFactory::createWorker() {
-  return WorkerPtr{new WorkerImpl(tls_, options_.fileFlushIntervalMsec())};
+  return WorkerPtr{new WorkerImpl(tls_, api_.allocateDispatcher())};
 }
 
-WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls,
-                       std::chrono::milliseconds file_flush_interval_msec)
-    : tls_(tls), handler_(new ConnectionHandlerImpl(
-                     log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
-  tls_.registerThread(handler_->dispatcher(), false);
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispatcher)
+    : tls_(tls), dispatcher_(std::move(dispatcher)),
+      handler_(new ConnectionHandlerImpl(log(), *dispatcher_)) {
+  tls_.registerThread(*dispatcher_, false);
 }
 
 void WorkerImpl::addListener(Listener& listener) {
@@ -32,10 +32,11 @@ void WorkerImpl::addListener(Listener& listener) {
                                                          listener.perConnectionBufferLimitBytes()};
   if (listener.sslContext()) {
     handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
-                             listener.socket(), listener.listenerScope(), listener_options);
+                             listener.socket(), listener.listenerScope(), listener.listenerTag(),
+                             listener_options);
   } else {
     handler_->addListener(listener.filterChainFactory(), listener.socket(),
-                          listener.listenerScope(), listener_options);
+                          listener.listenerScope(), listener.listenerTag(), listener_options);
   }
 }
 
@@ -55,20 +56,20 @@ void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
   // is happening, so we might not yet have a thread.
   if (thread_) {
-    handler_->dispatcher().exit();
+    dispatcher_->exit();
     thread_->join();
   }
 }
 
 void WorkerImpl::stopListeners() {
-  handler_->dispatcher().post([this]() -> void { handler_->closeListeners(); });
+  dispatcher_->post([this]() -> void { handler_->stopListeners(); });
 }
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(info, "worker entering dispatch loop");
   auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
-  watchdog->startWatchdog(handler_->dispatcher());
-  handler_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  watchdog->startWatchdog(*dispatcher_);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "worker exited dispatch loop");
   guard_dog.stopWatching(watchdog);
 
@@ -76,10 +77,9 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   // destructors from running on the main thread which might reference thread locals. Destroying
   // the handler does this as well as destroying the dispatcher which purges the delayed deletion
   // list.
-  handler_->closeConnections();
+  handler_.reset();
   tls_.shutdownThread();
   watchdog.reset();
-  handler_.reset();
 }
 
 } // Server

@@ -38,19 +38,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "connection_handler_lib",
-    srcs = ["connection_handler.cc"],
-    hdrs = ["connection_handler.h"],
-    deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/network:connection_handler_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "dispatcher_lib",
     srcs = ["dispatcher.cc"],
     hdrs = ["dispatcher.h"],
@@ -78,7 +65,6 @@ envoy_cc_library(
     deps = [
         ":api_lib",
         ":cluster_manager_lib",
-        ":connection_handler_lib",
         ":dns_lib",
         "//include/envoy/common:optional",
         "//include/envoy/server:drain_manager_interface",

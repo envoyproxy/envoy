@@ -95,7 +95,8 @@ ListenerImpl::ListenerImpl(Instance& server, ListenerComponentFactory& factory,
       use_proxy_proto_(json.getBoolean("use_proxy_proto", false)),
       use_original_dst_(json.getBoolean("use_original_dst", false)),
       per_connection_buffer_limit_bytes_(
-          json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)) {
+          json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
+      listener_tag_(factory.nextListenerTag()) {
 
   // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
   // later.

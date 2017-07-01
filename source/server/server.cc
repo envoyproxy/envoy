@@ -23,6 +23,7 @@
 #include "common/stats/statsd.h"
 
 #include "server/configuration_impl.h"
+#include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
@@ -38,10 +39,10 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
-      listener_component_factory_(*this), worker_factory_(thread_local_, options_),
-      dns_resolver_(handler_.dispatcher().createDnsResolver({})), local_info_(local_info),
-      access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
+      api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
+      handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
+      worker_factory_(thread_local_, *api_), dns_resolver_(dispatcher_->createDnsResolver({})),
+      local_info_(local_info), access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
   failHealthcheck(false);
 
@@ -51,7 +52,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   }
   server_stats_.version_.set(version_int);
 
-  restarter_.initialize(handler_.dispatcher(), *this);
+  restarter_.initialize(*dispatcher_, *this);
   drain_manager_ = component_factory.createDrainManager(*this);
 
   try {
@@ -140,8 +141,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
                              initial_config.admin().address(), *this));
 
   admin_scope_ = stats_store_.createScope("listener.admin.");
-  handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
-                       Network::ListenerOptions::listenerOptionsWithBindToPort());
+  handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_, 0,
+                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -151,10 +152,10 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(handler_.dispatcher(), true);
+  thread_local_.registerThread(*dispatcher_, true);
 
   // We can now initialize stats for threading.
-  stats_store_.initializeThreading(handler_.dispatcher(), thread_local_);
+  stats_store_.initializeThreading(*dispatcher_, thread_local_);
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
@@ -174,18 +175,18 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   main_config->initialize(*config_json, *this, *cluster_manager_factory_);
 
   // Setup signals.
-  sigterm_ = handler_.dispatcher().listenForSignal(SIGTERM, [this]() -> void {
+  sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
     ENVOY_LOG(warn, "caught SIGTERM");
     restarter_.terminateParent();
-    handler_.dispatcher().exit();
+    dispatcher_->exit();
   });
 
-  sig_usr_1_ = handler_.dispatcher().listenForSignal(SIGUSR1, [this]() -> void {
+  sig_usr_1_ = dispatcher_->listenForSignal(SIGUSR1, [this]() -> void {
     ENVOY_LOG(warn, "caught SIGUSR1");
     access_log_manager_.reopen();
   });
 
-  sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, []() -> void {
+  sig_hup_ = dispatcher_->listenForSignal(SIGHUP, []() -> void {
     ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
@@ -193,7 +194,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
-  stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
+  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 
   // GuardDog (deadlock detection) object and thread setup before workers are
@@ -282,7 +283,7 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
   }
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
-  if (handler_.api().fileExists(flags_path.value() + "/drain")) {
+  if (api_->fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(warn, "starting server in drain mode");
     failHealthcheck(true);
   }
@@ -294,8 +295,8 @@ void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(warn, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
-  watchdog->startWatchdog(handler_.dispatcher());
-  handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
+  watchdog->startWatchdog(*dispatcher_);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(warn, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
@@ -312,7 +313,7 @@ void InstanceImpl::run() {
   }
 
   config_->clusterManager().shutdown();
-  handler_.closeConnections();
+  handler_.reset();
   thread_local_.shutdownThread();
   ENVOY_LOG(warn, "exiting");
   log().flush();
@@ -328,7 +329,7 @@ void InstanceImpl::shutdown() {
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
   stat_flush_timer_.reset();
-  handler_.closeListeners();
+  handler_->stopListeners();
   admin_->mutable_socket().close();
 
   ENVOY_LOG(warn, "terminating parent process");

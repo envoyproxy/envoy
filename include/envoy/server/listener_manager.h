@@ -35,6 +35,11 @@ public:
   virtual std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
                           Configuration::FactoryContext& context) PURE;
+
+  /**
+   * @return uint64_t a listener tag usable for connection handler tracking.
+   */
+  virtual uint64_t nextListenerTag() PURE;
 };
 
 /**
@@ -96,6 +101,11 @@ public:
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
    */
   virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return uint64_t the tag the listener should use for connection handler tracking.
+   */
+  virtual uint64_t listenerTag() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

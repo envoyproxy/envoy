@@ -17,7 +17,6 @@
 
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
-#include "server/config_validation/connection_handler.h"
 #include "server/config_validation/dns.h"
 #include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
@@ -56,10 +55,10 @@ public:
 
   // Server::Instance
   Admin& admin() override { NOT_IMPLEMENTED; }
-  Api::Api& api() override { return handler_.api(); }
+  Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return config_->clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
-  Event::Dispatcher& dispatcher() override { return handler_.dispatcher(); }
+  Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   bool draining() override { NOT_IMPLEMENTED; }
   void drainListeners() override { NOT_IMPLEMENTED; }
@@ -99,6 +98,7 @@ public:
     // validation mock.
     return nullptr;
   }
+  uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
   WorkerPtr createWorker() override {
@@ -113,7 +113,8 @@ private:
   Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
-  ValidationConnectionHandler handler_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
