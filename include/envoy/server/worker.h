@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Interface for a threaded connection handling worker.
+ * Interface for a threaded connection handling worker. All routines are thread safe.
  */
 class Worker {
 public:
@@ -33,6 +33,20 @@ public:
    * Stop the worker thread.
    */
   virtual void stop() PURE;
+
+  /**
+   * Remove a listener from the worker.
+   * @param listener supplies the listener to remove.
+   * @param completion supplies the completion to be called when the listener has been removed.
+   *        This completion is called on the worker thread. No locking is performed by the worker.
+   */
+  virtual void removeListener(Listener& listener, std::function<void()> completion) PURE;
+
+  /**
+   * Stop a listener from accepting new connections. This is used for server draining.
+   * @param listener supplies the listener to stop.
+   */
+  virtual void stopListener(Listener& listener) PURE;
 
   /**
    * Stop all listeners from accepting new connections. This is used for server draining.
