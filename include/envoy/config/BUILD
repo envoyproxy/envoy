@@ -12,4 +12,5 @@ envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     external_deps = ["protobuf"],
+    deps = ["//include/envoy/stats:stats_macros"],
 )

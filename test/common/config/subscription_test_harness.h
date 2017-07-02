@@ -1,6 +1,9 @@
 #pragma once
 
+#include "test/mocks/stats/mocks.h"
+
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
@@ -12,6 +15,7 @@ namespace Config {
  */
 class SubscriptionTestHarness {
 public:
+  SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {}
   virtual ~SubscriptionTestHarness() {}
 
   /**
@@ -42,6 +46,16 @@ public:
    */
   virtual void deliverConfigUpdate(const std::vector<std::string> cluster_names,
                                    const std::string& version, bool accept) PURE;
+
+  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure) {
+    EXPECT_EQ(attempt, stats_.update_attempt_.value());
+    EXPECT_EQ(success, stats_.update_success_.value());
+    EXPECT_EQ(rejected, stats_.update_rejected_.value());
+    EXPECT_EQ(failure, stats_.update_failure_.value());
+  }
+
+  Stats::MockIsolatedStatsStore stats_store_;
+  SubscriptionStats stats_;
 };
 
 ACTION_P(ThrowOnRejectedConfig, accept) {

@@ -6,6 +6,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -29,7 +30,7 @@ public:
   std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config) {
     return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
-        config, node_, dispatcher_, cm_, random_,
+        config, node_, dispatcher_, cm_, random_, stats_store_,
         [this]() -> Subscription<envoy::api::v2::ClusterLoadAssignment>* {
           return legacy_subscription_.release();
         },
@@ -44,6 +45,7 @@ public:
   MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<MockSubscription<envoy::api::v2::ClusterLoadAssignment>> legacy_subscription_;
   Http::MockAsyncClientRequest http_request_;
+  Stats::MockIsolatedStatsStore stats_store_;
 };
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
