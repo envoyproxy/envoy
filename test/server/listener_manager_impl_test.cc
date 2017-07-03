@@ -47,6 +47,7 @@ TEST_F(ListenerManagerImplTest, EmptyFilter) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, true));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
   EXPECT_EQ(1U, manager_.listeners().size());
 }
@@ -62,6 +63,7 @@ TEST_F(ListenerManagerImplTest, DefaultListenerPerConnectionBufferLimit) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, true));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
   EXPECT_EQ(1024 * 1024U, manager_.listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -78,6 +80,7 @@ TEST_F(ListenerManagerImplTest, SetListenerPerConnectionBufferLimit) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, true));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
   EXPECT_EQ(8192U, manager_.listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -101,6 +104,7 @@ TEST_F(ListenerManagerImplTest, SslContext) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, true));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
   EXPECT_NE(nullptr, manager_.listeners().back().get().sslContext());
 }
@@ -151,6 +155,7 @@ TEST_F(ListenerManagerImplTest, BadFilterName) {
   )EOF";
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   EXPECT_THROW_WITH_MESSAGE(manager_.addListener(*loader), EnvoyException,
                             "unable to create filter factory for 'invalid'/'write'");
 }
@@ -170,6 +175,7 @@ TEST_F(ListenerManagerImplTest, BadFilterType) {
   )EOF";
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   EXPECT_THROW_WITH_MESSAGE(manager_.addListener(*loader), EnvoyException,
                             "unable to create filter factory for 'echo'/'write'");
 }
@@ -209,6 +215,7 @@ TEST_F(ListenerManagerImplTest, StatsScopeTest) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, false));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
   manager_.listeners().front().get().listenerScope().counter("foo").inc();
 
@@ -255,6 +262,7 @@ TEST_F(ListenerManagerImplTest, DeprecatedFilterConfigFactoryRegistrationTest) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _));
   EXPECT_CALL(listener_factory_, createListenSocket_(_, true));
+  EXPECT_CALL(listener_factory_, nextListenerTag());
   manager_.addListener(*loader);
 }
 

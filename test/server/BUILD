@@ -108,3 +108,15 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "worker_impl_test",
+    srcs = ["worker_impl_test.cc"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/server:worker_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)

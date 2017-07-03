@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 
 #include "envoy/api/api.h"
@@ -16,7 +15,7 @@
 namespace Envoy {
 namespace Server {
 
-class ProdWorkerFactory : public WorkerFactory {
+class ProdWorkerFactory : public WorkerFactory, Logger::Loggable<Logger::Id::main> {
 public:
   ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api) : tls_(tls), api_(api) {}
 
@@ -33,16 +32,20 @@ private:
  */
 class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
-  WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispatcher);
+  WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispatcher,
+             Network::ConnectionHandlerPtr handler);
 
   // Server::Worker
   void addListener(Listener& listener) override;
   uint64_t numConnections() override;
+  void removeListener(Listener& listener, std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
   void stop() override;
+  void stopListener(Listener& listener) override;
   void stopListeners() override;
 
 private:
+  void addListenerWorker(Listener& listener);
   void threadRoutine(GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;
