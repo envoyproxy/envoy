@@ -51,6 +51,7 @@ private:
   void refresh() {
     ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
     stats_.update_attempt_.inc();
+    bool config_update_available = false;
     try {
       const std::string json = Filesystem::fileReadToEnd(path_);
       envoy::api::v2::DiscoveryResponse message;
@@ -62,18 +63,18 @@ private:
         return;
       }
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
-      try {
-        callbacks_->onConfigUpdate(typed_resources);
-        stats_.update_success_.inc();
-        // TODO(htuch): Add some notion of current version for every API in stats/admin.
-      } catch (const EnvoyException& e) {
+      config_update_available = true;
+      callbacks_->onConfigUpdate(typed_resources);
+      stats_.update_success_.inc();
+      // TODO(htuch): Add some notion of current version for every API in stats/admin.
+    } catch (const EnvoyException& e) {
+      if (config_update_available) {
         ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
         stats_.update_rejected_.inc();
-        callbacks_->onConfigUpdateFailed(&e);
+      } else {
+        ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
+        stats_.update_failure_.inc();
       }
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
-      stats_.update_failure_.inc();
       callbacks_->onConfigUpdateFailed(&e);
     }
   }
