@@ -47,11 +47,13 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      const bool canary =
+          Config::Utility::metadataValue(lb_endpoint.metadata(), "envoy.lb", "canary").bool_value();
       new_hosts.emplace_back(new HostImpl(
           info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
                          lb_endpoint.endpoint().address().socket_address().ip_address(),
                          lb_endpoint.endpoint().address().socket_address().port().value())},
-          lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
+          canary, lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

@@ -54,9 +54,8 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     auto* address = lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
     address->set_ip_address(host->getString("ip_address"));
     address->mutable_port()->set_value(host->getInteger("port"));
-    // TODO(htuch): This will eventually be generalized metadata/labels, see
-    // https://github.com/lyft/envoy-api/issues/81.
-    lb_endpoint->mutable_canary()->set_value(canary);
+    Config::Utility::mutableMetadataValue(*lb_endpoint->mutable_metadata(), "envoy.lb", "canary")
+        .set_bool_value(canary);
     lb_endpoint->mutable_load_balancing_weight()->set_value(weight);
   }
 
