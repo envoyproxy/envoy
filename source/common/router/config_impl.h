@@ -406,7 +406,7 @@ private:
 class ConfigImpl : public Config {
 public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-             bool validate_clusters);
+             bool validate_clusters_default);
 
   const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
     return request_headers_to_add_;

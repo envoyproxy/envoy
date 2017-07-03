@@ -58,11 +58,15 @@ stat_prefix
   connection manager. See the :ref:`statistics <config_http_conn_man_stats>` documentation
   for more information.
 
+.. _config_http_conn_man_rds_option:
+
 :ref:`rds <config_http_conn_man_rds>`
   *(sometimes required, object)* The connection manager configuration must specify one of *rds* or
   *route_config*. If *rds* is specified, the connection manager's route table will be dynamically
   loaded via the RDS API. See the :ref:`documentation <config_http_conn_man_rds>` for more
   information.
+
+.. _config_http_conn_man_route_config:
 
 :ref:`route_config <config_http_conn_man_route_table>`
   *(sometimes required, object)* The connection manager configuration must specify one of *rds* or
@@ -115,7 +119,7 @@ http2_settings
     0 effectively disables header compression.
 
   max_concurrent_streams
-    *(optional, integer)* `Maximum concurrent streams 
+    *(optional, integer)* `Maximum concurrent streams
     <http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
     allowed for peer on one HTTP/2 connection.
     Valid values range from 1 to 2147483647 (2^31 - 1) and defaults to 2147483647.
@@ -123,7 +127,7 @@ http2_settings
 .. _config_http_conn_man_http2_settings_initial_stream_window_size:
 
   initial_stream_window_size
-    *(optional, integer)* `Initial stream-level flow-control window 
+    *(optional, integer)* `Initial stream-level flow-control window
     <http://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
     (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
     (256 * 1024 * 1024).
@@ -132,9 +136,9 @@ http2_settings
     size now, so it's also the minimum.
 
   initial_connection_window_size
-    *(optional, integer)* Similar to :ref:`initial_stream_window_size 
+    *(optional, integer)* Similar to :ref:`initial_stream_window_size
     <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control
-    window. Currently , this has the same minimum/maximum/default as :ref:`initial_stream_window_size 
+    window. Currently , this has the same minimum/maximum/default as :ref:`initial_stream_window_size
     <config_http_conn_man_http2_settings_initial_stream_window_size>`.
 
   These are the same options available in the upstream cluster :ref:`http2_settings
