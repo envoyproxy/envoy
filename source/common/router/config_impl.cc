@@ -606,8 +606,10 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm, bool validate_clusters) {
-  route_matcher_.reset(new RouteMatcher(config, *this, runtime, cm, validate_clusters));
+                       Upstream::ClusterManager& cm, bool validate_clusters_default) {
+  route_matcher_.reset(
+      new RouteMatcher(config, *this, runtime, cm,
+                       config.getBoolean("validate_clusters", validate_clusters_default)));
 
   if (config.hasObject("internal_only_headers")) {
     for (const std::string& header : config.getStringArray("internal_only_headers")) {
