@@ -107,7 +107,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                    Ssl::ContextManager& ssl_context_manager,
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                    Event::Dispatcher& dispatcher,
-                                   const Optional<SdsConfig>& sds_config,
+                                   const Optional<envoy::api::v2::ConfigSource>& eds_config,
                                    const LocalInfo::LocalInfo& local_info,
                                    Outlier::EventLoggerSharedPtr outlier_event_logger) {
 
@@ -143,13 +143,13 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                             selected_dns_resolver, tls, dispatcher));
   } else {
     ASSERT(string_type == "sds");
-    if (!sds_config.valid()) {
+    if (!eds_config.valid()) {
       throw EnvoyException("cannot create an sds cluster without an sds config");
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
     new_cluster.reset(new EdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                         sds_config.value(), local_info, cm, dispatcher, random));
+                                         eds_config.value(), local_info, cm, dispatcher, random));
   }
 
   if (cluster.hasObject("health_check")) {
