@@ -47,7 +47,8 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string> cluster_names,
                                    const std::string& version, bool accept) PURE;
 
-  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure) {
+  virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected,
+                           uint32_t failure) {
     EXPECT_EQ(attempt, stats_.update_attempt_.value());
     EXPECT_EQ(success, stats_.update_success_.value());
     EXPECT_EQ(rejected, stats_.update_rejected_.value());

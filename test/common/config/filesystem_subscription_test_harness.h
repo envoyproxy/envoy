@@ -32,6 +32,8 @@ public:
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
+    std::ifstream config_file(path_);
+    file_at_start_ = config_file.good();
     subscription_.start(cluster_names, callbacks_);
   }
 
@@ -81,10 +83,18 @@ public:
     updateFile(file_json);
   }
 
+  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected,
+                   uint32_t failure) override {
+    // The first attempt always fail unless there was a file there to begin with.
+    SubscriptionTestHarness::verifyStats(attempt, success, rejected,
+                                         failure + (file_at_start_ ? 0 : 1));
+  }
+
   const std::string path_;
   Event::DispatcherImpl dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;
+  bool file_at_start_{false};
 };
 
 } // namespace Config

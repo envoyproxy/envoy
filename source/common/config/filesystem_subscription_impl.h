@@ -36,10 +36,10 @@ public:
     callbacks_ = &callbacks;
     watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
       UNREFERENCED_PARAMETER(events);
-      refresh(false);
+      refresh();
     });
-    // Attempt to read, gracefully fail if the file isn't there yet.
-    refresh(true);
+    // Attempt to read in case there is a file there already.
+    refresh();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
@@ -48,7 +48,7 @@ public:
   }
 
 private:
-  void refresh(bool ignore_read_failure) {
+  void refresh() {
     ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
     stats_.update_attempt_.inc();
     try {
@@ -72,11 +72,9 @@ private:
         callbacks_->onConfigUpdateFailed(&e);
       }
     } catch (const EnvoyException& e) {
-      if (!ignore_read_failure) {
-        ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
-        stats_.update_failure_.inc();
-        callbacks_->onConfigUpdateFailed(&e);
-      }
+      ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
+      stats_.update_failure_.inc();
+      callbacks_->onConfigUpdateFailed(&e);
     }
   }
 
