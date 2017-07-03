@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -58,6 +59,7 @@ TEST_F(WorkerImplTest, All) {
   worker_.stopListener(listener2);
 
   ReadyWatcher ready;
+  ConditionalInitializer removed;
   EXPECT_CALL(*handler_, removeListeners(2))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
@@ -66,8 +68,12 @@ TEST_F(WorkerImplTest, All) {
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  worker_.removeListener(listener2, [&ready]() -> void { ready.ready(); });
+  worker_.removeListener(listener2, [&ready, &removed]() -> void {
+    ready.ready();
+    removed.setReady();
+  });
 
+  removed.waitReady();
   worker_.stop();
 }
 
