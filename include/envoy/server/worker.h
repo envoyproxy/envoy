@@ -45,11 +45,15 @@ public:
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
    * @param listener supplies the listener to stop.
+   * TODO(mattklein123): We might consider adding a completion here in the future to tell us when
+   * all connections are gone. This would allow us to remove the listener more quickly depending on
+   * drain speed.
    */
   virtual void stopListener(Listener& listener) PURE;
 
   /**
    * Stop all listeners from accepting new connections. This is used for server draining.
+   * TODO(mattklein123): Same comment about the addition of a completion as stopListener().
    */
   virtual void stopListeners() PURE;
 };

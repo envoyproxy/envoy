@@ -26,7 +26,12 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, Event::DispatcherPtr&& dispat
 }
 
 void WorkerImpl::addListener(Listener& listener) {
-  // If the worker thread is already started, post to it. Otherwise do it inline.
+  // If the worker thread is already started, post to it. Otherwise do it inline. The reason we do
+  // this is that there is a race condition where 2 processes can successfully bind to an address,
+  // but then fail to listen() with EADDRINUSE. During initial startup, we want to surface this on
+  // the main thread so that we can exit quickly.
+  // TODO(mattklein123): 1) Try to better figure out how this happens. 2) Need to potentially deal
+  // with this case in the runtime addListener() case.
   if (thread_) {
     dispatcher_->post([this, &listener]() -> void { addListenerWorker(listener); });
   } else {
@@ -60,7 +65,7 @@ uint64_t WorkerImpl::numConnections() {
 
 void WorkerImpl::removeListener(Listener& listener, std::function<void()> completion) {
   ASSERT(thread_);
-  uint64_t listener_tag = listener.listenerTag();
+  const uint64_t listener_tag = listener.listenerTag();
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->removeListeners(listener_tag);
     completion();
@@ -83,7 +88,7 @@ void WorkerImpl::stop() {
 
 void WorkerImpl::stopListener(Listener& listener) {
   ASSERT(thread_);
-  uint64_t listener_tag = listener.listenerTag();
+  const uint64_t listener_tag = listener.listenerTag();
   dispatcher_->post([this, listener_tag]() -> void { handler_->stopListeners(listener_tag); });
 }
 

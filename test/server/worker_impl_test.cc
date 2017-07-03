@@ -75,6 +75,25 @@ TEST_F(WorkerImplTest, All) {
       }));
   worker_.removeListener(listener2, [&ready]() -> void { ready.ready(); });
 
+  // Now test adding and removing a listener without stopping it first.
+  NiceMock<MockListener> listener3;
+  ON_CALL(listener3, listenerTag()).WillByDefault(Return(3));
+  EXPECT_CALL(*handler_, addListener(_, _, _, 3, _))
+      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
+  worker_.addListener(listener3);
+
+  EXPECT_CALL(*handler_, removeListeners(3))
+      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
+  EXPECT_CALL(ready, ready())
+      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
+  worker_.removeListener(listener3, [&ready]() -> void { ready.ready(); });
+
   worker_.stop();
 }
 
