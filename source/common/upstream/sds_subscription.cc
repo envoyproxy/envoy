@@ -6,21 +6,31 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 #include "api/eds.pb.h"
+#include "google/protobuf/util/time_util.h"
 
 namespace Envoy {
 namespace Upstream {
 
-SdsSubscription::SdsSubscription(ClusterStats& stats, const SdsConfig& sds_config,
-                                 ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                 Runtime::RandomGenerator& random)
-    : RestApiFetcher(cm, sds_config.sds_cluster_name_, dispatcher, random,
-                     sds_config.refresh_delay_),
-      stats_(stats) {}
+SdsSubscription::SdsSubscription(ClusterStats& stats,
+                                 const envoy::api::v2::ConfigSource& eds_config, ClusterManager& cm,
+                                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
+    : RestApiFetcher(cm, eds_config.api_config_source().cluster_name()[0], dispatcher, random,
+                     Config::Utility::apiConfigSourceRefreshDelay(eds_config.api_config_source())),
+      stats_(stats) {
+  const auto& api_config_source = eds_config.api_config_source();
+  UNREFERENCED_PARAMETER(api_config_source);
+  // If we are building an SdsSubscription, the ConfigSource should be REST_LEGACY.
+  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  // TODO(htuch): Add support for multiple clusters, #1170.
+  ASSERT(api_config_source.cluster_name().size() == 1);
+  ASSERT(api_config_source.has_refresh_delay());
+}
 
 void SdsSubscription::parseResponse(const Http::Message& response) {
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response.bodyAsString());

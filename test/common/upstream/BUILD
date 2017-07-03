@@ -26,6 +26,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     deps = [
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_lib",
@@ -47,6 +48,7 @@ envoy_cc_test(
     srcs = ["eds_test.cc"],
     external_deps = ["envoy_eds"],
     deps = [
+        "//source/common/config:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/upstream:eds_lib",
         "//test/mocks/local_info:local_info_mocks",
@@ -176,7 +178,9 @@ envoy_cc_test(
     name = "sds_test",
     srcs = ["sds_test.cc"],
     data = glob(["test_data/**"]),
+    external_deps = ["envoy_base"],
     deps = [
+        "//source/common/config:utility_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",

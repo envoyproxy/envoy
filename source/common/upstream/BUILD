@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -162,12 +163,17 @@ envoy_cc_library(
     name = "eds_lib",
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
-    external_deps = ["envoy_eds"],
+    external_deps = [
+        "envoy_base",
+        "envoy_eds",
+    ],
     deps = [
         ":sds_subscription_lib",
         ":upstream_includes",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
     ],
@@ -177,10 +183,14 @@ envoy_cc_library(
     name = "sds_subscription_lib",
     srcs = ["sds_subscription.cc"],
     hdrs = ["sds_subscription.h"],
-    external_deps = ["envoy_eds"],
+    external_deps = [
+        "envoy_base",
+        "envoy_eds",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
@@ -191,6 +201,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
+    external_deps = ["envoy_base"],
     deps = [
         ":eds_lib",
         ":health_checker_lib",
@@ -216,6 +227,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_includes",
     hdrs = ["upstream_impl.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":outlier_detection_lib",
         ":resource_manager_lib",

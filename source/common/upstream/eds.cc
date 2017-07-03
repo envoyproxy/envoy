@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/config/subscription_factory.h"
+#include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"
@@ -11,15 +13,22 @@ namespace Upstream {
 
 EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                               const SdsConfig& sds_config, const LocalInfo::LocalInfo& local_info,
-                               ClusterManager& cm, Event::Dispatcher& dispatcher,
-                               Runtime::RandomGenerator& random)
+                               const envoy::api::v2::ConfigSource& eds_config,
+                               const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
+                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager), local_info_(local_info),
       cluster_name_(config.getString("service_name")) {
-  // TODO(htuch): This is where the v2 Subscription implementations will be constructed based on
-  // config. Today, we just reuse the v1 SDS config and an adapter Subscription to the v1 REST JSON
-  // API.
-  subscription_.reset(new SdsSubscription(info_->stats(), sds_config, cm, dispatcher, random));
+  envoy::api::v2::Node node;
+  Config::Utility::localInfoToNode(local_info, node);
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
+      envoy::api::v2::ClusterLoadAssignment>(
+      eds_config, node, dispatcher, cm, random,
+      [this, &eds_config, &cm, &dispatcher, &random]()
+          -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
+            return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
+          },
+      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }
 
 void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }

@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
 
+#include "api/base.pb.h"
 #include "api/eds.pb.h"
 
 namespace Envoy {
@@ -21,8 +22,9 @@ class SdsSubscription : public Http::RestApiFetcher,
                         public Config::Subscription<envoy::api::v2::ClusterLoadAssignment>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
-  SdsSubscription(ClusterStats& stats, const SdsConfig& sds_config, ClusterManager& cm,
-                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random);
+  SdsSubscription(ClusterStats& stats, const envoy::api::v2::ConfigSource& eds_config,
+                  ClusterManager& cm, Event::Dispatcher& dispatcher,
+                  Runtime::RandomGenerator& random);
 
 private:
   // Config::Subscription

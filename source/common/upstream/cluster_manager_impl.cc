@@ -13,6 +13,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
@@ -577,8 +578,12 @@ ClusterPtr
 ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                                            const Optional<SdsConfig>& sds_config,
                                            Outlier::EventLoggerSharedPtr outlier_event_logger) {
+  Optional<envoy::api::v2::ConfigSource> eds_config((envoy::api::v2::ConfigSource()));
+  if (sds_config.valid()) {
+    Config::Utility::sdsConfigToEdsConfig(sds_config.value(), eds_config.value());
+  }
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, primary_dispatcher_, sds_config, local_info_,
+                                 runtime_, random_, primary_dispatcher_, eds_config, local_info_,
                                  outlier_event_logger);
 }
 

@@ -3,6 +3,7 @@
 
 #include "envoy/upstream/upstream.h"
 
+#include "common/config/utility.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
@@ -43,9 +44,11 @@ public:
         .WillByDefault(Invoke([&](const Json::Object& cluster, ClusterManager& cm,
                                   const Optional<SdsConfig>& sds_config,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger) -> Cluster* {
+          UNREFERENCED_PARAMETER(sds_config);
+          Optional<envoy::api::v2::ConfigSource> eds_config;
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         sds_config, local_info_, outlier_event_logger).release();
+                                         eds_config, local_info_, outlier_event_logger).release();
         }));
   }
 
