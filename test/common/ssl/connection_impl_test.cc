@@ -34,6 +34,7 @@ namespace {
 
 void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_json,
               const std::string& expected_digest, const std::string& expected_uri,
+              const std::string& expected_stats, bool expect_success,
               const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
@@ -66,19 +67,33 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-        if (!expected_digest.empty()) {
-          EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
-        }
-        EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
-        server_connection->close(Network::ConnectionCloseType::NoFlush);
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher.exit();
-      }));
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  if (expect_success) {
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](uint32_t) -> void {
+          if (!expected_digest.empty()) {
+            EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
+          }
+          if (!expected_uri.empty()) {
+            EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
+          }
+          server_connection->close(Network::ConnectionCloseType::NoFlush);
+          client_connection->close(Network::ConnectionCloseType::NoFlush);
+          dispatcher.exit();
+        }));
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  } else {
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](uint32_t) -> void {
+          client_connection->close(Network::ConnectionCloseType::NoFlush);
+          dispatcher.exit();
+        }));
+  }
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  if (!expected_stats.empty()) {
+    EXPECT_EQ(1UL, stats_store.counter(expected_stats).value());
+  }
 }
 
 } // namespace
@@ -106,7 +121,8 @@ TEST_P(SslConnectionImplTest, GetCertDigest) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", GetParam());
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "ssl.handshake",
+           true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
@@ -126,7 +142,8 @@ TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "ssl.handshake",
+           true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
@@ -146,7 +163,7 @@ TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
   )EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
-  testUtil(client_ctx_json, server_ctx_json, "", "", GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, NoCert) {
@@ -164,12 +181,75 @@ TEST_P(SslConnectionImplTest, NoCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.no_certificate", true, GetParam());
 }
 
-TEST_P(SslConnectionImplTest, ClientAuthBadVerification) {
-  Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
+TEST_P(SslConnectionImplTest, FailedClientAuthNoClientCert) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "",
+    "private_key_file": ""
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_subject_alt_name": [ "example.com" ]
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, FailedClientAuthCaVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_error", false, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, FailedClientAuthSanVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_subject_alt_name": [ "example.com" ]
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_san", false, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -180,48 +260,8 @@ TEST_P(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
-
-  Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
-  Network::MockListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
-
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ContextConfigImpl client_ctx_config(*client_ctx_loader);
-  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
-  client_connection->connect();
-
-  Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
-
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher.exit();
-      }));
-
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_cert_hash", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, SslError) {
