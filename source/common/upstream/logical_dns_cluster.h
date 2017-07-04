@@ -28,8 +28,8 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager,
+  LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
                     Event::Dispatcher& dispatcher, bool added_via_api);
 

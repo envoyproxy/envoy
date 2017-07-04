@@ -40,13 +40,16 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
 TEST(UtilityTest, LocalInfoToNode) {
   LocalInfo::MockLocalInfo local_info;
   std::string foo_id("foo_id");
-  EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(foo_id));
+  EXPECT_CALL(local_info, nodeName()).WillRepeatedly(ReturnRef(foo_id));
   std::string foo_zone("foo_zone");
-  EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(foo_zone));
+  EXPECT_CALL(local_info, zoneName()).WillRepeatedly(ReturnRef(foo_zone));
+  std::string foo_cluster("foo_cluster");
+  EXPECT_CALL(local_info, clusterName()).WillRepeatedly(ReturnRef(foo_cluster));
   envoy::api::v2::Node node;
   Utility::localInfoToNode(local_info, node);
   EXPECT_EQ("foo_id", node.id());
   EXPECT_EQ("foo_zone", node.locality().zone());
+  EXPECT_EQ("foo_cluster", node.metadata().fields().find("cluster")->second.string_value());
 }
 
 TEST(UtilityTest, SdsConfigToEdsConfig) {

@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:cds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
@@ -44,12 +45,14 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:cds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/upstream:upstream_lib",
     ],
@@ -59,6 +62,7 @@ envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
+    external_deps = ["envoy_health_check"],
     deps = [
         ":host_utility_lib",
         "//include/envoy/event:dispatcher_interface",
@@ -80,8 +84,8 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/redis:conn_pool_lib",
     ],
 )
@@ -114,8 +118,10 @@ envoy_cc_library(
         ":upstream_includes",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
+        "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -123,6 +129,7 @@ envoy_cc_library(
     name = "outlier_detection_lib",
     srcs = ["outlier_detection_impl.cc"],
     hdrs = ["outlier_detection_impl.h"],
+    external_deps = ["envoy_cds"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -134,6 +141,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -225,6 +233,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/ssl:connection_lib",
         "//source/common/ssl:context_config_lib",
     ],

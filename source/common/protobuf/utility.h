@@ -16,6 +16,20 @@
   ((message).has_##field_name() ? (message).field_name().value()                                   \
                                 : throw MissingFieldException(#field_name, (message)))
 
+// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
+// default value.
+#define PROTOBUF_GET_MS_OR_DEFAULT(message, field_name, default_value)                             \
+  ((message).has_##field_name()                                                                    \
+       ? Protobuf::util::TimeUtil::DurationToMilliseconds((message).field_name())                  \
+       : (default_value))
+
+// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
+// MissingFieldException.
+#define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
+  ((message).has_##field_name()                                                                    \
+       ? Protobuf::util::TimeUtil::DurationToMilliseconds((message).field_name())                  \
+       : throw MissingFieldException(#field_name, (message)))
+
 namespace Envoy {
 
 class MissingFieldException : public EnvoyException {
@@ -28,6 +42,13 @@ public:
   static std::string join(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source,
                           const std::string& delimiter) {
     return StringUtil::join(ProtobufTypes::stringVector(source), delimiter);
+  }
+};
+
+class MessageUtil {
+public:
+  static std::size_t hash(const Protobuf::Message& message) {
+    return std::hash<std::string>{}(message.SerializeAsString());
   }
 };
 

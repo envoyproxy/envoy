@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/cds_json.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -21,7 +22,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -33,7 +33,16 @@ using testing::SaveArg;
 using testing::WithArg;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
+namespace {
+
+envoy::api::v2::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
+  envoy::api::v2::HealthCheck health_check;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
+  return health_check;
+}
 
 TEST(HealthCheckerFactoryTest, createRedis) {
   std::string json = R"EOF(
@@ -46,14 +55,14 @@ TEST(HealthCheckerFactoryTest, createRedis) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockCluster> cluster;
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<RedisHealthCheckerImpl*>(
-                HealthCheckerFactory::create(*config, cluster, runtime, random, dispatcher).get()));
+  EXPECT_NE(nullptr, dynamic_cast<RedisHealthCheckerImpl*>(
+                         HealthCheckerFactory::create(parseHealthCheckFromJson(json), cluster,
+                                                      runtime, random, dispatcher)
+                             .get()));
 }
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -99,9 +108,8 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                        dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
     });
@@ -121,9 +129,8 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                        dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
     });
@@ -604,47 +611,27 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
-    std::string json = R"EOF(
-    {
-      "bytes": [
-        {"binary": "39000000"},
-        {"binary": "EEEEEEEE"}
-      ]
-    }
-    )EOF";
+    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    repeated_payload.Add()->set_text("39000000");
+    repeated_payload.Add()->set_text("EEEEEEEE");
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     TcpHealthCheckMatcher::MatchSegments segments =
-        TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
+        TcpHealthCheckMatcher::loadProtoBytes(repeated_payload);
     EXPECT_EQ(2U, segments.size());
   }
 
   {
-    std::string json = R"EOF(
-    {
-      "bytes": [
-        {"binary": "4"}
-      ]
-    }
-    )EOF";
+    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    repeated_payload.Add()->set_text("4");
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
-                 EnvoyException);
+    EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 
   {
-    std::string json = R"EOF(
-    {
-      "bytes": [
-        {"binary": "gg"}
-      ]
-    }
-    )EOF";
+    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    repeated_payload.Add()->set_text("gg");
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
-                 EnvoyException);
+    EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 }
 
@@ -653,18 +640,12 @@ static void add_uint8(Buffer::Instance& buffer, uint8_t addend) {
 }
 
 TEST(TcpHealthCheckMatcher, match) {
-  std::string json = R"EOF(
-  {
-    "bytes": [
-      {"binary": "01"},
-      {"binary": "02"}
-    ]
-  }
-  )EOF";
+  Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+  repeated_payload.Add()->set_text("01");
+  repeated_payload.Add()->set_text("02");
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   TcpHealthCheckMatcher::MatchSegments segments =
-      TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
+      TcpHealthCheckMatcher::loadProtoBytes(repeated_payload);
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(TcpHealthCheckMatcher::match(segments, buffer));
@@ -708,9 +689,8 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                   dispatcher_, runtime_, random_));
   }
 
   void setupNoData() {
@@ -726,9 +706,8 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                   dispatcher_, runtime_, random_));
   }
 
   void expectSessionCreate() {
@@ -862,9 +841,8 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    health_checker_.reset(
-        new RedisHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_, *this));
+    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                     dispatcher_, runtime_, random_, *this));
   }
 
   Redis::ConnPool::ClientPtr create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
@@ -965,5 +943,6 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -16,6 +16,8 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
+#include "api/cds.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -35,7 +37,7 @@ public:
    *
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdatePrimaryCluster(const Json::Object& config) PURE;
+  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
@@ -162,17 +164,17 @@ public:
                                                              ResourcePriority priority) PURE;
 
   /**
-   * Allocate a cluster from configuration JSON.
+   * Allocate a cluster from configuration proto.
    */
-  virtual ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                                     const Optional<SdsConfig>& sds_config,
-                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                     bool added_via_api) PURE;
+  virtual ClusterPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                      Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                      bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration JSON.
    */
-  virtual CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) PURE;
+  virtual CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                              ClusterManager& cm) PURE;
 };
 
 } // namespace Upstream

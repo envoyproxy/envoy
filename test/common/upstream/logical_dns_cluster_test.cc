@@ -7,6 +7,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -27,10 +28,10 @@ namespace Upstream {
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
-    cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
-                                         dns_resolver_, tls_, dispatcher_, false));
+    cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
+                                         ssl_context_manager_, dns_resolver_, tls_, dispatcher_,
+                                         false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();

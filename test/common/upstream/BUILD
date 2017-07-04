@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -25,6 +26,7 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     srcs = ["cluster_manager_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
@@ -48,8 +50,8 @@ envoy_cc_test(
     srcs = ["eds_test.cc"],
     external_deps = ["envoy_eds"],
     deps = [
+        ":utility_lib",
         "//source/common/config:utility_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/upstream:eds_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -63,6 +65,7 @@ envoy_cc_test(
     srcs = ["health_checker_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:cds_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
@@ -122,6 +125,7 @@ envoy_cc_test(
     name = "logical_dns_cluster_test",
     srcs = ["logical_dns_cluster_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:logical_dns_cluster_lib",
@@ -139,6 +143,7 @@ envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//source/common/network:utility_lib",
@@ -180,10 +185,10 @@ envoy_cc_test(
     data = glob(["test_data/**"]),
     external_deps = ["envoy_base"],
     deps = [
+        ":utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:eds_lib",
         "//test/mocks/local_info:local_info_mocks",
@@ -199,6 +204,7 @@ envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -214,5 +220,14 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "utility_lib",
+    hdrs = ["utility.h"],
+    deps = [
+        "//source/common/config:cds_json_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )

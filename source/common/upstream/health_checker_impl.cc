@@ -20,47 +20,47 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
+#include "common/protobuf/utility.h"
 #include "common/redis/conn_pool_impl.h"
 #include "common/upstream/host_utility.h"
 
 namespace Envoy {
 namespace Upstream {
 
-HealthCheckerPtr HealthCheckerFactory::create(const Json::Object& hc_config,
+HealthCheckerPtr HealthCheckerFactory::create(const envoy::api::v2::HealthCheck& hc_config,
                                               Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                               Runtime::RandomGenerator& random,
                                               Event::Dispatcher& dispatcher) {
-  hc_config.validateSchema(Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA);
-
-  const std::string hc_type = hc_config.getString("type");
-  if (hc_type == "http") {
+  switch (hc_config.health_checker_case()) {
+  case envoy::api::v2::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return HealthCheckerPtr{
         new ProdHttpHealthCheckerImpl(cluster, hc_config, dispatcher, runtime, random)};
-  } else if (hc_type == "tcp") {
+  case envoy::api::v2::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return HealthCheckerPtr{
         new TcpHealthCheckerImpl(cluster, hc_config, dispatcher, runtime, random)};
-  } else {
-    ASSERT(hc_type == "redis");
+  case envoy::api::v2::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     return HealthCheckerPtr{
         new RedisHealthCheckerImpl(cluster, hc_config, dispatcher, runtime, random,
                                    Redis::ConnPool::ClientFactoryImpl::instance_)};
+  default:
+    throw EnvoyException("Health checker not set");
   }
 }
 
 const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
 
-HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster, const Json::Object& config,
+HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
+                                             const envoy::api::v2::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
-    : cluster_(cluster), dispatcher_(dispatcher), timeout_(config.getInteger("timeout_ms")),
-      unhealthy_threshold_(config.getInteger("unhealthy_threshold")),
-      healthy_threshold_(config.getInteger("healthy_threshold")),
+    : cluster_(cluster), dispatcher_(dispatcher),
+      timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
+      unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
+      healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
-      interval_(config.getInteger("interval_ms")),
-      interval_jitter_(config.getInteger("interval_jitter_ms", 0)) {
+      interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
     onClusterMemberUpdate(hosts_added, hosts_removed);
@@ -223,14 +223,15 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   handleFailure(true);
 }
 
-HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
+                                             const envoy::api::v2::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.getString("path")) {
-  if (config.hasObject("service_name")) {
-    service_name_.value(config.getString("service_name"));
+      path_(config.http_health_check().path()) {
+  if (!config.http_health_check().service_name().empty()) {
+    service_name_.value(config.http_health_check().service_name());
   }
 }
 
@@ -351,12 +352,12 @@ ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
                                    data.host_description_);
 }
 
-TcpHealthCheckMatcher::MatchSegments
-TcpHealthCheckMatcher::loadJsonBytes(const std::vector<Json::ObjectSharedPtr>& byte_array) {
+TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload>& byte_array) {
   MatchSegments result;
 
-  for (const Json::ObjectSharedPtr& entry : byte_array) {
-    std::string hex_string = entry->getString("binary");
+  for (const auto& entry : byte_array) {
+    const std::string& hex_string = entry.text();
     result.push_back(Hex::decode(hex_string));
   }
 
@@ -377,12 +378,18 @@ bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::I
   return true;
 }
 
-TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
+                                           const envoy::api::v2::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      send_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("send"))),
-      receive_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("receive"))) {}
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random), send_bytes_([&config] {
+        Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> send_repeated;
+        if (!config.tcp_health_check().send().text().empty()) {
+          send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
+        }
+        return TcpHealthCheckMatcher::loadProtoBytes(send_repeated);
+      }()),
+      receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
   if (client_) {
@@ -453,7 +460,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
+                                               const envoy::api::v2::HealthCheck& config,
                                                Event::Dispatcher& dispatcher,
                                                Runtime::Loader& runtime,
                                                Runtime::RandomGenerator& random,

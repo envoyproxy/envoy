@@ -133,6 +133,23 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
   return std::make_shared<Address::Ipv4Instance>(&sa4);
 }
 
+Address::InstanceConstSharedPtr
+Utility::fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address) {
+  switch (resolved_address.address_case()) {
+  case envoy::api::v2::ResolvedAddress::kSocketAddress:
+    // TODO(htuch): Can do this more efficiently if it matters with direct sockaddr manipulation,
+    // keeping it simple for now.
+    return parseInternetAddressAndPort(
+        fmt::format("{}:{}", resolved_address.socket_address().ip_address(),
+                    resolved_address.socket_address().port().value()));
+  case envoy::api::v2::ResolvedAddress::kPipe:
+    return Address::InstanceConstSharedPtr{
+        new Address::PipeInstance(resolved_address.pipe().path())};
+  default:
+    NOT_REACHED;
+  }
+}
+
 void Utility::throwWithMalformedIp(const std::string& ip_address) {
   throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
 }

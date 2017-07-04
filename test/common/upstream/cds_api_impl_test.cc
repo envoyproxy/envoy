@@ -39,7 +39,8 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    cds_ = CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_);
+    cds_ = CdsApiImpl::create(*config, Optional<SdsConfig>(), cm_, dispatcher_, random_,
+                              local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -48,8 +49,8 @@ public:
 
   void expectAdd(const std::string& cluster_name) {
     EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
-        .WillOnce(Invoke([cluster_name](const Json::Object& config) -> bool {
-          EXPECT_EQ(cluster_name, config.getString("name"));
+        .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& config) -> bool {
+          EXPECT_EQ(cluster_name, config.name());
           return true;
         }));
   }
@@ -103,7 +104,8 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
-  EXPECT_THROW(CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_),
+  EXPECT_THROW(CdsApiImpl::create(*config, Optional<SdsConfig>(), cm_, dispatcher_, random_,
+                                  local_info_, store_),
                EnvoyException);
 }
 
@@ -116,10 +118,18 @@ TEST_F(CdsApiImplTest, Basic) {
   {
     "clusters": [
     {
-      "name": "cluster1"
+      "name": "cluster1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     },
     {
-      "name": "cluster2"
+      "name": "cluster2",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     }
     ]
   }
@@ -143,10 +153,18 @@ TEST_F(CdsApiImplTest, Basic) {
   {
     "clusters": [
     {
-      "name": "cluster1"
+      "name": "cluster1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     },
     {
-      "name": "cluster3"
+      "name": "cluster3",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     }
     ]
   }
