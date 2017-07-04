@@ -26,6 +26,8 @@ namespace Ssl {
   COUNTER(connection_error)                                                                        \
   COUNTER(handshake)                                                                               \
   COUNTER(no_certificate)                                                                          \
+  COUNTER(fail_verify_error)                                                                       \
+  COUNTER(fail_verify_no_cert)                                                                     \
   COUNTER(fail_verify_san)                                                                         \
   COUNTER(fail_verify_cert_hash)
 // clang-format on
@@ -44,11 +46,10 @@ public:
   virtual bssl::UniquePtr<SSL> newSsl() const;
 
   /**
-   * Performs all configured cert verifications on the connection
-   * @param ssl the connection to verify
-   * @return true if all configured cert verifications succeed
+   * Logs successful TLS handshake and updates stats.
+   * @param ssl the connection to log
    */
-  bool verifyPeer(SSL* ssl) const;
+  void logHandshake(SSL* ssl) const;
 
   /**
    * Performs subjectAltName verification
@@ -82,6 +83,9 @@ protected:
    * @see SSL_CTX_set_session_id_ctx
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
+
+  static int verifyCallback(int ok, X509_STORE_CTX* x509_store);
+  int verifyCertificate(X509* cert, int ok);
 
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the
