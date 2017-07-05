@@ -101,7 +101,7 @@ public:
   void onFetchComplete() override {}
 
   void onFetchFailure(const EnvoyException* e) override {
-    ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "");
+    ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "fetch failure");
     stats_.update_failure_.inc();
     callbacks_->onConfigUpdateFailed(e);
   }
