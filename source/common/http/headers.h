@@ -81,6 +81,7 @@ public:
     const std::string GrpcWebProto{"application/grpc-web+proto"};
     const std::string GrpcWebText{"application/grpc-web-text"};
     const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
+    const std::string Json{"application/json"};
   } ContentTypeValues;
 
   struct {

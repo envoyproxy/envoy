@@ -25,9 +25,9 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
                                        ComponentFactory& component_factory,
                                        const LocalInfo::LocalInfo& local_info)
     : options_(options), stats_store_(store),
-      handler_(Api::ApiPtr{new Api::ValidationImpl(options.fileFlushIntervalMsec())}),
-      local_info_(local_info),
-      access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store),
+      api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
+      dispatcher_(api_->allocateDispatcher()), local_info_(local_info),
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
       listener_manager_(*this, *this, *this) {
   try {
     initialize(options, component_factory);
@@ -51,7 +51,7 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   // be ready to serve, then the config has passed validation.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   Configuration::InitialImpl initial_config(*config_json);
-  thread_local_.registerThread(handler_.dispatcher(), true);
+  thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
   cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(

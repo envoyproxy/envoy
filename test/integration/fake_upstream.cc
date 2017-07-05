@@ -6,8 +6,6 @@
 #include <mutex>
 #include <string>
 
-#include "envoy/event/dispatcher.h"
-
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
@@ -16,6 +14,8 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+
+#include "server/connection_handler_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -225,14 +225,15 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
                            FakeHttpConnection::Type type)
     : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
-      handler_(log(), Api::ApiPtr{new Api::Impl(std::chrono::milliseconds(10000))}),
-      http_type_(type) {
+      api_(new Api::Impl(std::chrono::milliseconds(10000))),
+      dispatcher_(api_->allocateDispatcher()),
+      handler_(new Server::ConnectionHandlerImpl(log(), *dispatcher_)), http_type_(type) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
 
 FakeUpstream::~FakeUpstream() {
-  handler_.dispatcher().exit();
+  dispatcher_->exit();
   thread_->join();
 }
 
@@ -246,16 +247,16 @@ bool FakeUpstream::createFilterChain(Network::Connection& connection) {
 
 void FakeUpstream::threadRoutine() {
   if (ssl_ctx_) {
-    handler_.addSslListener(*this, *ssl_ctx_, *socket_, stats_store_,
-                            Network::ListenerOptions::listenerOptionsWithBindToPort());
+    handler_->addSslListener(*this, *ssl_ctx_, *socket_, stats_store_, 0,
+                             Network::ListenerOptions::listenerOptionsWithBindToPort());
   } else {
-    handler_.addListener(*this, *socket_, stats_store_,
-                         Network::ListenerOptions::listenerOptionsWithBindToPort());
+    handler_->addListener(*this, *socket_, stats_store_, 0,
+                          Network::ListenerOptions::listenerOptionsWithBindToPort());
   }
 
   server_initialized_.setReady();
-  handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
-  handler_.closeConnections();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  handler_.reset();
 }
 
 FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher) {

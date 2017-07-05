@@ -968,6 +968,33 @@ TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
   ConfigImpl(*loader, runtime, cm, false);
 }
 
+TEST(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
+  std::string json = R"EOF(
+{
+  "validate_clusters": false,
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "www2"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(nullptr));
+
+  ConfigImpl(*loader, runtime, cm, true);
+}
+
 TEST(RouteMatcherTest, Shadow) {
   std::string json = R"EOF(
 {

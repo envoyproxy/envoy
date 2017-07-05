@@ -27,6 +27,14 @@ MockAdmin::~MockAdmin() {}
 MockDrainManager::MockDrainManager() {}
 MockDrainManager::~MockDrainManager() {}
 
+MockWatchDog::MockWatchDog() {}
+MockWatchDog::~MockWatchDog() {}
+
+MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
+  ON_CALL(*this, createWatchDog(_)).WillByDefault(Return(watch_dog_));
+}
+MockGuardDog::~MockGuardDog() {}
+
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
@@ -35,6 +43,13 @@ MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
+
+MockListener::MockListener() {
+  ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
+  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+}
+MockListener::~MockListener() {}
 
 MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}

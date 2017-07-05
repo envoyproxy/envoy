@@ -33,11 +33,9 @@ envoy_cc_test(
     srcs = ["connection_handler_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
-        "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
         "//source/server:connection_handler_lib",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
     ],
@@ -108,5 +106,17 @@ envoy_cc_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "worker_impl_test",
+    srcs = ["worker_impl_test.cc"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/server:worker_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )

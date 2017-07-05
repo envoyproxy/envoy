@@ -72,6 +72,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "json_transcoder_filter_lib",
+    srcs = ["json_transcoder_filter.cc"],
+    hdrs = ["json_transcoder_filter.h"],
+    external_deps = [
+        "path_matcher",
+        "grpc_transcoding",
+        "http_api_protos",
+    ],
+    deps = [
+        ":codec_lib",
+        ":common_lib",
+        ":transcoder_input_stream_lib",
+        "//include/envoy/http:filter_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_web_filter_lib",
     srcs = ["grpc_web_filter.cc"],
     hdrs = ["grpc_web_filter.h"],

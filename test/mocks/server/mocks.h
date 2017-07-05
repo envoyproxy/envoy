@@ -81,6 +81,30 @@ public:
   MOCK_METHOD0(startParentShutdownSequence, void());
 };
 
+class MockWatchDog : public WatchDog {
+public:
+  MockWatchDog();
+  ~MockWatchDog();
+
+  // Server::WatchDog
+  MOCK_METHOD1(startWatchdog, void(Event::Dispatcher& dispatcher));
+  MOCK_METHOD0(touch, void());
+  MOCK_CONST_METHOD0(threadId, int32_t());
+  MOCK_CONST_METHOD0(lastTouchTime, MonotonicTime());
+};
+
+class MockGuardDog : public GuardDog {
+public:
+  MockGuardDog();
+  ~MockGuardDog();
+
+  // Server::GuardDog
+  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(int32_t thread_id));
+  MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
+
+  std::shared_ptr<MockWatchDog> watch_dog_;
+};
+
 class MockHotRestart : public HotRestart {
 public:
   MockHotRestart();
@@ -113,6 +137,7 @@ public:
   MOCK_METHOD2(createListenSocket_,
                Network::ListenSocket*(Network::Address::InstanceConstSharedPtr address,
                                       bool bind_to_port));
+  MOCK_METHOD0(nextListenerTag, uint64_t());
 };
 
 class MockListenerManager : public ListenerManager {
@@ -126,6 +151,27 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(stopWorkers, void());
+};
+
+class MockListener : public Listener {
+public:
+  MockListener();
+  ~MockListener();
+
+  MOCK_METHOD0(filterChainFactory, Network::FilterChainFactory&());
+  MOCK_METHOD0(address, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD0(socket, Network::ListenSocket&());
+  MOCK_METHOD0(sslContext, Ssl::ServerContext*());
+  MOCK_METHOD0(useProxyProto, bool());
+  MOCK_METHOD0(bindToPort, bool());
+  MOCK_METHOD0(useOriginalDst, bool());
+  MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
+  MOCK_METHOD0(listenerScope, Stats::Scope&());
+  MOCK_METHOD0(listenerTag, uint64_t());
+
+  testing::NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
+  testing::NiceMock<Network::MockListenSocket> socket_;
+  Stats::IsolatedStoreImpl scope_;
 };
 
 class MockWorkerFactory : public WorkerFactory {

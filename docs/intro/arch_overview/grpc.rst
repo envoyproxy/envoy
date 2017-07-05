@@ -21,3 +21,6 @@ application layer:
   client to send requests to Envoy over HTTP/1.1 and get proxied to a gRPC server. It's under
   active development and is expected to be the successor to the gRPC :ref:`bridge filter
   <config_http_filters_grpc_bridge>`.
+* gRPC-JSON transcoder is supported by a :ref:`filter <config_http_filters_grpc_json_transcoder>`
+  that allows a RESTful JSON API client to send requests to Envoy over HTTP and get proxied to a
+  gRPC service.

@@ -469,6 +469,7 @@ const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties":{
+      "validate_clusters" : {"type" : "boolean"},
       "virtual_hosts" : {"type" : "array"},
       "internal_only_headers" : {
         "type" : "array",

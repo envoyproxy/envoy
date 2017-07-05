@@ -9,12 +9,25 @@ Route configuration
 .. code-block:: json
 
   {
+    "validate_clusters": "...",
     "virtual_hosts": [],
     "internal_only_headers": [],
     "response_headers_to_add": [],
     "response_headers_to_remove": [],
     "request_headers_to_add": []
   }
+
+validate_clusters
+  *(optional, boolean)* An optional boolean that specifies whether the clusters that the route
+  table refers to will be validated by the cluster manager. If set to true and a route refers to
+  a non-existent cluster, the route table will not load. If set to false and a route refers to a
+  non-existent cluster, the route table will load and the router filter will return a 404 if the
+  route is selected at runtime. This setting defaults to true if the route table is statically
+  defined via the :ref:`route_config <config_http_conn_man_route_config>` option. This setting
+  default to false if the route table is loaded dynamically via the :ref:`rds
+  <config_http_conn_man_rds_option>` option. Users may which to override the default behavior in
+  certain cases (for example when using :ref:`cds <config_cluster_manager_cds>` with a static
+  route table).
 
 :ref:`virtual_hosts <config_http_conn_man_route_table_vhost>`
   *(required, array)* An array of virtual hosts that make up the route table.

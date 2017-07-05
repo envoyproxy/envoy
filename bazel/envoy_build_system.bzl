@@ -258,14 +258,14 @@ def _proto_header(proto_path):
   return None
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, srcs = [], deps = []):
+def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
     internal_name = name + "_internal"
     cc_proto_library(
         name = internal_name,
         srcs = srcs,
         default_runtime = "//external:protobuf",
         protoc = "//external:protoc",
-        deps = deps,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         linkstatic = 1,
     )
     # We can't use include_prefix directly in cc_proto_library, since it
@@ -277,4 +277,31 @@ def envoy_proto_library(name, srcs = [], deps = []):
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         deps = [internal_name],
         linkstatic = 1,
+    )
+
+# Envoy proto descriptor targets should be specified with this function.
+# This is used for testing only.
+def envoy_proto_descriptor(name, out, srcs = [], protocopts = [], external_deps = []):
+    input_files = ["$(location " + src + ")" for src in srcs]
+    include_paths = [".", PACKAGE_NAME]
+
+    if "http_api_protos" in external_deps:
+        srcs.append("@googleapis//:http_api_protos_src")
+        include_paths.append("external/googleapis")
+
+    if "well_known_protos" in external_deps:
+        srcs.append("@protobuf_bzl//:well_known_protos")
+        include_paths.append("external/protobuf_bzl/src")
+
+    options = protocopts[:]
+    options.extend(["-I" + include_path for include_path in include_paths])
+    options.append("--descriptor_set_out=$@")
+
+    cmd = "$(location //external:protoc) " + " ".join(options + input_files)
+    native.genrule(
+        name = name,
+        srcs = srcs,
+        outs = [out],
+        cmd = cmd,
+        tools = ["//external:protoc"],
     )

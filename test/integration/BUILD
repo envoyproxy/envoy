@@ -63,6 +63,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_json_transcoder_integration_test",
+    srcs = [
+        "grpc_json_transcoder_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration:server_grpc_json_transcoder.json",
+        "//test/proto:bookstore_proto_descriptor",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/http:header_map_lib",
+        "//test/proto:bookstore_proto",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "integration_admin_test",
     srcs = [
         "integration_admin_test.cc",
@@ -130,6 +148,7 @@ envoy_cc_test_library(
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
+        "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",

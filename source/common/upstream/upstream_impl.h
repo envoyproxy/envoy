@@ -27,6 +27,8 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -227,7 +229,7 @@ public:
                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                           const Optional<SdsConfig>& sds_config,
+                           const Optional<envoy::api::v2::ConfigSource>& eds_config,
                            const LocalInfo::LocalInfo& local_info,
                            Outlier::EventLoggerSharedPtr outlier_event_logger);
 
