@@ -87,32 +87,27 @@ public:
   TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
-  virtual ~TestScopeWrapper() {
-    std::unique_lock<std::mutex> lock(lock_);
-    wrapped_scope_.reset();
-  }
-
-  virtual void deliverHistogramToSinks(const std::string& name, uint64_t value) {
+  void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
     std::unique_lock<std::mutex> lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(name, value);
   }
 
-  virtual void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) {
+  void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override {
     std::unique_lock<std::mutex> lock(lock_);
     wrapped_scope_->deliverTimingToSinks(name, ms);
   }
 
-  virtual Counter& counter(const std::string& name) {
+  Counter& counter(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return wrapped_scope_->counter(name);
   }
 
-  virtual Gauge& gauge(const std::string& name) {
+  Gauge& gauge(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return wrapped_scope_->gauge(name);
   }
 
-  virtual Timer& timer(const std::string& name) {
+  Timer& timer(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return wrapped_scope_->timer(name);
   }
@@ -155,8 +150,7 @@ public:
   }
   ScopePtr createScope(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
-    ScopePtr tmp = store_.createScope(name);
-    return ScopePtr{new TestScopeWrapper(lock_, std::move(tmp))};
+    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
 
   // Stats::StoreRoot
