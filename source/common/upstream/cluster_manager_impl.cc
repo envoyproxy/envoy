@@ -337,12 +337,12 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
-  // Select a host and create a connection pool for it if it does not already exist.
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
     return nullptr;
   }
 
+  // Select a host and create a connection pool for it if it does not already exist.
   return entry->second->connPool(priority, context);
 }
 
