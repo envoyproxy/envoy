@@ -161,6 +161,6 @@ private:
   const ToLowerTable to_lower_table_;
 };
 
-} // CommandSplitter
-} // Redis
-} // Envoy
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Envoy

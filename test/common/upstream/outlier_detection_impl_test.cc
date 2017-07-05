@@ -20,11 +20,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Upstream {
 namespace Outlier {
@@ -229,8 +229,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
   EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx")
-                     .value());
+  EXPECT_EQ(
+      2UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
@@ -257,7 +258,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   // Expect non-enforcing logging
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]), _,
-                       EjectionType::Consecutive5xx, false)).Times(2);
+                       EjectionType::Consecutive5xx, false))
+      .Times(2);
 
   // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
   loadRq(cluster_.hosts_, 200, 200);
@@ -401,8 +403,9 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx")
-                     .value());
+  EXPECT_EQ(
+      1UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
 }
 
 TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
@@ -537,7 +540,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"-1\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
                            "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", "
-                           "\"enforced\": \"true\"}\n")).WillOnce(SaveArg<0>(&log1));
+                           "\"enforced\": \"true\"}\n"))
+      .WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
   Json::Factory::loadFromString(log1);
 
@@ -546,7 +550,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
+                           "\"num_ejections\": 0}\n"))
+      .WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log2);
 
@@ -566,7 +571,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"enforced\": \"false\", "
                            "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
                            "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
-                           "}\n")).WillOnce(SaveArg<0>(&log3));
+                           "}\n"))
+      .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
   Json::Factory::loadFromString(log3);
 
@@ -575,7 +581,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log4));
+                           "\"num_ejections\": 0}\n"))
+      .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);
 }
@@ -593,6 +600,6 @@ TEST(OutlierUtility, SRThreshold) {
   EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
 }
 
-} // Outlier
-} // Upstream
-} // Envoy
+} // namespace Outlier
+} // namespace Upstream
+} // namespace Envoy

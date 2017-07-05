@@ -43,6 +43,6 @@ std::string LightstepHttpTracerFactory::name() { return "lightstep"; }
  */
 static Registry::RegisterFactory<LightstepHttpTracerFactory, HttpTracerFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

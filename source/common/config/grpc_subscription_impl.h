@@ -22,17 +22,19 @@ public:
                        const google::protobuf::MethodDescriptor& service_method,
                        SubscriptionStats stats)
       : GrpcSubscriptionImpl(
-            node, std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                        envoy::api::v2::DiscoveryResponse>>(
-                      new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                envoy::api::v2::DiscoveryResponse>(
-                          cm, remote_cluster_name)),
+            node,
+            std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                                  envoy::api::v2::DiscoveryResponse>>(
+                new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                          envoy::api::v2::DiscoveryResponse>(cm,
+                                                                             remote_cluster_name)),
             dispatcher, service_method, stats) {}
 
   GrpcSubscriptionImpl(
       const envoy::api::v2::Node& node,
-      std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                        envoy::api::v2::DiscoveryResponse>> async_client,
+      std::unique_ptr<
+          Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+          async_client,
       Event::Dispatcher& dispatcher, const google::protobuf::MethodDescriptor& service_method,
       SubscriptionStats stats)
       : async_client_(std::move(async_client)), service_method_(service_method),
@@ -126,8 +128,9 @@ private:
     setRetryTimer();
   }
 
-  std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                    envoy::api::v2::DiscoveryResponse>> async_client_;
+  std::unique_ptr<
+      Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+      async_client_;
   const google::protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   google::protobuf::RepeatedPtrField<std::string> resources_;

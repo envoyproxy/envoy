@@ -74,5 +74,5 @@ private:
   std::list<WriteFilterSharedPtr> downstream_filters_;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

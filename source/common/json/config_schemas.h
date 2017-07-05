@@ -50,5 +50,5 @@ public:
   static const std::string REDIS_CONN_POOL_SCHEMA;
 };
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

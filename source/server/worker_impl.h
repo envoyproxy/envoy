@@ -54,5 +54,5 @@ private:
   Thread::ThreadPtr thread_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

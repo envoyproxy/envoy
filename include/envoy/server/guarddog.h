@@ -41,5 +41,5 @@ public:
   virtual void stopWatching(WatchDogSharedPtr wd) PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

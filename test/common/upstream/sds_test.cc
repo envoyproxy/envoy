@@ -25,13 +25,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
 using testing::WithArg;
+using testing::_;
 
 namespace Upstream {
 
@@ -133,8 +133,9 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   EXPECT_CALL(membership_updated_, ready()).Times(3);
   cluster_->addMemberUpdateCb(
-      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
-          -> void { membership_updated_.ready(); });
+      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+        membership_updated_.ready();
+      });
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
@@ -364,5 +365,5 @@ TEST_F(SdsTest, FailureArray) {
   EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

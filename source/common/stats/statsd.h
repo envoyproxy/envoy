@@ -120,6 +120,6 @@ private:
   Stats::Counter& cx_overflow_stat_;
 };
 
-} // Statsd
-} // Stats
-} // Envoy
+} // namespace Statsd
+} // namespace Stats
+} // namespace Envoy

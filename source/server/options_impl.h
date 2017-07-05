@@ -50,4 +50,4 @@ private:
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
 };
-} // Envoy
+} // namespace Envoy

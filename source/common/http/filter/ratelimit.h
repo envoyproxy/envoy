@@ -108,6 +108,6 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
 };
 
-} // RateLimit
-} // Http
-} // Envoy
+} // namespace RateLimit
+} // namespace Http
+} // namespace Envoy

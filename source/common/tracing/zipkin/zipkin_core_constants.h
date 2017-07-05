@@ -41,5 +41,5 @@ public:
 
 typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;
 
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

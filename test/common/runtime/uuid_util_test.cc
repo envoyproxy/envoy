@@ -82,4 +82,4 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
 }
-} // Envoy
+} // namespace Envoy

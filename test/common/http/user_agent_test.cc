@@ -56,5 +56,5 @@ TEST(UserAgentTest, All) {
   }
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

@@ -36,5 +36,5 @@ public:
   virtual void registerTarget(Target& target) PURE;
 };
 
-} // Init
-} // Envoy
+} // namespace Init
+} // namespace Envoy

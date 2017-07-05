@@ -198,4 +198,4 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
-} // Envoy
+} // namespace Envoy

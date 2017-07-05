@@ -19,12 +19,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::ReturnRefOfCopy;
+using testing::_;
 
 namespace Http {
 
@@ -605,5 +605,5 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

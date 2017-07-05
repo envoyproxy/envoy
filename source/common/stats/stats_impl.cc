@@ -42,5 +42,5 @@ bool RawStatData::matches(const std::string& name) {
   return 0 == strcmp(name.substr(0, MAX_NAME_SIZE).c_str(), name_);
 }
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

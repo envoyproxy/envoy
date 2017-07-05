@@ -14,11 +14,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::WithArg;
+using testing::_;
 
 namespace RateLimit {
 
@@ -93,8 +93,9 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
   {
     pb::lyft::ratelimit::RateLimitRequest request;
-    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}},
-                                                   {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
+    GrpcClientImpl::createRequest(
+        request, "foo",
+        {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
         .WillOnce(WithArg<3>(Invoke([&](::google::protobuf::Message* raw_response) -> void {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
@@ -162,5 +163,5 @@ TEST(RateLimitNullFactoryTest, Basic) {
   client->cancel();
 }
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

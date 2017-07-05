@@ -29,5 +29,5 @@ private:
   std::chrono::milliseconds file_flush_interval_msec_;
 };
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

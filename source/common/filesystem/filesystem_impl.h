@@ -117,5 +117,5 @@ private:
   FileSystemStats stats_;
 };
 
-} // Filesystem
+} // namespace Filesystem
 } // Envoy

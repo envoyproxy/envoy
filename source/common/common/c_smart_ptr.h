@@ -11,4 +11,4 @@ public:
   CSmartPtr() : std::unique_ptr<T, void (*)(T*)>(nullptr, deleter) {}
   CSmartPtr(T* object) : std::unique_ptr<T, void (*)(T*)>(object, deleter) {}
 };
-} // Envoy
+} // namespace Envoy

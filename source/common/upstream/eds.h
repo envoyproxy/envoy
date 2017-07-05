@@ -40,5 +40,5 @@ private:
   uint64_t pending_health_checks_{};
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

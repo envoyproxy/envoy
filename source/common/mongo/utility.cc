@@ -135,5 +135,5 @@ void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
   }
 }
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

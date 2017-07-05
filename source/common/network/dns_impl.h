@@ -93,5 +93,5 @@ private:
   std::unordered_map<int, Event::FileEventPtr> events_;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

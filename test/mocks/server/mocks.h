@@ -308,6 +308,6 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

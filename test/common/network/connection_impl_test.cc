@@ -22,13 +22,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
-using testing::Sequence;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::Sequence;
 using testing::StrictMock;
 using testing::Test;
+using testing::_;
 
 namespace Network {
 
@@ -90,8 +90,8 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   client_connection->connect();
 
   EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t)
-                           -> void { client_connection->close(ConnectionCloseType::NoFlush); }));
+      .WillOnce(Invoke(
+          [&](uint32_t) -> void { client_connection->close(ConnectionCloseType::NoFlush); }));
   EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::LocalClose));
 
   Network::ConnectionPtr server_connection;
@@ -173,12 +173,11 @@ TEST_P(ConnectionImplTest, BufferStats) {
   EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter, onNewConnection());
-  EXPECT_CALL(*read_filter, onData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
-        data.drain(data.length());
-        server_connection->close(ConnectionCloseType::FlushWrite);
-        return FilterStatus::StopIteration;
-      }));
+  EXPECT_CALL(*read_filter, onData(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+    data.drain(data.length());
+    server_connection->close(ConnectionCloseType::FlushWrite);
+    return FilterStatus::StopIteration;
+  }));
 
   EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](uint32_t) -> void { dispatcher.exit(); }));
@@ -288,5 +287,5 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

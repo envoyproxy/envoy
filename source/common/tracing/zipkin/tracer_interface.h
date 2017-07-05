@@ -28,5 +28,5 @@ public:
    */
   virtual void reportSpan(Span&& span) PURE;
 };
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

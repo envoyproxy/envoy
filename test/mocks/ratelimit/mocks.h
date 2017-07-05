@@ -31,5 +31,5 @@ inline bool operator==(const Descriptor& lhs, const Descriptor& rhs) {
   return lhs.entries_ == rhs.entries_;
 }
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

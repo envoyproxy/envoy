@@ -46,5 +46,5 @@ public:
 
 typedef std::unique_ptr<Message> MessagePtr;
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

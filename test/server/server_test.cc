@@ -43,5 +43,5 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -138,4 +138,4 @@ private:
   std::string data_;
 };
 
-} // Envoy
+} // namespace Envoy

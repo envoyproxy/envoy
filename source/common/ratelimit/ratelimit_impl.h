@@ -78,5 +78,5 @@ public:
   }
 };
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

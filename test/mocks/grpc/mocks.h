@@ -70,9 +70,9 @@ public:
                     ::google::protobuf::Message* response, ::google::protobuf::Closure* done));
 };
 
-} // Grpc
+} // namespace Grpc
 
 MATCHER_P(ProtoMessageEqual, rhs, "") {
   return arg->SerializeAsString() == rhs->SerializeAsString();
 }
-} // Envoy
+} // namespace Envoy

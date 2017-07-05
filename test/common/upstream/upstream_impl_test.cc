@@ -26,10 +26,10 @@
 
 namespace Envoy {
 
-using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::_;
 
 namespace Upstream {
 
@@ -195,8 +195,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   cluster.addMemberUpdateCb(
-      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
-          -> void { membership_updated.ready(); });
+      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+        membership_updated.ready();
+      });
 
   resolver1.expectResolve(*dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
@@ -528,5 +529,5 @@ TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

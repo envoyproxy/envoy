@@ -237,5 +237,5 @@ public:
   MOCK_METHOD0(stopListeners, void());
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

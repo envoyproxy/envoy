@@ -199,5 +199,5 @@ public:
                   Upstream::HostDescriptionConstSharedPtr host);
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

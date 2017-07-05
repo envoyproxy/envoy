@@ -98,6 +98,6 @@ void Instance::complete(LimitStatus status) {
   }
 }
 
-} // TcpFilter
-} // RateLimit
-} // Envoy
+} // namespace TcpFilter
+} // namespace RateLimit
+} // namespace Envoy

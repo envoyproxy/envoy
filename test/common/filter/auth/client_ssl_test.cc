@@ -20,13 +20,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::WithArg;
+using testing::_;
 
 namespace Filter {
 namespace Auth {
@@ -250,7 +250,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }
 
-} // ClientSsl
-} // Auth
-} // Filter
-} // Envoy
+} // namespace ClientSsl
+} // namespace Auth
+} // namespace Filter
+} // namespace Envoy

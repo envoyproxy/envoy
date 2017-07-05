@@ -40,4 +40,4 @@ public:
    */
   static std::string uint64ToHex(uint64_t value);
 };
-} // Envoy
+} // namespace Envoy

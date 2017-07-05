@@ -67,5 +67,5 @@ void RestApiFetcher::requestComplete() {
   refresh_timer_->enableTimer(final_delay);
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

@@ -58,4 +58,4 @@ private:
   T value_;
   bool valid_{};
 };
-} // Envoy
+} // namespace Envoy

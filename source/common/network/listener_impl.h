@@ -70,5 +70,5 @@ private:
   Ssl::Context& ssl_ctx_;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

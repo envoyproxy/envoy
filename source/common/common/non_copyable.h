@@ -12,4 +12,4 @@ private:
   NonCopyable(const NonCopyable&);
   NonCopyable& operator=(const NonCopyable&);
 };
-} // Envoy
+} // namespace Envoy

@@ -43,5 +43,5 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
 };
 
-} // ThreadLocal
-} // Envoy
+} // namespace ThreadLocal
+} // namespace Envoy

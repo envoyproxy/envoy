@@ -488,12 +488,12 @@ public:
   void setServiceName(const std::string& service_name);
 
   /**
-    * Serializes the span as a Zipkin-compliant JSON representation as a string.
-    * The resulting JSON string can be used as part of an HTTP POST call to
-    * send the span to Zipkin.
-    *
-    * @return a stringified JSON.
-    */
+   * Serializes the span as a Zipkin-compliant JSON representation as a string.
+   * The resulting JSON string can be used as part of an HTTP POST call to
+   * send the span to Zipkin.
+   *
+   * @return a stringified JSON.
+   */
   const std::string toJson() override;
 
   /**
@@ -543,5 +543,5 @@ private:
   int64_t monotonic_start_time_;
   TracerInterface* tracer_;
 };
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

@@ -146,6 +146,6 @@ private:
   std::function<std::string(const RequestInfo&)> field_extractor_;
 };
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

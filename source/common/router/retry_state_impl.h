@@ -59,5 +59,5 @@ private:
   Upstream::ResourcePriority priority_;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

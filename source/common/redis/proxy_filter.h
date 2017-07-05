@@ -109,4 +109,4 @@ private:
 };
 
 } // Redis
-} // Envoy
+} // namespace Envoy

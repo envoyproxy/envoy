@@ -5,9 +5,9 @@
 
 #include "gmock/gmock.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -39,8 +39,9 @@ TEST_F(InitManagerImplTest, TargetRemoveWhileInitializing) {
   Init::MockTarget target;
 
   manager_.registerTarget(target);
-  EXPECT_CALL(target, initialize(_))
-      .WillOnce(Invoke([](std::function<void()> callback) -> void { callback(); }));
+  EXPECT_CALL(target, initialize(_)).WillOnce(Invoke([](std::function<void()> callback) -> void {
+    callback();
+  }));
   EXPECT_CALL(initialized_, ready());
   manager_.initialize([&]() -> void { initialized_.ready(); });
 }
@@ -62,5 +63,5 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   target1.callback_();
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

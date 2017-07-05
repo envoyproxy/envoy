@@ -20,5 +20,5 @@ MockLocalInfo::MockLocalInfo() : address_(new Network::Address::Ipv4Instance("12
 
 MockLocalInfo::~MockLocalInfo() {}
 
-} // LocalInfo
-} // Envoy
+} // namespace LocalInfo
+} // namespace Envoy

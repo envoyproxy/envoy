@@ -133,5 +133,5 @@ void GuardDogImpl::stop() {
   }
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

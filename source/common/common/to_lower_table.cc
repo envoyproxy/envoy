@@ -15,4 +15,4 @@ void ToLowerTable::toLowerCase(char* buffer, uint32_t size) const {
     buffer[i] = table_[static_cast<uint8_t>(buffer[i])];
   }
 }
-} // Envoy
+} // namespace Envoy

@@ -27,5 +27,5 @@ private:
   std::unordered_map<std::string, Filesystem::FileSharedPtr> access_logs_;
 };
 
-} // AccessLog
-} // Envoy
+} // namespace AccessLog
+} // namespace Envoy

@@ -207,5 +207,5 @@ private:
   NullSnapshotImpl snapshot_;
 };
 
-} // Runtime
-} // Envoy
+} // namespace Runtime
+} // namespace Envoy

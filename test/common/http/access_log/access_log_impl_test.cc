@@ -28,10 +28,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 namespace AccessLog {
@@ -525,6 +525,6 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   EXPECT_FALSE(filter.evaluate(info, request_headers));
 }
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

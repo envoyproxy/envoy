@@ -16,9 +16,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::_;
 
 namespace Grpc {
 
@@ -61,8 +61,8 @@ TEST_F(GrpcRequestImplTest, NoError) {
   Http::LowerCaseString header_key("foo");
   std::string header_value("bar");
   EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers)
-                           -> void { headers.addStatic(header_key, header_value); }));
+      .WillOnce(Invoke(
+          [&](Http::HeaderMap& headers) -> void { headers.addStatic(header_key, header_value); }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::TestHeaderMapImpl expected_request_headers{{":method", "POST"},
@@ -323,5 +323,5 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   http_callbacks_->onSuccess(std::move(response_http_message));
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

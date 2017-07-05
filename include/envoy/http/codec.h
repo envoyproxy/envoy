@@ -264,5 +264,5 @@ public:
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

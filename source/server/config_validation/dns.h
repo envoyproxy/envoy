@@ -19,5 +19,5 @@ public:
                           ResolveCb callback) override;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

@@ -13,9 +13,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -76,7 +76,8 @@ public:
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb)))).WillOnce(ThrowOnRejectedConfig(accept));
+                        response_pb))))
+        .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }

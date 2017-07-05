@@ -28,6 +28,6 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
 static Registry::RegisterFactory<RateLimitConfigFactory, NamedNetworkFilterConfigFactory>
     registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

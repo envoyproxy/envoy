@@ -160,5 +160,5 @@ public:
   virtual bool empty() const PURE;
 };
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

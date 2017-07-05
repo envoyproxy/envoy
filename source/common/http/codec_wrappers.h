@@ -93,5 +93,5 @@ protected:
   StreamEncoder& inner_;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

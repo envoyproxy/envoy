@@ -133,5 +133,5 @@ public:
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
-} // Buffer
-} // Envoy
+} // namespace Buffer
+} // namespace Envoy

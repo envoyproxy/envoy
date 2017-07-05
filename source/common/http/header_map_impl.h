@@ -126,4 +126,4 @@ protected:
 typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
 
 } // Http
-} // Envoy
+} // namespace Envoy

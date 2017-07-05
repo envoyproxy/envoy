@@ -103,5 +103,5 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

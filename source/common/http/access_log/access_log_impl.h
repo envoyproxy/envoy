@@ -148,6 +148,6 @@ private:
   FormatterPtr formatter_;
 };
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

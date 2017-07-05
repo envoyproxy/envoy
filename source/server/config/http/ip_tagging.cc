@@ -26,6 +26,6 @@ HttpFilterFactoryCb IpTaggingFilterConfig::createFilterFactory(const Json::Objec
  */
 static Registry::RegisterFactory<IpTaggingFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

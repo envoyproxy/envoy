@@ -50,4 +50,4 @@ private:
   // Initial value for freshly generated uuid4.
   static const char NO_TRACE = '4';
 };
-} // Envoy
+} // namespace Envoy

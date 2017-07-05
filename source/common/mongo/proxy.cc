@@ -241,5 +241,5 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-} // Envoy
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

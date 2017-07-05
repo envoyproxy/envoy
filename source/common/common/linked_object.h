@@ -83,4 +83,4 @@ private:
   bool inserted_; // iterators do not have any "invalid" value so we need this boolean for sanity
                   // checking.
 };
-} // Envoy
+} // namespace Envoy

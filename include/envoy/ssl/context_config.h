@@ -70,5 +70,5 @@ public:
   virtual const std::string& serverNameIndication() const PURE;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

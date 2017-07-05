@@ -166,4 +166,4 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 }
 #endif
 
-} // Envoy
+} // namespace Envoy

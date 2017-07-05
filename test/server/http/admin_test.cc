@@ -15,8 +15,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
+using testing::_;
 
 namespace Server {
 
@@ -120,13 +120,14 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback =
-      [&](const std::string&, Buffer::Instance&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [&](const std::string&, Buffer::Instance&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   admin_.addHandler("/foo/bar", "hello", callback);
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

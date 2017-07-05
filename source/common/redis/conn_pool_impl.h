@@ -166,6 +166,6 @@ private:
   ConfigImpl config_;
 };
 
-} // ConnPool
-} // Redis
-} // Envoy
+} // namespace ConnPool
+} // namespace Redis
+} // namespace Envoy

@@ -47,5 +47,5 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

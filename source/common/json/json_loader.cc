@@ -693,5 +693,5 @@ const std::string Factory::listAsJsonString(const std::list<std::string>& items)
   return writer_string_buffer.GetString();
 }
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

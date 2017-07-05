@@ -61,5 +61,5 @@ private:
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
 };
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

@@ -20,5 +20,5 @@ public:
   virtual void setDateHeader(HeaderMap& headers) PURE;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

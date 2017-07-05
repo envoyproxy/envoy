@@ -168,4 +168,4 @@ private:
 };
 
 } // Server
-} // Envoy
+} // namespace Envoy

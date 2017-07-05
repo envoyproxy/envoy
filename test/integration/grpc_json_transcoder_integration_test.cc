@@ -11,12 +11,12 @@
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
-using google::protobuf::util::MessageDifferencer;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
 using google::protobuf::Empty;
 using google::protobuf::Message;
 using google::protobuf::TextFormat;
+using google::protobuf::util::MessageDifferencer;
+using google::protobuf::util::Status;
+using google::protobuf::util::error::Code;
 
 namespace Envoy {
 
@@ -113,11 +113,13 @@ protected:
 
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
-    response_headers.iterate([](const Http::HeaderEntry& entry, void* context) -> void {
-      IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-      Http::LowerCaseString lower_key{entry.key().c_str()};
-      EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
-    }, response.get());
+    response_headers.iterate(
+        [](const Http::HeaderEntry& entry, void* context) -> void {
+          IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+          Http::LowerCaseString lower_key{entry.key().c_str()};
+          EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        },
+        response.get());
     if (!response_body.empty()) {
       EXPECT_EQ(response_body, response->body());
     }
@@ -150,11 +152,11 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
       "", {""}, {R"(shelves { id: 20 theme: "Children" }
-          shelves { id: 1 theme: "Foo" } )"},
-      Status::OK, Http::TestHeaderMapImpl{{":status", "200"},
-                                          {"content-type", "application/json"},
-                                          {"content-length", "69"},
-                                          {"grpc-status", "0"}},
+          shelves { id: 1 theme: "Foo" } )"}, Status::OK,
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/json"},
+                              {"content-length", "69"},
+                              {"grpc-status", "0"}},
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
 }
 
@@ -221,8 +223,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-      "", {"shelf: 1"}, {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-                         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
       Status::OK, Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})"
       R"(,{"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"}])");
@@ -252,9 +255,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
        R"(id: 6 theme: "Children")",
        R"(id: 7 theme: "Documentary")",
        R"(id: 8 theme: "Mystery")"},
-      Status::OK, Http::TestHeaderMapImpl{{":status", "200"},
-                                          {"content-type", "application/json"},
-                                          {"transfer-encoding", "chunked"}},
+      Status::OK,
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/json"},
+                              {"transfer-encoding", "chunked"}},
       R"([{"id":"3","theme":"Classics"})"
       R"(,{"id":"4","theme":"Satire"})"
       R"(,{"id":"5","theme":"Russian"})"

@@ -15,12 +15,12 @@
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::_;
 
 using google::protobuf::util::MessageDifferencer;
 using google::protobuf::util::Status;

@@ -114,5 +114,5 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

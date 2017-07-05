@@ -4,8 +4,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
+using testing::_;
 
 namespace ThreadLocal {
 
@@ -19,5 +19,5 @@ MockInstance::MockInstance() {
 
 MockInstance::~MockInstance() {}
 
-} // ThreadLocal
-} // Envoy
+} // namespace ThreadLocal
+} // namespace Envoy

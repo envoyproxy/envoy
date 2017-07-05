@@ -4,4 +4,4 @@
 
 namespace Envoy {
 static const std::string EMPTY_STRING = "";
-} // Envoy
+} // namespace Envoy

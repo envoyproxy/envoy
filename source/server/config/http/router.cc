@@ -23,8 +23,9 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())},
       json_config.getBoolean("dynamic_stats", true)));
 
-  return [config](Http::FilterChainFactoryCallbacks& callbacks)
-      -> void { callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config)); };
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config));
+  };
 }
 
 /**
@@ -32,6 +33,6 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
  */
 static Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

@@ -42,7 +42,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
  * Static registration for the HTTP connection manager filter.
  */
 static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 NamedNetworkFilterConfigFactory> registered_;
+                                 NamedNetworkFilterConfigFactory>
+    registered_;
 
 std::string
 HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
@@ -54,9 +55,8 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
   // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
   // internal cases this should practically never happen.
-  if (-1 !=
-      data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(), Http::Http2::CLIENT_MAGIC_PREFIX.size(),
-                  0)) {
+  if (-1 != data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(),
+                        Http::Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
     return Http::Http2::ALPN_STRING;
   }
 
@@ -248,6 +248,6 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

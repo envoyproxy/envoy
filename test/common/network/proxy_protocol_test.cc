@@ -18,9 +18,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::_;
 
 namespace Network {
 
@@ -64,12 +64,11 @@ TEST_P(ProxyProtocolTest, Basic) {
 
   ConnectionPtr accepted_connection;
 
-  EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
-        conn->addReadFilter(read_filter_);
-        accepted_connection = std::move(conn);
-      }));
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
+    conn->addReadFilter(read_filter_);
+    accepted_connection = std::move(conn);
+  }));
 
   read_filter_.reset(new MockReadFilter());
   EXPECT_CALL(*read_filter_, onNewConnection());
@@ -86,12 +85,11 @@ TEST_P(ProxyProtocolTest, BasicV6) {
 
   ConnectionPtr accepted_connection;
 
-  EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("1:2:3::4", conn->remoteAddress().ip()->addressAsString());
-        conn->addReadFilter(read_filter_);
-        accepted_connection = std::move(conn);
-      }));
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("1:2:3::4", conn->remoteAddress().ip()->addressAsString());
+    conn->addReadFilter(read_filter_);
+    accepted_connection = std::move(conn);
+  }));
 
   read_filter_.reset(new MockReadFilter());
   EXPECT_CALL(*read_filter_, onNewConnection());
@@ -110,13 +108,12 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   write(".3.4 65535");
   write(" 1234\r\n");
 
-  EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
-        read_filter_.reset(new MockReadFilter());
-        conn->addReadFilter(read_filter_);
-        conn->close(ConnectionCloseType::NoFlush);
-      }));
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
+    read_filter_.reset(new MockReadFilter());
+    conn->addReadFilter(read_filter_);
+    conn->close(ConnectionCloseType::NoFlush);
+  }));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -126,13 +123,12 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   write("PROXY TCP4");
   write(" 255.255.2");
 
-  EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
-        read_filter_.reset(new MockReadFilter());
-        conn->addReadFilter(read_filter_);
-        conn->close(ConnectionCloseType::NoFlush);
-      }));
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
+    read_filter_.reset(new MockReadFilter());
+    conn->addReadFilter(read_filter_);
+    conn->close(ConnectionCloseType::NoFlush);
+  }));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
@@ -200,5 +196,5 @@ TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

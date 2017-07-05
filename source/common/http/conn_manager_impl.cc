@@ -399,10 +399,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   request_headers_ = std::move(headers);
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NVLOG
-  request_headers_->iterate([](const HeaderEntry& header, void* context) -> void {
-    ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                     header.key().c_str(), header.value().c_str());
-  }, this);
+  request_headers_->iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
+                         header.key().c_str(), header.value().c_str());
+      },
+      this);
 #endif
 
   connection_manager_.user_agent_.initializeFromHeaders(
@@ -710,10 +712,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):", *this,
                    end_stream && continue_data_entry == encoder_filters_.end());
 #ifndef NVLOG
-  headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                     header.key().c_str(), header.value().c_str());
-  }, this);
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
+                         header.key().c_str(), header.value().c_str());
+      },
+      this);
 #endif
 
   // Now actually encode via the codec.
@@ -789,10 +793,12 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec", *this);
 #ifndef NVLOG
-  trailers.iterate([](const HeaderEntry& header, void* context) -> void {
-    ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                     header.key().c_str(), header.value().c_str());
-  }, this);
+  trailers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
+                         header.key().c_str(), header.value().c_str());
+      },
+      this);
 #endif
 
   response_encoder_->encodeTrailers(trailers);
@@ -990,5 +996,5 @@ const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddr
   return parent_.downstream_address_;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

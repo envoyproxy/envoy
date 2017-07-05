@@ -43,4 +43,4 @@ private:
    */
   static void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret);
 };
-} // Envoy
+} // namespace Envoy

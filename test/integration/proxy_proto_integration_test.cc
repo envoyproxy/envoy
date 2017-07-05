@@ -31,4 +31,4 @@ TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBufferV6) {
                                        false);
 }
 
-} // Envoy
+} // namespace Envoy

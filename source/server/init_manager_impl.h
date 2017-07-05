@@ -27,5 +27,5 @@ private:
   std::function<void()> callback_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

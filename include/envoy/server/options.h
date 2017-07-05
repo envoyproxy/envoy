@@ -97,10 +97,10 @@ public:
   virtual Mode mode() const PURE;
 
   /**
-    * @return std::chrono::milliseconds the duration in msec between log flushes.
-    */
+   * @return std::chrono::milliseconds the duration in msec between log flushes.
+   */
   virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

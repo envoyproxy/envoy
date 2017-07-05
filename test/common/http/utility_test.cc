@@ -209,5 +209,5 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

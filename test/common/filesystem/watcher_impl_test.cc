@@ -59,5 +59,5 @@ TEST(WatcherImplTest, All) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

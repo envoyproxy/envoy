@@ -45,8 +45,8 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Obj
                                                     std::chrono::milliseconds(cache_time_ms)));
   }
 
-  return [&context, pass_through_mode, cache_manager, hc_endpoint](
-             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&context, pass_through_mode, cache_manager,
+          hc_endpoint](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
         new HealthCheckFilter(context, pass_through_mode, cache_manager, hc_endpoint)});
   };
@@ -57,8 +57,8 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Obj
  */
 static Registry::RegisterFactory<HealthCheckFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
 
 HealthCheckCacheManager::HealthCheckCacheManager(Event::Dispatcher& dispatcher,
                                                  std::chrono::milliseconds timeout)
@@ -149,4 +149,4 @@ void HealthCheckFilter::onComplete() {
 
   callbacks_->encodeHeaders(std::move(headers), true);
 }
-} // Envoy
+} // namespace Envoy

@@ -13,13 +13,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 class HealthCheckFilterTest : public testing::Test {
 public:
@@ -220,4 +220,4 @@ TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
 
   healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context);
 }
-} // Envoy
+} // namespace Envoy

@@ -79,5 +79,5 @@ public:
   }
 };
 
-} // Config
-} // Envoy
+} // namespace Config
+} // namespace Envoy

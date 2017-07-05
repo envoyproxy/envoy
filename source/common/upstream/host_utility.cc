@@ -22,5 +22,5 @@ std::string HostUtility::healthFlagsToString(const Host& host) {
   return ret;
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

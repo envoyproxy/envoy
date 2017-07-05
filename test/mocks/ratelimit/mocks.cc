@@ -6,5 +6,5 @@ namespace RateLimit {
 MockClient::MockClient() {}
 MockClient::~MockClient() {}
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

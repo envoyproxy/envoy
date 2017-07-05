@@ -179,5 +179,5 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   return active_span;
 }
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

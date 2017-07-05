@@ -47,4 +47,4 @@ TEST_P(NetworkUtilityTest, DISABLED_ValidateBindFreeLoopbackPort) {
 
 } // namespace Test
 } // namespace Network
-} // Envoy
+} // namespace Envoy

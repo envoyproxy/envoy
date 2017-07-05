@@ -8,11 +8,11 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -69,10 +69,9 @@ TEST_F(WorkerImplTest, All) {
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  EXPECT_CALL(ready, ready())
-      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+  EXPECT_CALL(ready, ready()).WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+  }));
   worker_.removeListener(listener2, [&ready]() -> void { ready.ready(); });
 
   // Now test adding and removing a listener without stopping it first.
@@ -88,14 +87,13 @@ TEST_F(WorkerImplTest, All) {
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  EXPECT_CALL(ready, ready())
-      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+  EXPECT_CALL(ready, ready()).WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+  }));
   worker_.removeListener(listener3, [&ready]() -> void { ready.ready(); });
 
   worker_.stop();
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -99,6 +99,6 @@ public:
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
-} // ConnectionPool
-} // Http
-} // Envoy
+} // namespace ConnectionPool
+} // namespace Http
+} // namespace Envoy

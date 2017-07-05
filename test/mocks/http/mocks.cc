@@ -7,11 +7,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 
@@ -34,20 +34,19 @@ MockStreamCallbacks::MockStreamCallbacks() {}
 MockStreamCallbacks::~MockStreamCallbacks() {}
 
 MockStream::MockStream() {
-  ON_CALL(*this, addCallbacks(_))
-      .WillByDefault(
-          Invoke([this](StreamCallbacks& callbacks) -> void { callbacks_.push_back(&callbacks); }));
+  ON_CALL(*this, addCallbacks(_)).WillByDefault(Invoke([this](StreamCallbacks& callbacks) -> void {
+    callbacks_.push_back(&callbacks);
+  }));
 
   ON_CALL(*this, removeCallbacks(_))
       .WillByDefault(
           Invoke([this](StreamCallbacks& callbacks) -> void { callbacks_.remove(&callbacks); }));
 
-  ON_CALL(*this, resetStream(_))
-      .WillByDefault(Invoke([this](StreamResetReason reason) -> void {
-        for (StreamCallbacks* callbacks : callbacks_) {
-          callbacks->onResetStream(reason);
-        }
-      }));
+  ON_CALL(*this, resetStream(_)).WillByDefault(Invoke([this](StreamResetReason reason) -> void {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      callbacks->onResetStream(reason);
+    }
+  }));
 }
 
 MockStream::~MockStream() {}
@@ -94,27 +93,29 @@ MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}
 
 MockStreamDecoderFilter::MockStreamDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks)
-                                -> void { callbacks_ = &callbacks; }));
+      .WillByDefault(Invoke(
+          [this](StreamDecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
 }
 
 MockStreamDecoderFilter::~MockStreamDecoderFilter() {}
 
 MockStreamEncoderFilter::MockStreamEncoderFilter() {
   ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamEncoderFilterCallbacks& callbacks)
-                                -> void { callbacks_ = &callbacks; }));
+      .WillByDefault(Invoke(
+          [this](StreamEncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
 }
 
 MockStreamEncoderFilter::~MockStreamEncoderFilter() {}
 
 MockStreamFilter::MockStreamFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks)
-                                -> void { decoder_callbacks_ = &callbacks; }));
+      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+        decoder_callbacks_ = &callbacks;
+      }));
   ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamEncoderFilterCallbacks& callbacks)
-                                -> void { encoder_callbacks_ = &callbacks; }));
+      .WillByDefault(Invoke([this](StreamEncoderFilterCallbacks& callbacks) -> void {
+        encoder_callbacks_ = &callbacks;
+      }));
 }
 
 MockStreamFilter::~MockStreamFilter() {}
@@ -137,7 +138,7 @@ MockAsyncClientStream::~MockAsyncClientStream() {}
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
 
-} // Http
+} // namespace Http
 
 namespace Http {
 namespace ConnectionPool {
@@ -148,8 +149,8 @@ MockCancellable::~MockCancellable() {}
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
-} // ConnectionPool
-} // Http
+} // namespace ConnectionPool
+} // namespace Http
 
 namespace Http {
 namespace AccessLog {
@@ -164,6 +165,6 @@ MockRequestInfo::MockRequestInfo() {
 
 MockRequestInfo::~MockRequestInfo() {}
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

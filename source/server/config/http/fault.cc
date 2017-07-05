@@ -27,6 +27,6 @@ HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(const Json::Object& j
  */
 static Registry::RegisterFactory<FaultFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

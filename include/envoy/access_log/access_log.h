@@ -28,5 +28,5 @@ public:
 
 typedef std::unique_ptr<AccessLogManager> AccessLogManagerPtr;
 
-} // AccessLog
-} // Envoy
+} // namespace AccessLog
+} // namespace Envoy

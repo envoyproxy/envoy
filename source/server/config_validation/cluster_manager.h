@@ -56,5 +56,5 @@ private:
   Http::ValidationAsyncClient async_client_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

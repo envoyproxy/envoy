@@ -60,4 +60,4 @@ bool UuidUtils::setTraceableUuid(std::string& uuid, UuidTraceStatus trace_status
 
   return true;
 }
-} // Envoy
+} // namespace Envoy

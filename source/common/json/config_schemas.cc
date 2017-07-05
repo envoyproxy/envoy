@@ -1440,4 +1440,4 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
     "required" : ["hosts"]
   }
   )EOF");
-} // Envoy
+} // namespace Envoy

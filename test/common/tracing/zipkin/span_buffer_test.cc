@@ -101,5 +101,5 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

@@ -78,5 +78,5 @@ public:
   }
 };
 
-} // Registry
-} // Envoy
+} // namespace Registry
+} // namespace Envoy

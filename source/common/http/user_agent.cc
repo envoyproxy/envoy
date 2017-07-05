@@ -57,5 +57,5 @@ void UserAgent::onConnectionDestroy(uint32_t events, bool active_streams) {
   }
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

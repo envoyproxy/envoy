@@ -332,5 +332,5 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
 }
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

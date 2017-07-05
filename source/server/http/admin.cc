@@ -425,4 +425,4 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 } // Server
-} // Envoy
+} // namespace Envoy

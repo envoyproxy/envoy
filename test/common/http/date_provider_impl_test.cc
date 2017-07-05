@@ -34,5 +34,5 @@ TEST(DateProviderImplTest, All) {
   EXPECT_NE(nullptr, headers.Date());
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

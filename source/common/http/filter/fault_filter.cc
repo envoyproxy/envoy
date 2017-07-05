@@ -281,5 +281,5 @@ void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callba
   callbacks_ = &callbacks;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

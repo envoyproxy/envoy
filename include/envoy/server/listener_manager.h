@@ -153,5 +153,5 @@ public:
   virtual void stopWorkers() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

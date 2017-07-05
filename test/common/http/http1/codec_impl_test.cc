@@ -17,11 +17,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Http {
 namespace Http1 {
@@ -126,8 +126,9 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::HeaderMapPtr&, bool)
-                           -> void { connection_.state_ = Network::Connection::State::Closing; }));
+      .WillOnce(Invoke([&](Http::HeaderMapPtr&, bool) -> void {
+        connection_.state_ = Network::Connection::State::Closing;
+      }));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
@@ -453,6 +454,6 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
   codec_->dispatch(response);
 }
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

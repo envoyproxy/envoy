@@ -20,6 +20,6 @@ public:
   HttpFilterType type() override { return HttpFilterType::Decoder; }
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

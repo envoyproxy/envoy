@@ -29,5 +29,5 @@ private:
   Upstream::ClusterManager& cm_;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

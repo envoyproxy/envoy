@@ -322,5 +322,5 @@ public:
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

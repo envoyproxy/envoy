@@ -33,4 +33,4 @@ TEST_P(UdsIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                        Http::CodecClient::Type::HTTP1);
 }
-} // Envoy
+} // namespace Envoy

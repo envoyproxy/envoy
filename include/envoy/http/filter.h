@@ -385,5 +385,5 @@ public:
   virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

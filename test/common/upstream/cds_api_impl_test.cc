@@ -15,11 +15,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Upstream {
 
@@ -217,5 +217,5 @@ TEST_F(CdsApiImplTest, FailureArray) {
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

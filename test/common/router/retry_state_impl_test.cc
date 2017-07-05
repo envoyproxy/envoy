@@ -14,9 +14,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Router {
 
@@ -307,5 +307,5 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
   EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

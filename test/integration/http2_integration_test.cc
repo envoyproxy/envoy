@@ -116,8 +116,8 @@ TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::StreamEncoder* downstream_request{};
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        [&]() -> void { downstream_request = &codec_client->startRequest(big_headers, *response); },
        [&]() -> void { response->waitForReset(); }, [&]() -> void { codec_client->close(); }});
 }
@@ -130,10 +130,11 @@ TEST_P(Http2IntegrationTest, BadMagic) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"),
-      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
-      }, version_);
+      },
+      version_);
 
   connection.run();
   EXPECT_EQ("", response);
@@ -143,10 +144,11 @@ TEST_P(Http2IntegrationTest, BadFrame) {
   Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("http"),
-      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
-      }, version_);
+      },
+      version_);
 
   connection.run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
@@ -158,8 +160,8 @@ TEST_P(Http2IntegrationTest, GoAway) {
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        [&]() -> void {
          encoder = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                        {":path", "/healthcheck"},
@@ -191,8 +193,8 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request2;
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        // Start request 1
        [&]() -> void {
          encoder1 = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -271,4 +273,4 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection2->close(); },
        [&]() -> void { fake_upstream_connection2->waitForDisconnect(); }});
 }
-} // Envoy
+} // namespace Envoy

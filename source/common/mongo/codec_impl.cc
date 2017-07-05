@@ -393,5 +393,5 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
   }
 }
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

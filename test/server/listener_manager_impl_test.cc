@@ -9,9 +9,9 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -21,13 +21,12 @@ public:
   ListenerManagerImplTest() {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
-                       Server::Configuration::FactoryContext& context)
-                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
-                         return Server::ProdListenerComponentFactory::createFilterFactoryList_(
-                             filters, server_, context);
-                       }));
+        .WillByDefault(Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
+                                  Server::Configuration::FactoryContext& context)
+                                  -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
+          return Server::ProdListenerComponentFactory::createFilterFactoryList_(filters, server_,
+                                                                                context);
+        }));
   }
 
   NiceMock<MockInstance> server_;
@@ -266,5 +265,5 @@ TEST_F(ListenerManagerImplTest, DeprecatedFilterConfigFactoryRegistrationTest) {
   manager_.addListener(*loader);
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -36,8 +36,9 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
   }
 
   AllowedPrincipalsSharedPtr empty(new AllowedPrincipals());
-  tls_.set(tls_slot_, [empty](Event::Dispatcher&)
-                          -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
+  tls_.set(tls_slot_, [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return empty;
+  });
 }
 
 ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
@@ -66,8 +67,10 @@ void Config::parseResponse(const Http::Message& message) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
   }
 
-  tls_.set(tls_slot_, [new_principals](Event::Dispatcher&)
-                          -> ThreadLocal::ThreadLocalObjectSharedPtr { return new_principals; });
+  tls_.set(tls_slot_,
+           [new_principals](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             return new_principals;
+           });
 
   stats_.update_success_.inc();
   stats_.total_principals_.set(new_principals->size());
@@ -121,7 +124,7 @@ void Instance::onEvent(uint32_t events) {
   read_callbacks_->continueReading();
 }
 
-} // Client Ssl
-} // Auth
-} // Filter
-} // Envoy
+} // namespace ClientSsl
+} // namespace Auth
+} // namespace Filter
+} // namespace Envoy

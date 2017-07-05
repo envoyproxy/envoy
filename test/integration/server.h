@@ -74,7 +74,7 @@ public:
   }
 };
 
-} // Server
+} // namespace Server
 
 namespace Stats {
 
@@ -163,7 +163,7 @@ private:
   IsolatedStoreImpl store_;
 };
 
-} // Stats
+} // namespace Stats
 
 class IntegrationTestServer;
 typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
@@ -218,4 +218,4 @@ private:
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;
 };
-} // Envoy
+} // namespace Envoy

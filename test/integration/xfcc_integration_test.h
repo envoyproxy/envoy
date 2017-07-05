@@ -53,5 +53,5 @@ private:
   Ssl::ClientContextPtr client_mtls_ssl_ctx_;
   Ssl::ServerContextPtr upstream_ssl_ctx_;
 };
-} // Xfcc
-} // Envoy
+} // namespace Xfcc
+} // namespace Envoy

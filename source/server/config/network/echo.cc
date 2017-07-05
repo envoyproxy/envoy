@@ -16,8 +16,9 @@ class EchoConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object&, FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager)
-        -> void { filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()}); };
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()});
+    };
   }
 
   std::string name() override { return "echo"; }
@@ -29,6 +30,6 @@ public:
  */
 static Registry::RegisterFactory<EchoConfigFactory, NamedNetworkFilterConfigFactory> registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

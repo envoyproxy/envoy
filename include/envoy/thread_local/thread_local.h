@@ -83,5 +83,5 @@ public:
   virtual void shutdownThread() PURE;
 };
 
-} // ThreadLocal
-} // Envoy
+} // namespace ThreadLocal
+} // namespace Envoy

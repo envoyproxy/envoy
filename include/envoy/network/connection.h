@@ -180,5 +180,5 @@ public:
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

@@ -42,6 +42,6 @@ typedef CSmartPtr<evbuffer, evbuffer_free> BufferPtr;
 typedef CSmartPtr<bufferevent, bufferevent_free> BufferEventPtr;
 typedef CSmartPtr<evconnlistener, evconnlistener_free> ListenerPtr;
 
-} // Libevent
-} // Event
-} // Envoy
+} // namespace Libevent
+} // namespace Event
+} // namespace Envoy

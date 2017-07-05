@@ -113,5 +113,5 @@ TEST(NullRuntimeImplTest, All) {
   EXPECT_TRUE(loader.snapshot().featureEnabled("foo", 50));
 }
 
-} // Runtime
-} // Envoy
+} // namespace Runtime
+} // namespace Envoy

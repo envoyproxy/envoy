@@ -100,5 +100,5 @@ private:
   RequestParser() {}
 };
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

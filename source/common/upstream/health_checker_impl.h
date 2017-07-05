@@ -376,5 +376,5 @@ private:
   Redis::ConnPool::ClientFactory& client_factory_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

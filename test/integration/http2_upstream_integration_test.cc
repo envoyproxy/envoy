@@ -109,8 +109,8 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
   FakeStreamPtr upstream_request;
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        // Start request
        [&]() -> void {
          encoder = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -167,8 +167,8 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   FakeStreamPtr upstream_request;
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        // Start request
        [&]() -> void {
          encoder = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -226,8 +226,8 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request2;
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+       },
        // Start request 1
        [&]() -> void {
          encoder1 = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -301,4 +301,4 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection->close(); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
-} // Envoy
+} // namespace Envoy

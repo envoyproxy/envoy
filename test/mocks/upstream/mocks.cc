@@ -12,12 +12,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Upstream {
 namespace Outlier {
@@ -29,13 +29,14 @@ MockEventLogger::MockEventLogger() {}
 MockEventLogger::~MockEventLogger() {}
 
 MockDetector::MockDetector() {
-  ON_CALL(*this, addChangedStateCb(_))
-      .WillByDefault(Invoke([this](ChangeStateCb cb) -> void { callbacks_.push_back(cb); }));
+  ON_CALL(*this, addChangedStateCb(_)).WillByDefault(Invoke([this](ChangeStateCb cb) -> void {
+    callbacks_.push_back(cb);
+  }));
 }
 
 MockDetector::~MockDetector() {}
 
-} // Outlier
+} // namespace Outlier
 
 MockHostDescription::MockHostDescription()
     : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
@@ -68,16 +69,17 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, resourceManager(_))
-      .WillByDefault(Invoke([this](ResourcePriority)
-                                -> Upstream::ResourceManager& { return *resource_manager_; }));
+      .WillByDefault(Invoke(
+          [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}
 
 MockCluster::MockCluster() {
-  ON_CALL(*this, addMemberUpdateCb(_))
-      .WillByDefault(Invoke([this](MemberUpdateCb cb) -> void { callbacks_.push_back(cb); }));
+  ON_CALL(*this, addMemberUpdateCb(_)).WillByDefault(Invoke([this](MemberUpdateCb cb) -> void {
+    callbacks_.push_back(cb);
+  }));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, hostsPerZone()).WillByDefault(ReturnRef(hosts_per_zone_));
@@ -117,8 +119,9 @@ MockClusterManager::MockClusterManager() {
 MockClusterManager::~MockClusterManager() {}
 
 MockHealthChecker::MockHealthChecker() {
-  ON_CALL(*this, addHostCheckCompleteCb(_))
-      .WillByDefault(Invoke([this](HostStatusCb cb) -> void { callbacks_.push_back(cb); }));
+  ON_CALL(*this, addHostCheckCompleteCb(_)).WillByDefault(Invoke([this](HostStatusCb cb) -> void {
+    callbacks_.push_back(cb);
+  }));
 }
 
 MockHealthChecker::~MockHealthChecker() {}
@@ -129,5 +132,5 @@ MockCdsApi::MockCdsApi() {
 
 MockCdsApi::~MockCdsApi() {}
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

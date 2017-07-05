@@ -110,5 +110,5 @@ private:
 
 typedef std::unique_ptr<Tracer> TracerPtr;
 
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

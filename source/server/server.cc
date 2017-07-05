@@ -37,8 +37,9 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
                            ComponentFactory& component_factory,
                            const LocalInfo::LocalInfo& local_info)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store),
-      server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
+      original_start_time_(start_time_),
+      stats_store_(store), server_stats_{ALL_SERVER_STATS(
+                               POOL_GAUGE_PREFIX(stats_store_, "server."))},
       api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_), dns_resolver_(dispatcher_->createDnsResolver({})),
@@ -336,5 +337,5 @@ void InstanceImpl::shutdownAdmin() {
   restarter_.terminateParent();
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

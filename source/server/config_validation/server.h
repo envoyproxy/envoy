@@ -127,5 +127,5 @@ private:
   ListenerManagerImpl listener_manager_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

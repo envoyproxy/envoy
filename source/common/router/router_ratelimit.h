@@ -38,8 +38,8 @@ public:
 };
 
 /**
-* Action for request headers rate limiting.
-*/
+ * Action for request headers rate limiting.
+ */
 class RequestHeadersAction : public RateLimitAction {
 public:
   RequestHeadersAction(const Json::Object& action)
@@ -145,5 +145,5 @@ private:
   static const uint64_t MAX_STAGE_NUMBER;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

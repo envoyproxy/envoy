@@ -52,5 +52,5 @@ private:
   Ring healthy_hosts_ring_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

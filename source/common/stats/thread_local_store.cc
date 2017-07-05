@@ -220,5 +220,5 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   return *central_ref;
 }
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

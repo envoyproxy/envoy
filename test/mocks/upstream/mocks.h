@@ -141,5 +141,5 @@ public:
   std::function<void()> initialized_callback_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

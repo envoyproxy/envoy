@@ -115,5 +115,5 @@ public:
 
 typedef std::unique_ptr<Loader> LoaderPtr;
 
-} // Runtime
-} // Envoy
+} // namespace Runtime
+} // namespace Envoy

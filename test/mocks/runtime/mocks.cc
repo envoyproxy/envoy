@@ -4,8 +4,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::ReturnArg;
+using testing::_;
 
 namespace Runtime {
 
@@ -17,5 +17,5 @@ MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(sn
 
 MockLoader::~MockLoader() {}
 
-} // Runtime
-} // Envoy
+} // namespace Runtime
+} // namespace Envoy

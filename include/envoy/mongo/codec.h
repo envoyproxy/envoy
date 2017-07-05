@@ -185,5 +185,5 @@ public:
   virtual void encodeReply(const ReplyMessage& message) PURE;
 };
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

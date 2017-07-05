@@ -248,6 +248,6 @@ IpList::IpList(const Json::Object& config, const std::string& member_name)
     : IpList(config.hasObject(member_name) ? config.getStringArray(member_name)
                                            : std::vector<std::string>()) {}
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

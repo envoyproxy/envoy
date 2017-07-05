@@ -74,5 +74,5 @@ public:
   virtual Resource& retries() PURE;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

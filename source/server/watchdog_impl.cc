@@ -15,5 +15,5 @@ void WatchDogImpl::startWatchdog(Event::Dispatcher& dispatcher) {
   timer_->enableTimer(timer_interval_);
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

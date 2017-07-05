@@ -26,5 +26,5 @@ private:
   const std::string node_name_;
 };
 
-} // LocalInfo
-} // Envoy
+} // namespace LocalInfo
+} // namespace Envoy

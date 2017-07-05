@@ -44,5 +44,5 @@ private:
   std::string server_name_indication_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

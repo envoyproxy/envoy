@@ -52,5 +52,5 @@ public:
   MOCK_METHOD3(addWatch, void(const std::string&, uint32_t, OnChangedCb));
 };
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

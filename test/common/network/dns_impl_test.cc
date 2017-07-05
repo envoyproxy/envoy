@@ -28,11 +28,11 @@
 #include "ares_dns.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Network {
@@ -356,9 +356,11 @@ TEST_P(DnsImplTest, LocalLookup) {
   EXPECT_TRUE(address_list.empty());
 
   if (GetParam() == Address::IpVersion::v4) {
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V4Only,
-                                          [&](std::list<Address::InstanceConstSharedPtr>&& results)
-                                              -> void { address_list = results; }));
+    EXPECT_EQ(nullptr,
+              resolver_->resolve("localhost", DnsLookupFamily::V4Only,
+                                 [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                   address_list = results;
+                                 }));
     EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_FALSE(hasAddress(address_list, "::1"));
   }
@@ -367,16 +369,20 @@ TEST_P(DnsImplTest, LocalLookup) {
     const std::string error_msg =
         "Synchronous DNS IPv6 localhost resolution failed. Please verify localhost resolves to ::1 "
         "in /etc/hosts, since this misconfiguration is a common cause of these failures.";
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V6Only,
-                                          [&](std::list<Address::InstanceConstSharedPtr>&& results)
-                                              -> void { address_list = results; }))
+    EXPECT_EQ(nullptr,
+              resolver_->resolve("localhost", DnsLookupFamily::V6Only,
+                                 [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                   address_list = results;
+                                 }))
         << error_msg;
     EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
 
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::Auto,
-                                          [&](std::list<Address::InstanceConstSharedPtr>&& results)
-                                              -> void { address_list = results; }))
+    EXPECT_EQ(nullptr,
+              resolver_->resolve("localhost", DnsLookupFamily::Auto,
+                                 [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                   address_list = results;
+                                 }))
         << error_msg;
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
@@ -541,7 +547,7 @@ TEST_P(DnsImplTest, Cancel) {
 
   ActiveDnsQuery* query =
       resolver_->resolve("some.domain", DnsLookupFamily::Auto,
-                         [](std::list<Address::InstanceConstSharedPtr> && ) -> void { FAIL(); });
+                         [](std::list<Address::InstanceConstSharedPtr> &&) -> void { FAIL(); });
 
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
@@ -599,5 +605,5 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
                                       }));
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

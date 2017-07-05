@@ -15,4 +15,4 @@ namespace Envoy {
  */
 int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& restarter);
 
-} // Envoy
+} // namespace Envoy

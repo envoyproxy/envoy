@@ -73,5 +73,5 @@ public:
   virtual WorkerPtr createWorker() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

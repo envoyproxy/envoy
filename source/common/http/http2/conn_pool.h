@@ -99,6 +99,6 @@ private:
   static const uint64_t MAX_STREAMS = (1 << 29);
 };
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

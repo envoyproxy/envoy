@@ -26,5 +26,5 @@ MockStore::~MockStore() {}
 MockIsolatedStatsStore::MockIsolatedStatsStore() {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

@@ -185,5 +185,5 @@ void Common::validateResponse(Http::Message& http_response) {
   }
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

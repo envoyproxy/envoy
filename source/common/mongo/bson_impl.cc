@@ -551,5 +551,5 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
   return nullptr;
 }
 
-} // Bson
-} // Envoy
+} // namespace Bson
+} // namespace Envoy

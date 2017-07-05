@@ -153,9 +153,9 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 
   // If we weren't tracking the fd before, create a new FileEvent.
   if (it == events_.end()) {
-    events_[fd] = dispatcher_.createFileEvent(fd, [this, fd](uint32_t events) {
-      onEventCallback(fd, events);
-    }, Event::FileTriggerType::Level, Event::FileReadyType::Read | Event::FileReadyType::Write);
+    events_[fd] = dispatcher_.createFileEvent(
+        fd, [this, fd](uint32_t events) { onEventCallback(fd, events); },
+        Event::FileTriggerType::Level, Event::FileReadyType::Read | Event::FileReadyType::Write);
   }
   events_[fd]->setEnabled((read ? Event::FileReadyType::Read : 0) |
                           (write ? Event::FileReadyType::Write : 0));
@@ -194,12 +194,13 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_gethostbyname(channel_, dns_name_.c_str(),
-                     family, [](void* arg, int status, int timeouts, hostent* hostent) {
-                       static_cast<PendingResolution*>(arg)
-                           ->onAresHostCallback(status, timeouts, hostent);
-                     }, this);
+  ares_gethostbyname(channel_, dns_name_.c_str(), family,
+                     [](void* arg, int status, int timeouts, hostent* hostent) {
+                       static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts,
+                                                                                hostent);
+                     },
+                     this);
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

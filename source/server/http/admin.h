@@ -171,5 +171,5 @@ private:
   Http::HeaderMap* request_headers_{};
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

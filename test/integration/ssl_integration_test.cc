@@ -170,5 +170,5 @@ TEST_P(SslIntegrationTest, AltAlpn) {
   checkStats();
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

@@ -10,12 +10,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::ByRef;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -215,5 +215,5 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   EXPECT_CALL(*listener3, onDestroy());
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

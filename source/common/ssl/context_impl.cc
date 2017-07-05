@@ -336,12 +336,12 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     SSL_CTX_set_alpn_select_cb(ctx_.get(),
                                [](SSL*, const unsigned char** out, unsigned char* outlen,
                                   const unsigned char* in, unsigned int inlen, void* arg) -> int {
-                                 return static_cast<ServerContextImpl*>(arg)
-                                     ->alpnSelectCallback(out, outlen, in, inlen);
+                                 return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
+                                     out, outlen, in, inlen);
                                },
                                this);
   }
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

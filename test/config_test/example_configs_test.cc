@@ -10,4 +10,4 @@ TEST(ExampleConfigsTest, All) {
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
   EXPECT_EQ(11UL, ConfigTest::run(TestEnvironment::temporaryDirectory() + "/test/config_test"));
 }
-} // Envoy
+} // namespace Envoy

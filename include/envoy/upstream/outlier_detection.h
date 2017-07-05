@@ -131,6 +131,6 @@ public:
 
 typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
 
-} // Outlier
-} // Upstream
-} // Envoy
+} // namespace Outlier
+} // namespace Upstream
+} // namespace Envoy

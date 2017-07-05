@@ -189,5 +189,5 @@ TEST(QueryMessageInfoTest, Command) {
   }
 }
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

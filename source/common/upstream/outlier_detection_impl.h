@@ -280,6 +280,6 @@ public:
                                double success_rate_stdev_factor);
 };
 
-} // Outlier
-} // Upstream
-} // Envoy
+} // namespace Outlier
+} // namespace Upstream
+} // namespace Envoy

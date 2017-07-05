@@ -35,7 +35,7 @@ public:
   }
 };
 
-} // Server
+} // namespace Server
 
 int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
   Event::Libevent::Global::initialize();
@@ -65,4 +65,4 @@ int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
   return 0;
 }
 
-} // Envoy
+} // namespace Envoy

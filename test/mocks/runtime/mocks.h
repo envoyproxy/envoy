@@ -40,5 +40,5 @@ public:
   testing::NiceMock<MockSnapshot> snapshot_;
 };
 
-} // Runtime
-} // Envoy
+} // namespace Runtime
+} // namespace Envoy

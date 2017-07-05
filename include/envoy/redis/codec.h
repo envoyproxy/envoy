@@ -131,5 +131,5 @@ public:
   ProtocolError(const std::string& error) : EnvoyException(error) {}
 };
 
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

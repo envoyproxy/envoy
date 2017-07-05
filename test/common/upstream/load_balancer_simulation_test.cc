@@ -103,7 +103,8 @@ public:
     for (const auto& host_hit_num_pair : hits) {
       double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
       std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
-                               host_hit_num_pair.second, percent_diff) << std::endl;
+                               host_hit_num_pair.second, percent_diff)
+                << std::endl;
     }
   }
 
@@ -189,5 +190,5 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

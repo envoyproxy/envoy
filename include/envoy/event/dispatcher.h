@@ -157,5 +157,5 @@ public:
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

@@ -61,4 +61,4 @@ private:
 };
 
 } // Upstream
-} // Envoy
+} // namespace Envoy

@@ -22,9 +22,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Server {
 namespace Configuration {
@@ -281,6 +281,6 @@ TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
       "Double registration for name: 'zipkin'");
 }
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

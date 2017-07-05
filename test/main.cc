@@ -19,8 +19,10 @@ int main(int argc, char** argv) {
   Envoy::SignalAction handle_sigs;
 #endif
 
-  ::setenv("TEST_RUNDIR", (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
-                           Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
+  ::setenv("TEST_RUNDIR",
+           (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+            Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE"))
+               .c_str(),
            1);
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set

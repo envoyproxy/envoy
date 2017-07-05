@@ -18,14 +18,14 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
-using testing::Invoke;
 using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 namespace Http2 {
@@ -80,8 +80,9 @@ public:
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_)).WillOnce(Return(test_client.connection_));
     EXPECT_CALL(pool_, createCodecClient_(_))
-        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&)
-                             -> CodecClient* { return test_clients_.back().codec_client_; }));
+        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
+          return test_clients_.back().codec_client_;
+        }));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
   }
 
@@ -404,6 +405,6 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
 }
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

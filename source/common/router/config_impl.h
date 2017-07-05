@@ -469,5 +469,5 @@ private:
   std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

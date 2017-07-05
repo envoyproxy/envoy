@@ -21,5 +21,5 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   EXPECT_EQ(nullptr, client.start(stream_callbacks, Optional<std::chrono::milliseconds>()));
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

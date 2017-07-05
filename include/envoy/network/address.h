@@ -139,6 +139,6 @@ public:
 
 typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

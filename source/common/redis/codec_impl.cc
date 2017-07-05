@@ -418,5 +418,5 @@ void EncoderImpl::encodeSimpleString(const std::string& string, Buffer::Instance
   out.add("\r\n", 2);
 }
 
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

@@ -20,9 +20,9 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
 
   // Configuration should guarantee that cluster exists before calling here. This is basically
   // fire and forget. We don't handle cancelling.
-  cm_.httpAsyncClientForCluster(cluster)
-      .send(std::move(request), *this, Optional<std::chrono::milliseconds>(timeout));
+  cm_.httpAsyncClientForCluster(cluster).send(std::move(request), *this,
+                                              Optional<std::chrono::milliseconds>(timeout));
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

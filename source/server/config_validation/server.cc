@@ -62,8 +62,8 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   config_.reset(main_config);
   main_config->initialize(*config_json, *this, *cluster_manager_factory_);
 
-  clusterManager().setInitializedCb([this]()
-                                        -> void { init_manager_.initialize([]() -> void {}); });
+  clusterManager().setInitializedCb(
+      [this]() -> void { init_manager_.initialize([]() -> void {}); });
 }
 
 void ValidationInstance::shutdown() {
@@ -74,5 +74,5 @@ void ValidationInstance::shutdown() {
   thread_local_.shutdownThread();
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -25,8 +25,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
+using testing::_;
 
 namespace Ssl {
 
@@ -392,5 +392,5 @@ TEST_P(SslReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

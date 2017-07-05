@@ -17,4 +17,4 @@ public:
 };
 
 // TODO(htuch): Add a mutable Singleton if there is a need for this.
-} // Envoy
+} // namespace Envoy

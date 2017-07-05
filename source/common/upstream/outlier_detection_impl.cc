@@ -469,6 +469,6 @@ Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_re
                           backup_success_rate_bucket_->total_request_counter_);
 }
 
-} // Outlier
-} // Upstream
-} // Envoy
+} // namespace Outlier
+} // namespace Upstream
+} // namespace Envoy

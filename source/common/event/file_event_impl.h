@@ -32,5 +32,5 @@ private:
   FileTriggerType trigger_;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

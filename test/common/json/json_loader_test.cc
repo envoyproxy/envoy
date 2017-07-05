@@ -386,5 +386,5 @@ TEST(JsonLoaderTest, ListAsString) {
   }
 }
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy
