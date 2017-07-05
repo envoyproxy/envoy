@@ -61,13 +61,5 @@ TEST(UtilityTest, SdsConfigToEdsConfig) {
   EXPECT_EQ(30000, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
-TEST(UtilityTest, MetadataValue) {
-  envoy::api::v2::Metadata metadata;
-  Utility::mutableMetadataValue(metadata, "envoy.lb", "canary").set_bool_value(true);
-  EXPECT_TRUE(Utility::metadataValue(metadata, "envoy.lb", "canary").bool_value());
-  EXPECT_FALSE(Utility::metadataValue(metadata, "foo", "bar").bool_value());
-  EXPECT_FALSE(Utility::metadataValue(metadata, "envoy.lb", "bar").bool_value());
-}
-
 } // namespace Config
 } // namespace Envoy

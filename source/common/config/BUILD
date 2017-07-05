@@ -59,6 +59,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metadata_lib",
+    srcs = ["metadata.cc"],
+    hdrs = ["metadata.h"],
+    external_deps = ["envoy_base"],
+    deps = ["//source/common/common:singleton"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

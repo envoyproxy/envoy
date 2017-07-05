@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
@@ -54,8 +55,9 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     auto* address = lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
     address->set_ip_address(host->getString("ip_address"));
     address->mutable_port()->set_value(host->getInteger("port"));
-    Config::Utility::mutableMetadataValue(*lb_endpoint->mutable_metadata(), "envoy.lb", "canary")
-        .set_bool_value(canary);
+    Config::Metadata::mutableMetadataValue(
+        *lb_endpoint->mutable_metadata(), Config::MetadataFilters::get().ENVOY_LB,
+        Config::MetadataEnvoyLbKeys::get().CANARY).set_bool_value(canary);
     lb_endpoint->mutable_load_balancing_weight()->set_value(weight);
   }
 

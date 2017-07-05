@@ -172,6 +172,7 @@ envoy_cc_library(
         ":upstream_includes",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
@@ -190,6 +191,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",

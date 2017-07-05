@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/network/address_impl.h"
@@ -47,8 +48,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const bool canary =
-          Config::Utility::metadataValue(lb_endpoint.metadata(), "envoy.lb", "canary").bool_value();
+      const bool canary = Config::Metadata::metadataValue(
+                              lb_endpoint.metadata(), Config::MetadataFilters::get().ENVOY_LB,
+                              Config::MetadataEnvoyLbKeys::get().CANARY).bool_value();
       new_hosts.emplace_back(new HostImpl(
           info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
                          lb_endpoint.endpoint().address().socket_address().ip_address(),
