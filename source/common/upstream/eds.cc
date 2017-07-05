@@ -22,7 +22,7 @@ EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
   Config::Utility::localInfoToNode(local_info, node);
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
-      eds_config, node, dispatcher, cm, random,
+      eds_config, node, dispatcher, cm, random, info_->statsScope(),
       [this, &eds_config, &cm, &dispatcher, &random]()
           -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
             return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
