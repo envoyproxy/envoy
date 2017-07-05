@@ -79,6 +79,45 @@ public:
 namespace Stats {
 
 /**
+ * This is a wrapper for Scopes for the TestIsolatedStoreImpl to ensure new scopes do
+ * not interact with the store without grabbing the lock from TestIsolatedStoreImpl.
+ */
+class TestScopeWrapper : public Scope {
+public:
+  TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
+      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+
+  void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    wrapped_scope_->deliverHistogramToSinks(name, value);
+  }
+
+  void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    wrapped_scope_->deliverTimingToSinks(name, ms);
+  }
+
+  Counter& counter(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->counter(name);
+  }
+
+  Gauge& gauge(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->gauge(name);
+  }
+
+  Timer& timer(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->timer(name);
+  }
+
+private:
+  std::mutex& lock_;
+  ScopePtr wrapped_scope_;
+};
+
+/**
  * This is a variant of the isolated store that has locking across all operations so that it can
  * be used during the integration tests.
  */
@@ -111,7 +150,7 @@ public:
   }
   ScopePtr createScope(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
-    return store_.createScope(name);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
 
   // Stats::StoreRoot

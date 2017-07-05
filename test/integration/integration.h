@@ -13,6 +13,7 @@
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
+#include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 
@@ -119,30 +120,25 @@ public:
                        Network::Address::IpVersion version);
 
   void close();
-  const std::string& data() { return data_; }
   void waitForData(const std::string& data);
   void waitForDisconnect();
   void write(const std::string& data);
+  const std::string& data() { return payload_reader_->data(); }
 
 private:
-  struct ConnectionCallbacks : public Network::ConnectionCallbacks,
-                               public Network::ReadFilterBaseImpl {
+  struct ConnectionCallbacks : public Network::ConnectionCallbacks {
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
 
-    // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override;
-
     IntegrationTcpClient& parent_;
   };
 
+  std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
-  std::string data_;
-  std::string data_to_wait_for_;
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;

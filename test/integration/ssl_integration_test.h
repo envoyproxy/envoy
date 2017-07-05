@@ -53,7 +53,6 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
   ServerContextPtr createUpstreamSslContext();
-  ClientContextPtr createClientSslContext(bool alpn, bool san);
   void checkStats();
 
 private:

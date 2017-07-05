@@ -178,22 +178,23 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
                                            Network::Address::IpVersion version)
-    : callbacks_(new ConnectionCallbacks(*this)) {
+    : payload_reader_(new WaitForPayloadReader(dispatcher)),
+      callbacks_(new ConnectionCallbacks(*this)) {
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
   connection_->addConnectionCallbacks(*callbacks_);
-  connection_->addReadFilter(callbacks_);
+  connection_->addReadFilter(payload_reader_);
   connection_->connect();
 }
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
 void IntegrationTcpClient::waitForData(const std::string& data) {
-  if (data_.find(data) == 0) {
+  if (payload_reader_->data().find(data) == 0) {
     return;
   }
 
-  data_to_wait_for_ = data;
+  payload_reader_->set_data_to_wait_for(data);
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
@@ -207,17 +208,6 @@ void IntegrationTcpClient::write(const std::string& data) {
   connection_->write(buffer);
   connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   // NOTE: We should run blocking until all the body data is flushed.
-}
-
-Network::FilterStatus IntegrationTcpClient::ConnectionCallbacks::onData(Buffer::Instance& data) {
-  parent_.data_.append(TestUtility::bufferToString(data));
-  data.drain(data.length());
-  if (!parent_.data_to_wait_for_.empty() && parent_.data_.find(parent_.data_to_wait_for_) == 0) {
-    parent_.data_to_wait_for_.clear();
-    parent_.connection_->dispatcher().exit();
-  }
-
-  return Network::FilterStatus::StopIteration;
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
