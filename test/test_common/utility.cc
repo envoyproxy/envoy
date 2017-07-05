@@ -19,8 +19,8 @@
 
 #include "test/test_common/printers.h"
 
-#include "spdlog/spdlog.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 

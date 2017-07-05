@@ -9,8 +9,8 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "spdlog/spdlog.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::Invoke;
 using testing::NiceMock;

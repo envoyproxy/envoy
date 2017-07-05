@@ -12,9 +12,9 @@
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
-#include "gtest/gtest.h"
 
 using testing::Return;
 

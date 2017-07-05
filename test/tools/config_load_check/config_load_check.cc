@@ -5,8 +5,8 @@
 
 #include "test/config_test/config_test.h"
 
-#include "spdlog/spdlog.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {

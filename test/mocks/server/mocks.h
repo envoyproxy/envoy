@@ -30,8 +30,8 @@
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
-#include "spdlog/spdlog.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
