@@ -1,8 +1,9 @@
 #!/bin/bash
-ENVOY_BUILD_SHA=cd7f513444fb24270175f0c961996d184b764f32
 
 # Script that lists all the steps take by the CI system when doing Envoy builds.
 set -e
+
+. ./ci/envoy_build_sha.sh
 
 # Lint travis file.
 travis lint .travis.yml --skip-completion-check
