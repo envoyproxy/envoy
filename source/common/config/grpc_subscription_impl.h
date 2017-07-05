@@ -49,9 +49,7 @@ public:
     stream_ = async_client_->start(service_method_, *this, Optional<std::chrono::milliseconds>());
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
-      stats_.update_failure_.inc();
-      callbacks_->onConfigUpdateFailed(nullptr);
-      setRetryTimer();
+      handleFailure();
       return;
     }
     sendDiscoveryRequest();
@@ -114,16 +112,20 @@ public:
 
   void onRemoteClose(Grpc::Status::GrpcStatus status) override {
     ENVOY_LOG(warn, "gRPC config stream closed: {}", status);
-    stats_.update_failure_.inc();
-    callbacks_->onConfigUpdateFailed(nullptr);
+    handleFailure();
     stream_ = nullptr;
-    setRetryTimer();
   }
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
 
 private:
+  void handleFailure() {
+    stats_.update_failure_.inc();
+    callbacks_->onConfigUpdateFailed(nullptr);
+    setRetryTimer();
+  }
+
   std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
                                     envoy::api::v2::DiscoveryResponse>> async_client_;
   const google::protobuf::MethodDescriptor& service_method_;

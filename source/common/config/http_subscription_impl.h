@@ -82,8 +82,7 @@ public:
         google::protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
     if (status != google::protobuf::util::Status::OK) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
-      stats_.update_failure_.inc();
-      callbacks_->onConfigUpdateFailed(nullptr);
+      handleFailure(nullptr);
       return;
     }
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
@@ -102,11 +101,15 @@ public:
 
   void onFetchFailure(const EnvoyException* e) override {
     ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "fetch failure");
+    handleFailure(e);
+  }
+
+private:
+  void handleFailure(const EnvoyException* e) {
     stats_.update_failure_.inc();
     callbacks_->onConfigUpdateFailed(e);
   }
 
-private:
   std::string path_;
   google::protobuf::RepeatedPtrField<std::string> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
