@@ -68,5 +68,5 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
   return Network::Utility::resolveUrl(url);
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

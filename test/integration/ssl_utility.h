@@ -11,5 +11,5 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

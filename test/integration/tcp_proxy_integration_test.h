@@ -27,4 +27,4 @@ public:
     fake_upstreams_.clear();
   }
 };
-} // Envoy
+} // namespace Envoy
