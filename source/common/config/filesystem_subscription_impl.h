@@ -4,6 +4,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 
+#include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -20,10 +21,12 @@ namespace Config {
  * lists of ResourceType.
  */
 template <class ResourceType>
-class FilesystemSubscriptionImpl : public Config::Subscription<ResourceType> {
+class FilesystemSubscriptionImpl : public Config::Subscription<ResourceType>,
+                                   Logger::Loggable<Logger::Id::config> {
 public:
-  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path)
-      : path_(path), watcher_(dispatcher.createFilesystemWatcher()) {}
+  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path,
+                             SubscriptionStats stats)
+      : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
@@ -35,6 +38,8 @@ public:
       UNREFERENCED_PARAMETER(events);
       refresh();
     });
+    // Attempt to read in case there is a file there already.
+    refresh();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
@@ -44,27 +49,40 @@ public:
 
 private:
   void refresh() {
+    ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
+    stats_.update_attempt_.inc();
+    bool config_update_available = false;
     try {
       const std::string json = Filesystem::fileReadToEnd(path_);
       envoy::api::v2::DiscoveryResponse message;
       const auto status = google::protobuf::util::JsonStringToMessage(json, &message);
       if (status != google::protobuf::util::Status::OK) {
-        // TODO(htuch): Track stats and log failures.
         callbacks_->onConfigUpdateFailed(nullptr);
+        ENVOY_LOG(warn, "Filesystem config JSON conversion error: {}", status.ToString());
+        stats_.update_failure_.inc();
         return;
       }
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
+      config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources);
+      stats_.update_success_.inc();
       // TODO(htuch): Add some notion of current version for every API in stats/admin.
     } catch (const EnvoyException& e) {
-      // TODO(htuch): Track stats and log failures.
+      if (config_update_available) {
+        ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
+        stats_.update_rejected_.inc();
+      } else {
+        ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
+        stats_.update_failure_.inc();
+      }
       callbacks_->onConfigUpdateFailed(&e);
     }
   }
 
   const std::string path_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
-  Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
+  SubscriptionCallbacks<ResourceType>* callbacks_{};
+  SubscriptionStats stats_;
 };
 
 } // namespace Config

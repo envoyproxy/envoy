@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
@@ -26,13 +27,16 @@ namespace Config {
  */
 template <class ResourceType>
 class HttpSubscriptionImpl : public Http::RestApiFetcher,
-                             public Config::Subscription<ResourceType> {
+                             public Config::Subscription<ResourceType>,
+                             Logger::Loggable<Logger::Id::config> {
 public:
   HttpSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
-                       const google::protobuf::MethodDescriptor& service_method)
-      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval) {
+                       const google::protobuf::MethodDescriptor& service_method,
+                       SubscriptionStats stats)
+      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval),
+        stats_(stats) {
     request_.mutable_node()->CopyFrom(node);
     ASSERT(service_method.options().HasExtension(google::api::http));
     const auto& http_rule = service_method.options().GetExtension(google::api::http);
@@ -59,6 +63,8 @@ public:
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override {
+    ENVOY_LOG(debug, "Sending REST request for {}", path_);
+    stats_.update_attempt_.inc();
     google::protobuf::util::JsonOptions json_options;
     std::string request_json;
     const auto status =
@@ -75,16 +81,18 @@ public:
     const auto status =
         google::protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
     if (status != google::protobuf::util::Status::OK) {
-      // TODO(htuch): Track stats and log failures.
-      callbacks_->onConfigUpdateFailed(nullptr);
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
+      handleFailure(nullptr);
       return;
     }
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message.version_info());
+      stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
-      // TODO(htuch): Track stats and log failures.
+      ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
+      stats_.update_rejected_.inc();
       callbacks_->onConfigUpdateFailed(&e);
     }
   }
@@ -92,15 +100,21 @@ public:
   void onFetchComplete() override {}
 
   void onFetchFailure(const EnvoyException* e) override {
-    // TODO(htuch): Track stats and log failures.
-    callbacks_->onConfigUpdateFailed(e);
+    ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "fetch failure");
+    handleFailure(e);
   }
 
 private:
+  void handleFailure(const EnvoyException* e) {
+    stats_.update_failure_.inc();
+    callbacks_->onConfigUpdateFailed(e);
+  }
+
   std::string path_;
   google::protobuf::RepeatedPtrField<std::string> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;
+  SubscriptionStats stats_;
 };
 
 } // namespace Config

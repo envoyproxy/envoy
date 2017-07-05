@@ -39,7 +39,7 @@ public:
     }));
     subscription_.reset(new HttpEdsSubscriptionImpl(node_, cm_, "eds_cluster", dispatcher_,
                                                     random_gen_, std::chrono::milliseconds(1),
-                                                    *method_descriptor_));
+                                                    *method_descriptor_, stats_));
   }
 
   ~HttpSubscriptionTestHarness() {

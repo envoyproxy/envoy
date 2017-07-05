@@ -15,8 +15,11 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  verifyStats(1, 0, 0, 1);
   timerTick();
+  verifyStats(2, 0, 0, 1);
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  verifyStats(3, 1, 0, 1);
 }
 
 // Validate that the client can recover from bad JSON responses.
@@ -29,9 +32,12 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onSuccess(std::move(message));
+  verifyStats(1, 0, 0, 1);
   request_in_progress_ = false;
   timerTick();
+  verifyStats(2, 0, 0, 1);
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  verifyStats(3, 1, 0, 1);
 }
 
 } // namespace

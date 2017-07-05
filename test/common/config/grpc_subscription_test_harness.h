@@ -39,7 +39,7 @@ public:
     }));
     subscription_.reset(new GrpcEdsSubscriptionImpl(
         node_, std::unique_ptr<SubscriptionMockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_));
+        *method_descriptor_, stats_));
   }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,

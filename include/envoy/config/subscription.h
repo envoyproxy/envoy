@@ -5,6 +5,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "google/protobuf/repeated_field.h"
 
@@ -58,6 +59,23 @@ public:
    * @param resources vector of resource names to fetch.
    */
   virtual void updateResources(const std::vector<std::string>& resources) PURE;
+};
+
+/**
+ * Per subscription stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_SUBSCRIPTION_STATS(COUNTER) \
+  COUNTER(update_attempt)               \
+  COUNTER(update_success)               \
+  COUNTER(update_failure)               \
+  COUNTER(update_rejected)
+
+/**
+ * Struct definition for per subscription stats. @see stats_macros.h
+ */
+struct SubscriptionStats {
+  ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 } // namespace Config

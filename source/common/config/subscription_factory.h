@@ -21,6 +21,7 @@ public:
    * @param dispatcher event dispatcher.
    * @param cm cluster manager for async clients (when REST/gRPC).
    * @param random random generator for jittering polling delays (when REST).
+   * @param scope stats scope.
    * @param rest_legacy_constructor constructor function for Subscription adapters (when legacy v1
    * REST).
    * @param rest_method fully qualified name of v2 REST API method (as per protobuf service
@@ -29,16 +30,17 @@ public:
    *        service description).
    */
   template <class ResourceType>
-  static std::unique_ptr<Subscription<ResourceType>>
-  subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config,
-                               const envoy::api::v2::Node& node, Event::Dispatcher& dispatcher,
-                               Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
-                               std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
-                               const std::string& rest_method, const std::string& grpc_method) {
+  static std::unique_ptr<Subscription<ResourceType>> subscriptionFromConfigSource(
+      const envoy::api::v2::ConfigSource& config, const envoy::api::v2::Node& node,
+      Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+      Stats::Scope& scope, std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
+      const std::string& rest_method, const std::string& grpc_method) {
     std::unique_ptr<Subscription<ResourceType>> result;
+    SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath:
-      result.reset(new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path()));
+      result.reset(
+          new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& api_config_source = config.api_config_source();
@@ -56,12 +58,14 @@ public:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method)));
+            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method),
+            stats));
         break;
       case envoy::api::v2::ApiConfigSource::GRPC:
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher,
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method)));
+            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
+            stats));
         break;
       default:
         NOT_REACHED;

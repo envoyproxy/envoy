@@ -24,6 +24,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:filesystem_subscription_lib",
+        "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//test/mocks/config:config_mocks",
         "//test/test_common:environment_lib",
@@ -94,6 +95,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -113,6 +115,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "subscription_test_harness",
     srcs = ["subscription_test_harness.h"],
+    deps = ["//test/mocks/stats:stats_mocks"],
 )
 
 envoy_cc_test(
