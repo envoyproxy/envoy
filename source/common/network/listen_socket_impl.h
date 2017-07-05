@@ -50,5 +50,5 @@ public:
   UdsListenSocket(const std::string& uds_path);
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

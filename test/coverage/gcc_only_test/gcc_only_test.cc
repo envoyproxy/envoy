@@ -9,4 +9,4 @@ TEST(GccOnly, CompilerCheck) {
 #endif
 }
 
-} // Envoy
+} // namespace Envoy

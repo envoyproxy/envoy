@@ -34,5 +34,5 @@ public:
 
 typedef ConstSingleton<ZipkinJsonFieldNameValues> ZipkinJsonFieldNames;
 
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

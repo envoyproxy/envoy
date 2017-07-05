@@ -39,6 +39,6 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
 static Registry::RegisterFactory<RedisProxyFilterConfigFactory, NamedNetworkFilterConfigFactory>
     registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

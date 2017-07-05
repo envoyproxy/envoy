@@ -23,5 +23,5 @@ public:
   static const std::string listAsJsonString(const std::list<std::string>& items);
 };
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

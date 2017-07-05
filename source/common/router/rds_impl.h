@@ -122,5 +122,5 @@ private:
   friend class RouteConfigProviderUtil;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

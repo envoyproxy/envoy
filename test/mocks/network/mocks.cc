@@ -13,12 +13,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Network {
 
@@ -46,20 +46,20 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));
   ON_CALL(connection, addConnectionCallbacks(_))
-      .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks)
-                                -> void { connection.callbacks_.push_back(&callbacks); }));
-  ON_CALL(connection, close(_))
-      .WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
-        connection.raiseEvents(Network::ConnectionEvent::LocalClose);
+      .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks) -> void {
+        connection.callbacks_.push_back(&callbacks);
       }));
+  ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
+    connection.raiseEvents(Network::ConnectionEvent::LocalClose);
+  }));
   ON_CALL(connection, remoteAddress()).WillByDefault(ReturnPointee(connection.remote_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
   // The real implementation will move the buffer data into the socket.
-  ON_CALL(connection, write(_))
-      .WillByDefault(
-          Invoke([](Buffer::Instance& buffer) -> void { buffer.drain(buffer.length()); }));
+  ON_CALL(connection, write(_)).WillByDefault(Invoke([](Buffer::Instance& buffer) -> void {
+    buffer.drain(buffer.length());
+  }));
 }
 
 MockConnection::MockConnection() { initializeMockConnection(*this); }
@@ -130,5 +130,5 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

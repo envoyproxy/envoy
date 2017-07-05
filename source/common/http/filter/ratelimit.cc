@@ -25,7 +25,7 @@ static const Http::HeaderMap* getTooManyRequestsHeader() {
   return header_map;
 }
 
-} // namespace;
+} // namespace
 
 void Filter::initiateCall(const HeaderMap& headers) {
   bool is_internal_request =
@@ -117,9 +117,16 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
     break;
   case Envoy::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
-    Http::CodeUtility::ResponseStatInfo info{config_->scope(), cluster_->statsScope(), EMPTY_STRING,
-                                             *getTooManyRequestsHeader(), true, EMPTY_STRING,
-                                             EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
+    Http::CodeUtility::ResponseStatInfo info{config_->scope(),
+                                             cluster_->statsScope(),
+                                             EMPTY_STRING,
+                                             *getTooManyRequestsHeader(),
+                                             true,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
   }
@@ -152,6 +159,6 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
   }
 }
 
-} // RateLimit
-} // Http
-} // Envoy
+} // namespace RateLimit
+} // namespace Http
+} // namespace Envoy

@@ -21,13 +21,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Router {
 
@@ -119,11 +119,10 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             callbacks.onPoolFailure(
-                                 Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                 cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
+                                cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "57"}, {"content-type", "text/plain"}};
@@ -132,8 +131,9 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -208,10 +208,9 @@ TEST_F(RouterTest, NoHost) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(
-      0U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_maintenance_mode")
-          .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_maintenance_mode")
+                    .value());
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
@@ -227,10 +226,9 @@ TEST_F(RouterTest, MaintenanceMode) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_maintenance_mode")
-          .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_maintenance_mode")
+                    .value());
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
@@ -239,10 +237,10 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
@@ -261,13 +259,14 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   expectResponseTimerCreate();
 
@@ -300,13 +299,14 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   expectResponseTimerCreate();
 
@@ -338,13 +338,14 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   expectResponseTimerCreate();
   expectPerTryTimerCreate();
@@ -366,10 +367,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
 
-  EXPECT_EQ(
-      1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_per_try_timeout")
-          .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -379,15 +379,16 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -404,15 +405,16 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   expectResponseTimerCreate();
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -438,10 +440,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -457,10 +459,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   router_.retry_state_->callback_();
 
   // Normal response.
@@ -476,10 +478,10 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
   expectPerTryTimerCreate();
 
@@ -498,10 +500,10 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
@@ -518,10 +520,10 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -544,10 +546,10 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -566,10 +568,10 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   router_.retry_state_->callback_();
 
   // Normal response.
@@ -585,10 +587,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -619,10 +621,10 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -637,11 +639,11 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
 
   Http::ConnectionPool::MockCancellable cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks&)
-                           -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             return &cancellable;
-                           }));
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder,
+                           Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        return &cancellable;
+      }));
   router_.retry_state_->callback_();
 
   // Fire timeout.
@@ -663,10 +665,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -692,10 +694,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   EXPECT_CALL(encoder2, encodeHeaders(_, false));
   EXPECT_CALL(encoder2, encodeData(_, false));
@@ -712,8 +714,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
                 .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
-                    .value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_200")
                     .value());
@@ -728,10 +731,10 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-grpc-retry-on", "cancelled"},
@@ -752,10 +755,10 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   router_.retry_state_->callback_();
 
   // Normal response.
@@ -775,10 +778,10 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
   expectResponseTimerCreate();
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
@@ -795,11 +798,11 @@ TEST_F(RouterTest, Shadow) {
       .Times(AtLeast(1))
       .WillRepeatedly(Return(body_data.get()));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
-      .WillOnce(Invoke([](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds)
-                           -> void {
-                             EXPECT_NE(nullptr, request->body());
-                             EXPECT_NE(nullptr, request->trailers());
-                           }));
+      .WillOnce(Invoke(
+          [](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds) -> void {
+            EXPECT_NE(nullptr, request->body());
+            EXPECT_NE(nullptr, request->trailers());
+          }));
   router_.decodeTrailers(trailers);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
@@ -817,10 +820,10 @@ TEST_F(RouterTest, AltStatName) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                   {"x-envoy-internal", "true"}};
@@ -1006,10 +1009,10 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                   {"x-envoy-internal", "true"}};
@@ -1038,10 +1041,10 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             response_decoder = &decoder;
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                   {"x-envoy-internal", "true"}};
@@ -1078,9 +1081,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
@@ -1090,8 +1093,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
 }
@@ -1112,9 +1116,9 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-                             return nullptr;
-                           }));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
 
   // :authority header in the outgoing request should match the :authority header of
   // the incoming request
@@ -1124,11 +1128,12 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
-                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
   router_.decodeHeaders(incoming_headers, true);
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

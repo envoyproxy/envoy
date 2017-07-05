@@ -75,5 +75,5 @@ void InstanceImpl::reset() {
   registered_threads_.clear();
 }
 
-} // ThreadLocal
-} // Envoy
+} // namespace ThreadLocal
+} // namespace Envoy

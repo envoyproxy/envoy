@@ -44,5 +44,5 @@ ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
   server_name_indication_ = config.getString("sni", "");
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

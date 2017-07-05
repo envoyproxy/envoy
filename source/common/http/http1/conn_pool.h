@@ -137,6 +137,6 @@ public:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 };
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

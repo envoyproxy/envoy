@@ -17,5 +17,5 @@ public:
   }
 };
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

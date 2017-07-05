@@ -9,14 +9,14 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace ConfigTest {
@@ -37,18 +37,17 @@ public:
     Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config;
 
-    ON_CALL(server_, clusterManager())
-        .WillByDefault(
-            Invoke([&]() -> Upstream::ClusterManager& { return main_config.clusterManager(); }));
+    ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
+      return main_config.clusterManager();
+    }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
-                       Server::Configuration::FactoryContext& context)
-                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
-                         return Server::ProdListenerComponentFactory::createFilterFactoryList_(
-                             filters, server_, context);
-                       }));
+        .WillByDefault(Invoke([&](const std::vector<Json::ObjectSharedPtr>& filters,
+                                  Server::Configuration::FactoryContext& context)
+                                  -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
+          return Server::ProdListenerComponentFactory::createFilterFactoryList_(filters, server_,
+                                                                                context);
+        }));
 
     try {
       main_config.initialize(*config_json, server_, cluster_manager_factory_);
@@ -77,5 +76,5 @@ uint32_t run(const std::string& directory) {
   return num_tested;
 }
 
-} // ConfigTest
-} // Envoy
+} // namespace ConfigTest
+} // namespace Envoy

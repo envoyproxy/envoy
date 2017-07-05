@@ -22,7 +22,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -32,6 +31,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
+using testing::_;
 
 namespace Upstream {
 
@@ -102,8 +102,9 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state)
-                                                -> void { onHostStatus(host, changed_state); });
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
   }
 
   void setupServiceValidationHC() {
@@ -123,8 +124,9 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state)
-                                                -> void { onHostStatus(host, changed_state); });
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
   }
 
   void expectSessionCreate() {
@@ -963,5 +965,5 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

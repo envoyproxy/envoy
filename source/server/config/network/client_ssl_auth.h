@@ -20,6 +20,6 @@ public:
   NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

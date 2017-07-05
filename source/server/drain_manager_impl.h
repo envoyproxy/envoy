@@ -35,5 +35,5 @@ private:
   Event::TimerPtr parent_shutdown_timer_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

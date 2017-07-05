@@ -124,8 +124,8 @@ public:
   void onResetStreamBase(StreamResetReason reason);
 
   /**
-  * Flush all pending output from encoding.
-  */
+   * Flush all pending output from encoding.
+   */
   void flushOutput();
 
   void addCharToBuffer(char c);
@@ -307,6 +307,6 @@ private:
   std::list<PendingResponse> pending_responses_;
 };
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

@@ -62,8 +62,9 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster, const Json:
       interval_(config.getInteger("interval_ms")),
       interval_jitter_(config.getInteger("interval_jitter_ms", 0)) {
   cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed)
-                                 -> void { onClusterMemberUpdate(hosts_added, hosts_removed); });
+                                    const std::vector<HostSharedPtr>& hosts_removed) -> void {
+    onClusterMemberUpdate(hosts_added, hosts_removed);
+  });
 }
 
 void HealthCheckerImplBase::decHealthy() {
@@ -523,5 +524,5 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
   request_.asArray().swap(values);
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

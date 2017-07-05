@@ -201,6 +201,6 @@ public:
   virtual HttpFilterType type() PURE;
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

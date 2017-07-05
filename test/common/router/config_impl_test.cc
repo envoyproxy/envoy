@@ -18,12 +18,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::ContainerEq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrNe;
+using testing::_;
 
 namespace Router {
 
@@ -1104,10 +1104,11 @@ TEST(RouteMatcherTest, Retry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                                              ->routeEntry()
-                                              ->retryPolicy()
-                                              .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1118,10 +1119,11 @@ TEST(RouteMatcherTest, Retry) {
                 ->retryPolicy()
                 .retryOn());
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                                              ->routeEntry()
-                                              ->retryPolicy()
-                                              .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1131,10 +1133,11 @@ TEST(RouteMatcherTest, Retry) {
                     ->retryPolicy()
                     .retryOn());
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                                                 ->routeEntry()
-                                                 ->retryPolicy()
-                                                 .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1187,10 +1190,11 @@ TEST(RouteMatcherTest, GrpcRetry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                                              ->routeEntry()
-                                              ->retryPolicy()
-                                              .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1201,10 +1205,11 @@ TEST(RouteMatcherTest, GrpcRetry) {
                 ->retryPolicy()
                 .retryOn());
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                                              ->routeEntry()
-                                              ->retryPolicy()
-                                              .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1214,10 +1219,11 @@ TEST(RouteMatcherTest, GrpcRetry) {
                     ->retryPolicy()
                     .retryOn());
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                                                 ->routeEntry()
-                                                 ->retryPolicy()
-                                                 .perTryTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -2023,5 +2029,5 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

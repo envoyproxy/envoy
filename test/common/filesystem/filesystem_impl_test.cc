@@ -15,7 +15,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -23,6 +22,7 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::Throw;
+using testing::_;
 
 TEST(FileSystemImpl, BadFile) {
   Event::MockDispatcher dispatcher;
@@ -277,4 +277,4 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
     }
   }
 }
-} // Envoy
+} // namespace Envoy

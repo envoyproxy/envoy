@@ -114,5 +114,5 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   watchdog.reset();
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

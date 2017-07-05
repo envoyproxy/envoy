@@ -19,5 +19,5 @@ private:
   SignalCb cb_;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

@@ -17,5 +17,5 @@ public:
 
 typedef std::unique_ptr<DeferredDeletable> DeferredDeletablePtr;
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

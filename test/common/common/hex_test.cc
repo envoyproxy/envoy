@@ -34,4 +34,4 @@ TEST(Hex, UIntToHex) {
   EXPECT_EQ("25c6f38dd0600e78", base16_string);
   EXPECT_EQ("0000000000000000", Hex::uint64ToHex(0ULL));
 }
-} // Envoy
+} // namespace Envoy

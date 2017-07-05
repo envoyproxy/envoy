@@ -47,5 +47,5 @@ Http::AsyncClient& ValidationClusterManager::httpAsyncClientForCluster(const std
   return async_client_;
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

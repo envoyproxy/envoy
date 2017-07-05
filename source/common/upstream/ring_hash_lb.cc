@@ -113,8 +113,9 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
     }
   }
 
-  std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs)
-                                            -> bool { return lhs.hash_ < rhs.hash_; });
+  std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs) -> bool {
+    return lhs.hash_ < rhs.hash_;
+  });
 #ifndef NVLOG
   for (auto entry : ring_) {
     ENVOY_LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(), entry.hash_);
@@ -127,5 +128,5 @@ void RingHashLoadBalancer::refresh() {
   healthy_hosts_ring_.create(runtime_, host_set_.healthyHosts());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

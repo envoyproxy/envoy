@@ -50,5 +50,5 @@ void ContextManagerImpl::iterateContexts(std::function<void(Context&)> callback)
   }
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

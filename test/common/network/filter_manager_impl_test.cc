@@ -21,12 +21,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::WithArgs;
+using testing::_;
 
 namespace Network {
 
@@ -144,11 +144,13 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterSharedPtr{new Envoy::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
-  EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                              {{{"hello", "world"}}}}),
+  EXPECT_CALL(*rl_client, limit(_, "foo",
+                                testing::ContainerEq(
+                                    std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
                                 Tracing::EMPTY_CONTEXT))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks)
-                                       -> void { request_callbacks = &callbacks; })));
+      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
+        request_callbacks = &callbacks;
+      })));
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
@@ -171,5 +173,5 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.onRead();
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

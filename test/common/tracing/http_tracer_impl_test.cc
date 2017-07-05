@@ -24,12 +24,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Test;
+using testing::_;
 
 namespace Tracing {
 
@@ -427,5 +427,5 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

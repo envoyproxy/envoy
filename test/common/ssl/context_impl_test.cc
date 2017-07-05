@@ -168,5 +168,5 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_EQ("", context->getCertChainInformation());
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

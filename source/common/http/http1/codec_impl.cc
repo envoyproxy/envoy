@@ -38,23 +38,25 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    const char* key_to_use = header.key().c_str();
-    uint32_t key_size_to_use = header.key().size();
-    // Translate :authority -> host so that upper layers do not need to deal with this.
-    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-      key_to_use = Headers::get().HostLegacy.get().c_str();
-      key_size_to_use = Headers::get().HostLegacy.get().size();
-    }
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        const char* key_to_use = header.key().c_str();
+        uint32_t key_size_to_use = header.key().size();
+        // Translate :authority -> host so that upper layers do not need to deal with this.
+        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+          key_to_use = Headers::get().HostLegacy.get().c_str();
+          key_size_to_use = Headers::get().HostLegacy.get().size();
+        }
 
-    // Skip all headers starting with ':' that make it here.
-    if (key_to_use[0] == ':') {
-      return;
-    }
+        // Skip all headers starting with ':' that make it here.
+        if (key_to_use[0] == ':') {
+          return;
+        }
 
-    static_cast<StreamEncoderImpl*>(context)
-        ->encodeHeader(key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
-  }, this);
+        static_cast<StreamEncoderImpl*>(context)->encodeHeader(
+            key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+      },
+      this);
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -236,8 +238,9 @@ http_parser_settings ConnectionImpl::settings_{
       static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
       return 0;
     },
-    [](http_parser* parser)
-        -> int { return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase(); },
+    [](http_parser* parser) -> int {
+      return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
+    },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onBody(at, length);
       return 0;
@@ -564,6 +567,6 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   }
 }
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

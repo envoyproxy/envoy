@@ -182,5 +182,5 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -21,8 +21,8 @@ uint64_t Stats::totalCurrentlyReserved() {
   return value;
 }
 
-} // Memory
-} // Envoy
+} // namespace Memory
+} // namespace Envoy
 
 #else
 
@@ -32,7 +32,7 @@ namespace Memory {
 uint64_t Stats::totalCurrentlyAllocated() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 
-} // Memory
-} // Envoy
+} // namespace Memory
+} // namespace Envoy
 
 #endif // #ifdef TCMALLOC

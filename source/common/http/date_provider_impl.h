@@ -58,5 +58,5 @@ public:
   void setDateHeader(HeaderMap& headers) override;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

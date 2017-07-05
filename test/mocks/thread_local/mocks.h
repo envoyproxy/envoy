@@ -40,5 +40,5 @@ public:
   std::unordered_map<uint32_t, ThreadLocalObjectSharedPtr> data_;
 };
 
-} // ThreadLocal
-} // Envoy
+} // namespace ThreadLocal
+} // namespace Envoy

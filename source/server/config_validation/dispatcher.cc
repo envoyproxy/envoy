@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Event {
 
 Network::ClientConnectionPtr
-    ValidationDispatcher::createClientConnection(Network::Address::InstanceConstSharedPtr) {
+ValidationDispatcher::createClientConnection(Network::Address::InstanceConstSharedPtr) {
   NOT_IMPLEMENTED;
 }
 
@@ -36,5 +36,5 @@ ValidationDispatcher::createSslListener(Network::ConnectionHandler&, Ssl::Server
   NOT_IMPLEMENTED;
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

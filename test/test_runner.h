@@ -33,4 +33,4 @@ public:
     return RUN_ALL_TESTS();
   }
 };
-} // Envoy
+} // namespace Envoy

@@ -47,5 +47,5 @@ public:
   };
 };
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

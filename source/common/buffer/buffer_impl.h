@@ -40,5 +40,5 @@ private:
   Event::Libevent::BufferPtr buffer_;
 };
 
-} // Buffer
-} // Envoy
+} // namespace Buffer
+} // namespace Envoy

@@ -38,5 +38,5 @@ public:
 
 typedef std::unique_ptr<HealthChecker> HealthCheckerPtr;
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

@@ -33,5 +33,5 @@ public:
 
 typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

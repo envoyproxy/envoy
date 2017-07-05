@@ -64,7 +64,7 @@ public:
   SystemTime start_time_;
 };
 
-} // AccessLog
+} // namespace AccessLog
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
@@ -412,7 +412,7 @@ public:
   MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterSharedPtr filter));
   MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstanceSharedPtr handler));
 };
-} // Http
+} // namespace Http
 
 namespace Http {
 namespace ConnectionPool {
@@ -440,8 +440,8 @@ public:
       new testing::NiceMock<Upstream::MockHostDescription>()};
 };
 
-} // ConnectionPool
-} // Http
+} // namespace ConnectionPool
+} // namespace Http
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
   Http::HeaderMapImpl& lhs = *dynamic_cast<Http::HeaderMapImpl*>(arg.get());
@@ -452,4 +452,4 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
   const Http::HeaderMapImpl& lhs = *dynamic_cast<const Http::HeaderMapImpl*>(&arg);
   return lhs == *dynamic_cast<const Http::HeaderMapImpl*>(rhs);
 }
-} // Envoy
+} // namespace Envoy

@@ -96,5 +96,5 @@ void RpcChannelImpl::onComplete() {
   grpc_response_ = nullptr;
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

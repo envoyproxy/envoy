@@ -12,5 +12,5 @@ struct TransportContext {
 
 static const TransportContext EMPTY_CONTEXT = {"", ""};
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

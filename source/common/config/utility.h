@@ -51,5 +51,5 @@ public:
                                    envoy::api::v2::ConfigSource& eds_config);
 };
 
-} // Config
-} // Envoy
+} // namespace Config
+} // namespace Envoy

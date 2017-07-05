@@ -17,4 +17,4 @@ TEST(Backward, InvalidUsageTest) {
   BackwardsTrace tracer;
   tracer.logTrace();
 }
-} // Envoy
+} // namespace Envoy

@@ -28,8 +28,8 @@ using google::protobuf::DescriptorPool;
 using google::protobuf::FileDescriptor;
 using google::protobuf::FileDescriptorSet;
 using google::protobuf::io::ZeroCopyInputStream;
-using google::protobuf::util::error::Code;
 using google::protobuf::util::Status;
+using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {

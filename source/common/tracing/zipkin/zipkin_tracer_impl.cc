@@ -63,9 +63,9 @@ Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
 Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator)
-    : cm_(cluster_manager),
-      tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))}, tls_(tls),
-      runtime_(runtime), local_info_(local_info), tls_slot_(tls.allocateSlot()) {
+    : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
+                                POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))},
+      tls_(tls), runtime_(runtime), local_info_(local_info), tls_slot_(tls.allocateSlot()) {
 
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
@@ -77,15 +77,16 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   const std::string collector_endpoint =
       config.getString("collector_endpoint", ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
 
-  tls_.set(tls_slot_, [this, collector_endpoint, &random_generator](Event::Dispatcher& dispatcher)
-                          -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                            TracerPtr tracer(new Tracer(local_info_.clusterName(),
-                                                        local_info_.address(), random_generator));
-                            tracer->setReporter(ReporterImpl::NewInstance(
-                                std::ref(*this), std::ref(dispatcher), collector_endpoint));
-                            return ThreadLocal::ThreadLocalObjectSharedPtr{
-                                new TlsTracer(std::move(tracer), *this)};
-                          });
+  tls_.set(
+      tls_slot_,
+      [this, collector_endpoint, &random_generator](
+          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        TracerPtr tracer(
+            new Tracer(local_info_.clusterName(), local_info_.address(), random_generator));
+        tracer->setReporter(
+            ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
+        return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
+      });
 }
 
 Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::string&,
@@ -200,5 +201,5 @@ void ReporterImpl::onSuccess(Http::MessagePtr&& http_response) {
     driver_.tracerStats().reports_sent_.inc();
   }
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

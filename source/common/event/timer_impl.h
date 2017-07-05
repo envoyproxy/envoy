@@ -25,5 +25,5 @@ private:
   TimerCb cb_;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

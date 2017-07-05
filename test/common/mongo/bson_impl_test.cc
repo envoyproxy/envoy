@@ -59,5 +59,5 @@ TEST(BufferHelperTest, InvalidSize) {
   EXPECT_THROW(BufferHelper::removeString(buffer), EnvoyException);
 }
 
-} // Bson
-} // Envoy
+} // namespace Bson
+} // namespace Envoy

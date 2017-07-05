@@ -16,5 +16,5 @@ protected:
   event raw_event_;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

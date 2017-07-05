@@ -87,5 +87,5 @@ TEST(GrpcCommonTest, resolveServiceAndMethod) {
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

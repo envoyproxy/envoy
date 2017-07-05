@@ -18,8 +18,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
+using testing::_;
 
 namespace Server {
 namespace Configuration {
@@ -408,6 +408,6 @@ TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
       EnvoyException, "Double registration for name: 'client_ssl_auth'");
 }
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

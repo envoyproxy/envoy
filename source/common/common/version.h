@@ -15,4 +15,4 @@ public:
   // Repository information and build type.
   static std::string version();
 };
-} // Envoy
+} // namespace Envoy

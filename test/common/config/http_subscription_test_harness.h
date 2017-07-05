@@ -17,9 +17,9 @@
 #include "google/protobuf/util/json_util.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -33,11 +33,10 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
-    EXPECT_CALL(dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-          timer_cb_ = timer_cb;
-          return timer_;
-        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
     subscription_.reset(new HttpEdsSubscriptionImpl(node_, cm_, "eds_cluster", dispatcher_,
                                                     random_gen_, std::chrono::milliseconds(1),
                                                     *method_descriptor_));
@@ -55,8 +54,8 @@ public:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](
-            Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-            const Optional<std::chrono::milliseconds>& timeout) {
+                             Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+                             const Optional<std::chrono::milliseconds>& timeout) {
           http_callbacks_ = &callbacks;
           UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
@@ -111,7 +110,8 @@ public:
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb)))).WillOnce(ThrowOnRejectedConfig(accept));
+                        response_pb))))
+        .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }

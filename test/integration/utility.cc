@@ -59,12 +59,14 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "", Network::Utility::resolveUrl(fmt::format(
-                       "tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
+      cluster, "",
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
       false, "")};
   Http::CodecClientProd client(
-      type, dispatcher->createClientConnection(Network::Utility::resolveUrl(fmt::format(
-                "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
+      type,
+      dispatcher->createClientConnection(Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
       host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
@@ -117,4 +119,4 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
   return Network::FilterStatus::StopIteration;
 }
 
-} // Envoy
+} // namespace Envoy

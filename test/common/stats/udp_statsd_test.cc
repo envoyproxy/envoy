@@ -9,8 +9,8 @@
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 using testing::NiceMock;
@@ -47,6 +47,6 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   tls_.shutdownThread();
 }
 
-} // Statsd
-} // Stats
-} // Envoy
+} // namespace Statsd
+} // namespace Stats
+} // namespace Envoy

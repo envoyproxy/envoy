@@ -30,5 +30,5 @@ public:
 
 typedef std::unique_ptr<ShadowWriter> ShadowWriterPtr;
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

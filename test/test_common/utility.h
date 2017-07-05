@@ -140,7 +140,7 @@ public:
   bool has(const LowerCaseString& key);
 };
 
-} // Http
+} // namespace Http
 
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 

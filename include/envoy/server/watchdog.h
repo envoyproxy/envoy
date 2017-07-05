@@ -41,5 +41,5 @@ public:
 
 typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

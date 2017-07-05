@@ -56,6 +56,6 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
 };
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

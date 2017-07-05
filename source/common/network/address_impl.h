@@ -198,6 +198,6 @@ private:
   sockaddr_un address_;
 };
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

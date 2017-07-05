@@ -36,5 +36,5 @@ void DispatchedThreadImpl::threadRoutine(Server::GuardDog& guard_dog) {
   dispatcher_.reset();
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

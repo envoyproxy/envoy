@@ -18,9 +18,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::_;
 
 namespace Upstream {
 
@@ -32,8 +32,9 @@ public:
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
                                          dns_resolver_, tls_, dispatcher_));
     cluster_->addMemberUpdateCb(
-        [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
-            -> void { membership_updated_.ready(); });
+        [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+          membership_updated_.ready();
+        });
     cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
   }
 
@@ -231,5 +232,5 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   tls_.shutdownThread();
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

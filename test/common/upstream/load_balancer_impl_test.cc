@@ -560,5 +560,5 @@ TEST_F(RandomLoadBalancerTest, Normal) {
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

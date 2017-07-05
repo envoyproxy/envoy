@@ -15,12 +15,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -38,7 +38,7 @@ Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
   ret.initial_connection_window_size_ = ::testing::get<3>(tp);
   return ret;
 }
-}
+} // namespace
 
 class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
@@ -75,12 +75,12 @@ public:
   }
 
   void setupDefaultConnectionMocks() {
-    ON_CALL(client_connection_, write(_))
-        .WillByDefault(Invoke([&](Buffer::Instance& data)
-                                  -> void { server_wrapper_.dispatch(data, server_); }));
-    ON_CALL(server_connection_, write(_))
-        .WillByDefault(Invoke([&](Buffer::Instance& data)
-                                  -> void { client_wrapper_.dispatch(data, client_); }));
+    ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+      server_wrapper_.dispatch(data, server_);
+    }));
+    ON_CALL(server_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+      client_wrapper_.dispatch(data, client_);
+    }));
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -174,9 +174,9 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 }
 
 TEST_P(Http2CodecImplTest, InvalidFrame) {
-  ON_CALL(client_connection_, write(_))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
+  ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+    server_wrapper_.buffer_.add(data);
+  }));
   request_encoder_.encodeHeaders(TestHeaderMapImpl{}, true);
   EXPECT_THROW(server_wrapper_.dispatch(Buffer::OwnedImpl(), server_), CodecProtocolException);
 }
@@ -204,9 +204,9 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   // Buffer server data so we can make sure we don't get any window updates.
-  ON_CALL(client_connection_, write(_))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
+  ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+    server_wrapper_.buffer_.add(data);
+  }));
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -243,9 +243,9 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   // Do a request, but pause server dispatch so we don't send window updates. This will result in a
   // deferred reset, followed by a pending frames flush which will cause the stream to actually
   // be reset immediately since we are outside of dispatch context.
-  ON_CALL(client_connection_, write(_))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
+  ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+    server_wrapper_.buffer_.add(data);
+  }));
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_.encodeHeaders(request_headers, false);
@@ -256,14 +256,13 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
 
   // Dispatch server. We expect to see some data.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
-        // Start a response inside the headers callback. This should not result in the client
-        // seeing any headers as the stream should already be reset on the other side, even though
-        // we don't know about it yet.
-        TestHeaderMapImpl response_headers{{":status", "200"}};
-        response_encoder_->encodeHeaders(response_headers, false);
-      }));
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    // Start a response inside the headers callback. This should not result in the client
+    // seeing any headers as the stream should already be reset on the other side, even though
+    // we don't know about it yet.
+    TestHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+  }));
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset));
 
@@ -280,9 +279,9 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   request_encoder_.encodeHeaders(request_headers, false);
 
   // In this case we do the same thing as DeferredResetClient but on the server side.
-  ON_CALL(server_connection_, write(_))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data) -> void { client_wrapper_.buffer_.add(data); }));
+  ON_CALL(server_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
+    client_wrapper_.buffer_.add(data);
+  }));
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -368,6 +367,6 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

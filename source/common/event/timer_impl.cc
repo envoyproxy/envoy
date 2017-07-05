@@ -12,9 +12,9 @@ namespace Event {
 
 TimerImpl::TimerImpl(DispatcherImpl& dispatcher, TimerCb cb) : cb_(cb) {
   ASSERT(cb_);
-  evtimer_assign(&raw_event_, &dispatcher.base(), [](evutil_socket_t, short, void* arg) -> void {
-    static_cast<TimerImpl*>(arg)->cb_();
-  }, this);
+  evtimer_assign(
+      &raw_event_, &dispatcher.base(),
+      [](evutil_socket_t, short, void* arg) -> void { static_cast<TimerImpl*>(arg)->cb_(); }, this);
 }
 
 void TimerImpl::disableTimer() { event_del(&raw_event_); }
@@ -31,5 +31,5 @@ void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
   }
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

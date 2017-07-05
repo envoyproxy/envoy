@@ -51,5 +51,5 @@ TEST(DispatcherImplTest, DeferredDelete) {
   dispatcher.clearDeferredDeleteList();
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

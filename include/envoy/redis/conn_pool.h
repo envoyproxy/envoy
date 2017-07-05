@@ -126,6 +126,6 @@ public:
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
-} // ConnPool
-} // Redis
-} // Envoy
+} // namespace ConnPool
+} // namespace Redis
+} // namespace Envoy

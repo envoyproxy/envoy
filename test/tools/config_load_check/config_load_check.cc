@@ -5,15 +5,16 @@
 
 #include "test/config_test/config_test.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
     std::cerr << "Usage: config_load_check PATH\n"
                  "\nValidate configuration files against json schema\n"
                  "\n\tPATH - root of the path that holds the json files to verify."
-                 " The tool recursively searches for json files to validate." << std::endl;
+                 " The tool recursively searches for json files to validate."
+              << std::endl;
     return EXIT_FAILURE;
   }
   try {

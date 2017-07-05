@@ -151,5 +151,5 @@ public:
   void connect() override { doConnect(); }
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

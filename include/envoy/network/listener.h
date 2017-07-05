@@ -70,5 +70,5 @@ public:
   CreateListenerException(const std::string& what) : EnvoyException(what) {}
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

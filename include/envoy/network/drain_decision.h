@@ -16,5 +16,5 @@ public:
   virtual bool drainClose() PURE;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

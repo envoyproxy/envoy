@@ -7,8 +7,8 @@ class EchoIntegrationTest : public BaseIntegrationTest,
 public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   /**
-    * Initializer for an individual test.
-    */
+   * Initializer for an individual test.
+   */
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
@@ -33,13 +33,14 @@ TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("echo"),
-      buffer, [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+      lookupPort("echo"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         connection.close();
-      }, version_);
+      },
+      version_);
 
   connection.run();
   EXPECT_EQ("hello", response);
 }
-} // Envoy
+} // namespace Envoy

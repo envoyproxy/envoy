@@ -21,6 +21,6 @@ public:
   NetworkFilterType type() override { return NetworkFilterType::Both; }
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

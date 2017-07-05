@@ -132,5 +132,5 @@ public:
   HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

@@ -249,6 +249,6 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
 
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

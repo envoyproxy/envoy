@@ -147,6 +147,6 @@ InitialImpl::InitialImpl(const Json::Object& json) {
   }
 }
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

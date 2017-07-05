@@ -135,5 +135,5 @@ public:
 
 typedef ConstSingleton<HeaderValues> Headers;
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

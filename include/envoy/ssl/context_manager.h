@@ -37,5 +37,5 @@ public:
   virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

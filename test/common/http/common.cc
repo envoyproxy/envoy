@@ -11,4 +11,4 @@ void HttpTestUtility::addDefaultHeaders(Http::HeaderMap& headers) {
   headers.insertHost().value(std::string("host"));
   headers.insertPath().value(std::string("/"));
 }
-} // Envoy
+} // namespace Envoy

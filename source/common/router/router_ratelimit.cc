@@ -114,9 +114,8 @@ void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& rou
   RateLimit::Descriptor descriptor;
   bool result = true;
   for (const RateLimitActionPtr& action : actions_) {
-    result = result &&
-             action->populateDescriptor(route, descriptor, local_service_cluster, headers,
-                                        remote_address);
+    result = result && action->populateDescriptor(route, descriptor, local_service_cluster, headers,
+                                                  remote_address);
     if (!result) {
       break;
     }
@@ -147,5 +146,5 @@ RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
   return rate_limit_entries_reference_[stage];
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

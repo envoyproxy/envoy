@@ -25,5 +25,5 @@ void IpTaggingFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& ca
   callbacks_ = &callbacks;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

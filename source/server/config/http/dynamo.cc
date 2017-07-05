@@ -24,6 +24,6 @@ HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
  */
 static Registry::RegisterFactory<DynamoFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

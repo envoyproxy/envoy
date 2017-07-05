@@ -158,4 +158,4 @@ public:
 };
 
 } // Mongo
-} // Envoy
+} // namespace Envoy

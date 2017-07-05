@@ -98,5 +98,5 @@ public:
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

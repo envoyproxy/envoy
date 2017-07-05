@@ -42,5 +42,5 @@ public:
   virtual const Network::ListenSocket& socket() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

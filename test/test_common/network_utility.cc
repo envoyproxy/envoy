@@ -22,8 +22,8 @@ namespace Test {
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
                                                     Address::SocketType type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
-    ADD_FAILURE() << "Not an internet address: " << (addr_port == nullptr ? "nullptr"
-                                                                          : addr_port->asString());
+    ADD_FAILURE() << "Not an internet address: "
+                  << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
   const int fd = addr_port->socket(type);
@@ -173,6 +173,6 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
   throw EnvoyException(msg);
 }
 
-} // Test
-} // Network
-} // Envoy
+} // namespace Test
+} // namespace Network
+} // namespace Envoy

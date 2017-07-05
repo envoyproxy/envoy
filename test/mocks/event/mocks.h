@@ -131,5 +131,5 @@ public:
   MOCK_METHOD1(setEnabled, void(uint32_t events));
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

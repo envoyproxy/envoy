@@ -28,5 +28,5 @@ public:
                                          Stats::Scope&, const Network::ListenerOptions&) override;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

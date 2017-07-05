@@ -27,6 +27,6 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Ob
 static Registry::RegisterFactory<TcpProxyConfigFactory, NamedNetworkFilterConfigFactory>
     registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

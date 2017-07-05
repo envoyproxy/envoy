@@ -35,5 +35,5 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store.gauges().size());
 }
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

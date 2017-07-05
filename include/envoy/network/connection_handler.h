@@ -79,5 +79,5 @@ public:
 
 typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

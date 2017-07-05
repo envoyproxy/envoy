@@ -117,5 +117,5 @@ private:
   AnnotationSet annotation_values_;
   bool is_initialized_;
 };
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

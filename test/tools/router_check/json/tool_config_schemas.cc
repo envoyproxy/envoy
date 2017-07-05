@@ -74,4 +74,4 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
 
   return *router_check_schema;
 }
-} // Envoy
+} // namespace Envoy

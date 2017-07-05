@@ -24,5 +24,5 @@ public:
                                               const std::string& partition_id);
 };
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

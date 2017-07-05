@@ -19,17 +19,19 @@ public:
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        const google::protobuf::MethodDescriptor& service_method)
       : GrpcSubscriptionImpl(
-            node, std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                        envoy::api::v2::DiscoveryResponse>>(
-                      new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                envoy::api::v2::DiscoveryResponse>(
-                          cm, remote_cluster_name)),
+            node,
+            std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                                  envoy::api::v2::DiscoveryResponse>>(
+                new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
+                                          envoy::api::v2::DiscoveryResponse>(cm,
+                                                                             remote_cluster_name)),
             dispatcher, service_method) {}
 
   GrpcSubscriptionImpl(
       const envoy::api::v2::Node& node,
-      std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                        envoy::api::v2::DiscoveryResponse>> async_client,
+      std::unique_ptr<
+          Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+          async_client,
       Event::Dispatcher& dispatcher, const google::protobuf::MethodDescriptor& service_method)
       : async_client_(std::move(async_client)), service_method_(service_method),
         retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })) {
@@ -112,8 +114,9 @@ public:
   const uint32_t RETRY_DELAY_MS = 5000;
 
 private:
-  std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                    envoy::api::v2::DiscoveryResponse>> async_client_;
+  std::unique_ptr<
+      Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+      async_client_;
   const google::protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   google::protobuf::RepeatedPtrField<std::string> resources_;

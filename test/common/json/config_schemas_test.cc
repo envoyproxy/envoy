@@ -8,8 +8,8 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 using testing::_;
@@ -59,5 +59,5 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
 }
 
 INSTANTIATE_TEST_CASE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
-}
-} // Envoy
+} // namespace Json
+} // namespace Envoy

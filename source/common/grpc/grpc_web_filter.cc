@@ -143,13 +143,15 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
   // Trailers in the trailers frame are separated by CRLFs.
   Buffer::OwnedImpl temp;
-  trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
-    temp->add(header.key().c_str(), header.key().size());
-    temp->add(":");
-    temp->add(header.value().c_str(), header.value().size());
-    temp->add("\r\n");
-  }, &temp);
+  trailers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> void {
+        Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
+        temp->add(header.key().c_str(), header.key().size());
+        temp->add(":");
+        temp->add(header.value().c_str(), header.value().size());
+        temp->add("\r\n");
+      },
+      &temp);
   Buffer::OwnedImpl buffer;
   // Adds the trailers frame head.
   buffer.add(&GRPC_WEB_TRAILER, 1);

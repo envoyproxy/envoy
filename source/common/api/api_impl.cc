@@ -27,5 +27,5 @@ bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(p
 
 std::string Impl::fileReadToEnd(const std::string& path) { return Filesystem::fileReadToEnd(path); }
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

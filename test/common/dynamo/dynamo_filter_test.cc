@@ -15,10 +15,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Dynamo {
 
@@ -628,5 +628,5 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

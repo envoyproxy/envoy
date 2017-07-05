@@ -65,4 +65,4 @@ class HttpTestUtility {
 public:
   static void addDefaultHeaders(Http::HeaderMap& headers);
 };
-} // Envoy
+} // namespace Envoy

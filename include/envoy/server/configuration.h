@@ -156,6 +156,6 @@ public:
   virtual Runtime* runtime() PURE;
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

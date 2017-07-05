@@ -29,5 +29,5 @@ std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
   return fmt::format("{}{}", stats_table_prefix, stats_partition_postfix);
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

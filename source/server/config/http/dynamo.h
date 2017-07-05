@@ -19,6 +19,6 @@ public:
   HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

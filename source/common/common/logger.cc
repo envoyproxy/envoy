@@ -42,4 +42,4 @@ void Registry::initialize(uint64_t log_level, Thread::BasicLockable& lock) {
 }
 
 } // Logger
-} // Envoy
+} // namespace Envoy

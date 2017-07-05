@@ -27,6 +27,6 @@ HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(const Json::Objec
  */
 static Registry::RegisterFactory<RateLimitFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

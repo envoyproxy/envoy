@@ -19,5 +19,5 @@ FilterUtility::resolveClusterInfo(Http::StreamDecoderFilterCallbacks* decoder_ca
   return cluster->info();
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

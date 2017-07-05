@@ -68,5 +68,5 @@ private:
   std::string command_;
 };
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

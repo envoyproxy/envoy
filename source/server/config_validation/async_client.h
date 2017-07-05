@@ -21,5 +21,5 @@ public:
   AsyncClient::Stream* start(StreamCallbacks&, const Optional<std::chrono::milliseconds>&) override;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

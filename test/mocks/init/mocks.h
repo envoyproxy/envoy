@@ -40,5 +40,5 @@ public:
   ReadyWatcher initialized_;
 };
 
-} // Init
-} // Envoy
+} // namespace Init
+} // namespace Envoy

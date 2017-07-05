@@ -15,5 +15,5 @@ Network::FilterStatus Echo::onData(Buffer::Instance& data) {
   return Network::FilterStatus::StopIteration;
 }
 
-} // Filter
-} // Envoy
+} // namespace Filter
+} // namespace Envoy

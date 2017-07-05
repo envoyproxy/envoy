@@ -258,6 +258,6 @@ private:
   ServerConnectionCallbacks& callbacks_;
 };
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

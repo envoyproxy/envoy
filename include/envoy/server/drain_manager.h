@@ -32,5 +32,5 @@ public:
 
 typedef std::unique_ptr<DrainManager> DrainManagerPtr;
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

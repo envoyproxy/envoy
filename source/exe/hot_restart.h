@@ -201,5 +201,5 @@ private:
   bool parent_terminated_{};
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

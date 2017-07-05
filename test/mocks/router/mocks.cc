@@ -6,11 +6,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Router {
 
@@ -77,5 +77,5 @@ MockConfig::~MockConfig() {}
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() {}
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

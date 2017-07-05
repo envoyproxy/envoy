@@ -261,5 +261,5 @@ private:
   std::list<FieldPtr> fields_;
 };
 
-} // Bson
-} // Envoy
+} // namespace Bson
+} // namespace Envoy

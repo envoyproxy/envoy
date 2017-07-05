@@ -9,8 +9,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -91,5 +91,5 @@ TEST_F(IpTaggingFilterTest, BothRequest) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

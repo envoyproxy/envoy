@@ -59,5 +59,5 @@ TEST_P(ListenSocketImplTest, BindPortZero) {
   EXPECT_GT(socket.localAddress()->ip()->port(), 0U);
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

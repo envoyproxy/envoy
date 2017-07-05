@@ -12,12 +12,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Combine;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::Values;
+using testing::_;
 
 namespace Envoy {
 namespace Grpc {
@@ -241,8 +241,9 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests response trailers.
   Buffer::OwnedImpl trailers_buffer;
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) { trailers_buffer.move(data); }));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_)).WillOnce(Invoke([&](Buffer::Instance& data) {
+    trailers_buffer.move(data);
+  }));
   Http::TestHeaderMapImpl response_trailers;
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");

@@ -13,5 +13,5 @@ AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&,
   return nullptr;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

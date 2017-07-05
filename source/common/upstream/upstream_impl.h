@@ -40,8 +40,8 @@ public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr address, bool canary,
                       const std::string& zone)
-      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary), zone_(zone),
-        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
+      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary),
+        zone_(zone), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -355,5 +355,5 @@ private:
   Network::DnsLookupFamily dns_lookup_family_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

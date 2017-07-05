@@ -10,5 +10,5 @@ ImplBase::~ImplBase() {
   event_del(&raw_event_);
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

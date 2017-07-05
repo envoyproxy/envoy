@@ -223,4 +223,4 @@ protected:
   TestEnvironment::PortMap port_map_;
   Network::Address::IpVersion version_;
 };
-} // Envoy
+} // namespace Envoy

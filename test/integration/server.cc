@@ -30,7 +30,7 @@ public:
   std::string version() override { return "1"; }
 };
 
-} // Server
+} // namespace Server
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path,
                                                        const Network::Address::IpVersion version) {
@@ -76,4 +76,4 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   server_->run();
   server_.reset();
 }
-} // Envoy
+} // namespace Envoy

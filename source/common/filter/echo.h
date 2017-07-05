@@ -23,5 +23,5 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-} // Filter
-} // Envoy
+} // namespace Filter
+} // namespace Envoy

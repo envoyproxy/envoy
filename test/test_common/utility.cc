@@ -19,8 +19,8 @@
 
 #include "test/test_common/printers.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
@@ -184,5 +184,5 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

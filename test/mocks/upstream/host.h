@@ -59,7 +59,7 @@ public:
   std::list<ChangeStateCb> callbacks_;
 };
 
-} // Outlier
+} // namespace Outlier
 
 class MockHostDescription : public HostDescription {
 public:
@@ -125,5 +125,5 @@ public:
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

@@ -44,4 +44,4 @@ public:
 
   MOCK_METHOD0(currentTime, MonotonicTime());
 };
-} // Envoy
+} // namespace Envoy

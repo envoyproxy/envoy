@@ -206,12 +206,14 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
-      : counters_([this](const std::string& name)
-                      -> CounterImpl* { return new CounterImpl(*alloc_.alloc(name), alloc_); }),
-        gauges_([this](const std::string& name)
-                    -> GaugeImpl* { return new GaugeImpl(*alloc_.alloc(name), alloc_); }),
-        timers_([this](const std::string& name)
-                    -> TimerImpl* { return new TimerImpl(name, *this); }) {}
+      : counters_([this](const std::string& name) -> CounterImpl* {
+          return new CounterImpl(*alloc_.alloc(name), alloc_);
+        }),
+        gauges_([this](const std::string& name) -> GaugeImpl* {
+          return new GaugeImpl(*alloc_.alloc(name), alloc_);
+        }),
+        timers_(
+            [this](const std::string& name) -> TimerImpl* { return new TimerImpl(name, *this); }) {}
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
@@ -249,5 +251,5 @@ private:
   IsolatedStatsCache<Timer, TimerImpl> timers_;
 };
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

@@ -19,5 +19,5 @@ std::string MessageImpl::bodyAsString() const {
   return ret;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

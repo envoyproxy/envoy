@@ -72,5 +72,5 @@ void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

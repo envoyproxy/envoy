@@ -178,6 +178,6 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
   connection_->write(buffer);
 }
 
-} // Statsd
-} // Stats
-} // Envoy
+} // namespace Statsd
+} // namespace Stats
+} // namespace Envoy

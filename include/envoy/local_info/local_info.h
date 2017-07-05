@@ -36,5 +36,5 @@ public:
   virtual const std::string& nodeName() const PURE;
 };
 
-} // LocalInfo
-} // Envoy
+} // namespace LocalInfo
+} // namespace Envoy

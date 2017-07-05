@@ -47,5 +47,5 @@ public:
 
 typedef std::unique_ptr<Api> ApiPtr;
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

@@ -20,5 +20,5 @@ Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::strin
   return access_logs_[file_name];
 }
 
-} // AccessLog
-} // Envoy
+} // namespace AccessLog
+} // namespace Envoy

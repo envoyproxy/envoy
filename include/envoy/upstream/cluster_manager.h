@@ -174,5 +174,5 @@ public:
   virtual CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) PURE;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

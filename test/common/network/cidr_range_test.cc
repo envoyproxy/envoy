@@ -10,8 +10,8 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 // We are adding things into the std namespace.
 // Note that this is technically undefined behavior!
@@ -23,7 +23,7 @@ std::ostream& operator<<(std::ostream& out, const std::pair<First, Second>& p) {
   return out << '(' << p.first << ", " << p.second << ')';
 }
 
-} // std
+} // namespace std
 
 namespace Envoy {
 
@@ -573,6 +573,6 @@ TEST(IpListTest, MatchAnyAll) {
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

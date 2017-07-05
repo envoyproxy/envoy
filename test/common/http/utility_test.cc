@@ -9,8 +9,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Http {
@@ -209,5 +209,5 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

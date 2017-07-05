@@ -41,5 +41,5 @@ public:
 
 typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

@@ -7,8 +7,8 @@
 
 #include "server/options_impl.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
@@ -69,4 +69,4 @@ TEST(OptionsImplTest, BadCliOption) {
   EXPECT_DEATH(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                "error: unknown IP address version 'foo'");
 }
-} // Envoy
+} // namespace Envoy

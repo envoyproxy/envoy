@@ -16,11 +16,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Router {
 
@@ -276,5 +276,5 @@ TEST_F(RdsImplTest, FailureArray) {
   EXPECT_EQ(1UL, store_.counter("foo.rds.update_failure").value());
 }
 
-} // Upstream
-} // Envoy
+} // namespace Router
+} // namespace Envoy

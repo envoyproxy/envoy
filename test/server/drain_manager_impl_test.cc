@@ -8,9 +8,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Return;
 using testing::SaveArg;
+using testing::_;
 
 namespace Server {
 
@@ -51,5 +51,5 @@ TEST(DrainManagerImplTest, All) {
   EXPECT_TRUE(drain_manager.drainClose());
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

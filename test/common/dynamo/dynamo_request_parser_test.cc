@@ -72,20 +72,16 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
 
 TEST(DynamoRequestParser, parseErrorType) {
   {
-    EXPECT_EQ(
-        "ResourceNotFoundException",
-        RequestParser::parseErrorType(
-            *Json::Factory::loadFromString(
-                "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\"}")));
+    EXPECT_EQ("ResourceNotFoundException",
+              RequestParser::parseErrorType(*Json::Factory::loadFromString(
+                  "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\"}")));
   }
 
   {
-    EXPECT_EQ(
-        "ResourceNotFoundException",
-        RequestParser::parseErrorType(
-            *Json::Factory::loadFromString(
-                "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\","
-                "\"message\":\"Requested resource not found: Table: tablename not found\"}")));
+    EXPECT_EQ("ResourceNotFoundException",
+              RequestParser::parseErrorType(*Json::Factory::loadFromString(
+                  "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\","
+                  "\"message\":\"Requested resource not found: Table: tablename not found\"}")));
   }
 
   {
@@ -265,5 +261,5 @@ TEST(DynamoRequestParser, parsePartitionIds) {
   }
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

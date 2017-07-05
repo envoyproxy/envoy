@@ -72,5 +72,5 @@ enum class Code {
   // clang-format on
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

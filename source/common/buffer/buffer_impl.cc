@@ -110,5 +110,5 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
-} // Buffer
-} // Envoy
+} // namespace Buffer
+} // namespace Envoy

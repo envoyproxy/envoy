@@ -11,10 +11,12 @@ namespace Envoy {
 namespace Thread {
 
 Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_routine) {
-  int rc = pthread_create(&thread_id_, nullptr, [](void* arg) -> void* {
-    static_cast<Thread*>(arg)->thread_routine_();
-    return nullptr;
-  }, this);
+  int rc = pthread_create(&thread_id_, nullptr,
+                          [](void* arg) -> void* {
+                            static_cast<Thread*>(arg)->thread_routine_();
+                            return nullptr;
+                          },
+                          this);
   RELEASE_ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
 }
@@ -27,5 +29,5 @@ void Thread::join() {
   UNREFERENCED_PARAMETER(rc);
 }
 
-} // Thread
-} // Envoy
+} // namespace Thread
+} // namespace Envoy

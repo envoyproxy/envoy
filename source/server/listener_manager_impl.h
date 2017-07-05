@@ -126,5 +126,5 @@ private:
   std::list<WorkerPtr> workers_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

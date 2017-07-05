@@ -157,5 +157,5 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

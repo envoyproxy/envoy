@@ -23,12 +23,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Test;
+using testing::_;
 
 namespace Envoy {
 namespace Zipkin {
@@ -325,5 +325,5 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   zipkin_span2->setTag("key", "value");
   EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

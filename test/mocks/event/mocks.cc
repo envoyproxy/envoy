@@ -4,18 +4,19 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
+using testing::_;
 
 namespace Event {
 
 MockDispatcher::MockDispatcher() {
-  ON_CALL(*this, clearDeferredDeleteList())
-      .WillByDefault(Invoke([this]() -> void { to_delete_.clear(); }));
+  ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
+    to_delete_.clear();
+  }));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 }
@@ -35,5 +36,5 @@ MockTimer::~MockTimer() {}
 MockFileEvent::MockFileEvent() {}
 MockFileEvent::~MockFileEvent() {}
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

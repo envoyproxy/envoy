@@ -85,7 +85,7 @@ public:
                                          PoolCallbacks& callbacks));
 };
 
-} // ConnPool
+} // namespace ConnPool
 
 namespace CommandSplitter {
 
@@ -119,6 +119,6 @@ public:
   MOCK_METHOD2(makeRequest_, SplitRequest*(const RespValue& request, SplitCallbacks& callbacks));
 };
 
-} // CommandSplitter
-} // Redis
-} // Envoy
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Envoy

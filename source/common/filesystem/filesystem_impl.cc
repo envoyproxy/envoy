@@ -194,5 +194,5 @@ void FileImpl::createFlushStructures() {
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

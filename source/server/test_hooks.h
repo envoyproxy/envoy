@@ -23,4 +23,4 @@ public:
   // TestHooks
   void onServerInitialized() override {}
 };
-} // Envoy
+} // namespace Envoy

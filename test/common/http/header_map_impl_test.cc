@@ -319,5 +319,5 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

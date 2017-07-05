@@ -65,5 +65,5 @@ private:
   ClientContextPtr client_ssl_ctx_alpn_san_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

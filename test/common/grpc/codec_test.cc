@@ -164,5 +164,5 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
   }
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

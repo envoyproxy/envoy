@@ -171,5 +171,5 @@ void ListenerManagerImpl::stopWorkers() {
   }
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

@@ -29,9 +29,9 @@ public:
                    const std::string& to_az = EMPTY_STRING) {
     TestHeaderMapImpl headers{{":status", std::to_string(code)}};
 
-    CodeUtility::ResponseStatInfo info{global_store_, cluster_scope_, "prefix.", headers,
-                                       internal_request, request_vhost_name, request_vcluster_name,
-                                       from_az, to_az, canary};
+    CodeUtility::ResponseStatInfo info{
+        global_store_,      cluster_scope_,        "prefix.", headers, internal_request,
+        request_vhost_name, request_vcluster_name, from_az,   to_az,   canary};
 
     CodeUtility::chargeResponseStat(info);
   }
@@ -93,8 +93,10 @@ TEST_F(CodeUtilityTest, Canary) {
 
 TEST_F(CodeUtilityTest, All) {
   std::vector<std::pair<Code, std::string>> testSet = {
-      std::make_pair(Code::Continue, "Continue"), std::make_pair(Code::OK, "OK"),
-      std::make_pair(Code::Created, "Created"), std::make_pair(Code::Accepted, "Accepted"),
+      std::make_pair(Code::Continue, "Continue"),
+      std::make_pair(Code::OK, "OK"),
+      std::make_pair(Code::Created, "Created"),
+      std::make_pair(Code::Accepted, "Accepted"),
       std::make_pair(Code::NonAuthoritativeInformation, "Non-Authoritative Information"),
       std::make_pair(Code::NoContent, "No Content"),
       std::make_pair(Code::ResetContent, "Reset Content"),
@@ -104,7 +106,8 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::IMUsed, "IM Used"),
       std::make_pair(Code::MultipleChoices, "Multiple Choices"),
       std::make_pair(Code::MovedPermanently, "Moved Permanently"),
-      std::make_pair(Code::Found, "Found"), std::make_pair(Code::SeeOther, "See Other"),
+      std::make_pair(Code::Found, "Found"),
+      std::make_pair(Code::SeeOther, "See Other"),
       std::make_pair(Code::NotModified, "Not Modified"),
       std::make_pair(Code::UseProxy, "Use Proxy"),
       std::make_pair(Code::TemporaryRedirect, "Temporary Redirect"),
@@ -112,12 +115,14 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::BadRequest, "Bad Request"),
       std::make_pair(Code::Unauthorized, "Unauthorized"),
       std::make_pair(Code::PaymentRequired, "Payment Required"),
-      std::make_pair(Code::Forbidden, "Forbidden"), std::make_pair(Code::NotFound, "Not Found"),
+      std::make_pair(Code::Forbidden, "Forbidden"),
+      std::make_pair(Code::NotFound, "Not Found"),
       std::make_pair(Code::MethodNotAllowed, "Method Not Allowed"),
       std::make_pair(Code::NotAcceptable, "Not Acceptable"),
       std::make_pair(Code::ProxyAuthenticationRequired, "Proxy Authentication Required"),
       std::make_pair(Code::RequestTimeout, "Request Timeout"),
-      std::make_pair(Code::Conflict, "Conflict"), std::make_pair(Code::Gone, "Gone"),
+      std::make_pair(Code::Conflict, "Conflict"),
+      std::make_pair(Code::Gone, "Gone"),
       std::make_pair(Code::LengthRequired, "Length Required"),
       std::make_pair(Code::PreconditionFailed, "Precondition Failed"),
       std::make_pair(Code::PayloadTooLarge, "Payload Too Large"),
@@ -173,9 +178,10 @@ TEST(CodeUtilityResponseTimingTest, All) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
 
-  CodeUtility::ResponseTimingInfo info{global_store, cluster_scope, "prefix.",
-                                       std::chrono::milliseconds(5), true, true, "vhost_name",
-                                       "req_vcluster_name", "from_az", "to_az"};
+  CodeUtility::ResponseTimingInfo info{
+      global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),
+      true,         true,          "vhost_name", "req_vcluster_name",
+      "from_az",    "to_az"};
 
   EXPECT_CALL(cluster_scope,
               deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
@@ -191,5 +197,5 @@ TEST(CodeUtilityResponseTimingTest, All) {
   CodeUtility::chargeResponseTiming(info);
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

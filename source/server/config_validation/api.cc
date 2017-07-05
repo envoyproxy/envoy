@@ -12,5 +12,5 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
   return Event::DispatcherPtr{new Event::ValidationDispatcher()};
 }
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

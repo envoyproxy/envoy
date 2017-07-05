@@ -31,4 +31,4 @@ public:
   }
 };
 
-} // Envoy
+} // namespace Envoy

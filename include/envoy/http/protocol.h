@@ -8,5 +8,5 @@ namespace Http {
  */
 enum class Protocol { Http10, Http11, Http2 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

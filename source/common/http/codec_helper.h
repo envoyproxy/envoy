@@ -46,5 +46,5 @@ private:
   bool reset_callbacks_run_{};
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

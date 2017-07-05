@@ -40,5 +40,5 @@ private:
   static std::atomic<uint64_t> next_stream_id_;
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

@@ -246,8 +246,9 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
                  : "0";
     };
   } else if (field_name == "BYTES_SENT") {
-    field_extractor_ =
-        [](const RequestInfo& request_info) { return std::to_string(request_info.bytesSent()); };
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return std::to_string(request_info.bytesSent());
+    };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.duration().count());
@@ -337,6 +338,6 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
   return HeaderFormatter::format(request_headers);
 }
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

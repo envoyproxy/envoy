@@ -32,5 +32,5 @@ TEST(ApiImplTest, fileExists) {
   EXPECT_FALSE(api.fileExists("/dev/blahblahblah"));
 }
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

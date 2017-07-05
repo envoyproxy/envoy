@@ -21,5 +21,5 @@ public:
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

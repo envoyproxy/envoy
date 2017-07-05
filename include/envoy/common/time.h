@@ -39,4 +39,4 @@ public:
    */
   virtual MonotonicTime currentTime() PURE;
 };
-} // Envoy
+} // namespace Envoy

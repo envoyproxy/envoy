@@ -233,5 +233,5 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs;sr;ss",
             span_context_6.serializeToString());
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

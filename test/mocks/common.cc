@@ -9,4 +9,4 @@ MockSystemTimeSource::~MockSystemTimeSource() {}
 
 MockMonotonicTimeSource::MockMonotonicTimeSource() {}
 MockMonotonicTimeSource::~MockMonotonicTimeSource() {}
-} // Envoy
+} // namespace Envoy

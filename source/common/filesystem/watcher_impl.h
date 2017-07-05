@@ -44,5 +44,5 @@ private:
   std::unordered_map<int, DirectoryWatch> callback_map_;
 };
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

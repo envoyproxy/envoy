@@ -27,5 +27,5 @@ MockHttpTracer::~MockHttpTracer() {}
 MockDriver::MockDriver() {}
 MockDriver::~MockDriver() {}
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

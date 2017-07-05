@@ -35,5 +35,5 @@ MockFile::~MockFile() {}
 MockWatcher::MockWatcher() {}
 MockWatcher::~MockWatcher() {}
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

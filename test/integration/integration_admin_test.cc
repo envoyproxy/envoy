@@ -6,8 +6,8 @@
 
 #include "test/integration/utility.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
@@ -166,4 +166,4 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 }
 #endif
 
-} // Envoy
+} // namespace Envoy

@@ -24,5 +24,5 @@ TEST(HostUtilityTest, All) {
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(host));
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

@@ -72,8 +72,8 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
   std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
-  parent_.connection().dispatcher().post([this, trailers_copy]()
-                                             -> void { encoder_.encodeTrailers(*trailers_copy); });
+  parent_.connection().dispatcher().post(
+      [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
 }
 
 void FakeStream::encodeResetStream() {
@@ -315,4 +315,4 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;
 }
-} // Envoy
+} // namespace Envoy

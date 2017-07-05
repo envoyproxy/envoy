@@ -35,5 +35,5 @@ private:
   static void forceLink();
 };
 
-} // Profiler
-} // Envoy
+} // namespace Profiler
+} // namespace Envoy

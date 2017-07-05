@@ -48,5 +48,5 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

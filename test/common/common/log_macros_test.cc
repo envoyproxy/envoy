@@ -44,4 +44,4 @@ TEST(Logger, All) {
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
-} // Envoy
+} // namespace Envoy

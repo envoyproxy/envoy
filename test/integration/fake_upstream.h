@@ -231,4 +231,4 @@ private:
   std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };
-} // Envoy
+} // namespace Envoy

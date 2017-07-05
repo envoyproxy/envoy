@@ -71,5 +71,5 @@ private:
   StreamDecoderFilterCallbacks* callbacks_{};
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

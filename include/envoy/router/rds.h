@@ -25,5 +25,5 @@ public:
 
 typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

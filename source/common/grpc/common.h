@@ -68,12 +68,12 @@ public:
                          bool success);
 
   /**
-     * Charge a success/failure stat to a cluster/service/method.
-     * @param cluster supplies the target cluster.
-     * @param grpc_service supplies the service name.
-     * @param grpc_method supplies the method name.
-     * @param success supplies whether the call succeeded.
-     */
+   * Charge a success/failure stat to a cluster/service/method.
+   * @param cluster supplies the target cluster.
+   * @param grpc_service supplies the service name.
+   * @param grpc_method supplies the method name.
+   * @param success supplies whether the call succeeded.
+   */
   static void chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
                          const std::string& grpc_method, bool success);
 
@@ -110,5 +110,5 @@ private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
 };
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

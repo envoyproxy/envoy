@@ -89,8 +89,9 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
     ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
     Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t listener_tag,
     const Network::ListenerOptions& listener_options)
-    : ActiveListener(parent, parent.dispatcher_.createSslListener(parent, ssl_ctx, socket, *this,
-                                                                  scope, listener_options),
+    : ActiveListener(parent,
+                     parent.dispatcher_.createSslListener(parent, ssl_ctx, socket, *this, scope,
+                                                          listener_options),
                      factory, scope, listener_tag) {}
 
 Network::Listener*
@@ -165,5 +166,5 @@ ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

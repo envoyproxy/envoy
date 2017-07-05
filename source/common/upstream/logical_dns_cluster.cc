@@ -60,8 +60,8 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](
-          std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this,
+       dns_address](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
@@ -123,5 +123,5 @@ LogicalDnsCluster::LogicalHost::createConnection(Event::Dispatcher& dispatcher) 
               new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy
