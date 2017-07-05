@@ -28,6 +28,7 @@ namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -128,10 +129,10 @@ TEST_F(SdsTest, PoolFailure) {
 }
 
 TEST_F(SdsTest, NoHealthChecker) {
+  InSequence s;
   setupRequest();
   cluster_->initialize();
 
-  EXPECT_CALL(membership_updated_, ready()).Times(3);
   cluster_->addMemberUpdateCb(
       [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
           -> void { membership_updated_.ready(); });
@@ -142,6 +143,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -170,6 +172,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   message->body().reset(
       new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
           "test/common/upstream/test_data/sds_response_weight_change.json"))));
+  EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -215,9 +218,10 @@ TEST_F(SdsTest, NoHealthChecker) {
 }
 
 TEST_F(SdsTest, HealthChecker) {
+  InSequence s;
   MockHealthChecker* health_checker = new MockHealthChecker();
   EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster_->setHealthChecker(HealthCheckerPtr{health_checker});
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
@@ -231,6 +235,7 @@ TEST_F(SdsTest, HealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
