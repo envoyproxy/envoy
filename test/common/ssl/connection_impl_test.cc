@@ -73,9 +73,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
           if (!expected_digest.empty()) {
             EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
           }
-          if (!expected_uri.empty()) {
-            EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
-          }
+          EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
           server_connection->close(Network::ConnectionCloseType::NoFlush);
           client_connection->close(Network::ConnectionCloseType::NoFlush);
           dispatcher.exit();
