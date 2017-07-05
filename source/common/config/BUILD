@@ -37,7 +37,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http_subscription_lib",
     hdrs = ["http_subscription_impl.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "http_api_protos",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/buffer:buffer_lib",
