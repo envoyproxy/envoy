@@ -4,7 +4,7 @@ Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
 ## Ubuntu envoy image
 The Ubuntu based Envoy Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks,
-where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
+where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/lyft/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `lyft/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
