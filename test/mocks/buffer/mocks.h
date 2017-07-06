@@ -20,8 +20,10 @@ public:
   MOCK_METHOD1(write, int(int fd));
   MOCK_METHOD1(move, void(Instance& rhs));
   MOCK_METHOD2(move, void(Instance& rhs, uint64_t length));
+  MOCK_METHOD1(drain, void(uint64_t size));
 
   void BaseMove(Instance& rhs) { Buffer::OwnedImpl::move(rhs); }
+  void BaseDrain(uint64_t size) { Buffer::OwnedImpl::drain(size); }
 
   int TrackWrites(int fd) {
     int bytes_written = Buffer::OwnedImpl::write(fd);
