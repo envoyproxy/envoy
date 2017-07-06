@@ -185,12 +185,11 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
        (*existing_warming_listener)->hash() == hash) ||
       (existing_active_listener != active_listeners_.end() &&
        (*existing_active_listener)->hash() == hash)) {
-    ENVOY_LOG(debug, "duplicate listener. no add/update");
+    ENVOY_LOG(debug, "duplicate listener '{}'. no add/update", name);
     return false;
   }
 
-  std::unique_ptr<ListenerImpl> new_listener(
-      new ListenerImpl(json, *this, name, workers_started_, hash));
+  ListenerImplPtr new_listener(new ListenerImpl(json, *this, name, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -340,7 +339,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
   if (existing_warming_listener == warming_listeners_.end() &&
       existing_active_listener == active_listeners_.end()) {
-    ENVOY_LOG(debug, "unknown listener. no remove", name);
+    ENVOY_LOG(debug, "unknown listener '{}'. no remove", name);
     return false;
   }
 

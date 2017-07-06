@@ -9,6 +9,7 @@ Each individual listener configuration has the following format:
 .. code-block:: json
 
   {
+    "name": "...",
     "address": "...",
     "filters": [],
     "ssl_context": "{...}",
@@ -17,6 +18,11 @@ Each individual listener configuration has the following format:
     "use_original_dst": "...",
     "per_connection_buffer_limit_bytes": "..."
   }
+
+name
+  *(optional, string)* The unique name by which this listener is known. If no name is provided,
+  Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
+  updated or removed via LDS a unique name must be provided.
 
 address
   *(required, string)* The address that the listener should listen on. Currently only TCP
