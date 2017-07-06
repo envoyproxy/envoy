@@ -186,8 +186,10 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
 
+  std::unique_ptr<MockBuffer> buffer{new MockBuffer()};
+  buffer_ = buffer.get();
   dynamic_cast<Network::ConnectionImpl*>(connection_.get())
-      ->replaceWriteBufferForTest(std::move(buffer_ptr_));
+      ->replaceWriteBufferForTest(std::move(buffer));
 
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
@@ -212,13 +214,13 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
-  EXPECT_CALL(buffer_, move(_)).Times(1);
-  EXPECT_CALL(buffer_, write(_)).Times(1);
+  EXPECT_CALL(*buffer_, move(_)).Times(1);
+  EXPECT_CALL(*buffer_, write(_)).Times(1);
 
-  int bytes_expected = buffer_.bytes_written() + data.size();
+  int bytes_expected = buffer_->bytes_written() + data.size();
 
   connection_->write(buffer);
-  while (buffer_.bytes_written() != bytes_expected) {
+  while (buffer_->bytes_written() != bytes_expected) {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   }
 }

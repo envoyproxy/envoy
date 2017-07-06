@@ -144,8 +144,7 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
-  std::unique_ptr<MockBuffer> buffer_ptr_{new MockBuffer()};
-  MockBuffer& buffer_{*buffer_ptr_};
+  MockBuffer* buffer_;
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
