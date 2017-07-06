@@ -371,8 +371,9 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   bool is_below = true;
   bool is_above = false;
 
-  ON_CALL(buffer_, write(testing::_))
-      .WillByDefault(testing::Invoke(&buffer_, &MockBuffer::FailWrite));
+  ON_CALL(buffer_, write(_)).WillByDefault(testing::Invoke(&buffer_, &MockBuffer::FailWrite));
+  ON_CALL(buffer_, drain(_)).WillByDefault(testing::Invoke(&buffer_, &MockBuffer::BaseDrain));
+  EXPECT_CALL(buffer_, drain(_)).Times(AnyNumber());
 
   // Randomly write 1-20 bytes and read 1-30 bytes per loop.
   for (int i = 0; i < 50; ++i) {
