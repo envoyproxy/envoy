@@ -25,7 +25,9 @@ MockOptions::~MockOptions() {}
 MockAdmin::MockAdmin() {}
 MockAdmin::~MockAdmin() {}
 
-MockDrainManager::MockDrainManager() {}
+MockDrainManager::MockDrainManager() {
+  ON_CALL(*this, startDrainSequence(_)).WillByDefault(SaveArg<0>(&drain_sequence_completion_));
+}
 MockDrainManager::~MockDrainManager() {}
 
 MockWatchDog::MockWatchDog() {}

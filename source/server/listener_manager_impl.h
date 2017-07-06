@@ -38,6 +38,7 @@ public:
   }
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
+  DrainManagerPtr createDrainManager() override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -96,8 +97,16 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
+  // Warming listeners are listeners that may need further initialization via the listener's init
+  // manager. For example, RDS, or in the future KDS. Once a listener is done warming it will
+  // be transitioned to active.
   ListenerList warming_listeners_;
+  // Draining listeners are listeners that are in the process of being drained and removed. They
+  // go through two phases where first the workers stop accepting new connections and existing
+  // connections are drained. Then after that time period the listener is removed from all workers
+  // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
@@ -106,14 +115,17 @@ private:
 
 // TODO(mattklein123): Listener manager stats.
 // TODO(mattklein123): Check that addresses for unbound listeners are unique.
-// TODO(mattklein123): Real listener draining with a per listener drain manager.
 // TODO(mattklein123): Detect runtime worker listener addition failure and handle.
+// TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
+// initializing all listeners after workers are started. This is related to correctly dealing with
+// runtime listener addition failure so can be handled in the same change.
 
 /**
  * Maps JSON config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Listener,
                      public Configuration::FactoryContext,
+                     public Network::DrainDecision,
                      public Network::FilterChainFactory,
                      Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
@@ -131,12 +143,13 @@ public:
                bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
-  Network::Address::InstanceConstSharedPtr address() { return address_; }
-  const Network::ListenSocketSharedPtr& getSocket() { return socket_; }
-  uint64_t hash() { return hash_; }
+  Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
+  uint64_t hash() const { return hash_; }
   void infoLog(const std::string& message);
   void initialize();
-  const std::string& name() { return name_; }
+  DrainManager& localDrainManager() const { return *local_drain_manager_; }
+  const std::string& name() const { return name_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
 
   // Server::Listener
@@ -156,7 +169,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
-  DrainManager& drainManager() override { return parent_.server_.drainManager(); }
+  Network::DrainDecision& drainManager() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
   Init::Manager& initManager() override;
@@ -170,6 +183,9 @@ public:
   Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
+
+  // Network::DrainDecision
+  bool drainClose() const override;
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
@@ -192,6 +208,7 @@ private:
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  DrainManagerPtr local_drain_manager_;
 };
 
 } // namespace Server

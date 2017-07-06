@@ -6,10 +6,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/drain_manager.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -47,9 +47,10 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return DrainManager& singleton for use by the entire server.
+   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
+   *         they should be doing graceful closes on connections when possible.
    */
-  virtual DrainManager& drainManager() PURE;
+  virtual const Network::DrainDecision& drainManager() PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

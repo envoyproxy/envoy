@@ -75,10 +75,11 @@ public:
   ~MockDrainManager();
 
   // Server::DrainManager
-  MOCK_METHOD0(drainClose, bool());
-  MOCK_METHOD0(draining, bool());
-  MOCK_METHOD0(startDrainSequence, void());
+  MOCK_CONST_METHOD0(drainClose, bool());
+  MOCK_METHOD1(startDrainSequence, void(std::function<void()> completion));
   MOCK_METHOD0(startParentShutdownSequence, void());
+
+  std::function<void()> drain_sequence_completion_;
 };
 
 class MockWatchDog : public WatchDog {
@@ -126,12 +127,15 @@ public:
   MockListenerComponentFactory();
   ~MockListenerComponentFactory();
 
+  DrainManagerPtr createDrainManager() override { return DrainManagerPtr{createDrainManager_()}; }
+
   MOCK_METHOD2(createFilterFactoryList, std::vector<Configuration::NetworkFilterFactoryCb>(
                                             const std::vector<Json::ObjectSharedPtr>& filters,
                                             Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port));
+  MOCK_METHOD0(createDrainManager_, DrainManager*());
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
   std::shared_ptr<Network::MockListenSocket> socket_;
@@ -221,7 +225,6 @@ public:
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(dnsResolver, Network::DnsResolverSharedPtr());
-  MOCK_METHOD0(draining, bool());
   MOCK_METHOD0(drainListeners, void());
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
@@ -303,7 +306,7 @@ public:
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(drainManager, DrainManager&());
+  MOCK_METHOD0(drainManager, const Network::DrainDecision&());
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
