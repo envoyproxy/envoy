@@ -92,6 +92,7 @@ public:
   virtual ~Instance() {}
 
   virtual bool operator==(const Instance& rhs) const PURE;
+  bool operator!=(const Instance& rhs) const { return !operator==(rhs); }
 
   /**
    * @return a human readable string for the address.

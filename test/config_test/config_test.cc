@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <string>
 
+#include "common/upstream/cluster_manager_impl.h"
+
 #include "server/configuration_impl.h"
 
 #include "test/integration/server.h"
@@ -23,12 +25,9 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path)
-      : options_(file_path),
-        cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
-                                 server_.random(), server_.dnsResolver(), ssl_context_manager_,
-                                 server_.dispatcher(), server_.localInfo()) {
+  ConfigTest(const std::string& file_path) : options_(file_path) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
+    ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
@@ -36,6 +35,10 @@ public:
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config;
+
+    cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+        server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo()));
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return main_config.clusterManager();
@@ -50,7 +53,7 @@ public:
         }));
 
     try {
-      main_config.initialize(*config_json, server_, cluster_manager_factory_);
+      main_config.initialize(*config_json, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }
@@ -61,10 +64,11 @@ public:
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Server::TestOptionsImpl options_;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory_;
+  std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
+  Runtime::RandomGeneratorImpl random_;
 };
 
 uint32_t run(const std::string& directory) {

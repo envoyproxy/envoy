@@ -16,7 +16,7 @@
 #include "common/common/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -43,7 +43,7 @@ void MainImpl::initialize(const Json::Object& json, Instance& server,
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(info, "listener #{}:", i);
-    server.listenerManager().addListener(*listeners[i]);
+    server.listenerManager().addOrUpdateListener(*listeners[i]);
   }
 
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
