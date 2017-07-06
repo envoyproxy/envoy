@@ -177,6 +177,10 @@ public:
   /**
    * Sets the high and low watermarks which trigger onAboveWriteBufferHighWatermark
    * and onBelowWriteBufferHighWatermark callbacks.
+   * @param low_watermark if the connection was above the high watermark and the
+   * connection buffer is drained below this many bytes, onBelowWriteBufferHighWatermark will be called.
+   * @param high_watermark if the connection has more bytes than this buffered,
+   * onAboveWriteBufferHighWatermark will be called.
    */
   virtual void setWriteBufferWatermarks(size_t low_watermark, size_t high_watermark) PURE;
 };
