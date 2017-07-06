@@ -64,9 +64,31 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   });
 }
 
+TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  FakeRawConnectionPtr fake_rest_connection;
+  std::string data(1024 * 16, 'a');
+  executeActions({
+      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy_with_write_limits")); },
+      [&]() -> void { tcp_client->write(data); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[2]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection->waitForData(data.size()); },
+      [&]() -> void { fake_upstream_connection->write(data); },
+      [&]() -> void { tcp_client->waitForData(data); }, [&]() -> void { tcp_client->close(); },
+      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+
+      // Clean up unused client_ssl_auth
+      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
+      [&]() -> void { fake_rest_connection->close(); },
+      [&]() -> void { fake_rest_connection->waitForDisconnect(); },
+  });
+}
+
 // Test proxying data in both directions with envoy doing TCP and TLS
 // termination.
-TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
+void TcpProxyIntegrationTest::SendAndReceiveTlsData(const std::string& data_to_send_upstream,
+                                                    const std::string& data_to_send_downstream) {
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
   FakeHttpConnectionPtr fake_rest_connection;
@@ -104,20 +126,20 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
       },
       // Ship some data upstream.
       [&]() -> void {
-        Buffer::OwnedImpl buffer("hello");
+        Buffer::OwnedImpl buffer(data_to_send_upstream);
         ssl_client->write(buffer);
         dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
       },
       // Make sure the data makes it upstream.
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(5); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[2]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection->waitForData(data_to_send_upstream.size()); },
       // Now send data downstream and make sure it arrives.
       [&]() -> void {
         std::shared_ptr<WaitForPayloadReader> payload_reader(
             new WaitForPayloadReader(*dispatcher_));
         ssl_client->addReadFilter(payload_reader);
-        fake_upstream_connection->write("world");
-        payload_reader->set_data_to_wait_for("world");
+        fake_upstream_connection->write(data_to_send_downstream);
+        payload_reader->set_data_to_wait_for(data_to_send_downstream);
         ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
       },
       // Clean up.
@@ -127,6 +149,13 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
       [&]() -> void { fake_rest_connection->close(); },
       [&]() -> void { fake_rest_connection->waitForDisconnect(); },
   });
+}
+
+TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { SendAndReceiveTlsData("hello", "world"); }
+
+TEST_P(TcpProxyIntegrationTest, LargeBidirectionalTlsWrites) {
+  std::string large_data(1024 * 8, 'a');
+  SendAndReceiveTlsData(large_data, large_data);
 }
 
 } // namespace

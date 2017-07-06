@@ -45,6 +45,17 @@ public:
    * @param events supplies the ConnectionEvent events that occurred as a bitmask.
    */
   virtual void onEvent(uint32_t events) PURE;
+
+  /**
+   * Called when the write buffer for a connection goes over its high watermark.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the write buffer for a connection goes from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -162,6 +173,12 @@ public:
    * Get the value set with setReadBufferLimit.
    */
   virtual uint32_t readBufferLimit() const PURE;
+
+  /**
+   * Sets the high and low watermarks which trigger onAboveWriteBufferHighWatermark
+   * and onBelowWriteBufferHighWatermark callbacks.
+   */
+  virtual void setWriteBufferWatermarks(size_t low_watermark, size_t high_watermark) PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

@@ -123,6 +123,32 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
                                                 config_->stats().downstream_cx_tx_bytes_buffered_});
 }
 
+void TcpProxy::readDisableUpstream(bool disable) { upstream_connection_->readDisable(disable); }
+
+void TcpProxy::readDisableDownstream(bool disable) {
+  read_callbacks_->connection().readDisable(disable);
+}
+
+void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  // If downstream has too much data buffered, stop reading on the upstream connection.
+  parent_.readDisableUpstream(true);
+}
+
+void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  // The downstream buffer has been drained.  Resume reading from upstream.
+  parent_.readDisableUpstream(false);
+}
+
+void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  // There's too much data buffered in the upstream write buffer, so stop reading.
+  parent_.readDisableDownstream(true);
+}
+
+void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  // The upstream write buffer is drained.  Resume reading.
+  parent_.readDisableDownstream(false);
+}
+
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
 

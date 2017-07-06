@@ -94,12 +94,19 @@ public:
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
+  // These two functions allow enabling/disabling reads on the upstream and downstream connections.
+  // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
+  void readDisableUpstream(bool disable);
+  void readDisableDownstream(bool disable);
+
 private:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     TcpProxy& parent_;
   };
@@ -110,6 +117,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {

@@ -102,6 +102,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     TcpStatsdSink& parent_;
     Event::Dispatcher& dispatcher_;

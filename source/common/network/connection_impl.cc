@@ -98,7 +98,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  uint64_t data_to_write = write_buffer_.length();
+  uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
@@ -207,15 +207,25 @@ void ConnectionImpl::readDisable(bool disable) {
   // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
   // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
-    ASSERT(read_enabled);
+    if (!read_enabled) {
+      ++read_disable_count_;
+      return;
+    }
     state_ &= ~InternalState::ReadEnabled;
     file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
   } else {
+    if (read_disable_count_ > 0) {
+      --read_disable_count_;
+      return;
+    }
     ASSERT(!read_enabled);
     state_ |= InternalState::ReadEnabled;
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    // If the connection has data buffered there's no guarantee there's also data in the kernel
+    // which will kick off the filter chain.  Instead fake an event to make sure the buffered data
+    // gets processed regardless.
     if (read_buffer_.length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
@@ -254,10 +264,48 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
     // That code assumes that we never change existing write_buffer_ chain elements between calls
     // to SSL_write(). That code will have to change if we ever copy here.
-    write_buffer_.move(data);
+    write_buffer_->move(data);
+    checkForHighWatermark();
+
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
     }
+  }
+}
+
+void ConnectionImpl::setWriteBufferWatermarks(size_t new_low_watermark, size_t new_high_watermark) {
+  ENVOY_CONN_LOG(trace, "Setting watermarks: {} {}", *this, new_low_watermark, new_high_watermark);
+  ASSERT(new_low_watermark < new_high_watermark);
+
+  high_watermark_ = new_high_watermark;
+  low_watermark_ = new_low_watermark;
+
+  checkForLowWatermark();
+  checkForHighWatermark();
+}
+
+void ConnectionImpl::checkForLowWatermark() {
+  if (!above_high_watermark_called_ || write_buffer_->length() >= low_watermark_) {
+    return;
+  }
+  ENVOY_CONN_LOG(trace, "onBelowWriteBufferLowWatermark", *this);
+
+  above_high_watermark_called_ = false;
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onBelowWriteBufferLowWatermark();
+  }
+}
+
+void ConnectionImpl::checkForHighWatermark() {
+  if (above_high_watermark_called_ || high_watermark_ == 0 ||
+      write_buffer_->length() <= high_watermark_) {
+    return;
+  }
+  ENVOY_CONN_LOG(trace, "onAboveWriteBufferHighWatermark", *this);
+
+  above_high_watermark_called_ = true;
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onAboveWriteBufferHighWatermark();
   }
 }
 
@@ -347,12 +395,11 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
-    if (write_buffer_.length() == 0) {
+    if (write_buffer_->length() == 0) {
       action = PostIoAction::KeepOpen;
       break;
     }
-
-    int rc = write_buffer_.write(fd_);
+    int rc = write_buffer_->write(fd_);
     ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
@@ -364,6 +411,7 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
       break;
     } else {
+      checkForLowWatermark();
       bytes_written += rc;
     }
   } while (true);
@@ -400,7 +448,7 @@ void ConnectionImpl::onWriteReady() {
   }
 
   IoResult result = doWriteToSocket();
-  uint64_t new_buffer_size = write_buffer_.length();
+  uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   if (result.action_ == PostIoAction::Close) {

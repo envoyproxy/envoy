@@ -14,6 +14,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 
@@ -87,6 +88,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
   };
@@ -131,6 +134,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationTcpClient& parent_;
   };
@@ -139,6 +144,8 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
+  std::unique_ptr<MockBuffer> buffer_ptr_{new MockBuffer()};
+  MockBuffer& buffer_{*buffer_ptr_};
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;

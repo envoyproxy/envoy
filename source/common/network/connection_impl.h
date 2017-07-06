@@ -72,10 +72,15 @@ public:
   void write(Buffer::Instance& data) override;
   void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
   uint32_t readBufferLimit() const override { return read_buffer_limit_; }
+  void setWriteBufferWatermarks(size_t low_watermark, size_t high_watermark) override;
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
+
+  void replaceWriteBufferForTest(std::unique_ptr<Buffer::OwnedImpl> new_buffer) {
+    write_buffer_ = std::move(new_buffer);
+  }
 
 protected:
   enum class PostIoAction { Close, KeepOpen };
@@ -99,12 +104,29 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
+  // Called when data is drained from the write buffer, to see if onBelowWriteBufferLowWatermark
+  // should be called.
+  void checkForLowWatermark();
+  // Called when data is added to the write buffer, to see if onAboveWriteBufferHighWatermark should
+  // be called.
+  void checkForHighWatermark();
+
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   Buffer::OwnedImpl read_buffer_;
-  Buffer::OwnedImpl write_buffer_;
+  std::unique_ptr<Buffer::OwnedImpl> write_buffer_{new Buffer::OwnedImpl};
   uint32_t read_buffer_limit_ = 0;
+  // Used for network level buffer limits (off by default).  If these are non-zero, when the write
+  // buffer passes |high_watermark_|, onAboveWriteBufferHighWatermark will be called to disable
+  // reading further data.  When the buffer drains below |low_watermark_|,
+  // onBelowWriteBufferLowWatermark will be called to resume reads.
+  size_t high_watermark_{0};
+  size_t low_watermark_{0};
+  // Tracks the latest state of watermark callbacks.
+  // True between the time onAboveWriteBufferHighWatermark is called until the next call to
+  // onBelowLowWatermark.
+  bool above_high_watermark_called_{false};
 
 private:
   // clang-format off
@@ -138,6 +160,10 @@ private:
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
   std::unique_ptr<BufferStats> buffer_stats_;
+  // Tracks the number of times reads have been disabled.  If N different components call
+  // readDisabled(true) this allows the connection to only resume reasd when readDisabled(false)
+  // has been called N times.
+  size_t read_disable_count_{0};
 };
 
 /**
