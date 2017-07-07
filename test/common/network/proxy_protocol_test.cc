@@ -196,5 +196,87 @@ TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
+class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersion> {
+public:
+  WildcardProxyProtocolTest()
+      : socket_(Network::Test::getAnyAddress(GetParam()), true),
+        local_dst_address_(Network::Utility::getAddressWithPort(
+            *Network::Test::getCanonicalLoopbackAddress(GetParam()),
+            socket_.localAddress()->ip()->port())),
+        listener_(connection_handler_, dispatcher_, socket_, callbacks_, stats_store_,
+                  {.bind_to_port_ = true,
+                   .use_proxy_proto_ = true,
+                   .use_original_dst_ = false,
+                   .per_connection_buffer_limit_bytes_ = 0}) {
+    conn_ = dispatcher_.createClientConnection(local_dst_address_);
+    conn_->addConnectionCallbacks(connection_callbacks_);
+    conn_->connect();
+  }
+
+  void write(const std::string& s) {
+    Buffer::OwnedImpl buf(s);
+    conn_->write(buf);
+  }
+
+  Event::DispatcherImpl dispatcher_;
+  TcpListenSocket socket_;
+  Network::Address::InstanceConstSharedPtr local_dst_address_;
+  Stats::IsolatedStoreImpl stats_store_;
+  MockListenerCallbacks callbacks_;
+  Network::MockConnectionHandler connection_handler_;
+  ListenerImpl listener_;
+  ClientConnectionPtr conn_;
+  NiceMock<MockConnectionCallbacks> connection_callbacks_;
+  std::shared_ptr<MockReadFilter> read_filter_;
+};
+
+// Parameterize the listener socket address version.
+INSTANTIATE_TEST_CASE_P(IpVersions, WildcardProxyProtocolTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(WildcardProxyProtocolTest, Basic) {
+
+  write("PROXY TCP4 1.2.3.4 255.255.255.255 65535 1234\r\nmore data");
+
+  ConnectionPtr accepted_connection;
+
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
+    EXPECT_EQ(conn->localAddress(), *local_dst_address_);
+    conn->addReadFilter(read_filter_);
+    accepted_connection = std::move(conn);
+  }));
+
+  read_filter_.reset(new MockReadFilter());
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
+
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  accepted_connection->close(ConnectionCloseType::NoFlush);
+  conn_->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(WildcardProxyProtocolTest, BasicV6) {
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
+
+  ConnectionPtr accepted_connection;
+
+  EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
+    ASSERT_EQ("1:2:3::4", conn->remoteAddress().ip()->addressAsString());
+    EXPECT_EQ(conn->localAddress(), *local_dst_address_);
+    conn->addReadFilter(read_filter_);
+    accepted_connection = std::move(conn);
+  }));
+
+  read_filter_.reset(new MockReadFilter());
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
+
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  accepted_connection->close(ConnectionCloseType::NoFlush);
+  conn_->close(ConnectionCloseType::NoFlush);
+}
+
 } // namespace Network
 } // namespace Envoy
