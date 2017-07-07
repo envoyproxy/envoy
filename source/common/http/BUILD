@@ -121,6 +121,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
         "//source/common/common:utility_lib",
+        "//source/common/network:filter_lib",
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/http/access_log:request_info_lib",
         "//source/common/http/http1:codec_lib",

@@ -23,6 +23,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
+#include "common/network/filter_impl.h"
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
@@ -106,6 +107,26 @@ struct ConnectionManagerStats {
  */
 struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * All WebSocket stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_WEBSOCKET_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_no_route)
+// clang-format on
+
+/**
+ * Struct definition for all WebSocket stats. @see stats_macros.h
+ */
+struct WebSocketStats {
+  ALL_WEBSOCKET_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -259,7 +280,8 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
-                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
+                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                        Upstream::ClusterManager& cm);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -497,6 +519,74 @@ private:
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
 
   /**
+ * An implementation of a WebSocket proxy based on TCP proxy. This filter will instantiate a
+ * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
+ * All data will be proxied back and forth between the two connections, without any knowledge of
+ * the underlying WebSocket protocol.
+ */
+  struct WsHandlerImpl : Logger::Loggable<Logger::Id::websocket> {
+    WsHandlerImpl(const std::string& cluster_name, ActiveStream& stream);
+    ~WsHandlerImpl();
+
+    // Network::ReadFilter
+    Network::FilterStatus onData(Buffer::Instance& data);
+    Network::FilterStatus onNewConnection() { return initializeUpstreamConnection(); }
+    void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks);
+
+    struct DownstreamCallbacks : public Network::ConnectionCallbacks {
+      DownstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
+
+      // Network::ConnectionCallbacks
+      void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+
+      WsHandlerImpl& parent_;
+    };
+
+    struct UpstreamCallbacks : public Network::ConnectionCallbacks,
+                               public Network::ReadFilterBaseImpl {
+      UpstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
+
+      // Network::ConnectionCallbacks
+      void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+
+      // Network::ReadFilter
+      Network::FilterStatus onData(Buffer::Instance& data) override {
+        parent_.onUpstreamData(data);
+        return Network::FilterStatus::StopIteration;
+      }
+
+      WsHandlerImpl& parent_;
+    };
+
+    Network::FilterStatus initializeUpstreamConnection();
+    void onConnectTimeout();
+    void onDownstreamEvent(uint32_t event);
+    void onUpstreamData(Buffer::Instance& data);
+    void onUpstreamEvent(uint32_t event);
+    static WebSocketStats generateStats(const std::string& name, Stats::Scope& scope) {
+      std::string final_prefix = fmt::format("websocket.{}.", name);
+      return {ALL_WEBSOCKET_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
+    }
+
+    const std::string& cluster_name_;
+    ActiveStream& stream_;
+    ConnectionManagerImpl& connection_manager_;
+    const WebSocketStats stats_;
+    Upstream::ClusterManager& cluster_manager_;
+    Network::ReadFilterCallbacks* read_callbacks_{};
+    Network::ClientConnectionPtr upstream_connection_;
+    DownstreamCallbacks downstream_callbacks_;
+    Event::TimerPtr connect_timeout_timer_;
+    Stats::TimespanPtr connect_timespan_;
+    Stats::TimespanPtr connected_timespan_;
+    std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
+    // read filter.
+  };
+
+  typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;
+
+  /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
    * data.
    */
@@ -535,6 +625,8 @@ private:
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
+  Upstream::ClusterManager& cm_;
+  WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
