@@ -65,6 +65,7 @@ public:
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const google::protobuf::MethodDescriptor*& method_descriptor);
 
+private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
@@ -72,7 +73,6 @@ public:
   methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
                       google::grpc::transcoding::RequestInfo* info);
 
-private:
   google::protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<const google::protobuf::MethodDescriptor*>
       path_matcher_;
