@@ -12,6 +12,7 @@
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/util/internal/type_info.h"
 #include "google/protobuf/util/type_resolver.h"
+#include "google/protobuf/util/json_util.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
@@ -76,6 +77,7 @@ private:
   google::grpc::transcoding::PathMatcherPtr<const google::protobuf::MethodDescriptor*>
       path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
+  google::protobuf::util::JsonPrintOptions print_options_;
 };
 
 typedef std::shared_ptr<JsonTranscoderConfig> TranscodingConfigSharedPtr;

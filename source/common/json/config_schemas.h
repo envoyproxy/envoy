@@ -34,6 +34,7 @@ public:
   static const std::string FAULT_HTTP_FILTER_SCHEMA;
   static const std::string HEALTH_CHECK_HTTP_FILTER_SCHEMA;
   static const std::string IP_TAGGING_HTTP_FILTER_SCHEMA;
+  static const std::string JSON_TRANSCODER_FILTER_SCHEMA;
   static const std::string RATE_LIMIT_HTTP_FILTER_SCHEMA;
   static const std::string ROUTER_HTTP_FILTER_SCHEMA;
 

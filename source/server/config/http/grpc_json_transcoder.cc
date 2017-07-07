@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/grpc/json_transcoder_filter.h"
+#include "common/json/config_schemas.h"
 
 namespace Envoy {
 namespace Server {
@@ -11,6 +12,8 @@ namespace Configuration {
 HttpFilterFactoryCb
 GrpcJsonTranscoderFilterConfig::createFilterFactory(const Json::Object& config_json,
                                                     const std::string&, FactoryContext&) {
+  config_json.validateSchema(Json::Schema::JSON_TRANSCODER_FILTER_SCHEMA);
+
   Grpc::TranscodingConfigSharedPtr config =
       std::make_shared<Grpc::JsonTranscoderConfig>(config_json);
 

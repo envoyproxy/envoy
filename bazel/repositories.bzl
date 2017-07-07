@@ -85,7 +85,7 @@ def cc_grpc_httpjson_transcoding_dep():
     native.git_repository(
         name = "grpc_httpjson_transcoding",
         remote = REPO_LOCATIONS["grpc_transcoding"],
-        commit = "3a90dfd2e7300e8dd60b74f0f4085f2a0bfc499e",
+        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
     )
 
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.

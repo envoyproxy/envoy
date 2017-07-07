@@ -917,6 +917,34 @@ const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "proto_descriptor" : {"type" : "string"},
+      "services" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : { "type" : "string" }
+      },
+      "print_options" : {
+        "type" : "object",
+        "properties" : {
+          "add_whitespace": {"type" : "boolean"},
+          "always_print_primitive_fields": {"type" : "boolean"},
+          "always_print_enums_as_ints": {"type" : "boolean"},
+          "preserve_proto_field_names": {"type" : "boolean"}
+        },
+        "additionalProperties" : false
+      }
+    },
+    "required" : ["proto_descriptor", "services"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",

@@ -131,6 +131,12 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
       google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX,
                                                                &descriptor_pool_)));
+
+  auto print_config = config.getObject("print_options", true);
+  print_options_.add_whitespace = print_config->getBoolean("add_whitespace", false);
+  print_options_.always_print_primitive_fields = print_config->getBoolean("always_print_primitive_fields", false);
+  print_options_.always_print_enums_as_ints = print_config->getBoolean("always_print_enums_as_ints", false);
+  print_options_.preserve_proto_field_names = print_config->getBoolean("preserve_proto_field_names", false);
 }
 
 Status JsonTranscoderConfig::createTranscoder(
@@ -182,7 +188,7 @@ Status JsonTranscoderConfig::createTranscoder(
       TYPE_URL_PREFIX + "/" + method_descriptor->output_type()->full_name();
   std::unique_ptr<ResponseToJsonTranslator> response_translator{
       new ResponseToJsonTranslator(type_helper_->Resolver(), response_type_url,
-                                   method_descriptor->server_streaming(), &response_input)};
+                                   method_descriptor->server_streaming(), &response_input, print_options_)};
 
   transcoder.reset(
       new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
