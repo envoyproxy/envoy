@@ -1199,7 +1199,11 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (event & Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
-    // TODO (rshriram): Need to send the HTTP headers to upstream
+    // Wrap upstream connection in HTTP Connection, so that we can re-use the HTTP1 codec to
+    // send upgrade headers to upstream host.
+    Http1::ClientConnectionImpl upstream_http(*upstream_connection_, *upstream_callbacks_);
+    Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
+    upstream_request.encodeHeaders(*stream_.request_headers_, false);
   }
 
   if (connect_timeout_timer_) {

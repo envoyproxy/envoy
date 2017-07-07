@@ -543,11 +543,15 @@ private:
     };
 
     struct UpstreamCallbacks : public Network::ConnectionCallbacks,
+                               public Http::ConnectionCallbacks,
                                public Network::ReadFilterBaseImpl {
       UpstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
 
       // Network::ConnectionCallbacks
       void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+
+      // Http::ConnectionCallbacks
+      void onGoAway() override  {};
 
       // Network::ReadFilter
       Network::FilterStatus onData(Buffer::Instance& data) override {
