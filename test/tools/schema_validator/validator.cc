@@ -49,7 +49,7 @@ void Validator::validate(const std::string& json_path, Schema::Type schema_type)
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
 
   switch(schema_type) {
-    case Type::Route:
+    case Schema::Type::Route:
       std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
       std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
         new NiceMock<Upstream::MockClusterManager>());
