@@ -48,12 +48,14 @@ Options::Options(int argc, char** argv) {
 void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
 
-  if (schema_type == Schema::Type::Route) {
-    // Construct a Router::ConfigImpl to validate the Route configuration.
-    std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
-    std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
+  switch(schema_type) {
+    case Type::Route:
+      std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
+      std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
         new NiceMock<Upstream::MockClusterManager>());
-    static_cast<void>(Router::ConfigImpl(*loader, *runtime, *cm, false));
+      // Construct a Router::ConfigImpl to validate the Route configuration and ignore the
+      // output since nothing will consume it.
+      static_cast<void>(Router::ConfigImpl(*loader, *runtime, *cm, false));
   }
 }
 
