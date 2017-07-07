@@ -68,4 +68,4 @@ public:
   static void validate(const std::string& json_path, Schema::Type schema_type);
 };
 
-} // Envoy
+} // namespace Envoy
