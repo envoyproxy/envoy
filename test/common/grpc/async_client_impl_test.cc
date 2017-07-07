@@ -342,7 +342,8 @@ TEST_F(GrpcAsyncClientImplTest, ReplyNoTrailers) {
 // Validate that send client initial metadata works.
 TEST_F(GrpcAsyncClientImplTest, ClientInitialMetadata) {
   TestMetadata initial_metadata = {
-      {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("baz"), "blah"},
   };
   auto stream = createStream(initial_metadata);
   expectResetOn(stream.get());
@@ -354,7 +355,8 @@ TEST_F(GrpcAsyncClientImplTest, ServerInitialMetadata) {
   auto stream = createStream(empty_metadata);
   stream->sendRequest();
   TestMetadata initial_metadata = {
-      {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("baz"), "blah"},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   expectResetOn(stream.get());
@@ -368,7 +370,8 @@ TEST_F(GrpcAsyncClientImplTest, ServerTrailingMetadata) {
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
   TestMetadata trailing_metadata = {
-      {Http::LowerCaseString("foo"), "bar"}, {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("baz"), "blah"},
   };
   stream->sendServerTrailers(Status::GrpcStatus::Ok, trailing_metadata);
   expectResetOn(stream.get());

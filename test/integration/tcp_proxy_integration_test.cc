@@ -53,7 +53,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->waitForData(5); },
       [&]() -> void { fake_upstream_connection->write("world"); },
       [&]() -> void { tcp_client->waitForData("world"); },
-      [&]() -> void { tcp_client->write("hello"); }, [&]() -> void { tcp_client->close(); },
+      [&]() -> void { tcp_client->write("hello"); },
+      [&]() -> void { tcp_client->close(); },
       [&]() -> void { fake_upstream_connection->waitForData(10); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
 
