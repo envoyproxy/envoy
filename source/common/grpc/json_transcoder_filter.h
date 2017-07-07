@@ -78,7 +78,7 @@ private:
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> TranscodingConfigSharedPtr;
+typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
 
 /**
  * The filter instance for gRPC JSON transcoder.
