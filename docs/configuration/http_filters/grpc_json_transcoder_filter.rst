@@ -21,12 +21,12 @@ services to be transcoded.
     "type": "both",
     "name": "grpc_json_transcoder",
     "config": {
-      "proto_descriptors": "proto.pb",
+      "proto_descriptor": "proto.pb",
       "services": ["grpc.service.Service"]
     }
   }
 
-proto_descriptors
+proto_descriptor
   *(required, string)* Supplies the binary protobuf descriptor set for the gRPC services.
   The descriptor set has to include all of the types that are used in the services. Make sure 
   to use the ``--include_import`` option for ``protoc``.
@@ -51,6 +51,6 @@ proto_descriptors
 
 services
   *(required, array)* A list of strings that supplies the service names that the
-  transcoder will translate. If the service name doesn't exist in ``proto_descriptors``, Envoy
-  will fail at startup. The ``proto_descriptors`` may contain more services than the service names
+  transcoder will translate. If the service name doesn't exist in ``proto_descriptor``, Envoy
+  will fail at startup. The ``proto_descriptor`` may contain more services than the service names
   specified here, but they won't be translated.
