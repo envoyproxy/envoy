@@ -166,6 +166,6 @@ public:
 
 typedef std::unique_ptr<Formatter> FormatterPtr;
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

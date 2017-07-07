@@ -27,4 +27,4 @@ TEST(ToLowerTableTest, All) {
     EXPECT_EQ(input, "\x90hello\x90");
   }
 }
-} // Envoy
+} // namespace Envoy

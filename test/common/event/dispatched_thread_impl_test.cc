@@ -41,5 +41,5 @@ TEST_F(DispatchedThreadTest, PostCallbackTest) {
   thread_.exit();
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

@@ -19,5 +19,5 @@ public:
   Event::DispatcherPtr allocateDispatcher() override;
 };
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

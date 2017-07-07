@@ -45,5 +45,5 @@ public:
    */
   static uint64_t generateRandom64();
 };
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

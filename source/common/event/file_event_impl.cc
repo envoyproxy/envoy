@@ -68,5 +68,5 @@ void FileEventImpl::setEnabled(uint32_t events) {
   event_add(&raw_event_, nullptr);
 }
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

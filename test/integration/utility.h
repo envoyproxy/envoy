@@ -102,4 +102,40 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion version, const std::string& host = "host");
 };
-} // Envoy
+
+// A set of connection callbacks which tracks connection state.
+class ConnectionStatusCallbacks : public Network::ConnectionCallbacks {
+public:
+  bool connected() const { return connected_; }
+  bool closed() const { return closed_; }
+
+  // Network::ConnectionCallbacks
+  void onEvent(uint32_t events) {
+    closed_ |= (events & Network::ConnectionEvent::RemoteClose ||
+                events & Network::ConnectionEvent::LocalClose);
+    connected_ |= events & Network::ConnectionEvent::Connected;
+  }
+
+private:
+  bool connected_{false};
+  bool closed_{false};
+};
+
+// A read filter which waits for a given data then stops the dispatcher loop.
+class WaitForPayloadReader : public Network::ReadFilterBaseImpl {
+public:
+  WaitForPayloadReader(Event::Dispatcher& dispatcher);
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance& data) override;
+
+  void set_data_to_wait_for(const std::string& data) { data_to_wait_for_ = data; }
+  const std::string& data() { return data_; }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  std::string data_to_wait_for_;
+  std::string data_;
+};
+
+} // namespace Envoy

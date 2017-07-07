@@ -20,7 +20,7 @@ class HeaderMap;
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 void PrintTo(const HeaderMap& headers, std::ostream* os);
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os);
-} // Http
+} // namespace Http
 
 namespace Buffer {
 /**
@@ -34,7 +34,7 @@ void PrintTo(const Instance& buffer, std::ostream* os);
  */
 class OwnedImpl;
 void PrintTo(const OwnedImpl& buffer, std::ostream* os);
-} // Buffer
+} // namespace Buffer
 
 namespace Redis {
 /**
@@ -44,5 +44,5 @@ class RespValue;
 typedef std::unique_ptr<RespValue> RespValuePtr;
 void PrintTo(const RespValue& value, std::ostream* os);
 void PrintTo(const RespValuePtr& value, std::ostream* os);
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

@@ -221,6 +221,6 @@ int PipeInstance::socket(SocketType type) const {
   return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
 }
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

@@ -54,5 +54,5 @@ public:
 
 typedef std::shared_ptr<DnsResolver> DnsResolverSharedPtr;
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

@@ -49,5 +49,5 @@ public:
 
 typedef std::unique_ptr<FileEvent> FileEventPtr;
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

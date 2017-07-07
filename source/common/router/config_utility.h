@@ -52,5 +52,5 @@ public:
                            const std::vector<HeaderData>& request_headers);
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

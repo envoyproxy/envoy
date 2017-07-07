@@ -74,9 +74,48 @@ public:
   }
 };
 
-} // Server
+} // namespace Server
 
 namespace Stats {
+
+/**
+ * This is a wrapper for Scopes for the TestIsolatedStoreImpl to ensure new scopes do
+ * not interact with the store without grabbing the lock from TestIsolatedStoreImpl.
+ */
+class TestScopeWrapper : public Scope {
+public:
+  TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
+      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+
+  void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    wrapped_scope_->deliverHistogramToSinks(name, value);
+  }
+
+  void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    wrapped_scope_->deliverTimingToSinks(name, ms);
+  }
+
+  Counter& counter(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->counter(name);
+  }
+
+  Gauge& gauge(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->gauge(name);
+  }
+
+  Timer& timer(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->timer(name);
+  }
+
+private:
+  std::mutex& lock_;
+  ScopePtr wrapped_scope_;
+};
 
 /**
  * This is a variant of the isolated store that has locking across all operations so that it can
@@ -111,7 +150,7 @@ public:
   }
   ScopePtr createScope(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
-    return store_.createScope(name);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
 
   // Stats::StoreRoot
@@ -124,7 +163,7 @@ private:
   IsolatedStoreImpl store_;
 };
 
-} // Stats
+} // namespace Stats
 
 class IntegrationTestServer;
 typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
@@ -145,12 +184,28 @@ public:
     RELEASE_ASSERT(server_ != nullptr);
     return *server_;
   }
+  void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
+    on_worker_listener_added_cb_ = on_worker_listener_added;
+  }
+  void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
+    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+  }
   void start(const Network::Address::IpVersion version);
   void start();
   Stats::Store& store() { return stats_store_; }
 
   // TestHooks
   void onServerInitialized() override { server_initialized_.setReady(); }
+  void onWorkerListenerAdded() override {
+    if (on_worker_listener_added_cb_) {
+      on_worker_listener_added_cb_();
+    }
+  }
+  void onWorkerListenerRemoved() override {
+    if (on_worker_listener_removed_cb_) {
+      on_worker_listener_removed_cb_();
+    }
+  }
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
@@ -178,5 +233,8 @@ private:
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;
+  std::function<void()> on_worker_listener_added_cb_;
+  std::function<void()> on_worker_listener_removed_cb_;
 };
-} // Envoy
+
+} // namespace Envoy

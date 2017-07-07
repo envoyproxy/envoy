@@ -97,5 +97,5 @@ private:
 };
 
 } // TcpFilter
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

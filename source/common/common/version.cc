@@ -25,6 +25,6 @@ std::string VersionInfo::version() {
 #else
                      "DEBUG"
 #endif
-                     );
+  );
 }
-} // Envoy
+} // namespace Envoy

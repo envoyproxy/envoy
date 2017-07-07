@@ -638,5 +638,5 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
   }
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

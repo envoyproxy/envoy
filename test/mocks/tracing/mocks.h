@@ -79,5 +79,5 @@ public:
                                  const std::string& operation_name, SystemTime start_time));
 };
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

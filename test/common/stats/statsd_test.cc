@@ -15,10 +15,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Stats {
 namespace Statsd {
@@ -103,6 +103,6 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   tls_.shutdownThread();
 }
 
-} // Statsd
-} // Stats
-} // Envoy
+} // namespace Statsd
+} // namespace Stats
+} // namespace Envoy

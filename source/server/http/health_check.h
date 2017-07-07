@@ -21,8 +21,8 @@ public:
   HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
 
 /**
  * Shared cache manager used by all instances of a health check filter configuration as well as
@@ -95,4 +95,4 @@ private:
   HealthCheckCacheManagerSharedPtr cache_manager_{};
   const std::string endpoint_;
 };
-} // Envoy
+} // namespace Envoy

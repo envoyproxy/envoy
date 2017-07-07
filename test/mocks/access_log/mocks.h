@@ -24,5 +24,5 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_{new testing::NiceMock<Filesystem::MockFile>()};
 };
 
-} // AccessLog
-} // Envoy
+} // namespace AccessLog
+} // namespace Envoy

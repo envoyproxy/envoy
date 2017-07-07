@@ -13,11 +13,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Invoke;
+using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
-using testing::Mock;
+using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -33,14 +33,13 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new SubscriptionMockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
-    EXPECT_CALL(dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-          timer_cb_ = timer_cb;
-          return timer_;
-        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
     subscription_.reset(new GrpcEdsSubscriptionImpl(
         node_, std::unique_ptr<SubscriptionMockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_));
+        *method_descriptor_, stats_));
   }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,

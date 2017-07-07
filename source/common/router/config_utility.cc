@@ -43,5 +43,5 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

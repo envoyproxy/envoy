@@ -39,5 +39,5 @@ public:
   CodecClientException(const std::string& message) : EnvoyException(message) {}
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

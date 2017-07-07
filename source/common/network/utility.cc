@@ -318,5 +318,5 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
   return false;
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

@@ -15,12 +15,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 
@@ -118,5 +118,5 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
   filter_.onDestroy();
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

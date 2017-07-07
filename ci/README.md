@@ -4,7 +4,7 @@ Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
 ## Ubuntu envoy image
 The Ubuntu based Envoy Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks,
-where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
+where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/lyft/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `lyft/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
@@ -69,5 +69,5 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
-* `check_format`&mdash; run `clang-format` 3.6 and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format` 3.6 and `buildifier` on entire source tree.
+* `check_format`&mdash; run `clang-format` 5.0 and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format` 5.0 and `buildifier` on entire source tree.

@@ -47,5 +47,5 @@ private:
   std::mutex mutex_;
 };
 
-} // Thread
-} // Envoy
+} // namespace Thread
+} // namespace Envoy

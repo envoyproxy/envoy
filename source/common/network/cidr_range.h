@@ -136,6 +136,6 @@ private:
   std::vector<CidrRange> ip_list_;
 };
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

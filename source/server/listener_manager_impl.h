@@ -8,6 +8,8 @@
 #include "common/common/logger.h"
 #include "common/json/json_validator.h"
 
+#include "server/init_manager_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -34,14 +36,78 @@ public:
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, server_, context);
   }
-  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                              bool bind_to_port) override;
+  Network::ListenSocketSharedPtr
+  createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
   Instance& server_;
   uint64_t next_listener_tag_{1};
 };
+
+class ListenerImpl;
+typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
+
+/**
+ * Implementation of ListenerManager.
+ */
+class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
+public:
+  ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
+                      WorkerFactory& worker_factory);
+
+  void onListenerWarmed(ListenerImpl& listener);
+
+  // Server::ListenerManager
+  bool addOrUpdateListener(const Json::Object& json) override;
+  std::vector<std::reference_wrapper<Listener>> listeners() override;
+  uint64_t numConnections() override;
+  bool removeListener(const std::string& listener_name) override;
+  void startWorkers(GuardDog& guard_dog) override;
+  void stopListeners() override;
+  void stopWorkers() override;
+
+  Instance& server_;
+  ListenerComponentFactory& factory_;
+
+private:
+  typedef std::list<ListenerImplPtr> ListenerList;
+
+  struct DrainingListener {
+    DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
+        : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
+
+    ListenerImplPtr listener_;
+    uint64_t workers_pending_removal_;
+  };
+
+  /**
+   * Mark a listener for draining. The listener will no longer be considered active but will remain
+   * present to allow connection draining.
+   * @param listener supplies the listener to drain.
+   */
+  void drainListener(ListenerImplPtr&& listener);
+
+  /**
+   * Get a listener by name. This routine is used because listeners have inherent order in static
+   * configuration and especially for tests. Thus, we can't use a map.
+   * @param listeners supplies the listener list to look in.
+   * @param name supplies the name to search for.
+   */
+  ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
+
+  ListenerList active_listeners_;
+  ListenerList warming_listeners_;
+  std::list<DrainingListener> draining_listeners_;
+  std::list<WorkerPtr> workers_;
+  bool workers_started_{};
+  std::mutex draining_listeners_lock_;
+};
+
+// TODO(mattklein123): Listener manager stats.
+// TODO(mattklein123): Check that addresses for unbound listeners are unique.
+// TODO(mattklein123): Real listener draining with a per listener drain manager.
+// TODO(mattklein123): Detect runtime worker listener addition failure and handle.
 
 /**
  * Maps JSON config to runtime config for a listener with a network filter chain.
@@ -52,11 +118,29 @@ class ListenerImpl : public Listener,
                      Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerImpl(Instance& server, ListenerComponentFactory& factory, const Json::Object& json);
+  /**
+   * Create a new listener.
+   * @param json supplies the configuration JSON.
+   * @param parent supplies the owning manager.
+   * @param name supplies the listener name.
+   * @param workers_started supplies whether the listener is being added before or after workers
+   *        have been started. This controls various behavior related to init management.
+   * @param hash supplies the hash to use for duplicate checking.
+   */
+  ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent, const std::string& name,
+               bool workers_started, uint64_t hash);
+  ~ListenerImpl();
+
+  Network::Address::InstanceConstSharedPtr address() { return address_; }
+  const Network::ListenSocketSharedPtr& getSocket() { return socket_; }
+  uint64_t hash() { return hash_; }
+  void infoLog(const std::string& message);
+  void initialize();
+  const std::string& name() { return name_; }
+  void setSocket(const Network::ListenSocketSharedPtr& socket);
 
   // Server::Listener
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::Address::InstanceConstSharedPtr address() override { return address_; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
   Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
@@ -67,64 +151,48 @@ public:
   uint64_t listenerTag() override { return listener_tag_; }
 
   // Server::Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
-  Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
-  DrainManager& drainManager() override { return server_.drainManager(); }
-  bool healthCheckFailed() override { return server_.healthCheckFailed(); }
-  Tracing::HttpTracer& httpTracer() override { return server_.httpTracer(); }
-  Init::Manager& initManager() override { return server_.initManager(); }
-  const LocalInfo::LocalInfo& localInfo() override { return server_.localInfo(); }
-  Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
+  AccessLog::AccessLogManager& accessLogManager() override {
+    return parent_.server_.accessLogManager();
+  }
+  Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
+  Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
+  DrainManager& drainManager() override { return parent_.server_.drainManager(); }
+  bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
+  Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() override { return parent_.server_.localInfo(); }
+  Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
   RateLimit::ClientPtr
   rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
-    return server_.rateLimitClient(timeout);
+    return parent_.server_.rateLimitClient(timeout);
   }
-  Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
-  Instance& server() override { return server_; }
+  Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
+  Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
-  ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
+  ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
 
 private:
-  Instance& server_;
+  ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
-  Network::ListenSocketPtr socket_;
+  Network::ListenSocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   Ssl::ServerContextPtr ssl_context_;
-  const bool bind_to_port_{};
-  const bool use_proxy_proto_{};
-  const bool use_original_dst_{};
-  const uint32_t per_connection_buffer_limit_bytes_{};
-  std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  const bool bind_to_port_;
+  const bool use_proxy_proto_;
+  const bool use_original_dst_;
+  const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
+  const std::string name_;
+  const bool workers_started_;
+  const uint64_t hash_;
+  InitManagerImpl dynamic_init_manager_;
+  bool initialize_canceled_{};
+  std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
 };
 
-/**
- * Implementation of ListenerManager.
- */
-class ListenerManagerImpl : public ListenerManager {
-public:
-  ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory);
-
-  // Server::ListenerManager
-  void addListener(const Json::Object& json) override;
-  std::list<std::reference_wrapper<Listener>> listeners() override;
-  uint64_t numConnections() override;
-  void startWorkers(GuardDog& guard_dog) override;
-  void stopListeners() override;
-  void stopWorkers() override;
-
-private:
-  Instance& server_;
-  ListenerComponentFactory& factory_;
-  std::list<ListenerPtr> listeners_;
-  std::list<WorkerPtr> workers_;
-};
-
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

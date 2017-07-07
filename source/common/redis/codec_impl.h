@@ -89,5 +89,5 @@ private:
   void encodeSimpleString(const std::string& string, Buffer::Instance& out);
 };
 
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

@@ -142,5 +142,5 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
   return partition_descriptors;
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

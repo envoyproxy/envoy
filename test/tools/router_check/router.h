@@ -92,4 +92,4 @@ private:
   std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm_;
   std::unique_ptr<Router::ConfigImpl> config_;
 };
-} // Envoy
+} // namespace Envoy

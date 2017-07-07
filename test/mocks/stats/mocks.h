@@ -95,5 +95,5 @@ public:
   MOCK_METHOD2(deliverTimingToSinks, void(const std::string&, std::chrono::milliseconds));
 };
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

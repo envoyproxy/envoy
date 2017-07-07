@@ -79,4 +79,4 @@ public:
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 } // Upstream
-} // Envoy
+} // namespace Envoy

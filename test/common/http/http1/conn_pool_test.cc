@@ -21,7 +21,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -29,6 +28,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 namespace Http1 {
@@ -78,16 +78,18 @@ public:
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
 
     Network::ClientConnectionPtr connection{test_client.connection_};
-    test_client.codec_client_ = new CodecClientForTest(
-        std::move(connection), test_client.codec_, [this](CodecClient* codec_client) -> void {
-          for (auto i = test_clients_.begin(); i != test_clients_.end(); i++) {
-            if (i->codec_client_ == codec_client) {
-              onClientDestroy();
-              test_clients_.erase(i);
-              return;
-            }
-          }
-        }, nullptr);
+    test_client.codec_client_ = new CodecClientForTest(std::move(connection), test_client.codec_,
+                                                       [this](CodecClient* codec_client) -> void {
+                                                         for (auto i = test_clients_.begin();
+                                                              i != test_clients_.end(); i++) {
+                                                           if (i->codec_client_ == codec_client) {
+                                                             onClientDestroy();
+                                                             test_clients_.erase(i);
+                                                             return;
+                                                           }
+                                                         }
+                                                       },
+                                                       nullptr);
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_))
         .WillOnce(Return(test_client.connection_));
@@ -305,11 +307,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
 
   NiceMock<Http::MockStreamDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
-  EXPECT_CALL(callbacks1.pool_failure_, ready())
-      .WillOnce(Invoke([&]() -> void {
-        conn_pool_.expectClientCreate();
-        EXPECT_NE(nullptr, conn_pool_.newStream(outer_decoder2, callbacks2));
-      }));
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+    conn_pool_.expectClientCreate();
+    EXPECT_NE(nullptr, conn_pool_.newStream(outer_decoder2, callbacks2));
+  }));
 
   conn_pool_.test_clients_[0].connect_timer_->callback_();
 
@@ -580,6 +581,6 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

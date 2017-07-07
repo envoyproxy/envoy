@@ -34,5 +34,5 @@ void SlowDateProviderImpl::setDateHeader(HeaderMap& headers) {
   headers.insertDate().value(date_formatter_.now());
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

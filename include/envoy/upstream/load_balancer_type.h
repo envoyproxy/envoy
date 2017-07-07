@@ -8,5 +8,5 @@ namespace Upstream {
  */
 enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

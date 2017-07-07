@@ -70,5 +70,5 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

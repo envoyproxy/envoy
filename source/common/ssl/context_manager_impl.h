@@ -41,5 +41,5 @@ private:
   std::mutex contexts_lock_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

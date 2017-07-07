@@ -23,11 +23,11 @@ EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
   Config::Utility::localInfoToNode(local_info, node);
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
-      eds_config, node, dispatcher, cm, random,
-      [this, &eds_config, &cm, &dispatcher, &random]()
-          -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
-            return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
-          },
+      eds_config, node, dispatcher, cm, random, info_->statsScope(),
+      [this, &eds_config, &cm, &dispatcher,
+       &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
+        return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
+      },
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }
@@ -48,14 +48,16 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const bool canary = Config::Metadata::metadataValue(
-                              lb_endpoint.metadata(), Config::MetadataFilters::get().ENVOY_LB,
-                              Config::MetadataEnvoyLbKeys::get().CANARY).bool_value();
+      const bool canary = Config::Metadata::metadataValue(lb_endpoint.metadata(),
+                                                          Config::MetadataFilters::get().ENVOY_LB,
+                                                          Config::MetadataEnvoyLbKeys::get().CANARY)
+                              .bool_value();
       new_hosts.emplace_back(new HostImpl(
-          info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
-                         lb_endpoint.endpoint().address().socket_address().ip_address(),
-                         lb_endpoint.endpoint().address().socket_address().port().value())},
-          canary, lb_endpoint.load_balancing_weight().value(), zone));
+          info_, "",
+          Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+              lb_endpoint.endpoint().address().socket_address().ip_address(),
+              lb_endpoint.endpoint().address().socket_address().port().value())},
+          lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 
@@ -121,5 +123,5 @@ void EdsClusterImpl::runInitializeCallbackIfAny() {
   }
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

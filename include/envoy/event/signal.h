@@ -21,5 +21,5 @@ public:
 
 typedef std::unique_ptr<SignalEvent> SignalEventPtr;
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

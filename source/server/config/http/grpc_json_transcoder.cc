@@ -25,6 +25,6 @@ GrpcJsonTranscoderFilterConfig::createFilterFactory(const Json::Object& config_j
 static Registry::RegisterFactory<GrpcJsonTranscoderFilterConfig, NamedHttpFilterConfigFactory>
     register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

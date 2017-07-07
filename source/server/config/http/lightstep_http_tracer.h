@@ -22,6 +22,6 @@ public:
   std::string name() override;
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

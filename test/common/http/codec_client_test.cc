@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Pointee;
@@ -27,6 +26,7 @@ using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::Throw;
+using testing::_;
 
 namespace Http {
 
@@ -131,11 +131,10 @@ TEST_F(CodecClientTest, ProtocolError) {
 }
 
 TEST_F(CodecClientTest, 408Response) {
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([](Buffer::Instance&) -> void {
-        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "408"}}};
-        throw PrematureResponseException(std::move(response_headers));
-      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
+    Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "408"}}};
+    throw PrematureResponseException(std::move(response_headers));
+  }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -146,11 +145,10 @@ TEST_F(CodecClientTest, 408Response) {
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([](Buffer::Instance&) -> void {
-        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
-        throw PrematureResponseException(std::move(response_headers));
-      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
+    Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    throw PrematureResponseException(std::move(response_headers));
+  }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -160,5 +158,5 @@ TEST_F(CodecClientTest, PrematureResponse) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

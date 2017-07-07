@@ -61,5 +61,5 @@ private:
   Thread::ThreadPtr thread_;
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

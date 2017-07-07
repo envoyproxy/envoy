@@ -20,4 +20,4 @@ TEST(Optional, All) {
   EXPECT_TRUE(optional_const_2.valid());
   EXPECT_EQ(10, optional_const_2.value());
 }
-} // Envoy
+} // namespace Envoy

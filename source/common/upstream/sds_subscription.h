@@ -57,5 +57,5 @@ private:
   ClusterStats& stats_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

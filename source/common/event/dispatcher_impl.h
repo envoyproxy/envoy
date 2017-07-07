@@ -70,5 +70,5 @@ private:
   bool deferred_deleting_{};
 };
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

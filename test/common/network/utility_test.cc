@@ -270,5 +270,5 @@ TEST(PortRangeListTest, Normal) {
   }
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

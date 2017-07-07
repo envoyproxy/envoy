@@ -69,4 +69,4 @@ TEST(OptionsImplTest, BadCliOption) {
   EXPECT_DEATH(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                "error: unknown IP address version 'foo'");
 }
-} // Envoy
+} // namespace Envoy

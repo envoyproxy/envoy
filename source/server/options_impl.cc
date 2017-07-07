@@ -113,4 +113,4 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
 }
-} // Envoy
+} // namespace Envoy

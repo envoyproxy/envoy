@@ -91,5 +91,5 @@ TEST_F(EdsTest, OnSuccessConfigUpdate) {
   EXPECT_TRUE(initialized);
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

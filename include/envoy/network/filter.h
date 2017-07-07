@@ -163,5 +163,5 @@ public:
   virtual bool createFilterChain(Connection& connection) PURE;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

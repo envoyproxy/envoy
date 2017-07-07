@@ -83,9 +83,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+  uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           .count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 
@@ -141,9 +141,9 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+  uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
 
   EXPECT_EQ(timestamp, ann.timestamp());
@@ -165,9 +165,9 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+  uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2(ann);
 
@@ -182,9 +182,9 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+  uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2 = ann;
 
@@ -326,14 +326,15 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_TRUE(span.isSetTraceIdHigh());
 
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          .count();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
   EXPECT_TRUE(span.isSetTimestamp());
 
-  int64_t start_time =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+  int64_t start_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                           ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+                           .count();
   span.setStartTime(start_time);
   EXPECT_EQ(start_time, span.startTime());
 
@@ -377,9 +378,10 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(
       R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
           span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
-                                                                   R"("annotations":[)"
-                                                                   R"({"timestamp":)" +
+          R"(","timestamp":)" + std::to_string(span.timestamp()) +
+          R"(,"duration":3000,)"
+          R"("annotations":[)"
+          R"({"timestamp":)" +
           std::to_string(span.timestamp()) +
           R"(,"value":"cs","endpoint":)"
           R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
@@ -411,17 +413,19 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
                 span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-                R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
-                                                                         R"("annotations":[)"
-                                                                         R"({"timestamp":)" +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) +
+                R"(,"duration":3000,)"
+                R"("annotations":[)"
+                R"({"timestamp":)" +
                 std::to_string(timestamp) +
                 R"(,"value":"cs","endpoint":)"
                 R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}},)"
                 R"({"timestamp":)" +
-                std::to_string(timestamp) + R"(,"value":"ss",)"
-                                            R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                                            R"("serviceName":"my_service_name"}},)"
-                                            R"({"timestamp":)" +
+                std::to_string(timestamp) +
+                R"(,"value":"ss",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}},)"
+                R"({"timestamp":)" +
                 std::to_string(timestamp) +
                 R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"my_service_name"}}],)"
@@ -443,17 +447,19 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setServiceName("NEW_SERVICE_NAME");
   EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
                 span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-                R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
-                                                                         R"("annotations":[)"
-                                                                         R"({"timestamp":)" +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) +
+                R"(,"duration":3000,)"
+                R"("annotations":[)"
+                R"({"timestamp":)" +
                 std::to_string(timestamp) +
                 R"(,"value":"cs","endpoint":)"
                 R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}},)"
                 R"({"timestamp":)" +
-                std::to_string(timestamp) + R"(,"value":"ss",)"
-                                            R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                                            R"("serviceName":"NEW_SERVICE_NAME"}},)"
-                                            R"({"timestamp":)" +
+                std::to_string(timestamp) +
+                R"(,"value":"ss",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"NEW_SERVICE_NAME"}},)"
+                R"({"timestamp":)" +
                 std::to_string(timestamp) +
                 R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"NEW_SERVICE_NAME"}},)"
@@ -482,7 +488,8 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
   span.setName("span_name");
@@ -517,7 +524,8 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
   span.setName("span_name");
@@ -559,5 +567,5 @@ TEST(ZipkinCoreTypesSpanTest, setTag) {
   EXPECT_EQ("key2", bann.key());
   EXPECT_EQ("value2", bann.value());
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

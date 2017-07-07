@@ -8,6 +8,7 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
@@ -36,10 +37,10 @@ void SslIntegrationTest::SetUp() {
                                                version_),
       version_);
   registerTestServerPorts({"http"});
-  client_ssl_ctx_plain_ = createClientSslContext(false, false);
-  client_ssl_ctx_alpn_ = createClientSslContext(true, false);
-  client_ssl_ctx_san_ = createClientSslContext(false, true);
-  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true);
+  client_ssl_ctx_plain_ = createClientSslContext(false, false, *context_manager_);
+  client_ssl_ctx_alpn_ = createClientSslContext(true, false, *context_manager_);
+  client_ssl_ctx_san_ = createClientSslContext(false, true, *context_manager_);
+  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true, *context_manager_);
 }
 
 void SslIntegrationTest::TearDown() {
@@ -68,59 +69,8 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
-ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san) {
-  std::string json_plain = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem"
-}
-)EOF";
-
-  std::string json_alpn = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "alpn_protocols": "h2,http/1.1"
-}
-)EOF";
-
-  std::string json_san = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
-}
-)EOF";
-
-  std::string json_alpn_san = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "alpn_protocols": "h2,http/1.1",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
-}
-)EOF";
-
-  std::string target;
-  if (alpn) {
-    target = san ? json_alpn_san : json_alpn;
-  } else {
-    target = san ? json_san : json_plain;
-  }
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  ContextConfigImpl cfg(*loader);
-  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  return context_manager_->createSslClientContext(*client_stats_store, cfg);
-}
-
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   if (alpn) {
     return dispatcher_->createSslClientConnection(
         san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_, address);
@@ -220,5 +170,5 @@ TEST_P(SslIntegrationTest, AltAlpn) {
   checkStats();
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

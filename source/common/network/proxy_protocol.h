@@ -79,5 +79,5 @@ private:
   std::list<std::unique_ptr<ActiveConnection>> connections_;
 };
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

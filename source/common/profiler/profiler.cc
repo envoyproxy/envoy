@@ -25,8 +25,8 @@ void Heap::forceLink() {
   HeapProfilerDump("");
 }
 
-} // Profiler
-} // Envoy
+} // namespace Profiler
+} // namespace Envoy
 
 #else
 
@@ -37,7 +37,7 @@ bool Cpu::profilerEnabled() { return false; }
 bool Cpu::startProfiler(const std::string&) { return false; }
 void Cpu::stopProfiler() {}
 
-} // Profiler
-} // Envoy
+} // namespace Profiler
+} // namespace Envoy
 
 #endif // #ifdef TCMALLOC

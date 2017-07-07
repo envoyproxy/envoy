@@ -16,12 +16,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::WithArgs;
+using testing::_;
 
 namespace RateLimit {
 namespace TcpFilter {
@@ -84,10 +84,10 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
 
-  EXPECT_CALL(*client_,
-              limit(_, "foo", testing::ContainerEq(std::vector<Descriptor>{
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                    Tracing::EMPTY_CONTEXT))
+                              Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
@@ -200,8 +200,8 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RequestCallbacks& callbacks)
-                                       -> void { callbacks.complete(LimitStatus::OK); })));
+      .WillOnce(WithArgs<0>(Invoke(
+          [&](RequestCallbacks& callbacks) -> void { callbacks.complete(LimitStatus::OK); })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -227,6 +227,6 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 }
 
-} // TcpFilter
-} // RateLimit
-} // Envoy
+} // namespace TcpFilter
+} // namespace RateLimit
+} // namespace Envoy

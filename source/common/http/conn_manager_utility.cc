@@ -219,5 +219,5 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   }
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

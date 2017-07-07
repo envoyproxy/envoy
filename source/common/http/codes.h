@@ -76,5 +76,5 @@ public:
   static std::string groupStringForResponseCode(Code response_code);
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

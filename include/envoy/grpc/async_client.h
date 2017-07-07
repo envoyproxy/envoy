@@ -109,5 +109,5 @@ public:
         const Optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

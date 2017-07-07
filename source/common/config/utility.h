@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -49,7 +50,16 @@ public:
    */
   static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
                                    envoy::api::v2::ConfigSource& eds_config);
+
+  /**
+   * Generate a SubscriptionStats object from stats scope.
+   * @param scope for stats.
+   * @return SubscriptionStats for scope.
+   */
+  static SubscriptionStats generateStats(Stats::Scope& scope) {
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
+  }
 };
 
-} // Config
-} // Envoy
+} // namespace Config
+} // namespace Envoy

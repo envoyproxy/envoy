@@ -34,5 +34,5 @@ public:
 
 typedef std::unique_ptr<Timer> TimerPtr;
 
-} // Event
-} // Envoy
+} // namespace Event
+} // namespace Envoy

@@ -25,12 +25,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Test;
+using testing::_;
 
 namespace Tracing {
 
@@ -328,5 +328,5 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   EXPECT_FALSE(base2_context.empty());
 }
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

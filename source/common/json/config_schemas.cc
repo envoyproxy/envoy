@@ -43,6 +43,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties": {
+       "name": {"type": "string"},
        "address": {"type": "string"},
        "filters" : {
          "type" : "array",
@@ -1440,4 +1441,4 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
     "required" : ["hosts"]
   }
   )EOF");
-} // Envoy
+} // namespace Envoy

@@ -29,6 +29,6 @@ ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
 static Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>
     registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

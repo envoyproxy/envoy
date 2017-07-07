@@ -186,5 +186,5 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

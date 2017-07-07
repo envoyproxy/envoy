@@ -112,7 +112,8 @@ public:
    * @param hosts_removed supplies the removed hosts, if any.
    */
   typedef std::function<void(const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed)> MemberUpdateCb;
+                             const std::vector<HostSharedPtr>& hosts_removed)>
+      MemberUpdateCb;
 
   /**
    * Install a callback that will be invoked when the cluster membership changes.
@@ -341,5 +342,5 @@ public:
 
 typedef std::unique_ptr<Cluster> ClusterPtr;
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

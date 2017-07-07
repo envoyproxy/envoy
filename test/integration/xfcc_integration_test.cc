@@ -141,8 +141,8 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientCo
 
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
-      },
+         codec_client = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
+       },
        [&]() -> void { codec_client->makeHeaderOnlyRequest(header_map, *response); },
        [&]() -> void {
          fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
@@ -253,5 +253,5 @@ TEST_P(XfccIntegrationTest, NonTlsEnforceSanitize) {
   startTestServerWithXfccConfig("forward_only", "");
   testRequestAndResponseWithXfccHeader(makeClientConnection(), previous_xfcc_, "");
 }
-} // Xfcc
-} // Envoy
+} // namespace Xfcc
+} // namespace Envoy

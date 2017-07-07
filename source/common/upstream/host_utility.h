@@ -18,5 +18,5 @@ public:
   static std::string healthFlagsToString(const Host& host);
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

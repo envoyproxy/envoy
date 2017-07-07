@@ -100,8 +100,8 @@ struct ConnectionManagerStats {
 // clang-format on
 
 /**
-* Wrapper struct for connection manager tracing stats. @see stats_macros.h
-*/
+ * Wrapper struct for connection manager tracing stats. @see stats_macros.h
+ */
 struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
@@ -537,4 +537,4 @@ private:
 };
 
 } // Http
-} // Envoy
+} // namespace Envoy

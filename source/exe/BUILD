@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:grpc_web_lib",
+        "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/network:client_ssl_auth_lib",

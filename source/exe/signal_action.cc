@@ -97,4 +97,4 @@ void SignalAction::tryEvilAccessForTest(bool end) {
     *(altaltstack + guard_size_ - 1) = 43;
   }
 }
-} // Envoy
+} // namespace Envoy

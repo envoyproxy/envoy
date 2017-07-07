@@ -125,5 +125,5 @@ private:
   HeapRawStatDataAllocator heap_allocator_;
 };
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

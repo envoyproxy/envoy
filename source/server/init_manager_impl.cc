@@ -42,5 +42,5 @@ void InitManagerImpl::registerTarget(Init::Target& target) {
   }
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

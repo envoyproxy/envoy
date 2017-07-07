@@ -199,6 +199,6 @@ void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* respon
   log_file_->write(access_log_line);
 }
 
-} // AccessLog
-} // Http
-} // Envoy
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

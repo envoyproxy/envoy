@@ -18,9 +18,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Router {
 
@@ -661,5 +661,5 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
   EXPECT_TRUE(descriptors_.empty());
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

@@ -482,5 +482,5 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

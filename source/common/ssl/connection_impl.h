@@ -55,5 +55,5 @@ public:
   void connect() override;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

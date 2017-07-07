@@ -33,6 +33,6 @@ std::string ZipkinHttpTracerFactory::name() { return "zipkin"; }
  */
 static Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

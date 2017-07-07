@@ -22,5 +22,5 @@ public:
   static uint64_t totalCurrentlyReserved();
 };
 
-} // Memory
-} // Envoy
+} // namespace Memory
+} // namespace Envoy

@@ -47,21 +47,21 @@ public:
   virtual ~HttpTracerFactory() {}
 
   /**
-  * Create a particular HttpTracer implementation.  If the implementation is unable to produce an
-  * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
-  * general error or a Json::Exception if the json configuration is erroneous.  The returned pointer
-  * should always be valid.
-  * @param json_config supplies the general json configuration for the HttpTracer
-  * @param server supplies the server instance
-  * @param cluster_manager supplies the cluster_manager instance
-  */
+   * Create a particular HttpTracer implementation.  If the implementation is unable to produce an
+   * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
+   * general error or a Json::Exception if the json configuration is erroneous.  The returned
+   * pointer should always be valid.
+   * @param json_config supplies the general json configuration for the HttpTracer
+   * @param server supplies the server instance
+   * @param cluster_manager supplies the cluster_manager instance
+   */
   virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config, Instance& server,
                                                   Upstream::ClusterManager& cluster_manager) PURE;
 
   /**
-  * Returns the identifying name for a particular implementation of HttpTracer produced by the
-  * factory.
-  */
+   * Returns the identifying name for a particular implementation of HttpTracer produced by the
+   * factory.
+   */
   virtual std::string name() PURE;
 };
 
@@ -212,6 +212,6 @@ private:
   std::unique_ptr<RuntimeImpl> runtime_;
 };
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

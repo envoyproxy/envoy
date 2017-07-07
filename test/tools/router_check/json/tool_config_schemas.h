@@ -14,5 +14,5 @@ public:
   static const std::string& routerCheckSchema();
 };
 
-} // Json
-} // Envoy
+} // namespace Json
+} // namespace Envoy

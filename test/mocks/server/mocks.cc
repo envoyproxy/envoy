@@ -5,11 +5,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -27,17 +28,44 @@ MockAdmin::~MockAdmin() {}
 MockDrainManager::MockDrainManager() {}
 MockDrainManager::~MockDrainManager() {}
 
+MockWatchDog::MockWatchDog() {}
+MockWatchDog::~MockWatchDog() {}
+
+MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
+  ON_CALL(*this, createWatchDog(_)).WillByDefault(Return(watch_dog_));
+}
+MockGuardDog::~MockGuardDog() {}
+
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
-MockListenerComponentFactory::MockListenerComponentFactory() {}
+MockListenerComponentFactory::MockListenerComponentFactory()
+    : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
+  ON_CALL(*this, createListenSocket(_, _)).WillByDefault(Return(socket_));
+}
 MockListenerComponentFactory::~MockListenerComponentFactory() {}
 
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
+MockListener::MockListener() {
+  ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
+  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+}
+MockListener::~MockListener() {}
+
 MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}
+
+MockWorker::MockWorker() {
+  ON_CALL(*this, removeListener(_, _))
+      .WillByDefault(Invoke([this](Listener&, std::function<void()> completion) -> void {
+        EXPECT_EQ(nullptr, remove_listener_completion_);
+        remove_listener_completion_ = completion;
+      }));
+}
+MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
@@ -89,6 +117,6 @@ MockFactoryContext::MockFactoryContext() {
 
 MockFactoryContext::~MockFactoryContext() {}
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

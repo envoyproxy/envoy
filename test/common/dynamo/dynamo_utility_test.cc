@@ -56,5 +56,5 @@ TEST(DynamoUtility, PartitionIdStatString) {
   }
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

@@ -32,19 +32,19 @@ TEST_P(IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HT
 TEST_P(IntegrationTest, ConnectionClose) {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void {
-    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-  },
-                  [&]() -> void {
-                    codec_client->makeHeaderOnlyRequest(
-                        Http::TestHeaderMapImpl{{":method", "GET"},
-                                                {":path", "/healthcheck"},
-                                                {":authority", "host"},
-                                                {"connection", "close"}},
-                        *response);
-                  },
-                  [&]() -> void { response->waitForEndStream(); },
-                  [&]() -> void { codec_client->waitForDisconnect(); }});
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+       },
+       [&]() -> void {
+         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                     {":path", "/healthcheck"},
+                                                                     {":authority", "host"},
+                                                                     {"connection", "close"}},
+                                             *response);
+       },
+       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { codec_client->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -171,4 +171,4 @@ TEST_P(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
-} // Envoy
+} // namespace Envoy

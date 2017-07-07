@@ -81,5 +81,5 @@ private:
   State state_;
   Frame frame_;
 };
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

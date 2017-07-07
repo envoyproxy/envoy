@@ -24,11 +24,13 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
       local_host_set_(local_host_set) {
   if (local_host_set_) {
     host_set_.addMemberUpdateCb(
-        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
-            -> void { regenerateZoneRoutingStructures(); });
+        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+          regenerateZoneRoutingStructures();
+        });
     local_host_set_->addMemberUpdateCb(
-        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
-            -> void { regenerateZoneRoutingStructures(); });
+        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+          regenerateZoneRoutingStructures();
+        });
   }
 }
 
@@ -297,5 +299,5 @@ HostConstSharedPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
   return hosts_to_use[random_.random() % hosts_to_use.size()];
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

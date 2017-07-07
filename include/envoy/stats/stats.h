@@ -209,5 +209,5 @@ public:
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

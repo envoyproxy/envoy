@@ -97,5 +97,5 @@ Grpc::RpcChannelPtr GrpcFactoryImpl::create(Grpc::RpcChannelCallbacks& callbacks
   return Grpc::RpcChannelPtr{new Grpc::RpcChannelImpl(cm_, cluster_name_, callbacks, timeout)};
 }
 
-} // RateLimit
-} // Envoy
+} // namespace RateLimit
+} // namespace Envoy

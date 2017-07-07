@@ -58,5 +58,5 @@ void DrainManagerImpl::startParentShutdownSequence() {
       server_.options().parentShutdownTime()));
 }
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

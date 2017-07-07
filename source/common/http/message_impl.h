@@ -44,5 +44,5 @@ public:
   ResponseMessageImpl(HeaderMapPtr&& headers) : MessageImpl(std::move(headers)) {}
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

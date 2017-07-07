@@ -44,5 +44,5 @@ public:
   virtual std::string uriSanPeerCertificate() PURE;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

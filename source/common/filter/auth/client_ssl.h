@@ -126,6 +126,6 @@ private:
 };
 
 } // ClientSsl
-} // Auth
-} // Filter
-} // Envoy
+} // namespace Auth
+} // namespace Filter
+} // namespace Envoy

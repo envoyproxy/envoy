@@ -61,4 +61,4 @@ std::string Hex::uint64ToHex(uint64_t value) {
 
   return encode(&data[0], data.size());
 }
-} // Envoy
+} // namespace Envoy

@@ -36,6 +36,6 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
 static Registry::RegisterFactory<MongoProxyFilterConfigFactory, NamedNetworkFilterConfigFactory>
     registered_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

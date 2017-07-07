@@ -237,5 +237,5 @@ private:
   ClusterManagerInitHelper init_helper_;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

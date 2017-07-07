@@ -263,6 +263,6 @@ TEST(AddressFromSockAddr, Pipe) {
                EnvoyException);
 }
 
-} // Address
-} // Network
-} // Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

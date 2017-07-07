@@ -58,5 +58,5 @@ void ZeroCopyInputStreamImpl::BackUp(int count) {
   position_ -= count;
   byte_count_ -= count;
 }
-}
-}
+} // namespace Buffer
+} // namespace Envoy

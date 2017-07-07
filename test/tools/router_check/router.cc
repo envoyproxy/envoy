@@ -70,22 +70,33 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     }
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
 
-    const std::unordered_map<std::string,
-                             std::function<bool(ToolConfig&, const std::string&)>> checkers = {
-        {"cluster_name", [this](ToolConfig& tool_config, const std::string& expected)
-                             -> bool { return compareCluster(tool_config, expected); }},
-        {"virtual_cluster_name",
-         [this](ToolConfig& tool_config, const std::string& expected)
-             -> bool { return compareVirtualCluster(tool_config, expected); }},
-        {"virtual_host_name", [this](ToolConfig& tool_config, const std::string& expected)
-                                  -> bool { return compareVirtualHost(tool_config, expected); }},
-        {"path_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
-                             -> bool { return compareRewritePath(tool_config, expected); }},
-        {"host_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
-                             -> bool { return compareRewriteHost(tool_config, expected); }},
-        {"path_redirect", [this](ToolConfig& tool_config, const std::string& expected)
-                              -> bool { return compareRedirectPath(tool_config, expected); }},
-    };
+    const std::unordered_map<std::string, std::function<bool(ToolConfig&, const std::string&)>>
+        checkers = {
+            {"cluster_name",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareCluster(tool_config, expected);
+             }},
+            {"virtual_cluster_name",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareVirtualCluster(tool_config, expected);
+             }},
+            {"virtual_host_name",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareVirtualHost(tool_config, expected);
+             }},
+            {"path_rewrite",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareRewritePath(tool_config, expected);
+             }},
+            {"host_rewrite",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareRewriteHost(tool_config, expected);
+             }},
+            {"path_redirect",
+             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
+               return compareRedirectPath(tool_config, expected);
+             }},
+        };
 
     // Call appropriate function for each match case
     for (std::pair<std::string, std::function<bool(ToolConfig&, std::string)>> test : checkers) {
@@ -190,4 +201,4 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
   return false;
 }
-} // Envoy
+} // namespace Envoy

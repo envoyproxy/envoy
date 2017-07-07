@@ -150,5 +150,5 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
     is_initialized_ = false;
   }
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

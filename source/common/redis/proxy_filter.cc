@@ -115,5 +115,5 @@ ProxyFilter::PendingRequest::~PendingRequest() {
   parent_.config_->stats().downstream_rq_active_.dec();
 }
 
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

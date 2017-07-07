@@ -143,8 +143,8 @@ void MGETCommandHandler::SplitRequestImpl::onFailure(uint32_t index) {
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                            const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), all_to_one_handler_(*conn_pool_),
-      mget_handler_(*conn_pool_),
-      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
+      mget_handler_(*conn_pool_), stats_{ALL_COMMAND_SPLITTER_STATS(
+                                      POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   for (const std::string& command : Commands::allToOneCommands()) {
     addHandler(scope, stat_prefix, command, all_to_one_handler_);
@@ -197,6 +197,6 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                   handler});
 }
 
-} // CommandSplitter
-} // Redis
-} // Envoy
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Envoy

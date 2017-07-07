@@ -172,10 +172,14 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       Http::CodeUtility::groupStringForResponseCode(static_cast<Http::Code>(status));
 
   scope_.counter(fmt::format("{}{}.{}.upstream_rq_total", stat_prefix_, entity_type, entity)).inc();
-  scope_.counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
-                             group_string)).inc();
-  scope_.counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
-                             std::to_string(status))).inc();
+  scope_
+      .counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
+                           group_string))
+      .inc();
+  scope_
+      .counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
+                           std::to_string(status)))
+      .inc();
 
   scope_.deliverTimingToSinks(
       fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity), latency);
@@ -192,8 +196,10 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    scope_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
-                               unprocessed_table)).inc();
+    scope_
+        .counter(
+            fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_, unprocessed_table))
+        .inc();
   }
 }
 
@@ -204,8 +210,10 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
     if (table_descriptor_.table_name.empty()) {
       scope_.counter(fmt::format("{}error.no_table.{}", stat_prefix_, error_type)).inc();
     } else {
-      scope_.counter(fmt::format("{}error.{}.{}", stat_prefix_, table_descriptor_.table_name,
-                                 error_type)).inc();
+      scope_
+          .counter(
+              fmt::format("{}error.{}.{}", stat_prefix_, table_descriptor_.table_name, error_type))
+          .inc();
     }
   } else {
     scope_.counter(fmt::format("{}empty_response_body", stat_prefix_)).inc();
@@ -226,5 +234,5 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   }
 }
 
-} // Dynamo
-} // Envoy
+} // namespace Dynamo
+} // namespace Envoy

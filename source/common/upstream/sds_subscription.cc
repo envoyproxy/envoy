@@ -95,5 +95,5 @@ void SdsSubscription::onFetchComplete() {
   ENVOY_LOG(debug, "sds refresh complete for cluster: {}", cluster_name_);
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

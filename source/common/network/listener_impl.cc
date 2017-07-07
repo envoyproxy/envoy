@@ -114,5 +114,5 @@ void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remo
   cb_.onNewConnection(std::move(new_connection));
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

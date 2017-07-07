@@ -204,11 +204,11 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   }
 
   tls.set(thread_local_slot_,
-          [this, local_cluster_name](Event::Dispatcher& dispatcher)
-              -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                return ThreadLocal::ThreadLocalObjectSharedPtr{
-                    new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
-              });
+          [this, local_cluster_name](
+              Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+            return ThreadLocal::ThreadLocalObjectSharedPtr{
+                new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
+          });
 
   // To avoid threading issues, for those clusters that start with hosts already in them (like the
   // static cluster), we need to post an update onto each thread to notify them of the update. We
@@ -337,12 +337,12 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
-  // Select a host and create a connection pool for it if it does not already exist.
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
     return nullptr;
   }
 
+  // Select a host and create a connection pool for it if it does not already exist.
   return entry->second->connPool(priority, context);
 }
 
@@ -591,5 +591,5 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, Clust
   return CdsApiImpl::create(config, cm, primary_dispatcher_, random_, local_info_, stats_);
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

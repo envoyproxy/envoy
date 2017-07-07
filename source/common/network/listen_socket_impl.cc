@@ -57,5 +57,5 @@ UdsListenSocket::UdsListenSocket(const std::string& uds_path) {
   doBind();
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

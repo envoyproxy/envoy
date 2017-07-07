@@ -172,4 +172,4 @@ public:
    */
   static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 };
-} // Envoy
+} // namespace Envoy

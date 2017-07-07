@@ -59,12 +59,14 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "", Network::Utility::resolveUrl(fmt::format(
-                       "tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
+      cluster, "",
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
       false, "")};
   Http::CodecClientProd client(
-      type, dispatcher->createClientConnection(Network::Utility::resolveUrl(fmt::format(
-                "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
+      type,
+      dispatcher->createClientConnection(Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
       host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
@@ -102,4 +104,19 @@ RawConnectionDriver::~RawConnectionDriver() {}
 void RawConnectionDriver::run() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
-} // Envoy
+
+WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {}
+
+Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
+  data_.append(TestUtility::bufferToString(data));
+  data.drain(data.length());
+  if (!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) {
+    data_to_wait_for_.clear();
+    dispatcher_.exit();
+  }
+
+  return Network::FilterStatus::StopIteration;
+}
+
+} // namespace Envoy

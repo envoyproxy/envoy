@@ -12,11 +12,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::ByRef;
 using testing::Eq;
 using testing::Invoke;
 using testing::Return;
+using testing::_;
 
 namespace Network {
 
@@ -100,10 +100,11 @@ TEST_P(ListenerImplTest, NormalRedirect) {
   Network::MockConnectionHandler connection_handler;
   // The traffic should redirect from binding listener to the virtual listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
-                                     stats_store, {.bind_to_port_ = true,
-                                                   .use_proxy_proto_ = false,
-                                                   .use_original_dst_ = true,
-                                                   .per_connection_buffer_limit_bytes_ = 0});
+                                     stats_store,
+                                     {.bind_to_port_ = true,
+                                      .use_proxy_proto_ = false,
+                                      .use_original_dst_ = true,
+                                      .per_connection_buffer_limit_bytes_ = 0});
   Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
                                         listener_callbacks2, stats_store,
@@ -139,10 +140,11 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   Network::MockConnectionHandler connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
-                                     stats_store, {.bind_to_port_ = true,
-                                                   .use_proxy_proto_ = false,
-                                                   .use_original_dst_ = true,
-                                                   .per_connection_buffer_limit_bytes_ = 0});
+                                     stats_store,
+                                     {.bind_to_port_ = true,
+                                      .use_proxy_proto_ = false,
+                                      .use_original_dst_ = true,
+                                      .per_connection_buffer_limit_bytes_ = 0});
   Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
                                         listener_callbacks2, stats_store,
@@ -177,10 +179,11 @@ TEST_P(ListenerImplTest, UseActualDst) {
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
-                                     stats_store, {.bind_to_port_ = true,
-                                                   .use_proxy_proto_ = false,
-                                                   .use_original_dst_ = false,
-                                                   .per_connection_buffer_limit_bytes_ = 0});
+                                     stats_store,
+                                     {.bind_to_port_ = true,
+                                      .use_proxy_proto_ = false,
+                                      .use_original_dst_ = false,
+                                      .per_connection_buffer_limit_bytes_ = 0});
   Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
                                         listener_callbacks2, stats_store,
@@ -206,5 +209,5 @@ TEST_P(ListenerImplTest, UseActualDst) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

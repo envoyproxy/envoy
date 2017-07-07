@@ -69,4 +69,4 @@ private:
 };
 
 } // Http
-} // Envoy
+} // namespace Envoy

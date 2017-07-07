@@ -96,6 +96,6 @@ bool supportsIpVersion(const Address::IpVersion version);
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
                                                                      Address::SocketType type);
 
-} // Test
-} // Network
-} // Envoy
+} // namespace Test
+} // namespace Network
+} // namespace Envoy

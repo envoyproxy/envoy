@@ -86,5 +86,5 @@ void CdsApiImpl::onFetchFailure(const EnvoyException* e) {
   }
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

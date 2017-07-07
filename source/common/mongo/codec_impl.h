@@ -215,5 +215,5 @@ private:
   Buffer::Instance& output_;
 };
 
-} // Mongo
-} // Envoy
+} // namespace Mongo
+} // namespace Envoy

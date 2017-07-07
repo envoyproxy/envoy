@@ -22,13 +22,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WithArgs;
+using testing::_;
 
 namespace Http {
 
@@ -254,7 +254,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected)).Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected))
+      .Times(0);
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -331,7 +332,8 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
@@ -350,8 +352,9 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
-                                                 100)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(125UL));
@@ -374,7 +377,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
 
@@ -396,8 +400,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
-                                                 100)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(125UL));
@@ -620,7 +625,8 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
@@ -658,7 +664,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   timer_->callback_();
 
@@ -714,5 +721,5 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

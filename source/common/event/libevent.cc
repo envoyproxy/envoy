@@ -17,6 +17,6 @@ void Global::initialize() {
   signal(SIGPIPE, SIG_IGN);
 }
 
-} // Libevent
-} // Event
-} // Envoy
+} // namespace Libevent
+} // namespace Event
+} // namespace Envoy

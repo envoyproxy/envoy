@@ -25,6 +25,6 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(const Json:
 static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig, NamedHttpFilterConfigFactory>
     register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

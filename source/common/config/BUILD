@@ -16,6 +16,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
+        "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -27,6 +28,7 @@ envoy_cc_library(
     external_deps = ["envoy_base"],
     deps = [
         "//include/envoy/config:subscription_interface",
+        "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_lib",
     ],
@@ -35,10 +37,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http_subscription_lib",
     hdrs = ["http_subscription_impl.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "http_api_protos",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
@@ -71,5 +77,8 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = ["envoy_base"],
-    deps = ["//include/envoy/upstream:cluster_manager_interface"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
 )

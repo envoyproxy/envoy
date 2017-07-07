@@ -15,7 +15,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
@@ -23,6 +22,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Redis {
 namespace ConnPool {
@@ -116,20 +116,19 @@ TEST_F(RedisClientImplTest, Basic) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
-        InSequence s;
-        RespValuePtr response1(new RespValue());
-        EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
-        EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
-        callbacks_->onRespValue(std::move(response1));
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    RespValuePtr response1(new RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    callbacks_->onRespValue(std::move(response1));
 
-        RespValuePtr response2(new RespValue());
-        EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
-        EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-        EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
-        callbacks_->onRespValue(std::move(response2));
-      }));
+    RespValuePtr response2(new RespValue());
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    callbacks_->onRespValue(std::move(response2));
+  }));
   upstream_read_filter_->onData(fake_data);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -160,21 +159,20 @@ TEST_F(RedisClientImplTest, Cancel) {
   handle1->cancel();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
-        InSequence s;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
 
-        RespValuePtr response1(new RespValue());
-        EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
-        EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
-        callbacks_->onRespValue(std::move(response1));
+    RespValuePtr response1(new RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
+    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    callbacks_->onRespValue(std::move(response1));
 
-        RespValuePtr response2(new RespValue());
-        EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
-        EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-        EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
-        callbacks_->onRespValue(std::move(response2));
-      }));
+    RespValuePtr response2(new RespValue());
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    callbacks_->onRespValue(std::move(response2));
+  }));
   upstream_read_filter_->onData(fake_data);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -251,8 +249,9 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void { throw ProtocolError("error"); }));
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    throw ProtocolError("error");
+  }));
   EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(500));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
@@ -457,6 +456,6 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
   tls_.shutdownThread();
 }
 
-} // ConnPool
-} // Redis
-} // Envoy
+} // namespace ConnPool
+} // namespace Redis
+} // namespace Envoy

@@ -112,19 +112,31 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
                      (upstream_host ? upstream_host->canary() : false);
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
-    Http::CodeUtility::ResponseStatInfo info{
-        config_.scope_, cluster_->statsScope(), EMPTY_STRING, response_headers, internal_request,
-        route_entry_->virtualHost().name(),
-        request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
-        config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
+    Http::CodeUtility::ResponseStatInfo info{config_.scope_,
+                                             cluster_->statsScope(),
+                                             EMPTY_STRING,
+                                             response_headers,
+                                             internal_request,
+                                             route_entry_->virtualHost().name(),
+                                             request_vcluster_ ? request_vcluster_->name()
+                                                               : EMPTY_STRING,
+                                             config_.local_info_.zoneName(),
+                                             upstreamZone(upstream_host),
+                                             is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{
-          config_.scope_, cluster_->statsScope(), alt_stat_prefix_, response_headers,
-          internal_request, EMPTY_STRING, EMPTY_STRING, config_.local_info_.zoneName(),
-          upstreamZone(upstream_host), is_canary};
+      Http::CodeUtility::ResponseStatInfo info{config_.scope_,
+                                               cluster_->statsScope(),
+                                               alt_stat_prefix_,
+                                               response_headers,
+                                               internal_request,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               config_.local_info_.zoneName(),
+                                               upstreamZone(upstream_host),
+                                               is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
@@ -232,11 +244,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                                               callbacks_->streamId());
 
 #ifndef NVLOG
-  headers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
-                     *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
-                     header.key().c_str(), header.value().c_str());
-  }, callbacks_);
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> void {
+        ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
+                         *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
+                         header.key().c_str(), header.value().c_str());
+      },
+      callbacks_);
 #endif
 
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
@@ -517,19 +531,31 @@ void Filter::onUpstreamComplete() {
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
-    Http::CodeUtility::ResponseTimingInfo info{
-        config_.scope_, cluster_->statsScope(), EMPTY_STRING, response_time,
-        upstream_request_->upstream_canary_, internal_request, route_entry_->virtualHost().name(),
-        request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
-        config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
+    Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
+                                               cluster_->statsScope(),
+                                               EMPTY_STRING,
+                                               response_time,
+                                               upstream_request_->upstream_canary_,
+                                               internal_request,
+                                               route_entry_->virtualHost().name(),
+                                               request_vcluster_ ? request_vcluster_->name()
+                                                                 : EMPTY_STRING,
+                                               config_.local_info_.zoneName(),
+                                               upstreamZone(upstream_request_->upstream_host_)};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseTimingInfo info{
-          config_.scope_, cluster_->statsScope(), alt_stat_prefix_, response_time,
-          upstream_request_->upstream_canary_, internal_request, EMPTY_STRING, EMPTY_STRING,
-          config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
+      Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
+                                                 cluster_->statsScope(),
+                                                 alt_stat_prefix_,
+                                                 response_time,
+                                                 upstream_request_->upstream_canary_,
+                                                 internal_request,
+                                                 EMPTY_STRING,
+                                                 EMPTY_STRING,
+                                                 config_.local_info_.zoneName(),
+                                                 upstreamZone(upstream_request_->upstream_host_)};
 
       Http::CodeUtility::chargeResponseTiming(info);
     }
@@ -750,5 +776,5 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                                 priority);
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

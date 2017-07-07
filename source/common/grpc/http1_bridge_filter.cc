@@ -100,5 +100,5 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
       Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

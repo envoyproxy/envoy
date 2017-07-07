@@ -179,10 +179,11 @@ InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterMan
                            const Json::Object& config)
     : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()),
       config_(config) {
-  tls.set(tls_slot_, [this, cluster_name](
-                         Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
-  });
+  tls.set(tls_slot_,
+          [this,
+           cluster_name](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+            return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
+          });
 }
 
 PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
@@ -196,8 +197,9 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
 
   cluster_->hostSet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>&,
-             const std::vector<Upstream::HostSharedPtr>& hosts_removed)
-          -> void { onHostsRemoved(hosts_removed); });
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
+        onHostsRemoved(hosts_removed);
+      });
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
@@ -248,6 +250,6 @@ void InstanceImpl::ThreadLocalPool::shutdown() {
   }
 }
 
-} // ConnPool
-} // Redis
-} // Envoy
+} // namespace ConnPool
+} // namespace Redis
+} // namespace Envoy

@@ -39,5 +39,5 @@ typedef std::unique_ptr<ClientContext> ClientContextPtr;
 class ServerContext : public virtual Context {};
 typedef std::unique_ptr<ServerContext> ServerContextPtr;
 
-} // SSL
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

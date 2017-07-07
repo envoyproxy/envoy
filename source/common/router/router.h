@@ -81,8 +81,8 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
+      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
+        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
@@ -251,4 +251,4 @@ private:
 };
 
 } // Router
-} // Envoy
+} // namespace Envoy

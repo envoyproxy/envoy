@@ -9,5 +9,5 @@ MockRpcChannelCallbacks::~MockRpcChannelCallbacks() {}
 MockRpcChannel::MockRpcChannel() {}
 MockRpcChannel::~MockRpcChannel() {}
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

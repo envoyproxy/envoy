@@ -31,5 +31,5 @@ public:
   virtual LoadBalancer& loadBalancer() PURE;
 };
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

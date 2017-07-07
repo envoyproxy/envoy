@@ -129,5 +129,5 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

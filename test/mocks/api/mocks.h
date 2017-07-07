@@ -33,5 +33,5 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
 };
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

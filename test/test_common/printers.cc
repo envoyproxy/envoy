@@ -11,10 +11,12 @@
 namespace Envoy {
 namespace Http {
 void PrintTo(const HeaderMapImpl& headers, std::ostream* os) {
-  headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    std::ostream* os = static_cast<std::ostream*>(context);
-    *os << "{'" << header.key().c_str() << "','" << header.value().c_str() << "'}";
-  }, os);
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        std::ostream* os = static_cast<std::ostream*>(context);
+        *os << "{'" << header.key().c_str() << "','" << header.value().c_str() << "'}";
+      },
+      os);
 }
 
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os) {
@@ -24,7 +26,7 @@ void PrintTo(const HeaderMapPtr& headers, std::ostream* os) {
 void PrintTo(const HeaderMap& headers, std::ostream* os) {
   PrintTo(*dynamic_cast<const HeaderMapImpl*>(&headers), os);
 }
-} // Http
+} // namespace Http
 
 namespace Buffer {
 void PrintTo(const Instance& buffer, std::ostream* os) {
@@ -34,11 +36,11 @@ void PrintTo(const Instance& buffer, std::ostream* os) {
 void PrintTo(const Buffer::OwnedImpl& buffer, std::ostream* os) {
   PrintTo(dynamic_cast<const Buffer::Instance&>(buffer), os);
 }
-} // Buffer
+} // namespace Buffer
 
 namespace Redis {
 void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
 
 void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
-} // Redis
-} // Envoy
+} // namespace Redis
+} // namespace Envoy

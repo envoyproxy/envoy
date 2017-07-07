@@ -12,9 +12,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Upstream {
 
@@ -140,5 +140,5 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   }
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

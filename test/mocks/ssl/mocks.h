@@ -55,5 +55,5 @@ public:
   MOCK_METHOD0(getCertChainInformation, std::string());
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

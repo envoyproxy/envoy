@@ -237,5 +237,5 @@ void TcpProxy::onUpstreamEvent(uint32_t event) {
   }
 }
 
-} // Filter
-} // Envoy
+} // namespace Filter
+} // namespace Envoy

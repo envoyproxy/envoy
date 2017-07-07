@@ -53,5 +53,5 @@ private:
   std::string grpc_method_;
 };
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

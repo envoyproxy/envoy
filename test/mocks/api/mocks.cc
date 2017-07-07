@@ -4,8 +4,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Return;
+using testing::_;
 
 namespace Api {
 
@@ -13,5 +13,5 @@ MockApi::MockApi() { ON_CALL(*this, createFile(_, _, _, _)).WillByDefault(Return
 
 MockApi::~MockApi() {}
 
-} // Api
-} // Envoy
+} // namespace Api
+} // namespace Envoy

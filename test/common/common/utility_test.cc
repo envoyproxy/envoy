@@ -179,4 +179,4 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
-} // Envoy
+} // namespace Envoy

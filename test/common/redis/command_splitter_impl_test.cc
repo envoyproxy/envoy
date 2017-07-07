@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -22,6 +21,7 @@ using testing::InSequence;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
+using testing::_;
 
 namespace Redis {
 namespace CommandSplitter {
@@ -384,6 +384,6 @@ TEST_F(RedisMGETCommandHandlerTest, Cancel) {
   handle_->cancel();
 };
 
-} // CommandSplitter
-} // Redis
-} // Envoy
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Envoy

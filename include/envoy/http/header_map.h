@@ -321,5 +321,5 @@ public:
 
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

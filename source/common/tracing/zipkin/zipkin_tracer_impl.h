@@ -207,4 +207,4 @@ private:
   const std::string collector_endpoint_;
 };
 } // Zipkin
-} // Envoy
+} // namespace Envoy

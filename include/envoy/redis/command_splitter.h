@@ -57,6 +57,6 @@ public:
   virtual SplitRequestPtr makeRequest(const RespValue& request, SplitCallbacks& callbacks) PURE;
 };
 
-} // CommandSplitter
-} // Redis
-} // Envoy
+} // namespace CommandSplitter
+} // namespace Redis
+} // namespace Envoy

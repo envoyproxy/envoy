@@ -32,6 +32,7 @@ public:
 };
 
 typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
+typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

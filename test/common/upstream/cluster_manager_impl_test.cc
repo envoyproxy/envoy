@@ -22,15 +22,15 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Return;
-using testing::ReturnRef;
 using testing::ReturnNew;
+using testing::ReturnRef;
 using testing::SaveArg;
+using testing::_;
 
 namespace Upstream {
 
@@ -48,7 +48,8 @@ public:
           Optional<envoy::api::v2::ConfigSource> eds_config;
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         eds_config, local_info_, outlier_event_logger).release();
+                                         eds_config, local_info_, outlier_event_logger)
+              .release();
         }));
   }
 
@@ -349,8 +350,9 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(Network::Utility::resolveUrl(
-                                        "tcp://127.0.0.1:11001")))).WillOnce(Return(connection));
+  EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(
+                                        Network::Utility::resolveUrl("tcp://127.0.0.1:11001"))))
+      .WillOnce(Return(connection));
   create(*loader);
   factory_.tls_.shutdownThread();
 }
@@ -875,13 +877,14 @@ TEST(ClusterManagerInitHelper, RemoveClusterWithinInitLoop) {
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
-  EXPECT_CALL(cluster, initialize())
-      .WillOnce(Invoke([&]() -> void { init_helper.removeCluster(cluster); }));
+  EXPECT_CALL(cluster, initialize()).WillOnce(Invoke([&]() -> void {
+    init_helper.removeCluster(cluster);
+  }));
 
   // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
   // which calls initialize() on the members of the secondary init list.
   init_helper.onStaticLoadComplete();
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

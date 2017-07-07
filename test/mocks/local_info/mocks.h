@@ -25,5 +25,5 @@ public:
   std::string node_name_{"node_name"};
 };
 
-} // LocalInfo
-} // Envoy
+} // namespace LocalInfo
+} // namespace Envoy

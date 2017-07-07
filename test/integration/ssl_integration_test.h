@@ -53,7 +53,6 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
   ServerContextPtr createUpstreamSslContext();
-  ClientContextPtr createClientSslContext(bool alpn, bool san);
   void checkStats();
 
 private:
@@ -66,5 +65,5 @@ private:
   ClientContextPtr client_ssl_ctx_alpn_san_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

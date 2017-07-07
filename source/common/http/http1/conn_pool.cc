@@ -308,6 +308,6 @@ CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnect
   return codec;
 }
 
-} // Http1
-} // Http
-} // Envoy
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

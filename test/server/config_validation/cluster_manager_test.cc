@@ -54,5 +54,5 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   EXPECT_EQ(nullptr, client.start(stream_callbacks, Optional<std::chrono::milliseconds>()));
 }
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

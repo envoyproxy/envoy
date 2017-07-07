@@ -29,5 +29,5 @@ std::string SpanBuffer::toStringifiedJsonArray() {
 
   return stringified_json_array;
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

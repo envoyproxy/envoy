@@ -91,5 +91,5 @@ private:
   std::condition_variable_any force_checked_event_;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

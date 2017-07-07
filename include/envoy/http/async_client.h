@@ -156,5 +156,5 @@ public:
 
 typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

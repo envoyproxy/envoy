@@ -139,4 +139,4 @@ private:
 };
 
 } // Filter
-} // Envoy
+} // namespace Envoy

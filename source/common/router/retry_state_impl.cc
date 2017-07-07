@@ -213,5 +213,5 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
   return false;
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

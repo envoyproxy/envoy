@@ -63,5 +63,5 @@ private:
   std::string prefix_;
 };
 
-} // Http
+} // namespace Http
 } // Envoy

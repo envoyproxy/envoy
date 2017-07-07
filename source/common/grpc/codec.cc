@@ -97,4 +97,4 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
 }
 
 } // namespace Grpc
-} // Envoy
+} // namespace Envoy

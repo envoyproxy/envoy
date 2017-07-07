@@ -102,12 +102,14 @@ envoy_cc_test_library(
         "fake_upstream.cc",
         "integration.cc",
         "server.cc",
+        "ssl_utility.cc",
         "utility.cc",
     ],
     hdrs = [
         "fake_upstream.h",
         "integration.h",
         "server.h",
+        "ssl_utility.h",
         "utility.h",
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
@@ -147,6 +149,7 @@ envoy_cc_test_library(
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
+        "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
@@ -234,6 +237,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_proxy_integration_test",
+    srcs = [
+        "tcp_proxy_integration_test.cc",
+        "tcp_proxy_integration_test.h",
+    ],
+    data = [
+        "//test/config/integration:server_config_files",
+        "//test/config/integration:tcp_proxy.json",
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "xfcc_integration_test",
     srcs = [
         "ssl_integration_test.h",
@@ -246,12 +271,8 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:context_lib",
-        "//test/mocks/runtime:runtime_mocks",
+        "//source/common/http:header_map_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

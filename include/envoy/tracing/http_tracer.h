@@ -115,5 +115,5 @@ public:
 
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

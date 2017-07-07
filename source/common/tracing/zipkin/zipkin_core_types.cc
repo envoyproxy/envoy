@@ -225,7 +225,8 @@ void Span::finish() {
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
     ss.setTimestamp(std::chrono::duration_cast<std::chrono::microseconds>(
-                        ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count());
+                        ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                        .count());
     ss.setValue(ZipkinCoreConstants::get().SERVER_SEND);
     annotations_.push_back(std::move(ss));
   } else if (context.annotationSet().cs_ && !context.annotationSet().cr_) {
@@ -233,14 +234,16 @@ void Span::finish() {
     Annotation cr;
     const uint64_t stop_timestamp =
         std::chrono::duration_cast<std::chrono::microseconds>(
-            ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+            ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+            .count();
     cr.setEndpoint(annotations_[0].endpoint());
     cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
     annotations_.push_back(std::move(cr));
     const int64_t monotonic_stop_time =
         std::chrono::duration_cast<std::chrono::microseconds>(
-            ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+            ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+            .count();
     setDuration(monotonic_stop_time - monotonic_start_time_);
   }
 
@@ -254,5 +257,5 @@ void Span::setTag(const std::string& name, const std::string& value) {
     addBinaryAnnotation(BinaryAnnotation(name, value));
   }
 }
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

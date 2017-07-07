@@ -134,5 +134,5 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   }
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

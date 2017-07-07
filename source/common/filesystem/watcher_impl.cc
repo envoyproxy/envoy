@@ -19,11 +19,14 @@ namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
     : inotify_fd_(inotify_init1(IN_NONBLOCK)),
-      inotify_event_(dispatcher.createFileEvent(inotify_fd_, [this](uint32_t events) -> void {
-        ASSERT(events == Event::FileReadyType::Read);
-        UNREFERENCED_PARAMETER(events);
-        onInotifyEvent();
-      }, Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
+      inotify_event_(dispatcher.createFileEvent(inotify_fd_,
+                                                [this](uint32_t events) -> void {
+                                                  ASSERT(events == Event::FileReadyType::Read);
+                                                  UNREFERENCED_PARAMETER(events);
+                                                  onInotifyEvent();
+                                                },
+                                                Event::FileTriggerType::Edge,
+                                                Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 
@@ -86,5 +89,5 @@ void WatcherImpl::onInotifyEvent() {
   }
 }
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

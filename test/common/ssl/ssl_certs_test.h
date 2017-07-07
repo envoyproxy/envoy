@@ -11,4 +11,4 @@ public:
     TestEnvironment::exec({TestEnvironment::runfilesPath("test/common/ssl/gen_unittest_certs.sh")});
   }
 };
-} // Envoy
+} // namespace Envoy

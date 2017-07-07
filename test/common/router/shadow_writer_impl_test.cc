@@ -11,8 +11,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Invoke;
+using testing::_;
 
 namespace Router {
 
@@ -59,5 +59,5 @@ TEST(ShadowWriterImplTest, All) {
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

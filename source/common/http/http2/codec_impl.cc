@@ -63,23 +63,27 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   // nghttp2 requires that all ':' headers come before all other headers. To avoid making higher
   // layers understand that we do two passes here to build the final header list to encode.
   final_headers.reserve(headers.size());
-  headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
-    if (header.key().c_str()[0] == ':') {
-      final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                remove_const<uint8_t>(header.value().c_str()), header.key().size(),
-                                header.value().size(), 0});
-    }
-  }, &final_headers);
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
+        if (header.key().c_str()[0] == ':') {
+          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
+                                    remove_const<uint8_t>(header.value().c_str()),
+                                    header.key().size(), header.value().size(), 0});
+        }
+      },
+      &final_headers);
 
-  headers.iterate([](const HeaderEntry& header, void* context) -> void {
-    std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
-    if (header.key().c_str()[0] != ':') {
-      final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                remove_const<uint8_t>(header.value().c_str()), header.key().size(),
-                                header.value().size(), 0});
-    }
-  }, &final_headers);
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
+        if (header.key().c_str()[0] != ':') {
+          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
+                                    remove_const<uint8_t>(header.value().c_str()),
+                                    header.key().size(), header.value().size(), 0});
+        }
+      },
+      &final_headers);
 }
 
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -89,11 +93,11 @@ void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool en
   nghttp2_data_provider provider;
   if (!end_stream) {
     provider.source.ptr = this;
-    provider.read_callback =
-        [](nghttp2_session*, int32_t, uint8_t*, size_t length, uint32_t* data_flags,
-           nghttp2_data_source* source, void*) -> ssize_t {
-          return static_cast<StreamImpl*>(source->ptr)->onDataSourceRead(length, data_flags);
-        };
+    provider.read_callback = [](nghttp2_session*, int32_t, uint8_t*, size_t length,
+                                uint32_t* data_flags, nghttp2_data_source* source,
+                                void*) -> ssize_t {
+      return static_cast<StreamImpl*>(source->ptr)->onDataSourceRead(length, data_flags);
+    };
   }
 
   local_end_stream_ = end_stream;
@@ -576,12 +580,14 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
   nghttp2_session_callbacks_set_send_callback(
       callbacks_,
-      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data)
-          -> ssize_t { return static_cast<ConnectionImpl*>(user_data)->onSend(data, length); });
+      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+        return static_cast<ConnectionImpl*>(user_data)->onSend(data, length);
+      });
 
   nghttp2_session_callbacks_set_send_data_callback(
-      callbacks_, [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
-                     nghttp2_data_source* source, void*) -> int {
+      callbacks_,
+      [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
+         nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
         UNREFERENCED_PARAMETER(frame);
         return static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
@@ -602,13 +608,14 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
         HeaderString value;
         value.setCopy(reinterpret_cast<const char*>(raw_value), value_length);
-        return static_cast<ConnectionImpl*>(user_data)
-            ->onHeader(frame, std::move(name), std::move(value));
+        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame, std::move(name),
+                                                                 std::move(value));
       });
 
   nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
-      callbacks_, [](nghttp2_session*, uint8_t, int32_t stream_id, const uint8_t* data, size_t len,
-                     void* user_data) -> int {
+      callbacks_,
+      [](nghttp2_session*, uint8_t, int32_t stream_id, const uint8_t* data, size_t len,
+         void* user_data) -> int {
         return static_cast<ConnectionImpl*>(user_data)->onData(stream_id, data, len);
       });
 
@@ -637,8 +644,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(
       callbacks_,
-      [](nghttp2_session*, const nghttp2_frame*, int error_code, void* user_data)
-          -> int { return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(error_code); });
+      [](nghttp2_session*, const nghttp2_frame*, int error_code, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(error_code);
+      });
 }
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
@@ -731,6 +739,6 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
-} // Http2
-} // Http
-} // Envoy
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

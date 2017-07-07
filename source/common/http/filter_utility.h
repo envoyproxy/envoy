@@ -21,5 +21,5 @@ public:
                      Upstream::ClusterManager& cm);
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

@@ -80,5 +80,5 @@ public:
   virtual std::string version() PURE;
 };
 
-} // Server
-} // Envoy
+} // namespace Server
+} // namespace Envoy

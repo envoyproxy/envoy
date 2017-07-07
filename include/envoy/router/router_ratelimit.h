@@ -87,5 +87,5 @@ public:
   getApplicableRateLimit(uint64_t stage) const PURE;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

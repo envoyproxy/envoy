@@ -94,5 +94,5 @@ public:
   static std::string getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

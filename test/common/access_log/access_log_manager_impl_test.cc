@@ -12,8 +12,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::Return;
+using testing::_;
 
 namespace AccessLog {
 
@@ -40,5 +40,5 @@ TEST(AccessLogManagerImpl, reopenAllFiles) {
   access_log_manager.reopen();
 }
 
-} // AccessLog
-} // Envoy
+} // namespace AccessLog
+} // namespace Envoy

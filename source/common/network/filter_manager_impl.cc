@@ -82,5 +82,5 @@ FilterStatus FilterManagerImpl::onWrite() {
   return FilterStatus::Continue;
 }
 
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

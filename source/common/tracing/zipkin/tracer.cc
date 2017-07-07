@@ -26,7 +26,8 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp) {
   span_ptr->setTraceId(random_number);
   int64_t start_time_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+          .count();
   span_ptr->setStartTime(start_time_micro);
 
   // Set the timestamp globally for the span and also for the CS annotation
@@ -97,7 +98,8 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp,
 
   int64_t start_time_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+          .count();
   span_ptr->setStartTime(start_time_micro);
 
   span_ptr->setTracer(this);
@@ -113,5 +115,5 @@ void Tracer::reportSpan(Span&& span) {
 
 void Tracer::setReporter(ReporterPtr reporter) { reporter_ = std::move(reporter); }
 
-} // Zipkin
-} // Envoy
+} // namespace Zipkin
+} // namespace Envoy

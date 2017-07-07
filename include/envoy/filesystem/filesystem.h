@@ -79,5 +79,5 @@ public:
 
 typedef std::unique_ptr<Watcher> WatcherPtr;
 
-} // Filesystem
-} // Envoy
+} // namespace Filesystem
+} // namespace Envoy

@@ -67,5 +67,5 @@ private:
 
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;
 
-} // Upstream
-} // Envoy
+} // namespace Upstream
+} // namespace Envoy

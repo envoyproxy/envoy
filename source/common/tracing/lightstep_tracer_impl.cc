@@ -110,8 +110,8 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::TracerOptions> options)
-    : cm_(cluster_manager),
-      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
+    : cm_(cluster_manager), tracer_stats_{LIGHTSTEP_TRACER_STATS(
+                                POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_(tls), runtime_(runtime), options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
@@ -180,5 +180,5 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
   }
 }
 
-} // Tracing
-} // Envoy
+} // namespace Tracing
+} // namespace Envoy

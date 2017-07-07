@@ -11,11 +11,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Grpc {
 
@@ -178,5 +178,5 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

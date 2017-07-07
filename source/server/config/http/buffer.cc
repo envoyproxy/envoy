@@ -33,6 +33,6 @@ HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& 
  */
 static Registry::RegisterFactory<BufferFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

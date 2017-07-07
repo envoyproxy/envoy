@@ -113,4 +113,4 @@ private:
 };
 
 } // Tracing
-} // Envoy
+} // namespace Envoy

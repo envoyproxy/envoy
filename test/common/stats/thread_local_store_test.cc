@@ -14,11 +14,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Stats {
 
@@ -65,12 +65,13 @@ private:
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
 public:
   StatsThreadLocalStoreTest() {
-    ON_CALL(*this, alloc(_))
-        .WillByDefault(
-            Invoke([this](const std::string& name) -> RawStatData* { return alloc_.alloc(name); }));
+    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
+      return alloc_.alloc(name);
+    }));
 
-    ON_CALL(*this, free(_))
-        .WillByDefault(Invoke([this](RawStatData& data) -> void { return alloc_.free(data); }));
+    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
+      return alloc_.free(data);
+    }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
     store_.reset(new ThreadLocalStoreImpl(*this));
@@ -311,5 +312,5 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
-} // Stats
-} // Envoy
+} // namespace Stats
+} // namespace Envoy

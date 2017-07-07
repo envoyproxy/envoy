@@ -23,5 +23,5 @@ public:
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
 };
 
-} // Config
-} // Envoy
+} // namespace Config
+} // namespace Envoy

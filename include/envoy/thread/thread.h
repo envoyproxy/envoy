@@ -38,5 +38,5 @@ private:
   T* lock_;
 };
 
-} // Thread
-} // Envoy
+} // namespace Thread
+} // namespace Envoy

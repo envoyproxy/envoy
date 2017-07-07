@@ -66,5 +66,5 @@ private:
   Optional<std::chrono::milliseconds> timeout_;
 };
 
-} // Grpc
-} // Envoy
+} // namespace Grpc
+} // namespace Envoy

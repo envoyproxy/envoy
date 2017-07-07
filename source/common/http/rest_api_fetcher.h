@@ -67,5 +67,5 @@ private:
   Http::AsyncClient::Request* active_request_{};
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

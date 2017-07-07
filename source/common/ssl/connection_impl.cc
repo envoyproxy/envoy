@@ -314,5 +314,5 @@ std::string ConnectionImpl::nextProtocol() {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

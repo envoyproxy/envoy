@@ -114,5 +114,5 @@ public:
   virtual const std::list<FieldPtr>& values() const PURE;
 };
 
-} // Bson
-} // Envoy
+} // namespace Bson
+} // namespace Envoy
