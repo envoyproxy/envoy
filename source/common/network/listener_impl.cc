@@ -30,10 +30,14 @@ Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
+  Address::InstanceConstSharedPtr final_local_address = listener->socket_.localAddress();
 
-  // Get the local address from the new socket.  This is different from the listener address, if
-  // the listener is listening on the all hosts address (e.g., 0.0.0.0 for IPv4).
-  Address::InstanceConstSharedPtr final_local_address = listener->getLocalAddress(fd);
+  // Get the local address from the new socket if the listener is listening on the all hosts
+  // address (e.g., 0.0.0.0 for IPv4).
+  auto ip = final_local_address->ip();
+  if (ip && ip->isAnyAddress()) {
+    final_local_address = listener->getLocalAddress(fd);
+  }
 
   if (listener->options_.use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
     Address::InstanceConstSharedPtr original_local_address = listener->getOriginalDst(fd);

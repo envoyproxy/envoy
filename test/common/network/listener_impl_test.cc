@@ -115,7 +115,7 @@ TEST_P(ListenerImplTest, NormalRedirect) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(socket.localAddress()));
+  EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
   EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(alt_address_));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillOnce(Return(&listenerDst));
@@ -156,7 +156,7 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(socket.localAddress()));
+  EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
   EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(alt_address_));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillOnce(Return(&listenerDst));
@@ -272,7 +272,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(socket.localAddress()));
+  EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
   EXPECT_CALL(listener, getOriginalDst(_)).Times(0);
   EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
 
