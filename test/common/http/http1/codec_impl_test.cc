@@ -42,7 +42,10 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{
-      {"Test", ""}, {"Hello", "World"}, {":path", "/"}, {":method", "GET"},
+      {"Test", ""},
+      {"Hello", "World"},
+      {":path", "/"},
+      {":method", "GET"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
