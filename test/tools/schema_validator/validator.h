@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #include "common/json/json_loader.h"
