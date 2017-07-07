@@ -52,12 +52,12 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                                           Config::MetadataFilters::get().ENVOY_LB,
                                                           Config::MetadataEnvoyLbKeys::get().CANARY)
                               .bool_value();
-      new_hosts.emplace_back(new HostImpl(
-          info_, "",
-          Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
-              lb_endpoint.endpoint().address().socket_address().ip_address(),
-              lb_endpoint.endpoint().address().socket_address().port().value())},
-          lb_endpoint.canary().value(), lb_endpoint.load_balancing_weight().value(), zone));
+      new_hosts.emplace_back(
+          new HostImpl(info_, "",
+                       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+                           lb_endpoint.endpoint().address().socket_address().ip_address(),
+                           lb_endpoint.endpoint().address().socket_address().port().value())},
+                       canary, lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 
