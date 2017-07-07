@@ -26,8 +26,8 @@
 
 namespace Envoy {
 using testing::DoAll;
-using testing::Invoke;
 using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;

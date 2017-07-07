@@ -59,5 +59,5 @@ public:
 
 typedef ConstSingleton<MetadataEnvoyLbKeyValues> MetadataEnvoyLbKeys;
 
-} // Config
-} // Envoy
+} // namespace Config
+} // namespace Envoy
