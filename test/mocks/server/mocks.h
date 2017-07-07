@@ -306,7 +306,7 @@ public:
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(drainManager, const Network::DrainDecision&());
+  MOCK_METHOD0(drainDecision, const Network::DrainDecision&());
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());

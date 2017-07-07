@@ -117,8 +117,9 @@ private:
 // TODO(mattklein123): Check that addresses for unbound listeners are unique.
 // TODO(mattklein123): Detect runtime worker listener addition failure and handle.
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
-// initializing all listeners after workers are started. This is related to correctly dealing with
-// runtime listener addition failure so can be handled in the same change.
+//                     initializing all listeners after workers are started. This is related to
+//                     correctly dealing with runtime listener addition failure so can be handled in
+//                     the same change.
 
 /**
  * Maps JSON config to runtime config for a listener with a network filter chain.
@@ -169,7 +170,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
-  Network::DrainDecision& drainManager() override { return *this; }
+  Network::DrainDecision& drainDecision() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
   Init::Manager& initManager() override;

@@ -50,7 +50,7 @@ public:
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
-  virtual const Network::DrainDecision& drainManager() PURE;
+  virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

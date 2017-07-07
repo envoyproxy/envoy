@@ -551,7 +551,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainManager().drainClose());
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
@@ -559,14 +559,14 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainManager().drainClose());
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainManager().drainClose());
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();

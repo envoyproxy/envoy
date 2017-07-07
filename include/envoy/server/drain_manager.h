@@ -16,7 +16,7 @@ public:
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).
    * @param completion supplies the completion that will be called when the drain sequence is
-   *                   finished.
+   *                   finished. The parameter is optional and can be an unassigned function.
    */
   virtual void startDrainSequence(std::function<void()> completion) PURE;
 
