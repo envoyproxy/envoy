@@ -59,8 +59,8 @@ class Validator {
 public:
   /**
    * Validates the JSON at config_path against schema_type.
-   * An EnvoyException is thrown in two cases:
-   *  - Cannot load the JSON from config_path.
+   * An EnvoyException is thrown in several cases:
+   *  - Cannot load the JSON from config_path(invalid path or malformed JSON).
    *  - A schema error from validating the JSON.
    * @param json_path specifies the path to the JSON file.
    * @param schema_type specifies the schema to validate the JSON against.
