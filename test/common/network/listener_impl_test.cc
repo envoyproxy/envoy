@@ -135,7 +135,7 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
-  Network::TcpListenSocket socketDst(alt_address_, false);
+  Network::TcpListenSocket socketDst(Network::Test::getAnyAddress(version_), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
@@ -162,6 +162,8 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   EXPECT_CALL(listenerDst, newConnection(_, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ(*alt_address_, conn->localAddress());
+        EXPECT_FALSE(*socketDst.localAddress() == conn->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
