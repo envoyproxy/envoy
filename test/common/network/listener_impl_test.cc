@@ -114,9 +114,9 @@ TEST_P(ListenerImplTest, NormalRedirect) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
+  EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(alt_address_));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
-      .WillRepeatedly(Return(&listenerDst));
+      .WillOnce(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listenerDst, newConnection(_, _, _));
@@ -154,9 +154,9 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
+  EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(alt_address_));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
-      .WillRepeatedly(Return(&listenerDst));
+      .WillOnce(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listenerDst, newConnection(_, _, _));
@@ -164,6 +164,72 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(*alt_address_, conn->localAddress());
         EXPECT_FALSE(*socketDst.localAddress() == conn->localAddress());
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  // The virtual listener of exact address does not exist, fall back to the wild card listener.
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = true,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
+
+  auto local_dst_address = Network::Utility::getAddressWithPort(*Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(local_dst_address);
+  client_connection->connect();
+
+  EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(alt_address_));
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
+      .WillOnce(Return(&listener));
+
+  EXPECT_CALL(listener, newConnection(_, _, _));
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+	EXPECT_EQ(conn->localAddress(), *alt_address_);
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  // The virtual listener of exact address does not exist, fall back to the wild card listener.
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = true,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
+
+  auto local_dst_address = Network::Utility::getAddressWithPort(*Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(local_dst_address);
+  client_connection->connect();
+
+  // getOriginalDst() returns the same address as the connections destination.
+  EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(local_dst_address));
+  EXPECT_CALL(connection_handler, findListenerByAddress(_)).WillOnce(Return(&listener));
+
+  EXPECT_CALL(listener, newConnection(_, _, _));
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ(conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -195,14 +261,47 @@ TEST_P(ListenerImplTest, UseActualDst) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
-  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
-      .WillRepeatedly(Return(&listener));
+  EXPECT_CALL(listener, getOriginalDst(_)).Times(0);
+  EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
   EXPECT_CALL(listenerDst, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ(conn->localAddress(), *socket.localAddress());
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  // Do not redirect since use_original_dst is false.
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = false,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
+
+  auto local_dst_address = Network::Utility::getAddressWithPort(*Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(local_dst_address);
+  client_connection->connect();
+
+  EXPECT_CALL(listener, getOriginalDst(_)).Times(0);
+  EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
+
+  EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+	EXPECT_EQ(conn->localAddress(), *socket.localAddress()); // Connection address is a wildcard address!
+	EXPECT_FALSE(conn->localAddress() == *local_dst_address); // Connection address is not the the address the client connected to!
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
