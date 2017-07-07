@@ -1,7 +1,7 @@
 {
   "listeners": [
     {
-      "address": "tcp://0.0.0.0:80",
+      "address": "tcp://0.0.0.0:9999",
       "filters": [
         {
           "type": "read",
@@ -17,15 +17,10 @@
                   "routes": [
                     {
                       "timeout_ms": 0,
-                      "prefix": "/service/1",
-                      "cluster": "service1"
-                    },
-                    {
-                      "timeout_ms": 0,
-                      "prefix": "/service/2",
-                      "cluster": "service2"
+                      "prefix": "/",
+                      "cluster": "service1",
+                      "websocket" : true
                     }
-
                   ]
                 }
               ]
@@ -56,19 +51,7 @@
         "features": "http2",
         "hosts": [
           {
-            "url": "tcp://service1:80"
-          }
-        ]
-      },
-      {
-        "name": "service2",
-        "connect_timeout_ms": 250,
-        "type": "strict_dns",
-        "lb_type": "round_robin",
-        "features": "http2",
-        "hosts": [
-          {
-            "url": "tcp://service2:80"
+            "url": "tcp://echo.websocket.org:80"
           }
         ]
       }
