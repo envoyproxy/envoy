@@ -179,7 +179,9 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   // N.B. The first request from the client to Envoy will still be processed as a
   // normal HTTP/1.1 request, where Envoy will detect the WebSocket upgrade and establish a
   // connection to the upstream (ws_connection_ variable).
+  ENVOY_CONN_LOG(trace, "connman received {} bytes", read_callbacks_->connection(), data.length());
   if (ws_connection_) {
+    ENVOY_CONN_LOG(trace, "sending to wsHandler {} bytes", read_callbacks_->connection(), data.length());
     return ws_connection_->onData(data);
   }
 
@@ -1054,7 +1056,7 @@ const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddr
 ConnectionManagerImpl::WsHandlerImpl::WsHandlerImpl(const std::string& cluster_name,
                                                     ActiveStream& stream)
     : cluster_name_(cluster_name), stream_(stream), connection_manager_(stream.connection_manager_),
-      stats_(generateStats(connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_)),
+      //stats_(generateStats(connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_)),
       cluster_manager_(connection_manager_.cm_), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
@@ -1076,7 +1078,7 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   ENVOY_CONN_LOG(info, "new websocket session", read_callbacks_->connection());
-  stats_.downstream_cx_total_.inc();
+  //stats_.downstream_cx_total_.inc();
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   // read_callbacks_->connection().setBufferStats(
   //     {stats_.downstream_cx_rx_bytes_total_, stats_.downstream_cx_rx_bytes_buffered_,
@@ -1090,7 +1092,7 @@ Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamCo
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name_);
   } else {
-    stats_.downstream_cx_no_route_.inc();
+    //stats_.downstream_cx_no_route_.inc();
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
     stream_.encodeHeaders(nullptr, headers, true);
     // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -1158,7 +1160,7 @@ void ConnectionManagerImpl::WsHandlerImpl::onConnectTimeout() {
 }
 
 Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::onData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
+  ENVOY_CONN_LOG(trace, "wshandlerImpl received {} bytes", read_callbacks_->connection(), data.length());
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;
@@ -1168,6 +1170,9 @@ void ConnectionManagerImpl::WsHandlerImpl::onDownstreamEvent(uint32_t event) {
   if ((event & Network::ConnectionEvent::RemoteClose ||
        event & Network::ConnectionEvent::LocalClose) &&
       upstream_connection_) {
+    bool remote_close = event & Network::ConnectionEvent::RemoteClose;
+    bool local_close = event & Network::ConnectionEvent::LocalClose;
+    ENVOY_CONN_LOG(trace, "wshandlerImpl onDownstreamEvent remote_close {} local_close {}", read_callbacks_->connection(), remote_close, local_close);
     // TODO(mattklein123): If we close without flushing here we may drop some data. The downstream
     // connection is about to go away. So to support this we need to either have a way for the
     // downstream connection to stick around, or, we need to be able to pass this connection to a
@@ -1177,6 +1182,7 @@ void ConnectionManagerImpl::WsHandlerImpl::onDownstreamEvent(uint32_t event) {
 }
 
 void ConnectionManagerImpl::WsHandlerImpl::onUpstreamData(Buffer::Instance& data) {
+  ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamData received {} bytes", read_callbacks_->connection(), data.length());
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
 }
@@ -1184,10 +1190,12 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamData(Buffer::Instance& data
 void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
   if (event & Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
+    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent remote close", read_callbacks_->connection());
   }
 
   if (event & Network::ConnectionEvent::LocalClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
+    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent local close", read_callbacks_->connection());
   }
 
   if (event & Network::ConnectionEvent::RemoteClose) {
@@ -1199,6 +1207,7 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (event & Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
+    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent connected", read_callbacks_->connection());
     // Wrap upstream connection in HTTP Connection, so that we can re-use the HTTP1 codec to
     // send upgrade headers to upstream host.
     Http1::ClientConnectionImpl upstream_http(*upstream_connection_, *upstream_callbacks_);

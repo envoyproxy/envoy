@@ -109,25 +109,25 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-/**
- * All WebSocket stats. @see stats_macros.h
- */
-// clang-format off
-#define ALL_WEBSOCKET_STATS(COUNTER, GAUGE)                                                        \
-  COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_no_route)
-// clang-format on
+/* /\** */
+/*  * All WebSocket stats. @see stats_macros.h */
+/*  *\/ */
+/* // clang-format off */
+/* #define ALL_WEBSOCKET_STATS(COUNTER, GAUGE)                                                        \ */
+/*   COUNTER(downstream_cx_rx_bytes_total)                                                            \ */
+/*   GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \ */
+/*   COUNTER(downstream_cx_tx_bytes_total)                                                            \ */
+/*   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \ */
+/*   COUNTER(downstream_cx_total)                                                                     \ */
+/*   COUNTER(downstream_cx_no_route) */
+/* // clang-format on */
 
-/**
- * Struct definition for all WebSocket stats. @see stats_macros.h
- */
-struct WebSocketStats {
-  ALL_WEBSOCKET_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
+/* /\** */
+/*  * Struct definition for all WebSocket stats. @see stats_macros.h */
+/*  *\/ */
+/* struct WebSocketStats { */
+/*   ALL_WEBSOCKET_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT) */
+/* }; */
 
 /**
  * Configuration for tracing which is set on the connection manager level.
@@ -567,16 +567,16 @@ private:
     void onDownstreamEvent(uint32_t event);
     void onUpstreamData(Buffer::Instance& data);
     void onUpstreamEvent(uint32_t event);
-    static WebSocketStats generateStats(const std::string& name, Stats::Scope& scope) {
-      std::string final_prefix = fmt::format("websocket.{}.", name);
-      return {ALL_WEBSOCKET_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
-    }
+    /* static WebSocketStats generateStats(const std::string& name, Stats::Scope& scope) { */
+    /*   std::string final_prefix = fmt::format("websocket.{}.", name); */
+    /*   return {ALL_WEBSOCKET_STATS(POOL_COUNTER_PREFIX(scope, final_prefix), */
+    /*                               POOL_GAUGE_PREFIX(scope, final_prefix))}; */
+    /* } */
 
     const std::string& cluster_name_;
     ActiveStream& stream_;
     ConnectionManagerImpl& connection_manager_;
-    const WebSocketStats stats_;
+    //const WebSocketStats stats_;
     Upstream::ClusterManager& cluster_manager_;
     Network::ReadFilterCallbacks* read_callbacks_{};
     Network::ClientConnectionPtr upstream_connection_;
