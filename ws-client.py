@@ -31,5 +31,5 @@ if __name__ == "__main__":
                               on_error = on_error,
                               on_close = on_close)
     ws.on_open = on_open
-    ws.run_forever()
+    ws.run_forever(host="echo.websocket.org", origin="http://localhost:9999")
 

@@ -91,7 +91,7 @@ public:
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
     conn_manager_.reset(
-        new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_, local_info_));
+        new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_, local_info_, cm_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -190,6 +190,7 @@ public:
   RouteConfigProvider route_config_provider_;
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_;
+  NiceMock<Upstream::MockClusterManager> cm_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;

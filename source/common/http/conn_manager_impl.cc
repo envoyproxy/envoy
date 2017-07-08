@@ -1078,9 +1078,9 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeReadFilterCallbacks(
   ENVOY_CONN_LOG(info, "new websocket session", read_callbacks_->connection());
   stats_.downstream_cx_total_.inc();
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  read_callbacks_->connection().setBufferStats(
-      {stats_.downstream_cx_rx_bytes_total_, stats_.downstream_cx_rx_bytes_buffered_,
-       stats_.downstream_cx_tx_bytes_total_, stats_.downstream_cx_tx_bytes_buffered_});
+  // read_callbacks_->connection().setBufferStats(
+  //     {stats_.downstream_cx_rx_bytes_total_, stats_.downstream_cx_rx_bytes_buffered_,
+  //      stats_.downstream_cx_tx_bytes_total_, stats_.downstream_cx_tx_bytes_buffered_});
 }
 
 Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection() {
