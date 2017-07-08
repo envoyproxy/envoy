@@ -84,8 +84,8 @@ protected:
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
-  static int verifyCallback(int ok, X509_STORE_CTX* x509_store);
-  int verifyCertificate(X509* cert, int ok);
+  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+  int verifyCertificate(X509* cert);
 
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the

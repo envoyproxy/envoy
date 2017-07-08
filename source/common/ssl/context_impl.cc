@@ -66,8 +66,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
   }
 
   if (verify_mode != SSL_VERIFY_NONE) {
-    SSL_CTX_set_verify(ctx_.get(), verify_mode, ContextImpl::verifyCallback);
-    SSL_CTX_set_app_data(ctx_.get(), this);
+    SSL_CTX_set_verify(ctx_.get(), verify_mode, nullptr);
+    SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
   if (!config.certChainFile().empty()) {
@@ -147,30 +147,22 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
-int ContextImpl::verifyCallback(int ok, X509_STORE_CTX* store) {
-  // run additional checks only on the leaf certificate
-  if (X509_STORE_CTX_get_error_depth(store)) {
-    return ok;
-  }
+int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
+  ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
 
-  X509* cert = X509_STORE_CTX_get_current_cert(store);
-  if (cert == nullptr) {
-    return ok;
+  int ret = X509_verify_cert(store_ctx);
+  if (ret <= 0) {
+    impl->stats_.fail_verify_error_.inc();
+    return ret;
   }
 
   SSL* ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(store, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  SSL_CTX* ctx = SSL_get_SSL_CTX(ssl);
-  ContextImpl* impl = reinterpret_cast<ContextImpl*>(SSL_CTX_get_app_data(ctx));
-  return impl->verifyCertificate(cert, ok);
+      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+  return impl->verifyCertificate(cert.get());
 }
 
-int ContextImpl::verifyCertificate(X509* cert, int ok) {
-  if (!ok) {
-    stats_.fail_verify_error_.inc();
-    return ok;
-  }
-
+int ContextImpl::verifyCertificate(X509* cert) {
   if (!verify_subject_alt_name_list_.empty() &&
       !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
     stats_.fail_verify_san_.inc();
@@ -182,7 +174,7 @@ int ContextImpl::verifyCertificate(X509* cert, int ok) {
     return 0;
   }
 
-  return ok;
+  return 1;
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
