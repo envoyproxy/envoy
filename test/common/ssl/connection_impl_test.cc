@@ -106,7 +106,7 @@ TEST_P(SslConnectionImplTest, GetCertDigest) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "9d51ffbe193020e88ac2eb9072315e2e8bb3dac589041995b2af80ec7cb86de2", "", GetParam());
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
