@@ -148,6 +148,7 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
 }
 
 int ContextImpl::verifyCallback(int ok, X509_STORE_CTX* store) {
+  // run additional checks only on the leaf certificate
   if (X509_STORE_CTX_get_error_depth(store)) {
     return ok;
   }
