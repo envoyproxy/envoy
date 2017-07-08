@@ -12,21 +12,6 @@ set -e
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
 openssl x509 -req -days 3650 -in ca_cert.csr -signkey ca_key.pem -out ca_cert.pem -extensions v3_ca -extfile ca_cert.cfg
 
-# Generate fake_ca_cert.pem.
-openssl req -new -key fake_ca_key.pem -out fake_ca_cert.csr -sha256 <<EOF
-US
-California
-San Francisco
-Lyft
-Test
-Test CA
-test@lyft.com
-
-
-EOF
-
-openssl x509 -req -days 3650 -in fake_ca_cert.csr -sha256 -signkey fake_ca_key.pem -out fake_ca_cert.pem
-
 # Generate no_san_cert.pem.
 openssl req -new -key no_san_key.pem -out no_san_cert.csr -config no_san_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out no_san_cert.pem -extensions v3_ca -extfile no_san_cert.cfg
@@ -39,9 +24,8 @@ openssl x509 -req -days 730 -in san_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey 
 openssl req -new -key san_uri_key.pem -out san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
 
-# Generate selfsigned_key.pem and selfsigned_cert.pem (signed by Fake CA).
-openssl req -new -key selfsigned_key.pem -out selfsigned_cert.csr -config selfsigned_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in selfsigned_cert.csr -sha256 -CA fake_ca_cert.pem -CAkey fake_ca_key.pem -CAcreateserial -out selfsigned_cert.pem -extensions v3_req -extfile selfsigned_cert.cfg
+# Generate selfsigned_cert.pem.
+openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
 
 rm *csr
 rm *srl

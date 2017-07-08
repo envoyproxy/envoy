@@ -1,5 +1,5 @@
 # What are the identities, certificates and keys
-There are 6 identities:
+There are 5 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key.
@@ -11,12 +11,8 @@ There are 6 identities:
 - **SAN With DNS**: It has the certificate *san_dns_cert.pem*, which is signed
   by the **CA** using the config *san_dns_cert.cfg*. The certificate has SAN
   field of DNS type. *san_dns_key.pem* is its private key.
-- **Fake CA**: Fake Certificate Authority used to validate verification logic.
-  It has the self-signed certificate *fake_ca_cert.pem"*. *fake_ca_key.pem" is
-  its private key.
-- **Self-signed**: The self-signed certificate *selfsigned_cert.pem" (in reality
-  signed by **Fake CA**), using the config *selfsigned_cert.cfg*.
-  *selfsigned_key.pem* is its private key.
+- **Self-signed**: The self-signed certificate *selfsigned_cert.pem", using the
+  config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
 
 # How to update certificates
 **certs.sh** has the commands to generate all files except the private key
