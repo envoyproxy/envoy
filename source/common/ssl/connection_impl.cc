@@ -137,15 +137,15 @@ void ConnectionImpl::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
-    if (!saw_error) {
-      saw_error = true;
+    if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
+      if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
+        ctx_.stats().fail_verify_no_cert_.inc();
+        saw_counted_error = true;
+      } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
+        saw_counted_error = true;
+      }
     }
-    if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
-      ctx_.stats().fail_verify_no_cert_.inc();
-      saw_counted_error = true;
-    } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
-      saw_counted_error = true;
-    }
+    saw_error = true;
 
     ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
