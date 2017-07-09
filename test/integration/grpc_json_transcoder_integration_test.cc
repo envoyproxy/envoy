@@ -77,8 +77,8 @@ protected:
       for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
         RequestType actual_message;
         if (frames[i].length_ > 0) {
-          EXPECT_TRUE(actual_message.ParseFromArray(frames[i].data_->linearize(frames[i].length_),
-                                                    frames[i].length_));
+          EXPECT_TRUE(
+              actual_message.ParseFromString(TestUtility::bufferToString(*frames[i].data_)));
         }
         RequestType expected_message;
         EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
