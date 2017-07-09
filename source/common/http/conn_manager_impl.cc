@@ -103,6 +103,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
+    ENVOY_CONN_LOG(trace, "connman deferred close. Closing downstream", read_callbacks_->connection());
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -180,7 +181,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   // normal HTTP/1.1 request, where Envoy will detect the WebSocket upgrade and establish a
   // connection to the upstream (ws_connection_ variable).
   ENVOY_CONN_LOG(trace, "connman received {} bytes", read_callbacks_->connection(), data.length());
-  if (ws_connection_) {
+  if (isWebSocketConnection()) {
     ENVOY_CONN_LOG(trace, "sending to wsHandler {} bytes", read_callbacks_->connection(), data.length());
     return ws_connection_->onData(data);
   }
@@ -194,6 +195,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
       stats_.named_.downstream_cx_http1_total_.inc();
       stats_.named_.downstream_cx_http1_active_.inc();
     }
+    ENVOY_CONN_LOG(trace, "connman creating new codec of type http1: {}", read_callbacks_->connection(), (codec_->protocol() != Protocol::Http2));
   }
 
   bool redispatch;
@@ -201,7 +203,9 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     redispatch = false;
 
     try {
+      ENVOY_CONN_LOG(trace, "connman dispatching data", read_callbacks_->connection());
       codec_->dispatch(data);
+      ENVOY_CONN_LOG(trace, "connman successfully parsed data", read_callbacks_->connection());
     } catch (const CodecProtocolException& e) {
       // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
       // GOAWAY.
@@ -226,15 +230,18 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     if (codec_->protocol() != Protocol::Http2) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
+	ENVOY_CONN_LOG(trace, "connman streams empty. redispatching..", read_callbacks_->connection());
         redispatch = true;
       }
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
+      if (!streams_.empty() && streams_.front()->state_.remote_complete_ && !isWebSocketConnection()) {
+	ENVOY_CONN_LOG(trace, "connman streams NOT empty and remote_complete_ is true. Disabling reads..", read_callbacks_->connection());
         read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);
 
+  ENVOY_CONN_LOG(trace, "connman stopping iteration..", read_callbacks_->connection());
   return Network::FilterStatus::StopIteration;
 }
 
@@ -487,6 +494,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // If route doesn't exist, we fall through to the http connection manager filter where a 404 would
   // be sent, and stats recorded.
   if (cached_route_.value()) {
+    ENVOY_STREAM_LOG(trace, "checking for websocket upgrade (end_stream={}):", *this, end_stream);
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     // Websocket route entries cannot be redirects.
     bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
@@ -499,11 +507,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                                      Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 
     if (isWsConnection && isWsRoute) {
+      ENVOY_STREAM_LOG(trace, "found websocket connection. Creating WsHandlerImpl (end_stream={}):", *this, end_stream);
       connection_manager_.ws_connection_ = std::unique_ptr<ConnectionManagerImpl::WsHandlerImpl>(
           new ConnectionManagerImpl::WsHandlerImpl(route_entry->clusterName(), *this));
-      connection_manager_.ws_connection_->initializeReadFilterCallbacks(
-          *connection_manager_.read_callbacks_);
-      connection_manager_.ws_connection_->onNewConnection();
+      ENVOY_STREAM_LOG(trace, "calling initializeUpstreamConnection() (end_stream={}):", *this, end_stream);
+      connection_manager_.ws_connection_->initializeUpstreamConnection(*connection_manager_.read_callbacks_);
+      ENVOY_STREAM_LOG(trace, "returning from initializeUpstreamConnection() (end_stream={}):", *this, end_stream);
+      // // Mark remote as not complete, so that reads are not disabled from downstream.
+      // ASSERT(state_.remote_complete_);
+      // state_.remote_complete_ = false;
       return;
     } else if (isWsConnection || isWsRoute) {
       if (isWsConnection) {
@@ -1074,18 +1086,13 @@ ConnectionManagerImpl::WsHandlerImpl::~WsHandlerImpl() {
   }
 }
 
-void ConnectionManagerImpl::WsHandlerImpl::initializeReadFilterCallbacks(
-    Network::ReadFilterCallbacks& callbacks) {
+void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(
+     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  ENVOY_CONN_LOG(info, "new websocket session", read_callbacks_->connection());
-  //stats_.downstream_cx_total_.inc();
-  read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  // read_callbacks_->connection().setBufferStats(
-  //     {stats_.downstream_cx_rx_bytes_total_, stats_.downstream_cx_rx_bytes_buffered_,
-  //      stats_.downstream_cx_tx_bytes_total_, stats_.downstream_cx_tx_bytes_buffered_});
-}
 
-Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection() {
+  ENVOY_CONN_LOG(trace, "websocket initializing upstream", read_callbacks_->connection());
+
+  read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name_);
 
   if (thread_local_cluster) {
@@ -1096,7 +1103,7 @@ Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamCo
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
     stream_.encodeHeaders(nullptr, headers, true);
     // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return Network::FilterStatus::StopIteration;
+    return; //Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
@@ -1106,7 +1113,7 @@ Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamCo
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
     stream_.encodeHeaders(nullptr, headers, true);
     // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return Network::FilterStatus::StopIteration;
+    return;// Network::FilterStatus::StopIteration;
   }
   Upstream::Host::CreateConnectionData conn_info =
       cluster_manager_.tcpConnForCluster(cluster_name_);
@@ -1118,10 +1125,10 @@ Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamCo
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
     stream_.encodeHeaders(nullptr, headers, true);
     // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return Network::FilterStatus::StopIteration;
+    return;// Network::FilterStatus::StopIteration;
   }
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
-
+  ENVOY_CONN_LOG(info, "adding upstream_connection_ callbacks", read_callbacks_->connection());
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
   upstream_connection_->setBufferStats(
@@ -1144,8 +1151,8 @@ Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamCo
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   connected_timespan_ =
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_.allocateSpan();
-
-  return Network::FilterStatus::Continue;
+  ENVOY_CONN_LOG(trace, "end of initializeupstream", read_callbacks_->connection());
+  return;// Network::FilterStatus::Continue;
 }
 
 void ConnectionManagerImpl::WsHandlerImpl::onConnectTimeout() {

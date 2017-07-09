@@ -528,11 +528,6 @@ private:
     WsHandlerImpl(const std::string& cluster_name, ActiveStream& stream);
     ~WsHandlerImpl();
 
-    // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data);
-    Network::FilterStatus onNewConnection() { return initializeUpstreamConnection(); }
-    void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks);
-
     struct DownstreamCallbacks : public Network::ConnectionCallbacks {
       DownstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
 
@@ -562,7 +557,8 @@ private:
       WsHandlerImpl& parent_;
     };
 
-    Network::FilterStatus initializeUpstreamConnection();
+    Network::FilterStatus onData(Buffer::Instance& data);
+    void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks);
     void onConnectTimeout();
     void onDownstreamEvent(uint32_t event);
     void onUpstreamData(Buffer::Instance& data);
@@ -611,6 +607,8 @@ private:
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+
+  bool isWebSocketConnection() { return ws_connection_ != nullptr ; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 

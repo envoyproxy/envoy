@@ -585,7 +585,7 @@ TEST(RouteMatcherTest, NoRedirectAndWebSocket) {
       "routes": [
         {
           "prefix": "/foo",
-          "host_redirect": "new.lyft.com"
+          "host_redirect": "new.lyft.com",
           "websocket": true
         }
       ]
