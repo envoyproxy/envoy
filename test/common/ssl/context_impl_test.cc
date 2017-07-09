@@ -49,8 +49,8 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  std::vector<std::string> verify_subject_alt_name_list = {"istio:account1.foo.cluster.local",
-                                                           "istio:account2.bar.cluster.local"};
+  std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
+                                                           "spiffe://lyft.com/test-team"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
   X509_free(cert);
   fclose(fp);

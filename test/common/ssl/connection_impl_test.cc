@@ -122,11 +122,11 @@ TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "istio:account1.foo.cluster.local" ]
+    "verify_subject_alt_name": [ "spiffe://lyft.com/test-team" ]
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "istio:account1.foo.cluster.local", GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
