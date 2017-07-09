@@ -137,6 +137,9 @@ bool ListenerImpl::createFilterChain(Network::Connection& connection) {
 }
 
 bool ListenerImpl::drainClose() const {
+  // When a listener is draining, the "drain close" decision is the union of the per-listener drain
+  // manager and the server wide drain manager. This allows individual listeners to be drained and
+  // removed independently of a server-wide drain event (e.g., /healthcheck/fail or hot restart).
   return local_drain_manager_->drainClose() || parent_.server_.drainManager().drainClose();
 }
 
@@ -271,7 +274,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
 }
 
 void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
-  // First add the listener to the draining list. Thist must be done under the lock since it
+  // First add the listener to the draining list. This must be done under the lock since it
   // can race with remove completions.
   std::list<DrainingListener>::iterator draining_it;
   {
@@ -287,10 +290,11 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   }
 
   // The following sets up 2 level lambda. The first completes when the listener's drain manager
-  // has completed draining at whatever the server configured drain times are. Once that is
-  // done we tell the workers to remove the listener. The 2nd lambda acquires the lock and
-  // determines when we can remove the listener from the draining list. This makes sure that we
-  // don't destroy the listener while filters might still be using its context (stats, etc.).
+  // has completed draining at whatever the server configured drain times are. Once the drain time
+  // has completed via the drain manager's timer, we tell the workers to remove the listener. The
+  // 2nd lambda acquires the lock and determines when we can remove the listener from the draining
+  // list. This makes sure that we don't destroy the listener while filters might still be using its
+  // context (stats, etc.).
   draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
     draining_it->listener_->infoLog("removing listener");
     for (const auto& worker : workers_) {
