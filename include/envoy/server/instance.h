@@ -63,20 +63,14 @@ public:
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
-   * @return TRUE if the server is currently draining. No new connections will be received and
-   *         filters should shed connections where possible.
-   */
-  virtual bool draining() PURE;
-
-  /**
    * Close the server's listening sockets and begin draining the listeners.
    */
   virtual void drainListeners() PURE;
 
   /**
-   * @return DrainManager& singleton for use by the entire server.
+   * @return const DrainManager& singleton for use by the entire server.
    */
-  virtual DrainManager& drainManager() PURE;
+  virtual const DrainManager& drainManager() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.

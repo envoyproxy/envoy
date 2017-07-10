@@ -77,7 +77,7 @@ Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(warn, "closing and draining listeners");
   listener_manager_->stopListeners();
-  drain_manager_->startDrainSequence();
+  drain_manager_->startDrainSequence(nullptr);
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {

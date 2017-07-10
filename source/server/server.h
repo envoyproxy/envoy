@@ -99,7 +99,6 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
-  bool draining() override { return drain_manager_->draining(); }
   void drainListeners() override;
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
