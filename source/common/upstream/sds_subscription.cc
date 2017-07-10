@@ -11,6 +11,7 @@
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/repeated_field.h"
 
 #include "api/eds.pb.h"
 #include "google/protobuf/util/time_util.h"
@@ -40,8 +41,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   // Since in the v2 EDS API we place all the endpoints for a given zone in the same proto, we first
   // need to bin the returned hosts list so that we group them by zone. We use an ordered map here
   // to provide better determinism for debug/test behavior.
-  std::map<std::string, google::protobuf::RepeatedPtrField<envoy::api::v2::LbEndpoint>>
-      zone_lb_endpoints;
+  std::map<std::string, Protobuf::RepeatedPtrField<envoy::api::v2::LbEndpoint>> zone_lb_endpoints;
   for (const Json::ObjectSharedPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
@@ -62,7 +62,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     lb_endpoint->mutable_load_balancing_weight()->set_value(weight);
   }
 
-  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name(cluster_name_);
   for (auto it : zone_lb_endpoints) {

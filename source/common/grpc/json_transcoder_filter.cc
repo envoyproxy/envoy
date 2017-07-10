@@ -89,7 +89,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
     }
   }
 
-  PathMatcherBuilder<const google::protobuf::MethodDescriptor*> pmb;
+  PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
 
   for (const auto& service_name : config.getStringArray("services")) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -117,8 +117,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
 Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder,
-    const google::protobuf::MethodDescriptor*& method_descriptor) {
+    std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
   const std::string method = headers.Method()->value().c_str();
   std::string path = headers.Path()->value().c_str();
   std::string args;
@@ -170,7 +169,7 @@ Status JsonTranscoderConfig::createTranscoder(
   return Status::OK;
 }
 
-Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
                                                  google::grpc::transcoding::RequestInfo* info) {
   auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);

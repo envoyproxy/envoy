@@ -6,6 +6,9 @@
 #include "common/common/logger.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/protobuf/descriptor.h"
+#include "common/protobuf/repeated_field.h"
+#include "common/protobuf/string.h"
 
 #include "api/base.pb.h"
 
@@ -19,8 +22,7 @@ class GrpcSubscriptionImpl : public Config::Subscription<ResourceType>,
 public:
   GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                       const google::protobuf::MethodDescriptor& service_method,
-                       SubscriptionStats stats)
+                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : GrpcSubscriptionImpl(
             node,
             std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
@@ -30,13 +32,12 @@ public:
                                                                              remote_cluster_name)),
             dispatcher, service_method, stats) {}
 
-  GrpcSubscriptionImpl(
-      const envoy::api::v2::Node& node,
-      std::unique_ptr<
-          Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
-          async_client,
-      Event::Dispatcher& dispatcher, const google::protobuf::MethodDescriptor& service_method,
-      SubscriptionStats stats)
+  GrpcSubscriptionImpl(const envoy::api::v2::Node& node,
+                       std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
+                                                         envoy::api::v2::DiscoveryResponse>>
+                           async_client,
+                       Event::Dispatcher& dispatcher,
+                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : async_client_(std::move(async_client)), service_method_(service_method),
         retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })),
         stats_(stats) {
@@ -46,7 +47,8 @@ public:
   void setRetryTimer() { retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS)); }
 
   void establishNewStream() {
-    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
+    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}",
+              Protobuf::FromString(service_method_.DebugString()));
     stats_.update_attempt_.inc();
     stream_ = async_client_->start(service_method_, *this, Optional<std::chrono::milliseconds>());
     if (stream_ == nullptr) {
@@ -68,16 +70,16 @@ public:
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
     ASSERT(callbacks_ == nullptr);
-    google::protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(),
-                                                                     resources.end());
+    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
+                                                                  resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
     callbacks_ = &callbacks;
     establishNewStream();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    google::protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(),
-                                                                     resources.end());
+    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
+                                                                  resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
     sendDiscoveryRequest();
   }
@@ -95,7 +97,7 @@ public:
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(message->version_info());
+      request_.set_version_info(Protobuf::FromString(message->version_info()));
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "gRPC config update rejected: {}", e.what());
@@ -103,7 +105,7 @@ public:
       callbacks_->onConfigUpdateFailed(&e);
     }
     // This effectively ACK/NACKs the accepted configuration.
-    ENVOY_LOG(debug, "Sending version update: {}", message->version_info());
+    ENVOY_LOG(debug, "Sending version update: {}", Protobuf::FromString(message->version_info()));
     stats_.update_attempt_.inc();
     sendDiscoveryRequest();
   }
@@ -131,9 +133,9 @@ private:
   std::unique_ptr<
       Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
       async_client_;
-  const google::protobuf::MethodDescriptor& service_method_;
+  const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
-  google::protobuf::RepeatedPtrField<std::string> resources_;
+  Protobuf::RepeatedPtrField<Protobuf::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
   Grpc::AsyncClientStream<envoy::api::v2::DiscoveryRequest>* stream_{};
   envoy::api::v2::DiscoveryRequest request_;

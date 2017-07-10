@@ -41,10 +41,10 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD3_T(start, AsyncClientStream<RequestType>*(
-                            const google::protobuf::MethodDescriptor& service_method,
-                            AsyncClientCallbacks<ResponseType>& callbacks,
-                            const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3_T(
+      start, AsyncClientStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
+                                             AsyncClientCallbacks<ResponseType>& callbacks,
+                                             const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockRpcChannelCallbacks : public RpcChannelCallbacks {
@@ -64,7 +64,7 @@ public:
 
   MOCK_METHOD0(cancel, void());
   MOCK_METHOD5(CallMethod,
-               void(const ::google::protobuf::MethodDescriptor* method,
+               void(const Protobuf::MethodDescriptor* method,
                     ::google::protobuf::RpcController* controller,
                     const ::google::protobuf::Message* request,
                     ::google::protobuf::Message* response, ::google::protobuf::Closure* done));

@@ -16,6 +16,7 @@ envoy_cc_library(
         ":status",
         "//include/envoy/common:optional",
         "//include/envoy/http:header_map_interface",
+        "//source/common/protobuf:descriptor",
     ],
 )
 

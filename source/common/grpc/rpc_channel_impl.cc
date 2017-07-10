@@ -21,7 +21,7 @@ void RpcChannelImpl::cancel() {
   onComplete();
 }
 
-void RpcChannelImpl::CallMethod(const ::google::protobuf::MethodDescriptor* method,
+void RpcChannelImpl::CallMethod(const Protobuf::MethodDescriptor* method,
                                 ::google::protobuf::RpcController*,
                                 const ::google::protobuf::Message* grpc_request,
                                 ::google::protobuf::Message* grpc_response,

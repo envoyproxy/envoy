@@ -96,7 +96,7 @@ public:
   }
 
   std::string version_;
-  const google::protobuf::MethodDescriptor* method_descriptor_;
+  const Protobuf::MethodDescriptor* method_descriptor_;
   SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;

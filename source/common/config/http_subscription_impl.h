@@ -9,11 +9,13 @@
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/http/rest_api_fetcher.h"
+#include "common/protobuf/descriptor.h"
+#include "common/protobuf/repeated_field.h"
+#include "common/protobuf/string.h"
+#include "common/protobuf/util/json_util.h"
 
 #include "api/base.pb.h"
 #include "google/api/annotations.pb.h"
-#include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/util/json_util.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,8 +35,7 @@ public:
   HttpSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
-                       const google::protobuf::MethodDescriptor& service_method,
-                       SubscriptionStats stats)
+                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval),
         stats_(stats) {
     request_.mutable_node()->CopyFrom(node);
@@ -48,16 +49,16 @@ public:
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
     ASSERT(callbacks_ == nullptr);
-    google::protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(),
-                                                                     resources.end());
+    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
+                                                                  resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
     callbacks_ = &callbacks;
     initialize();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    google::protobuf::RepeatedPtrField<std::string> resources_vector(resources.begin(),
-                                                                     resources.end());
+    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
+                                                                  resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
   }
 
@@ -65,22 +66,21 @@ public:
   void createRequest(Http::Message& request) override {
     ENVOY_LOG(debug, "Sending REST request for {}", path_);
     stats_.update_attempt_.inc();
-    google::protobuf::util::JsonOptions json_options;
-    std::string request_json;
-    const auto status =
-        google::protobuf::util::MessageToJsonString(request_, &request_json, json_options);
+    Protobuf::Util::JsonOptions json_options;
+    Protobuf::String request_json;
+    const auto status = Protobuf::Util::MessageToJsonString(request_, &request_json, json_options);
     // If the status isn't OK, we just send an empty body.
-    ASSERT(status == google::protobuf::util::Status::OK);
+    ASSERT(status.ok());
     request.headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
-    request.body().reset(new Buffer::OwnedImpl(request_json));
+    request.body().reset(new Buffer::OwnedImpl(Protobuf::FromString(request_json)));
   }
 
   void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
     const auto status =
-        google::protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
-    if (status != google::protobuf::util::Status::OK) {
+        Protobuf::Util::JsonStringToMessage(Protobuf::ToString(response.bodyAsString()), &message);
+    if (!status.ok()) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
       handleFailure(nullptr);
       return;
@@ -88,7 +88,7 @@ public:
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(message.version_info());
+      request_.set_version_info(Protobuf::FromString(message.version_info()));
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
@@ -111,7 +111,7 @@ private:
   }
 
   std::string path_;
-  google::protobuf::RepeatedPtrField<std::string> resources_;
+  Protobuf::RepeatedPtrField<Protobuf::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;

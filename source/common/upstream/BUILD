@@ -197,6 +197,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:repeated_field",
     ],
 )
 

@@ -102,8 +102,7 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_EQ(google::protobuf::util::Status::OK,
-              google::protobuf::util::JsonStringToMessage(response_json, &response_pb));
+    EXPECT_TRUE(google::protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body().reset(new Buffer::OwnedImpl(response_json));
@@ -133,7 +132,7 @@ public:
   bool request_in_progress_{};
   std::string version_;
   std::vector<std::string> cluster_names_;
-  const google::protobuf::MethodDescriptor* method_descriptor_;
+  const Protobuf::MethodDescriptor* method_descriptor_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;

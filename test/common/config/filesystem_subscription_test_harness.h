@@ -71,8 +71,7 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_EQ(google::protobuf::util::Status::OK,
-              google::protobuf::util::JsonStringToMessage(file_json, &response_pb));
+    EXPECT_TRUE(google::protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(

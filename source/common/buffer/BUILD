@@ -22,8 +22,9 @@ envoy_cc_library(
     name = "zero_copy_input_stream_lib",
     srcs = ["zero_copy_input_stream_impl.cc"],
     hdrs = ["zero_copy_input_stream_impl.h"],
-    external_deps = ["protobuf"],
     deps = [
         ":buffer_lib",
+        "//source/common/protobuf:types",
+        "//source/common/protobuf/io:zero_copy_stream",
     ],
 )

@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/transcoder_input_stream_impl.h"
+#include "common/protobuf/descriptor.h"
 
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/io/zero_copy_stream.h"
@@ -62,19 +63,17 @@ public:
                    google::protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   const google::protobuf::MethodDescriptor*& method_descriptor);
+                   const Protobuf::MethodDescriptor*& method_descriptor);
 
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
-  google::protobuf::util::Status
-  methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
-                      google::grpc::transcoding::RequestInfo* info);
+  google::protobuf::util::Status methodToRequestInfo(const Protobuf::MethodDescriptor* method,
+                                                     google::grpc::transcoding::RequestInfo* info);
 
 private:
   google::protobuf::DescriptorPool descriptor_pool_;
-  google::grpc::transcoding::PathMatcherPtr<const google::protobuf::MethodDescriptor*>
-      path_matcher_;
+  google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
 };
 
@@ -111,7 +110,7 @@ private:
   TranscoderInputStreamImpl response_in_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-  const google::protobuf::MethodDescriptor* method_{nullptr};
+  const Protobuf::MethodDescriptor* method_{nullptr};
   Http::HeaderMap* response_headers_{nullptr};
 
   bool error_{false};

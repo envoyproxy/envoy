@@ -8,6 +8,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/protobuf/descriptor.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -41,7 +42,7 @@ public:
   void cancel() override;
 
   // ::google::protobuf::RpcChannel
-  void CallMethod(const ::google::protobuf::MethodDescriptor* method,
+  void CallMethod(const Protobuf::MethodDescriptor* method,
                   ::google::protobuf::RpcController* controller,
                   const ::google::protobuf::Message* grpc_request,
                   ::google::protobuf::Message* grpc_response,
@@ -60,7 +61,7 @@ private:
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::AsyncClient::Request* http_request_{};
-  const ::google::protobuf::MethodDescriptor* grpc_method_{};
+  const Protobuf::MethodDescriptor* grpc_method_{};
   ::google::protobuf::Message* grpc_response_{};
   RpcChannelCallbacks& callbacks_;
   Optional<std::chrono::milliseconds> timeout_;

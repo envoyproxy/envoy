@@ -7,6 +7,8 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 
+#include "common/protobuf/descriptor.h"
+
 #include "google/protobuf/descriptor.h"
 
 namespace Envoy {
@@ -104,7 +106,7 @@ public:
    *         be reclaimed.
    */
   virtual AsyncClientStream<RequestType>*
-  start(const google::protobuf::MethodDescriptor& service_method,
+  start(const Protobuf::MethodDescriptor& service_method,
         AsyncClientCallbacks<ResponseType>& callbacks,
         const Optional<std::chrono::milliseconds>& timeout) PURE;
 };

@@ -6,6 +6,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/descriptor.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -25,10 +26,11 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
+using Envoy::Protobuf::MethodDescriptor;
+
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using google::protobuf::FileDescriptorSet;
-using google::protobuf::MethodDescriptor;
 using google::protobuf::util::MessageDifferencer;
 using google::protobuf::util::Status;
 using google::protobuf::util::error::Code;
