@@ -300,7 +300,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
-  std::string context_format = "{{\n\t\"ca_cert\": \"{}\"\n\t\"cert_chain\": \"{}\"\n}}\n";
+  std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
   server_.sslContextManager().iterateContexts([&](Ssl::Context& context) -> void {
     context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
                                         context.getCertChainInformation()));

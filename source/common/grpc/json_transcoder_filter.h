@@ -80,7 +80,7 @@ private:
   google::protobuf::util::JsonPrintOptions print_options_;
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> TranscodingConfigSharedPtr;
+typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
 
 /**
  * The filter instance for gRPC JSON transcoder.

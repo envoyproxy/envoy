@@ -14,7 +14,7 @@ GrpcJsonTranscoderFilterConfig::createFilterFactory(const Json::Object& config_j
                                                     const std::string&, FactoryContext&) {
   config_json.validateSchema(Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA);
 
-  Grpc::TranscodingConfigSharedPtr config =
+  Grpc::JsonTranscoderConfigSharedPtr config =
       std::make_shared<Grpc::JsonTranscoderConfig>(config_json);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
