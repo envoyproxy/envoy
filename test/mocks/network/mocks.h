@@ -185,7 +185,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision();
 
-  MOCK_METHOD0(drainClose, bool());
+  MOCK_CONST_METHOD0(drainClose, bool());
 };
 
 class MockFilterChainFactory : public FilterChainFactory {
