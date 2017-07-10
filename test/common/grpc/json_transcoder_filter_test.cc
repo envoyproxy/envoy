@@ -296,7 +296,7 @@ public:
   GrpcJsonTranscoderFilterPrintTest()
       : filter_(JsonTranscoderConfig(*Json::Factory::loadFromString(GetParam().config_json_)))
 
-  JsonTranscoderFilter filter_;
+            JsonTranscoderFilter filter_;
 };
 
 TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
@@ -335,7 +335,7 @@ INSTANTIATE_TEST_CASE_P(
      "print_options":{"add_whitespace": true}
     }
 			                                           )",
-                                          R"({
+                                               R"({
  "id": "101",
  "gender": "MALE",
  "lastName": "Shakespeare"
