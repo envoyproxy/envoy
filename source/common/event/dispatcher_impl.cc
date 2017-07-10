@@ -25,7 +25,7 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : base_(event_base_new()),
+    : buffer_factory_(new Buffer::OwnedImplFactory), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {}
@@ -143,6 +143,10 @@ void DispatcherImpl::run(RunType type) {
   runPostCallbacks();
 
   event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
+}
+
+void DispatcherImpl::setBufferFactory(Buffer::FactoryPtr factory) {
+  buffer_factory_ = std::move(factory);
 }
 
 void DispatcherImpl::runPostCallbacks() {

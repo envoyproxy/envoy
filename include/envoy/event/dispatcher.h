@@ -153,6 +153,17 @@ public:
    */
   enum class RunType { Block, NonBlock };
   virtual void run(RunType type) PURE;
+
+  /**
+   * Optionally sets a custom buffer factory for the dispatcher.  This factory may be used by new
+   * connections on connection creation.
+   */
+  virtual void setBufferFactory(Buffer::FactoryPtr factory) PURE;
+
+  /**
+   * Returns the buffer factory for this dispatcher.
+   */
+  virtual Buffer::Factory& getBufferFactory() PURE;
 };
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;

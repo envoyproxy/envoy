@@ -104,9 +104,14 @@ public:
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
+  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
+  void setBufferFactory(Buffer::FactoryPtr factory) override {
+    buffer_factory_ = std::move(factory);
+  }
 
 private:
   std::list<DeferredDeletablePtr> to_delete_;
+  Buffer::FactoryPtr buffer_factory_;
 };
 
 class MockTimer : public Timer {

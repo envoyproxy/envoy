@@ -133,5 +133,20 @@ public:
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
+/**
+ * A factory for creating buffer instances.
+ */
+class Factory {
+public:
+  virtual ~Factory() {}
+
+  /**
+   * Creates and returns a unique pointer to a new buffer instance.
+   */
+  virtual InstancePtr create() PURE;
+};
+
+typedef std::unique_ptr<Factory> FactoryPtr;
+
 } // namespace Buffer
 } // namespace Envoy

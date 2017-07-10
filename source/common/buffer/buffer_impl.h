@@ -10,6 +10,11 @@
 namespace Envoy {
 namespace Buffer {
 
+class OwnedImplFactory : public Factory {
+public:
+  InstancePtr create() override;
+};
+
 /**
  * Wraps an allocated and owned evbuffer.
  */

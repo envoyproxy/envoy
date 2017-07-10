@@ -77,6 +77,10 @@ public:
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
+  void replaceWriteBufferForTest(std::unique_ptr<Buffer::OwnedImpl> new_buffer) {
+    write_buffer_ = std::move(new_buffer);
+  }
+
 protected:
   enum class PostIoAction { Close, KeepOpen };
 
@@ -103,7 +107,7 @@ protected:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   Buffer::OwnedImpl read_buffer_;
-  Buffer::OwnedImpl write_buffer_;
+  Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:
