@@ -48,7 +48,7 @@ ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const 
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
-                                             Network::DrainDecision& drain_close,
+                                             const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info)

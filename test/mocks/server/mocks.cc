@@ -25,7 +25,9 @@ MockOptions::~MockOptions() {}
 MockAdmin::MockAdmin() {}
 MockAdmin::~MockAdmin() {}
 
-MockDrainManager::MockDrainManager() {}
+MockDrainManager::MockDrainManager() {
+  ON_CALL(*this, startDrainSequence(_)).WillByDefault(SaveArg<0>(&drain_sequence_completion_));
+}
 MockDrainManager::~MockDrainManager() {}
 
 MockWatchDog::MockWatchDog() {}
@@ -104,7 +106,7 @@ MockFactoryContext::MockFactoryContext() {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
-  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
