@@ -274,8 +274,8 @@ void ConnectionImpl::write(Buffer::Instance& data) {
   }
 }
 
-void ConnectionImpl::setWriteBufferWatermarks(size_t new_low_watermark, size_t new_high_watermark) {
-  ENVOY_CONN_LOG(trace, "Setting watermarks: {} {}", *this, new_low_watermark, new_high_watermark);
+void ConnectionImpl::setWriteBufferWatermarks(uint32_t new_low_watermark, uint32_t new_high_watermark) {
+  ENVOY_CONN_LOG(debug, "Setting watermarks: {} {}", *this, new_low_watermark, new_high_watermark);
   ASSERT(new_low_watermark < new_high_watermark);
 
   high_watermark_ = new_high_watermark;
@@ -289,7 +289,7 @@ void ConnectionImpl::checkForLowWatermark() {
   if (!above_high_watermark_called_ || write_buffer_->length() >= low_watermark_) {
     return;
   }
-  ENVOY_CONN_LOG(trace, "onBelowWriteBufferLowWatermark", *this);
+  ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
 
   above_high_watermark_called_ = false;
   for (ConnectionCallbacks* callback : callbacks_) {
@@ -302,7 +302,7 @@ void ConnectionImpl::checkForHighWatermark() {
       write_buffer_->length() <= high_watermark_) {
     return;
   }
-  ENVOY_CONN_LOG(trace, "onAboveWriteBufferHighWatermark", *this);
+  ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
 
   above_high_watermark_called_ = true;
   for (ConnectionCallbacks* callback : callbacks_) {

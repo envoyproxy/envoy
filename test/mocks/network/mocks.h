@@ -67,7 +67,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
   MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
-  MOCK_METHOD2(setWriteBufferWatermarks, void(size_t low_watermark, size_t high_watermark));
+  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t low_watermark, uint32_t high_watermark));
 };
 
 /**

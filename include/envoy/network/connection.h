@@ -177,13 +177,16 @@ public:
   /**
    * Sets the high and low watermarks which trigger onAboveWriteBufferHighWatermark
    * and onBelowWriteBufferHighWatermark callbacks.
+   * The connection is assumed to start out with less than high_watermark
+   * worth of data buffered, so onAboveWriteBufferHighWatermark will always be
+   * called before onAboveWriteBufferHighWatermark
    * @param low_watermark if the connection was above the high watermark and the
    * connection buffer is drained below this many bytes, onBelowWriteBufferHighWatermark will be
    * called.
    * @param high_watermark if the connection has more bytes than this buffered,
    * onAboveWriteBufferHighWatermark will be called.
    */
-  virtual void setWriteBufferWatermarks(size_t low_watermark, size_t high_watermark) PURE;
+  virtual void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

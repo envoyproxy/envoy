@@ -64,8 +64,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  Event::DispatcherImpl dispatcher_;
-  EXPECT_DEATH(ConnectionImpl(dispatcher_, -1,
+  Event::DispatcherImpl dispatcher;
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
                               Network::Test::getCanonicalLoopbackAddress(GetParam()),
                               Network::Test::getCanonicalLoopbackAddress(GetParam())),
                ".*assert failure: fd_ != -1.*");
@@ -466,8 +466,8 @@ public:
           return FilterStatus::StopIteration;
         }));
 
-    MockConnectionCallbacks client_callbacks_;
-    client_connection_->addConnectionCallbacks(client_callbacks_);
+    MockConnectionCallbacks client_callbacks;
+    client_connection_->addConnectionCallbacks(client_callbacks);
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
