@@ -74,6 +74,12 @@ service Bookstore {
       }
     };
   }
+  // Returns a specific author.
+  rpc GetAuthor(GetAuthorRequest) returns (Author) {
+    option (google.api.http) = {
+      get: "/authors/{author}"
+    };
+  }
 }
 
 // A shelf resource.
@@ -94,6 +100,20 @@ message Book {
   string title = 3;
   // Quotes from the book.
   repeated string quotes = 4;
+}
+
+// An author resource.
+message Author {
+  // A unique author id.
+  int64 id = 1;
+  enum Gender {
+    UNKNOWN = 0;
+    MALE = 1;
+    FEMALE = 2;
+  };
+  Gender gender = 2;
+  string first_name = 3;
+  string last_name = 4;
 }
 
 // Response to ListShelves call.
@@ -156,4 +176,10 @@ message DeleteBookRequest {
   int64 shelf = 1;
   // The ID of the book to delete.
   int64 book = 2;
+}
+
+// Request message for GetAuthor method.
+message GetAuthorRequest {
+  // The ID of the shelf resource to retrieve.
+  int64 author = 1;
 }
