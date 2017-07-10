@@ -34,12 +34,9 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/common/tracing/zipkin:zipkin_lib",
-        "//source/common/upstream:cluster_manager_lib",
     ],
 )
 
@@ -125,6 +122,7 @@ envoy_cc_library(
     hdrs = ["listener_manager_impl.h"],
     deps = [
         ":configuration_lib",
+        ":init_manager_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
@@ -159,7 +157,6 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
-        "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -171,6 +168,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/common/upstream:cluster_manager_lib",
         "//source/server/http:admin_lib",
     ],
 )
@@ -198,6 +196,7 @@ envoy_cc_library(
     hdrs = ["worker_impl.h"],
     deps = [
         ":connection_handler_lib",
+        ":test_hooks_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

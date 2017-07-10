@@ -16,7 +16,7 @@ connections running in the main data center.
 In the above diagram, the front Envoy proxy running in region 1 authenticates itself with the front
 Envoy proxy running in region 2 via TLS mutual authentication and pinned certificates. This allows
 the front Envoy instances running in region 2 to trust elements of the incoming requests that
-ordinarily would not be trustable (such as the x-forwaded-for HTTP header).
+ordinarily would not be trustable (such as the x-forwarded-for HTTP header).
 
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^

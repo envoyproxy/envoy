@@ -29,7 +29,8 @@ public:
   Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl();
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
-  WorkerImpl worker_{tls_, Event::DispatcherPtr{dispatcher_},
+  DefaultTestHooks hooks_;
+  WorkerImpl worker_{tls_, hooks_, Event::DispatcherPtr{dispatcher_},
                      Network::ConnectionHandlerPtr{handler_}};
   Event::TimerPtr no_exit_timer_ = dispatcher_->createTimer([]() -> void {});
 };

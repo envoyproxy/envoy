@@ -100,14 +100,17 @@ public:
   }
 
   /**
-   * String environment path substitution.
+   * String environment path, loopback, and DNS resolver type substitution.
    * @param str string with template patterns including {{ test_tmpdir }}.
+   * @param version supplies the IP version to substitute for relevant templates.
    * @return std::string with patterns replaced with environment values.
    */
-  static std::string substitute(const std::string str);
+  static std::string
+  substitute(const std::string& str,
+             Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   /**
-   * Substitue ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param port_map map from port name to port number.
@@ -117,7 +120,7 @@ public:
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
                                              Network::Address::IpVersion version);
   /**
-   * Substitue ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param param_map map from parameter name to values.
@@ -130,11 +133,15 @@ public:
                                              Network::Address::IpVersion version);
 
   /**
-   * Build JSON object from a string subject to environment path substitution.
+   * Build JSON object from a string subject to environment path, loopback, and DNS resolver type
+   * substitution.
    * @param json JSON with template patterns including {{ test_certs }}.
+   * @param version supplies the IP version to substitute for relevant templates.
    * @return Json::ObjectSharedPtr with built JSON object.
    */
-  static Json::ObjectSharedPtr jsonLoadFromString(const std::string& json);
+  static Json::ObjectSharedPtr
+  jsonLoadFromString(const std::string& json,
+                     Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   /**
    * Execute a program under ::system. Any failure is fatal.

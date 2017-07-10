@@ -1,4 +1,7 @@
+#include <fstream>
+
 #include "common/buffer/buffer_impl.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/grpc/json_transcoder_filter.h"
@@ -22,12 +25,134 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
+using google::api::HttpRule;
+using google::grpc::transcoding::Transcoder;
+using google::protobuf::FileDescriptorSet;
+using google::protobuf::MethodDescriptor;
 using google::protobuf::util::MessageDifferencer;
 using google::protobuf::util::Status;
 using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {
+
+class GrpcJsonTranscoderConfigTest : public testing::Test {
+public:
+  GrpcJsonTranscoderConfigTest() {}
+
+  const Json::ObjectSharedPtr configJson(const std::string& descriptor_path,
+                                         const std::string& service_name) {
+    std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
+                              "\",\"services\": [\"" + service_name + "\"]}";
+    return Json::Factory::loadFromString(json_string);
+  }
+
+  std::string makeProtoDescriptor(std::function<void(FileDescriptorSet&)> process) {
+    FileDescriptorSet descriptor_set;
+    descriptor_set.ParseFromString(Filesystem::fileReadToEnd(
+        TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+
+    process(descriptor_set);
+
+    mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
+    std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
+    std::ofstream file(path);
+    descriptor_set.SerializeToOstream(&file);
+
+    return path;
+  }
+
+  void setGetBookHttpRule(FileDescriptorSet& descriptor_set, const HttpRule& http_rule) {
+    for (auto& file : *descriptor_set.mutable_file()) {
+      for (auto& service : *file.mutable_service()) {
+        for (auto& method : *service.mutable_method()) {
+          if (method.name() == "GetBook") {
+            method.mutable_options()->MutableExtension(google::api::http)->MergeFrom(http_rule);
+            return;
+          }
+        }
+      }
+    }
+  }
+};
+
+TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
+  EXPECT_NO_THROW(JsonTranscoderConfig config(*configJson(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore")));
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
+  EXPECT_THROW_WITH_MESSAGE(
+      JsonTranscoderConfig config(
+          *configJson(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                      "grpc.service.UnknownService")),
+      EnvoyException,
+      "transcoding_filter: Could not find 'grpc.service.UnknownService' in the proto descriptor");
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, IncompleteProto) {
+  EXPECT_THROW_WITH_MESSAGE(
+      JsonTranscoderConfig config(
+          *configJson(TestEnvironment::runfilesPath("test/proto/bookstore_bad.descriptor"),
+                      "grpc.service.UnknownService")),
+      EnvoyException, "transcoding_filter: Unable to build proto descriptor pool");
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
+  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*configJson(
+                                TestEnvironment::runfilesPath("test/proto/bookstore.proto"),
+                                "grpc.service.UnknownService")),
+                            EnvoyException, "transcoding_filter: Unable to parse proto descriptor");
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, InvalidHttpTemplate) {
+  HttpRule http_rule;
+  http_rule.set_get("/book/{");
+  EXPECT_THROW_WITH_MESSAGE(
+      JsonTranscoderConfig config(*configJson(
+          makeProtoDescriptor([&](FileDescriptorSet& pb) { setGetBookHttpRule(pb, http_rule); }),
+          "bookstore.Bookstore")),
+      EnvoyException,
+      "transcoding_filter: Cannot register 'bookstore.Bookstore.GetBook' to path matcher");
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
+  JsonTranscoderConfig config(*configJson(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore"));
+
+  Http::TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  std::unique_ptr<Transcoder> transcoder;
+  const MethodDescriptor* method_descriptor;
+  auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  EXPECT_EQ("bookstore.Bookstore.ListShelves", method_descriptor->full_name());
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
+  HttpRule http_rule;
+  http_rule.set_get("/book/{b}");
+  JsonTranscoderConfig config(*configJson(
+      makeProtoDescriptor([&](FileDescriptorSet& pb) { setGetBookHttpRule(pb, http_rule); }),
+      "bookstore.Bookstore"));
+
+  Http::TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/book/1"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  std::unique_ptr<Transcoder> transcoder;
+  const MethodDescriptor* method_descriptor;
+  auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+
+  EXPECT_EQ(google::protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
+            status.error_message());
+  EXPECT_FALSE(transcoder);
+}
 
 class GrpcJsonTranscoderFilterTest : public testing::Test {
 public:
@@ -52,32 +177,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
-
-TEST_F(GrpcJsonTranscoderFilterTest, BadConfig) {
-
-  const Json::ObjectSharedPtr unknown_service =
-      Json::Factory::loadFromString("{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
-                                    "\",\"services\": [\"grpc.service.UnknownService\"]}");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(*unknown_service), EnvoyException,
-      "transcoding_filter: Could not find 'grpc.service.UnknownService' in the proto descriptor");
-
-  const Json::ObjectSharedPtr bad_descriptor = Json::Factory::loadFromString(
-      "{\"proto_descriptor\": \"" +
-      TestEnvironment::runfilesPath("test/proto/bookstore_bad.descriptor") +
-      "\",\"services\": [\"bookstore.Bookstore\"]}");
-
-  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*bad_descriptor), EnvoyException,
-                            "transcoding_filter: Unable to build proto descriptor pool");
-
-  const Json::ObjectSharedPtr not_descriptor = Json::Factory::loadFromString(
-      "{\"proto_descriptor\": \"" + TestEnvironment::runfilesPath("test/proto/bookstore.proto") +
-      "\",\"services\": [\"bookstore.Bookstore\"]}");
-
-  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(*not_descriptor), EnvoyException,
-                            "transcoding_filter: Unable to parse proto descriptor");
-}
 
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -134,7 +233,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest request;
-  request.ParseFromArray(frames[0].data_->linearize(frames[0].length_), frames[0].length_);
+  request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
@@ -155,9 +254,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  std::string response_json(
-      reinterpret_cast<const char*>(response_data->linearize(response_data->length())),
-      response_data->length());
+  std::string response_json = TestUtility::bufferToString(*response_data);
 
   EXPECT_EQ("{\"id\":\"20\",\"theme\":\"Children\"}", response_json);
 
