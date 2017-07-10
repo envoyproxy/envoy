@@ -178,7 +178,7 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   while (!disconnected_) {
     connection_event_.wait(lock);
     // The default behavior of waitForDisconnect is to assume the test cleanly
-    // calls waitForData, waitoforNewStream, etc. to handle all events on the
+    // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection.  If the caller explicitly notes that other events should be
     // ignored, continue looping until a disconnect is detected.  Otherwise fall
     // through and hit the assert below.
