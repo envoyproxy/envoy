@@ -23,6 +23,8 @@ public:
 
   // Network::ConnectionCallbacks
   MOCK_METHOD1(onEvent, void(uint32_t events));
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockConnectionBase {
@@ -65,6 +67,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
   MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
+  MOCK_METHOD2(setWriteBufferWatermarks, void(size_t low_watermark, size_t high_watermark));
 };
 
 /**
@@ -97,6 +100,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
   MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
+  MOCK_METHOD2(setWriteBufferWatermarks, void(size_t low_watermark, size_t high_watermark));
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

@@ -8,6 +8,42 @@
 #include "gmock/gmock.h"
 
 namespace Envoy {
+
+class MockBuffer : public Buffer::OwnedImpl {
+public:
+  MockBuffer() {
+    ON_CALL(*this, write(testing::_))
+        .WillByDefault(testing::Invoke(this, &MockBuffer::TrackWrites));
+    ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::BaseMove));
+  }
+
+  MOCK_METHOD1(write, int(int fd));
+  MOCK_METHOD1(move, void(Instance& rhs));
+  MOCK_METHOD2(move, void(Instance& rhs, uint64_t length));
+  MOCK_METHOD1(drain, void(uint64_t size));
+
+  void BaseMove(Instance& rhs) { Buffer::OwnedImpl::move(rhs); }
+  void BaseDrain(uint64_t size) { Buffer::OwnedImpl::drain(size); }
+
+  int TrackWrites(int fd) {
+    int bytes_written = Buffer::OwnedImpl::write(fd);
+    if (bytes_written > 0) {
+      bytes_written_ += bytes_written;
+    }
+    return bytes_written;
+  }
+
+  int FailWrite(int) {
+    errno = EAGAIN;
+    return -1;
+  }
+
+  int bytes_written() const { return bytes_written_; }
+
+private:
+  int bytes_written_{0};
+};
+
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
   return TestUtility::buffersEqual(arg, *rhs);
 }
@@ -23,4 +59,9 @@ ACTION_P(AddBufferToString, target_string) {
   target_string->append(TestUtility::bufferToString(arg0));
   arg0.drain(arg0.length());
 }
+
+ACTION_P(AddBufferToStringWithoutDraining, target_string) {
+  target_string->append(TestUtility::bufferToString(arg0));
+}
+
 } // namespace Envoy

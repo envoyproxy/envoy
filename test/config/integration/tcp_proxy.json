@@ -3,8 +3,7 @@
   {
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
-      { "type": "read", "name":
-        "tcp_proxy",
+      { "type": "read", "name": "tcp_proxy",
         "config": {
           "stat_prefix": "test_tcp",
           "route_config": {
@@ -20,6 +19,25 @@
   },
   {
     "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
+    "filters": [
+      { "type": "read", "name": "tcp_proxy",
+        "config": {
+          "stat_prefix": "tcp_with_write_limits",
+          "route_config": {
+            "routes": [
+              {
+                "cluster": "cluster_with_buffer_limits"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
     "ssl_context": {
       "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
       "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/servercert.pem",
@@ -34,7 +52,7 @@
           "route_config": {
             "routes": [
               {
-                "cluster": "cluster_1"
+                "cluster": "cluster_with_buffer_limits"
               }
             ]
           }
@@ -68,7 +86,15 @@
       "type": "strict_dns",
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
+      "hosts": [{"url": "tcp://localhost:{{ ssl_auth }}"}]
+    },
+    {
+      "name": "cluster_with_buffer_limits",
+      "connect_timeout_ms": 5000,
+      "type": "static",
+      "lb_type": "round_robin",
+      "per_connection_buffer_limit_bytes": 1024,
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ cluster_with_buffer_limits }}"}]
     }]
   }
 }

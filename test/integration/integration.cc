@@ -15,6 +15,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -27,6 +28,8 @@
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+
+using testing::_;
 
 namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
@@ -182,6 +185,12 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32
       callbacks_(new ConnectionCallbacks(*this)) {
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
+
+  std::unique_ptr<MockBuffer> buffer{new MockBuffer()};
+  buffer_ = buffer.get();
+  dynamic_cast<Network::ConnectionImpl*>(connection_.get())
+      ->replaceWriteBufferForTest(std::move(buffer));
+
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
@@ -205,9 +214,15 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
+  EXPECT_CALL(*buffer_, move(_)).Times(1);
+  EXPECT_CALL(*buffer_, write(_)).Times(1);
+
+  int bytes_expected = buffer_->bytes_written() + data.size();
+
   connection_->write(buffer);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  // NOTE: We should run blocking until all the body data is flushed.
+  while (buffer_->bytes_written() != bytes_expected) {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {

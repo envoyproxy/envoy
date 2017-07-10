@@ -102,6 +102,17 @@ void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_
                                  Address::InstanceConstSharedPtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
   new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+  // Due to the fact that writes to the connection and flushing data from the connection are done
+  // asynchronously, we have the option of either setting the watermarks aggressively, and regularly
+  // enabling/disabling reads from the socket, or allowing more data, but then not triggering
+  // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
+  // limits we err on the side of buffeing more and having better performace.
+  // If the connection class is changed to write-and-flush the high watermark should be changed to
+  // the buffer limit without the + 1
+  if (options_.per_connection_buffer_limit_bytes_ > 0) {
+    new_connection->setWriteBufferWatermarks(options_.per_connection_buffer_limit_bytes_ / 2,
+                                             options_.per_connection_buffer_limit_bytes_ + 1);
+  }
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -111,6 +122,10 @@ void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remo
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));
   new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+  if (options_.per_connection_buffer_limit_bytes_ > 0) {
+    new_connection->setWriteBufferWatermarks(options_.per_connection_buffer_limit_bytes_ / 2,
+                                             options_.per_connection_buffer_limit_bytes_ + 1);
+  }
   cb_.onNewConnection(std::move(new_connection));
 }
 

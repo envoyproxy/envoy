@@ -83,6 +83,8 @@ private:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
@@ -125,6 +127,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ThreadLocalPool& parent_;
     Upstream::HostConstSharedPtr host_;
