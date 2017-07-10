@@ -85,7 +85,7 @@ def cc_grpc_httpjson_transcoding_dep():
     native.git_repository(
         name = "grpc_httpjson_transcoding",
         remote = REPO_LOCATIONS["grpc_transcoding"],
-        commit = "3a90dfd2e7300e8dd60b74f0f4085f2a0bfc499e",
+        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
     )
 
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
@@ -106,15 +106,15 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "8047d578919175cdcaddad8364511d77db5bba87",
+        commit = "422332bf5fb251904dd53ed8cbb5f28e892ed69d",
     )
     native.bind(
         name = "envoy_base",
-        actual = "@envoy_api//api:base",
+        actual = "@envoy_api//api:base_cc",
     )
     native.bind(
         name = "envoy_eds",
-        actual = "@envoy_api//api:eds",
+        actual = "@envoy_api//api:eds_cc",
     )
     native.bind(
         name = "http_api_protos",
