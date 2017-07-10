@@ -113,7 +113,7 @@ message Author {
   };
   Gender gender = 2;
   string first_name = 3;
-  string last_name = 4;
+  string last_name = 4 [json_name = "lname"];
 }
 
 // Response to ListShelves call.

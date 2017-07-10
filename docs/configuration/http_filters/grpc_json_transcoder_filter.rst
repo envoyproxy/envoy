@@ -81,4 +81,6 @@ print_options
     strings. Default to false.
 
   preserve_proto_field_names
-    *(optional, boolean)* Whether to preserve proto field names. Default to false.
+    *(optional, boolean)* Whether to preserve proto field names. By default protobuf will generate
+    JSON field names use ``json_name`` option, or lower camel case, in that order. Set this flag
+    will preserve original field names. Default to false.

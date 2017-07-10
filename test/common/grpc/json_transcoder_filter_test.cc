@@ -294,9 +294,10 @@ class GrpcJsonTranscoderFilterPrintTest
     : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam> {
 public:
   GrpcJsonTranscoderFilterPrintTest()
-      : filter_(JsonTranscoderConfig(*Json::Factory::loadFromString(GetParam().config_json_)))
+      : config_(*Json::Factory::loadFromString(GetParam().config_json_)), filter_(config_) {}
 
-            JsonTranscoderFilter filter_;
+  JsonTranscoderConfig config_;
+  JsonTranscoderFilter filter_;
 };
 
 TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
@@ -327,7 +328,7 @@ INSTANTIATE_TEST_CASE_P(
      "services": ["bookstore.Bookstore"]
     }
 			                                           )",
-            R"({"id":"101","gender":"MALE","lastName":"Shakespeare"})"},
+            R"({"id":"101","gender":"MALE","lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{R"(
     {
      "proto_descriptor": "test/proto/bookstore.descriptor",
@@ -338,7 +339,7 @@ INSTANTIATE_TEST_CASE_P(
                                                R"({
  "id": "101",
  "gender": "MALE",
- "lastName": "Shakespeare"
+ "lname": "Shakespeare"
 }
 )"},
         GrpcJsonTranscoderFilterPrintTestParam{
@@ -349,7 +350,7 @@ INSTANTIATE_TEST_CASE_P(
      "print_options":{"always_print_primitive_fields": true}
     }
 			                                           )",
-            R"({"id":"101","gender":"MALE","firstName":"","lastName":"Shakespeare"})"},
+            R"({"id":"101","gender":"MALE","firstName":"","lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{
             R"(
     {
@@ -358,7 +359,7 @@ INSTANTIATE_TEST_CASE_P(
      "print_options":{"always_print_enums_as_ints": true}
     }
 			                                           )",
-            R"({"id":"101","gender":1,"lastName":"Shakespeare"})"},
+            R"({"id":"101","gender":1,"lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{
             R"(
     {
