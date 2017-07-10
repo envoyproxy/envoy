@@ -22,7 +22,13 @@ services to be transcoded.
     "name": "grpc_json_transcoder",
     "config": {
       "proto_descriptor": "proto.pb",
-      "services": ["grpc.service.Service"]
+      "services": ["grpc.service.Service"],
+      "print_options": {
+        "add_whitespace": false,
+        "always_print_primitive_fields": false,
+        "always_print_enums_as_ints": false,
+        "preserve_proto_field_names": false
+      }
     }
   }
 
