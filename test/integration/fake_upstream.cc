@@ -175,7 +175,7 @@ void FakeConnectionBase::onEvent(uint32_t events) {
 
 void FakeConnectionBase::waitForDisconnect() {
   std::unique_lock<std::mutex> lock(lock_);
-  if (!disconnected_) {
+  while (!disconnected_) {
     connection_event_.wait(lock);
   }
 
