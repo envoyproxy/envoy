@@ -10,7 +10,7 @@ EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-")
 SUFFIXES = (".cc", ".h", "BUILD")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG-FORMAT", "clang-format-5.0")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
