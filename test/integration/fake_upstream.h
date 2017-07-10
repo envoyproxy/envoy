@@ -110,7 +110,10 @@ class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
   void close();
   void readDisable(bool disable);
-  void waitForDisconnect();
+  // By default waitForDisconnect assumes the next event is a disconnect and
+  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // wait until disconnect, set ignore_spurious_events = true.
+  void waitForDisconnect(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;

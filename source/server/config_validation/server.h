@@ -60,7 +60,6 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
-  bool draining() override { NOT_IMPLEMENTED; }
   void drainListeners() override { NOT_IMPLEMENTED; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
@@ -98,6 +97,7 @@ public:
     // validation mock.
     return nullptr;
   }
+  DrainManagerPtr createDrainManager() override { return nullptr; }
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory

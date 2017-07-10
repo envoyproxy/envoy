@@ -37,9 +37,9 @@ public:
   const std::string& configPath() override { return config_path_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
-  std::chrono::seconds drainTime() override { return std::chrono::seconds(0); }
+  std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
-  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
+  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
   uint64_t restartEpoch() override { return 0; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
@@ -55,9 +55,8 @@ private:
 class TestDrainManager : public DrainManager {
 public:
   // Server::DrainManager
-  bool drainClose() override { return draining_; }
-  bool draining() override { return draining_; }
-  void startDrainSequence() override {}
+  bool drainClose() const override { return draining_; }
+  void startDrainSequence(std::function<void()>) override {}
   void startParentShutdownSequence() override {}
 
   bool draining_{};

@@ -122,6 +122,7 @@ envoy_cc_library(
     hdrs = ["listener_manager_impl.h"],
     deps = [
         ":configuration_lib",
+        ":drain_manager_lib",
         ":init_manager_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
