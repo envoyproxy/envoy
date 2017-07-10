@@ -158,7 +158,7 @@ public:
    * Optionally sets a custom buffer factory for the dispatcher.  This factory may be used by new
    * connections on connection creation.
    */
-  virtual void setBufferFactory(Buffer::FactoryPtr factory) PURE;
+  virtual void setBufferFactory(Buffer::FactoryPtr&& factory) PURE;
 
   /**
    * Returns the buffer factory for this dispatcher.

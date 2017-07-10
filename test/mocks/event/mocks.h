@@ -105,7 +105,7 @@ public:
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
   Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
-  void setBufferFactory(Buffer::FactoryPtr factory) override {
+  void setBufferFactory(Buffer::FactoryPtr&& factory) override {
     buffer_factory_ = std::move(factory);
   }
 

@@ -145,7 +145,7 @@ void DispatcherImpl::run(RunType type) {
   event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
 }
 
-void DispatcherImpl::setBufferFactory(Buffer::FactoryPtr factory) {
+void DispatcherImpl::setBufferFactory(Buffer::FactoryPtr&& factory) {
   buffer_factory_ = std::move(factory);
 }
 

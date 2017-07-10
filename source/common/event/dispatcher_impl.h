@@ -55,7 +55,7 @@ public:
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
-  void setBufferFactory(Buffer::FactoryPtr factory) override;
+  void setBufferFactory(Buffer::FactoryPtr&& factory) override;
   Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
 
 private:
