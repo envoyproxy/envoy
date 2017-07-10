@@ -357,6 +357,24 @@ public:
   }
 
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
+    MockBuffer* client_write_buffer = nullptr;
+    MockBufferFactory* factory = new MockBufferFactory;
+    dispatcher_.setBufferFactory(Buffer::FactoryPtr{factory});
+
+    ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
+      return new Buffer::OwnedImpl;
+    }));
+    // By default, expect 4 buffers to be created - the client and server read and write buffers.
+    EXPECT_CALL(*factory, create_())
+        .Times(4)
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          return new MockBuffer; // client read buffer.
+        }))
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          client_write_buffer = new MockBuffer;
+          return client_write_buffer;
+        }));
+
     Initialize(read_buffer_limit);
 
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -367,21 +385,17 @@ public:
           EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
         }));
 
-    std::unique_ptr<MockBuffer> buffer_ptr_{new MockBuffer()};
-    MockBuffer& buffer_{*buffer_ptr_};
-    dynamic_cast<ConnectionImpl*>(client_connection_.get())
-        ->replaceWriteBufferForTest(std::move(buffer_ptr_));
-
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_)).Times(testing::AnyNumber());
 
     std::string data_to_write(bytes_to_write, 'a');
     Buffer::OwnedImpl buffer_to_write(data_to_write);
     std::string data_written;
-    EXPECT_CALL(buffer_, move(_))
+    EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                              Invoke(&buffer_, &MockBuffer::BaseMove)));
-    EXPECT_CALL(buffer_, drain(_)).WillOnce(Invoke(&buffer_, &MockBuffer::BaseDrain));
+                              Invoke(client_write_buffer, &MockBuffer::BaseMove)));
+    EXPECT_CALL(*client_write_buffer, drain(_))
+        .WillOnce(Invoke(client_write_buffer, &MockBuffer::BaseDrain));
     client_connection_->write(buffer_to_write);
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     EXPECT_EQ(data_to_write, data_written);

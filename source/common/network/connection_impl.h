@@ -77,10 +77,6 @@ public:
   Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
-  void replaceWriteBufferForTest(std::unique_ptr<Buffer::OwnedImpl> new_buffer) {
-    write_buffer_ = std::move(new_buffer);
-  }
-
 protected:
   enum class PostIoAction { Close, KeepOpen };
 
