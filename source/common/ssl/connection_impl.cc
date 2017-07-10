@@ -70,7 +70,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);
+    uint64_t num_slices = read_buffer_->reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
       ENVOY_CONN_LOG(trace, "ssl read returns: {}", *this, rc);
@@ -97,7 +97,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     }
 
     if (slices_to_commit > 0) {
-      read_buffer_.commit(slices, slices_to_commit);
+      read_buffer_->commit(slices, slices_to_commit);
       if (shouldDrainReadBuffer()) {
         setReadBufferReady();
         keep_reading = false;

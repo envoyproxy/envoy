@@ -134,14 +134,14 @@ public:
 typedef std::unique_ptr<Instance> InstancePtr;
 
 /**
- * A factory for creating buffer instances.
+ * A factory for creating buffers.
  */
 class Factory {
 public:
   virtual ~Factory() {}
 
   /**
-   * Creates and returns a unique pointer to a new buffer instance.
+   * Creates and returns a unique pointer to a new buffer.
    */
   virtual InstancePtr create() PURE;
 };

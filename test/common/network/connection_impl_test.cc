@@ -112,10 +112,16 @@ public:
     ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
       return new Buffer::OwnedImpl;
     }));
-    EXPECT_CALL(*factory, create_()).Times(2).WillOnce(Invoke([&]() -> Buffer::Instance* {
-      buffer_ = new MockBuffer;
-      return buffer_;
-    }));
+    // By default, expect 4 buffers to be created - the client and server read and write buffers.
+    EXPECT_CALL(*factory, create_())
+        .Times(4)
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          return new MockBuffer; // client read buffer.
+        }))
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          client_write_buffer_ = new MockBuffer;
+          return client_write_buffer_;
+        }));
   }
 
 protected:
@@ -130,7 +136,7 @@ protected:
   Network::ConnectionPtr server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
-  MockBuffer* buffer_ = nullptr;
+  MockBuffer* client_write_buffer_ = nullptr;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
@@ -242,10 +248,11 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   std::string data_to_write = "hello world";
   Buffer::OwnedImpl buffer_to_write(data_to_write);
   std::string data_written;
-  EXPECT_CALL(*buffer_, move(_))
+  EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                            Invoke(buffer_, &MockBuffer::BaseMove)));
-  EXPECT_CALL(*buffer_, write(_)).WillOnce(Invoke(buffer_, &MockBuffer::TrackWrites));
+                            Invoke(client_write_buffer_, &MockBuffer::BaseMove)));
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::TrackWrites));
   client_connection_->write(buffer_to_write);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
