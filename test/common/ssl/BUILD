@@ -18,6 +18,7 @@ envoy_cc_test(
         "gen_unittest_certs.sh",
         "//test/common/ssl/test_data:certs",
     ],
+    external_deps = ["ssl"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

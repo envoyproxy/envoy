@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "connection_interface",
     hdrs = ["connection.h"],
+    external_deps = ["ssl"],
 )
 
 envoy_cc_library(

@@ -10,6 +10,7 @@
 #include "envoy/stats/stats.h"
 
 #include "gmock/gmock.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -43,6 +44,7 @@ public:
   MOCK_METHOD0(sha256PeerCertificateDigest, std::string());
   MOCK_METHOD0(subjectPeerCertificate, std::string());
   MOCK_METHOD0(uriSanPeerCertificate, std::string());
+  MOCK_METHOD0(rawSslForTest, SSL*());
 };
 
 class MockClientContext : public ClientContext {

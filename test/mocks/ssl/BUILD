@@ -12,6 +12,7 @@ envoy_cc_mock(
     name = "ssl_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
+    external_deps = ["ssl"],
     deps = [
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/ssl:context_config_interface",
