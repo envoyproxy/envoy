@@ -60,12 +60,12 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTest,
 
 TEST_P(ProxyProtocolTest, Basic) {
 
-  write("PROXY TCP4 1.2.3.4 255.255.255.255 65535 1234\r\nmore data");
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
   ConnectionPtr accepted_connection;
 
   EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-    ASSERT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
+    EXPECT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
     conn->addReadFilter(read_filter_);
     accepted_connection = std::move(conn);
   }));
@@ -75,7 +75,9 @@ TEST_P(ProxyProtocolTest, Basic) {
   EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  accepted_connection->close(ConnectionCloseType::NoFlush);
+  if (accepted_connection) {
+    accepted_connection->close(ConnectionCloseType::NoFlush);
+  }
   conn_->close(ConnectionCloseType::NoFlush);
 }
 
@@ -96,20 +98,22 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  accepted_connection->close(ConnectionCloseType::NoFlush);
+  if (accepted_connection) {
+    accepted_connection->close(ConnectionCloseType::NoFlush);
+  }
   conn_->close(ConnectionCloseType::NoFlush);
 }
 
 TEST_P(ProxyProtocolTest, Fragmented) {
 
   write("PROXY TCP4");
-  write(" 255.255.2");
-  write("55.255 1.2");
+  write(" 254.254.2");
+  write("54.254 1.2");
   write(".3.4 65535");
   write(" 1234\r\n");
 
   EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-    ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
+    ASSERT_EQ("254.254.254.254", conn->remoteAddress().ip()->addressAsString());
     read_filter_.reset(new MockReadFilter());
     conn->addReadFilter(read_filter_);
     conn->close(ConnectionCloseType::NoFlush);
@@ -121,10 +125,10 @@ TEST_P(ProxyProtocolTest, Fragmented) {
 TEST_P(ProxyProtocolTest, PartialRead) {
 
   write("PROXY TCP4");
-  write(" 255.255.2");
+  write(" 254.254.2");
 
   EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-    ASSERT_EQ("255.255.255.255", conn->remoteAddress().ip()->addressAsString());
+    ASSERT_EQ("254.254.254.254", conn->remoteAddress().ip()->addressAsString());
     read_filter_.reset(new MockReadFilter());
     conn->addReadFilter(read_filter_);
     conn->close(ConnectionCloseType::NoFlush);
@@ -132,7 +136,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  write("55.255 1.2");
+  write("54.254 1.2");
   write(".3.4 65535");
   write(" 1234\r\n");
 
@@ -236,13 +240,13 @@ INSTANTIATE_TEST_CASE_P(IpVersions, WildcardProxyProtocolTest,
 
 TEST_P(WildcardProxyProtocolTest, Basic) {
 
-  write("PROXY TCP4 1.2.3.4 255.255.255.255 65535 1234\r\nmore data");
+  write("PROXY TCP4 1.2.3.4 254.254.254.254 65535 1234\r\nmore data");
 
   ConnectionPtr accepted_connection;
 
   EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-    ASSERT_EQ("1.2.3.4", conn->remoteAddress().ip()->addressAsString());
-    EXPECT_EQ(conn->localAddress(), *local_dst_address_);
+    EXPECT_EQ("1.2.3.4:65535", conn->remoteAddress().asString());
+    EXPECT_EQ("254.254.254.254:1234", conn->localAddress().asString());
     conn->addReadFilter(read_filter_);
     accepted_connection = std::move(conn);
   }));
@@ -252,7 +256,9 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
   EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  accepted_connection->close(ConnectionCloseType::NoFlush);
+  if (accepted_connection) {
+    accepted_connection->close(ConnectionCloseType::NoFlush);
+  }
   conn_->close(ConnectionCloseType::NoFlush);
 }
 
@@ -263,8 +269,8 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   ConnectionPtr accepted_connection;
 
   EXPECT_CALL(callbacks_, onNewConnection_(_)).WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-    ASSERT_EQ("1:2:3::4", conn->remoteAddress().ip()->addressAsString());
-    EXPECT_EQ(conn->localAddress(), *local_dst_address_);
+    EXPECT_EQ("[1:2:3::4]:65535", conn->remoteAddress().asString());
+    EXPECT_EQ("[5:6::7:8]:1234", conn->localAddress().asString());
     conn->addReadFilter(read_filter_);
     accepted_connection = std::move(conn);
   }));
@@ -274,7 +280,9 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  accepted_connection->close(ConnectionCloseType::NoFlush);
+  if (accepted_connection) {
+    accepted_connection->close(ConnectionCloseType::NoFlush);
+  }
   conn_->close(ConnectionCloseType::NoFlush);
 }
 

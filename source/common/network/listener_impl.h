@@ -32,15 +32,6 @@ public:
                              Address::InstanceConstSharedPtr local_address);
 
   /**
-   * Accept/process a new connection using fd's local address.
-   * @param fd supplies the new connection's fd.
-   * @param remote_address supplies the remote address for the new connection.
-   */
-  void newConnection(int fd, Address::InstanceConstSharedPtr remote_address) {
-    newConnection(fd, remote_address, getLocalAddress(fd));
-  }
-
-  /**
    * @return the socket supplied to the listener at construction time
    */
   ListenSocket& socket() { return socket_; }

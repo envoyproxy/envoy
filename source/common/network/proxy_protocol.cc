@@ -63,6 +63,9 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
+  // Remove the line feed at the end
+  StringUtil::rtrim(proxy_line);
+
   // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
   // SOURCE_PORT DESTINATION_PORT.
   const auto line_parts = StringUtil::split(proxy_line, " ", true);
@@ -72,51 +75,40 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   }
 
   Address::IpVersion protocol_version;
+  Address::InstanceConstSharedPtr remote_address;
+  Address::InstanceConstSharedPtr local_address;
   if (line_parts[1] == "TCP4") {
     protocol_version = Address::IpVersion::v4;
+    remote_address = Utility::parseInternetAddressAndPort(line_parts[2] + ":" + line_parts[4]);
+    local_address = Utility::parseInternetAddressAndPort(line_parts[3] + ":" + line_parts[5]);
   } else if (line_parts[1] == "TCP6") {
     protocol_version = Address::IpVersion::v6;
+    remote_address =
+        Utility::parseInternetAddressAndPort("[" + line_parts[2] + "]:" + line_parts[4]);
+    local_address =
+        Utility::parseInternetAddressAndPort("[" + line_parts[3] + "]:" + line_parts[5]);
   } else {
     throw EnvoyException("failed to read proxy protocol");
   }
 
   // Error check the source and destination fields. Currently the source port, destination address,
   // and destination port fields are ignored. Remote address refers to the source address.
-  Address::InstanceConstSharedPtr remote_address = Utility::parseInternetAddress(line_parts[2]);
-  Address::InstanceConstSharedPtr destination_address =
-      Utility::parseInternetAddress(line_parts[3]);
   const auto remote_version = remote_address->ip()->version();
-  const auto destination_version = destination_address->ip()->version();
-  if (remote_version != protocol_version || destination_version != protocol_version) {
+  const auto local_version = local_address->ip()->version();
+  if (remote_version != protocol_version || local_version != protocol_version) {
     throw EnvoyException("failed to read proxy protocol");
   }
-
-  uint32_t remote_port, destination_port;
-  try {
-    remote_port = std::stoul(line_parts[4]);
-    destination_port = std::stoul(line_parts[5]);
-    // Check that TCP port value is in range [0, 65535].
-    if (remote_port > 65535 || destination_port > 65535) {
-      throw std::out_of_range("failed to read proxy protocol");
-    }
-  } catch (const std::invalid_argument& ia) {
-    throw EnvoyException(ia.what());
-  } catch (const std::out_of_range& ex) {
-    throw EnvoyException(ex.what());
+  // Check that both addresses are valid unicast addresses, as required for TCP
+  if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
+    throw EnvoyException("failed to read proxy protocol");
   }
-  UNREFERENCED_PARAMETER(remote_port);
-  UNREFERENCED_PARAMETER(destination_port);
-
   ListenerImpl& listener = listener_;
   int fd = fd_;
   fd_ = -1;
 
   removeFromList(parent_.connections_);
 
-  // TODO(mattklein123): Parse the remote port instead of passing zero.
-  // TODO(jrajahalme): Use destination address from proxy protocol instead of the local
-  //                   address of the socket?
-  listener.newConnection(fd, remote_address);
+  listener.newConnection(fd, remote_address, local_address);
 }
 
 void ProxyProtocol::ActiveConnection::close() {
