@@ -163,7 +163,7 @@ private:
   // Tracks the number of times reads have been disabled.  If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
-  size_t read_disable_count_{0};
+  uint32_t read_disable_count_{0};
 };
 
 /**

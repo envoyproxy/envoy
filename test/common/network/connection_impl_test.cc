@@ -466,8 +466,7 @@ public:
           return FilterStatus::StopIteration;
         }));
 
-    MockConnectionCallbacks client_callbacks;
-    client_connection_->addConnectionCallbacks(client_callbacks);
+    client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {

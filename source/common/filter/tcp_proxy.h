@@ -109,6 +109,7 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
 
   struct UpstreamCallbacks : public Network::ConnectionCallbacks,
@@ -127,6 +128,7 @@ private:
     }
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
 
   Network::FilterStatus initializeUpstreamConnection();

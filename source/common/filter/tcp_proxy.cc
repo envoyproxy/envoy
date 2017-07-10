@@ -130,21 +130,29 @@ void TcpProxy::readDisableDownstream(bool disable) {
 }
 
 void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  ASSERT(!on_high_watermark_called_);
+  on_high_watermark_called_ = true;
   // If downstream has too much data buffered, stop reading on the upstream connection.
   parent_.readDisableUpstream(true);
 }
 
 void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  ASSERT(on_high_watermark_called_);
+  on_high_watermark_called_ = false;
   // The downstream buffer has been drained.  Resume reading from upstream.
   parent_.readDisableUpstream(false);
 }
 
 void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  ASSERT(!on_high_watermark_called_);
+  on_high_watermark_called_ = true;
   // There's too much data buffered in the upstream write buffer, so stop reading.
   parent_.readDisableDownstream(true);
 }
 
 void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  ASSERT(on_high_watermark_called_);
+  on_high_watermark_called_ = false;
   // The upstream write buffer is drained.  Resume reading.
   parent_.readDisableDownstream(false);
 }

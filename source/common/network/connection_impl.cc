@@ -274,7 +274,8 @@ void ConnectionImpl::write(Buffer::Instance& data) {
   }
 }
 
-void ConnectionImpl::setWriteBufferWatermarks(uint32_t new_low_watermark, uint32_t new_high_watermark) {
+void ConnectionImpl::setWriteBufferWatermarks(uint32_t new_low_watermark,
+                                              uint32_t new_high_watermark) {
   ENVOY_CONN_LOG(debug, "Setting watermarks: {} {}", *this, new_low_watermark, new_high_watermark);
   ASSERT(new_low_watermark < new_high_watermark);
 
