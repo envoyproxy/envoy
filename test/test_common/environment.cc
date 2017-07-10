@@ -104,7 +104,8 @@ const std::string TestEnvironment::unixDomainSocketDirectory() {
   return *uds_directory;
 }
 
-std::string TestEnvironment::substitute(const std::string str) {
+std::string TestEnvironment::substitute(const std::string& str,
+                                        Network::Address::IpVersion version) {
   const std::unordered_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
@@ -115,6 +116,21 @@ std::string TestEnvironment::substitute(const std::string str) {
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
+
+  // Substitute IP loopback addresses.
+  const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
+                                       Network::Test::getLoopbackAddressUrlString(version));
+
+  // Substitute dns lookup family.
+  const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");
+  switch (version) {
+  case Network::Address::IpVersion::v4:
+    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v4_only");
+  case Network::Address::IpVersion::v6:
+    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
+  }
+
   return out_json_string;
 }
 
@@ -156,22 +172,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
     out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
   }
 
-  // Substitute IP loopback addresses.
-  const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
-  out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
-                                       Network::Test::getLoopbackAddressUrlString(version));
+  // Substitute paths and other common things.
+  out_json_string = substitute(out_json_string, version);
 
-  // Substitute dns lookup family.
-  const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");
-  switch (version) {
-  case Network::Address::IpVersion::v4:
-    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v4_only");
-  case Network::Address::IpVersion::v6:
-    out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
-  }
-
-  // Substitute paths.
-  out_json_string = substitute(out_json_string);
   const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
   {
@@ -181,8 +184,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return out_json_path;
 }
 
-Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
-  return Json::Factory::loadFromString(substitute(json));
+Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& json,
+                                                          Network::Address::IpVersion version) {
+  return Json::Factory::loadFromString(substitute(json, version));
 }
 
 void TestEnvironment::exec(const std::vector<std::string>& args) {

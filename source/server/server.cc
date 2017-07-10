@@ -21,6 +21,7 @@
 #include "common/network/address_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
+#include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
@@ -42,8 +43,9 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
       api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_), dns_resolver_(dispatcher_->createDnsResolver({})),
-      local_info_(local_info), access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
+      worker_factory_(thread_local_, *api_, hooks),
+      dns_resolver_(dispatcher_->createDnsResolver({})), local_info_(local_info),
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
   failHealthcheck(false);
 
@@ -213,7 +215,6 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 }
 
 void InstanceImpl::startWorkers(TestHooks& hooks) {
-  ENVOY_LOG(warn, "all dependencies initialized. starting workers");
   try {
     listener_manager_->startWorkers(*guard_dog_);
   } catch (const Network::CreateListenerException& e) {

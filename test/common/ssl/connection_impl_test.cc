@@ -107,7 +107,7 @@ TEST_P(SslConnectionImplTest, GetCertDigest) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "9d51ffbe193020e88ac2eb9072315e2e8bb3dac589041995b2af80ec7cb86de2", "", GetParam());
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
@@ -123,11 +123,11 @@ TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "istio:account1.foo.cluster.local" ]
+    "verify_subject_alt_name": [ "spiffe://lyft.com/test-team" ]
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "istio:account1.foo.cluster.local", GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {

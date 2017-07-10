@@ -20,7 +20,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -162,7 +161,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
+  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
 };

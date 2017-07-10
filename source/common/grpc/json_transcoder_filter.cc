@@ -17,9 +17,12 @@
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
 #include "grpc_transcoding/json_request_translator.h"
+#include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
 using google::grpc::transcoding::JsonRequestTranslator;
+using google::grpc::transcoding::PathMatcherBuilder;
+using google::grpc::transcoding::PathMatcherUtility;
 using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::ResponseToJsonTranslator;
 using google::grpc::transcoding::Transcoder;
@@ -86,8 +89,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
     }
   }
 
-  // TODO(lizan): Consider factor out building PathMatcher building.
-  google::grpc::transcoding::PathMatcherBuilder<const google::protobuf::MethodDescriptor*> pmb;
+  PathMatcherBuilder<const google::protobuf::MethodDescriptor*> pmb;
 
   for (const auto& service_name : config.getStringArray("services")) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -97,31 +99,10 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-
-      auto http_rule = method->options().GetExtension(google::api::http);
-
-      switch (http_rule.pattern_case()) {
-      case ::google::api::HttpRule::kGet:
-        pmb.Register("GET", http_rule.get(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPut:
-        pmb.Register("PUT", http_rule.put(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPost:
-        pmb.Register("POST", http_rule.post(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kDelete:
-        pmb.Register("DELETE", http_rule.delete_(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPatch:
-        pmb.Register("PATCH", http_rule.patch(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kCustom:
-        pmb.Register(http_rule.custom().kind(), http_rule.custom().path(), http_rule.body(),
-                     method);
-        break;
-      default: // ::google::api::HttpRule::PATTEN_NOT_SET
-        break;
+      if (!PathMatcherUtility::RegisterByHttpRule(
+              pmb, method->options().GetExtension(google::api::http), method)) {
+        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
+                             "' to path matcher");
       }
     }
   }

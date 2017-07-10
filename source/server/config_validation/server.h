@@ -92,8 +92,8 @@ public:
                           Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createFilterFactoryList_(filters, *this, context);
   }
-  Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              bool) override {
+  Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
+                                                    bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
