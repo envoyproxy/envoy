@@ -83,7 +83,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
       // Clean up unused client_ssl_auth
       [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
       [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(); },
+      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 }
 
