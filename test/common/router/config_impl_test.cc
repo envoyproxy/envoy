@@ -2137,8 +2137,9 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   // Request header manipulation testing.
   {
     {
+      std::string s1 = ("127.0.0.1");
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-      ON_CALL(requestInfo, getDownstreamAddress()).WillByDefault(ReturnRef("127.0.0.1"));
+      ON_CALL(requestInfo, getDownstreamAddress()).WillByDefault(ReturnRef(s1));
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers, requestInfo);
       EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
