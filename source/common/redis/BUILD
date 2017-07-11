@@ -25,6 +25,7 @@ envoy_cc_library(
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
     deps = [
+        ":supported_commands_lib",
         "//include/envoy/redis:command_splitter_interface",
         "//include/envoy/redis:conn_pool_interface",
         "//source/common/common:assert_lib",
@@ -67,4 +68,9 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_validator_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "supported_commands_lib",
+    hdrs = ["supported_commands.h"],
 )
