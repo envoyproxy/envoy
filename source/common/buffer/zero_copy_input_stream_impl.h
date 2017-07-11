@@ -26,7 +26,7 @@ public:
   // Mark the stream is finished
   void finish() { finished_ = true; }
 
-  // google::protobuf::io::ZeroCopyInputStream
+  // Protobuf::io::ZeroCopyInputStream
   // See
   // https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.zero_copy_stream#ZeroCopyInputStream
   // for each method details.

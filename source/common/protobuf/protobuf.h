@@ -1,14 +1,20 @@
 #pragma once
 
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/service.h"
+#include "google/protobuf/stubs/status.h"
+#include "google/protobuf/text_format.h"
 #include "google/protobuf/util/json_util.h"
+#include "google/protobuf/util/message_differencer.h"
 #include "google/protobuf/util/time_util.h"
+#include "google/protobuf/util/type_resolver.h"
+#include "google/protobuf/util/type_resolver_util.h"
 
 namespace Envoy {
 

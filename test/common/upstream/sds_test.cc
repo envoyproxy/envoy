@@ -9,6 +9,7 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/upstream/eds.h"
 
 #include "test/mocks/local_info/mocks.h"
@@ -21,7 +22,6 @@
 
 #include "api/base.pb.h"
 #include "gmock/gmock.h"
-#include "google/protobuf/util/time_util.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

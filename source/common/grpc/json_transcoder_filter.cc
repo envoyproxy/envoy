@@ -9,17 +9,20 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
-#include "google/protobuf/descriptor.h"
-#include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/util/type_resolver.h"
-#include "google/protobuf/util/type_resolver_util.h"
 #include "grpc_transcoding/json_request_translator.h"
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
+using Envoy::Protobuf::DescriptorPool;
+using Envoy::Protobuf::FileDescriptor;
+using Envoy::Protobuf::FileDescriptorSet;
+using Envoy::Protobuf::io::ZeroCopyInputStream;
+using Envoy::Protobuf::util::Status;
+using Envoy::Protobuf::util::error::Code;
 using google::grpc::transcoding::JsonRequestTranslator;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
@@ -27,12 +30,6 @@ using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::ResponseToJsonTranslator;
 using google::grpc::transcoding::Transcoder;
 using google::grpc::transcoding::TranscoderInputStream;
-using google::protobuf::DescriptorPool;
-using google::protobuf::FileDescriptor;
-using google::protobuf::FileDescriptorSet;
-using google::protobuf::io::ZeroCopyInputStream;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {
@@ -110,8 +107,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   path_matcher_ = pmb.Build();
 
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX,
-                                                               &descriptor_pool_)));
+      Protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX, &descriptor_pool_)));
 }
 
 Status JsonTranscoderConfig::createTranscoder(
@@ -355,7 +351,7 @@ void JsonTranscoderFilter::setEncoderFilterCallbacks(
 }
 
 // TODO(lizan): Incorporate watermarks to bound buffer sizes
-bool JsonTranscoderFilter::readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream,
+bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& stream,
                                         Buffer::Instance& data) {
   const void* out;
   int size;

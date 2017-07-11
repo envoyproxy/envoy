@@ -10,8 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-
-#include "google/protobuf/message.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -21,11 +20,9 @@ void RpcChannelImpl::cancel() {
   onComplete();
 }
 
-void RpcChannelImpl::CallMethod(const Protobuf::MethodDescriptor* method,
-                                ::google::protobuf::RpcController*,
-                                const ::google::protobuf::Message* grpc_request,
-                                ::google::protobuf::Message* grpc_response,
-                                ::google::protobuf::Closure*) {
+void RpcChannelImpl::CallMethod(const Protobuf::MethodDescriptor* method, Protobuf::RpcController*,
+                                const Protobuf::Message* grpc_request,
+                                Protobuf::Message* grpc_response, Protobuf::Closure*) {
   ASSERT(!http_request_ && !grpc_method_ && !grpc_response_);
   grpc_method_ = method;
   grpc_response_ = grpc_response;
