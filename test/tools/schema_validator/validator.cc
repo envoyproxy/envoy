@@ -39,7 +39,7 @@ Options::Options(int argc, char** argv) {
     schema_type_ = Schema::Type::Route;
   } else {
     std::cerr << "error: unknown schema type '" << schema_type.getValue() << "'" << std::endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   json_path_ = json_path.getValue();
@@ -50,12 +50,11 @@ void Validator::validate(const std::string& json_path, Schema::Type schema_type)
 
   switch (schema_type) {
   case Schema::Type::Route: {
-    std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
-    std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
-        new NiceMock<Upstream::MockClusterManager>());
+    Runtime::MockLoader runtime;
+    Upstream::MockClusterManager cm;
     // Construct a Router::ConfigImpl to validate the Route configuration and ignore the
     // output since nothing will consume it.
-    UNREFERENCED_PARAMETER(Router::ConfigImpl(*loader, *runtime, *cm, false));
+    UNREFERENCED_PARAMETER(Router::ConfigImpl(*loader, runtime, cm, false));
     break;
   }
   default:
