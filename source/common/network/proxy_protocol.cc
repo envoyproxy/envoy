@@ -91,8 +91,10 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  // Error check the source and destination fields. Currently the source port, destination address,
-  // and destination port fields are ignored. Remote address refers to the source address.
+  // Error check the source and destination fields.  Most errors are cought by the address
+  // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
+  // an IPv6 address when parsing for an IPv4 address.  Remote address refers to the source
+  // address.
   const auto remote_version = remote_address->ip()->version();
   const auto local_version = local_address->ip()->version();
   if (remote_version != protocol_version || local_version != protocol_version) {

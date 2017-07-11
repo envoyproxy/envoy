@@ -144,9 +144,11 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
-  write("BOGUS\r\n");
+  write("BOGUS\r");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  write("\n");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -160,6 +162,27 @@ TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
 
 TEST_P(ProxyProtocolTest, NotEnoughFields) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, UnsupportedProto) {
+  write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
+  write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, InvalidDstAddress) {
+  write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -194,9 +217,36 @@ TEST_P(ProxyProtocolTest, BadAddress) {
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
-  write("PROXY TCP6 1:2:3::4 1.2.3.4 1234 5678\r\nmore data");
+  write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
+  write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, Truncated) {
+  write("PROXY TCP4 1.2.3.4 5.6.7.8 1234 5678");
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected));
+  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  conn_->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(ProxyProtocolTest, Closed) {
+  write("PROXY TCP4 1.2.3");
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  conn_->close(ConnectionCloseType::FlushWrite);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_P(ProxyProtocolTest, ClosedEmpty) {
+  conn_->close(ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
