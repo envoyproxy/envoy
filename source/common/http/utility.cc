@@ -163,8 +163,17 @@ Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOpt
   return ret;
 }
 
+Http1Settings Utility::parseHttp1Settings(const Json::Object& config) {
+  Http1Settings ret;
+
+  Json::ObjectSharedPtr http1_settings = config.getObject("http1_settings", true);
+  ret.allow_absolute_url_ = http1_settings->getBoolean("allow_absolute_url", false);
+  ret.allow_connect_ = http1_settings->getBoolean("allow_connect", false);
+  return ret;
+}
+
 void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                             Code response_code, const std::string& body_text) {
+                              Code response_code, const std::string& body_text) {
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {

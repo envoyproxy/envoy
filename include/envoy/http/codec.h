@@ -146,6 +146,16 @@ public:
    */
   virtual void onGoAway() PURE;
 };
+/**
+ * HTTP/1.* Codec settings
+ */
+
+struct Http1Settings {
+  // Enable codec to handle CONNECT requests. This will enable forward/explicit proxy support on TLS connections
+  bool allow_connect_{false} ;
+  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS traffic
+  bool allow_absolute_url_{false};
+};
 
 /**
  * HTTP/2 codec settings

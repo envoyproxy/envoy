@@ -361,10 +361,11 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   reset_stream_called_ = true;
   onResetStream(reason);
 }
-
+  
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
-                                           ServerConnectionCallbacks& callbacks)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks) {}
+                                           ServerConnectionCallbacks& callbacks,
+                                           Http1Settings settings)
+    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -376,16 +377,80 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
+
+  // handlePath computes the correct :authority and :path headers based on 7230#5.7 and 7230#6
+  //
+  bool
+  ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
+  // TODO(mattwoodyard) - check configuration option if forward proxy is enabled
+  // In practice there will only ever be one scheme delivered for forward proxy
+  // support
+    HeaderString path(Headers::get().Path);
+
+    // The url is relative nothing to do here
+    if (active_request_->request_url_.c_str()[0] == '/' || active_request_->request_url_.c_str()[0] == '*') {
+      headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
+      return true;
+    }
+
+    if (!codec_settings_.allow_connect_ && !codec_settings_.allow_absolute_url_) {
+      return true;
+    }
+
+    struct http_parser_url u;
+    http_parser_url_init(&u);
+    int result = http_parser_parse_url(active_request_->request_url_.buffer(), active_request_->request_url_.size(), is_connect, &u);
+    if (result != HPE_OK) {
+      ENVOY_CONN_LOG(trace, "invalid uri in request", connection_);
+      return false;
+    } else {
+      if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
+        // RFC7230#5.7
+        // When a proxy receives a request with an absolute-form of
+        // request-target, the proxy MUST ignore the received Host header field
+        // (if any) and instead replace it with the host information of the
+        // request-target.  A proxy that forwards such a request MUST generate a
+        // new Host field-value based on the received request-target rather than
+        // forward the received Host field-value.
+
+        // Insert the host header, this will later be converted to :authority
+        std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off, u.field_data[UF_HOST].len);
+        headers->insertHost().value(new_host);
+
+        // RFC allows the absolute-uri to not end in /, but the absolute path form
+        // must start with /
+        if ((u.field_set & UF_HOST) == UF_PATH) {
+          HeaderString new_path;
+          new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
+                           active_request_->request_url_.size() - u.field_data[UF_PATH].off);
+          headers->addViaMove(std::move(path), std::move(new_path));
+        } else {
+          HeaderString new_path;
+          new_path.setCopy("/", 1);
+          headers->addViaMove(std::move(path), std::move(new_path));
+        }
+
+        // The existing code clears the request_url_ via move
+        // TODO(mattwoodyard) Is this neccessary, just cargo culted
+        active_request_->request_url_.clear();
+        return true;
+      }
+    }
+    return false;
+}
+
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    HeaderString path(Headers::get().Path);
-    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
-    ASSERT(active_request_->request_url_.empty());
-
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+
+    if (!handlePath(headers, strncmp(method_string, "CONNECT", 7) == 0)) {
+      // TOOD(mattwoodyard) - figure out the most appropriate way to send back a 400 from here
+    }
+
+    // This can't be reordered with out modifying the test code to be more independent of key insertion order
     headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since higher layers are never going to do anything other

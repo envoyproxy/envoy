@@ -129,7 +129,7 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
                                        Stats::Store& store, Type type)
     : FakeConnectionBase(std::move(connection_wrapper)) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
+    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this, Http::Http1Settings()));
   } else {
     codec_.reset(
         new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));

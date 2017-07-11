@@ -244,7 +244,7 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks);
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks, Http1Settings settings);
 
 private:
   /**
@@ -259,6 +259,8 @@ private:
     bool remote_complete_{};
   };
 
+  bool handlePath(HeaderMapImplPtr& headers, bool is_connect);
+
   // ConnectionImpl
   void onEncodeComplete() override;
   void onMessageBegin() override;
@@ -271,6 +273,7 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
+  Http1Settings codec_settings_;
 };
 
 /**

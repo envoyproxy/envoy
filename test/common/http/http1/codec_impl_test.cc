@@ -28,11 +28,13 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public ::testing::Test {
 public:
-  Http1ServerConnectionImplTest() : codec_(new ServerConnectionImpl(connection_, callbacks_)) {}
+  Http1ServerConnectionImplTest() : codec_(new ServerConnectionImpl(connection_, callbacks_, codec_settings_)) {}
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
+  NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
+
 };
 
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
@@ -68,6 +70,65 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath) {
+  InSequence sequence;
+
+  //There's probably a better way to do this....
+  //Make a new 'codec' with the right settings
+  codec_settings_.allow_absolute_url_ = true;
+  codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
+  InSequence sequence;
+
+  //Make a new 'codec' with the right settings
+  codec_settings_.allow_absolute_url_ = true;
+  codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
+}
+
+
+TEST_F(Http1ServerConnectionImplTest, Http11Options) {
+  InSequence sequence;
+
+  codec_settings_.allow_absolute_url_ = true;
+  codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "*"}, {":method", "OPTIONS"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  Buffer::OwnedImpl buffer("OPTIONS * HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
+}
+
 
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   InSequence sequence;

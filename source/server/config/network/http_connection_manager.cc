@@ -78,6 +78,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
             http2_protocol_options);
         return Http::Utility::parseHttp2Settings(http2_protocol_options);
       }()),
+      http1_settings_(Http::Utility::parseHttp1Settings(config)),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(context_.dispatcher(), context_.threadLocal()) {
@@ -216,7 +217,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks)};
+    return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
         connection, callbacks, context_.scope(), http2_settings_)};
@@ -227,7 +228,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
           connection, callbacks, context_.scope(), http2_settings_)};
     } else {
       return Http::ServerConnectionPtr{
-          new Http::Http1::ServerConnectionImpl(connection, callbacks)};
+        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
     }
   }
 

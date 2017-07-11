@@ -138,6 +138,7 @@ private:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
+  const Http::Http1Settings http1_settings_;
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   Optional<std::string> user_agent_;
