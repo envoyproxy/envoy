@@ -72,7 +72,10 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     external_deps = ["envoy_base"],
-    deps = ["//source/common/common:singleton"],
+    deps = [
+        "//source/common/common:singleton",
+        "//source/common/protobuf",
+    ],
 )
 
 envoy_cc_library(

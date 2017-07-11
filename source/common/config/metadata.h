@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/common/singleton.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
 
