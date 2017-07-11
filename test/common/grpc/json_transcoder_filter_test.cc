@@ -294,7 +294,9 @@ class GrpcJsonTranscoderFilterPrintTest
     : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam> {
 public:
   GrpcJsonTranscoderFilterPrintTest()
-      : config_(*Json::Factory::loadFromString(GetParam().config_json_)), filter_(config_) {}
+      : config_(
+            *Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_))),
+        filter_(config_) {}
 
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
@@ -323,12 +325,12 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Values(
         GrpcJsonTranscoderFilterPrintTestParam{
             R"({
-     "proto_descriptor": "test/proto/bookstore.descriptor",
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"]
     })",
             R"({"id":"101","gender":"MALE","lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{R"({
-     "proto_descriptor": "test/proto/bookstore.descriptor",
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"add_whitespace": true}
     })",
@@ -340,20 +342,20 @@ INSTANTIATE_TEST_CASE_P(
 )"},
         GrpcJsonTranscoderFilterPrintTestParam{
             R"({
-     "proto_descriptor": "test/proto/bookstore.descriptor",
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"always_print_primitive_fields": true}
     })",
             R"({"id":"101","gender":"MALE","firstName":"","lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{R"({
-     "proto_descriptor": "test/proto/bookstore.descriptor",
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"always_print_enums_as_ints": true}
     })",
                                                R"({"id":"101","gender":1,"lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{
             R"({
-     "proto_descriptor": "test/proto/bookstore.descriptor",
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"preserve_proto_field_names": true}
     })",
