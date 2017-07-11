@@ -15,8 +15,8 @@
   additional error handing that cannot possibly happen in the case an exception is thrown.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
-* Function names using camel case starting with a lower case letter (e.g., "doFoo()").
-* Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
+* Function names using camel case starting with a lower case letter (e.g., `doFoo()`).
+* Struct/Class member variables have a `_` postfix (e.g., `int foo_;`).
 * Enum values using PascalCase (e.g., `RoundRobin`).
 * 100 columns is the line limit.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
@@ -30,6 +30,13 @@
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
   the callsite clear. Otherwise, it's difficult to tell if a const reference is actually being
   passed to the called function. This is true even for `std::unique_ptr`.
+* Prefer `unique_ptr` over `shared_ptr` wherever possible. `unique_ptr` makes ownership in
+  production code easier to reason about. Note that this creates some test oddities where 
+  production code requires a `unique_ptr` but the test must still have access to the memory
+  the production code is using (mock or otherwise). In these cases it is acceptable to allocate
+  raw memory in a test and return it to the production code with the expectation that the 
+  production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
+  quite a bit for these cases. (Search the code for "factory").
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
   This _includes_ types such as `std::string`. We encourage the use of the
   advice in the [C++ FAQ on the static initialization
@@ -45,6 +52,9 @@
   exceptions such as `main()` functions. When code cannot be placed inside the
   Envoy namespace there should be a comment of the form `// NOLINT(namespace-envoy)` at
   the top of the file.
+* If a method that must be defined outside the `test` directory is intended to be called only
+  from test code then it should have a name that ends in `ForTest()` such as `aMethodForTest()`.
+  In most cases tests can and should be structured so this is not necessary.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 

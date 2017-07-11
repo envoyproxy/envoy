@@ -56,14 +56,17 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   )EOF";
 
   // Add the listener.
-  ConditionalInitializer listener_added;
+  ConditionalInitializer listener_added_by_worker;
+  ConditionalInitializer listener_added_by_manager;
   test_server_->setOnWorkerListenerAddedCb(
-      [&listener_added]() -> void { listener_added.setReady(); });
+      [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json, GetParam());
-  test_server_->server().dispatcher().post([this, loader]() -> void {
+  test_server_->server().dispatcher().post([this, loader, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(*loader));
+    listener_added_by_manager.setReady();
   });
-  listener_added.waitReady();
+  listener_added_by_worker.waitReady();
+  listener_added_by_manager.waitReady();
 
   EXPECT_EQ(2UL, test_server_->server().listenerManager().listeners().size());
   uint32_t new_listener_port = test_server_->server()

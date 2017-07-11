@@ -3,6 +3,7 @@
 #include "envoy/json/json_object.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/ssl/context.h"
@@ -35,6 +36,11 @@ public:
   virtual std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
                           Configuration::FactoryContext& context) PURE;
+
+  /**
+   * @return DrainManagerPtr a new drain manager.
+   */
+  virtual DrainManagerPtr createDrainManager() PURE;
 
   /**
    * @return uint64_t a listener tag usable for connection handler tracking.
