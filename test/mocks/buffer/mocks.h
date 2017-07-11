@@ -33,11 +33,6 @@ public:
     return bytes_written;
   }
 
-  int FailWrite(int) {
-    errno = EAGAIN;
-    return -1;
-  }
-
   int bytes_written() const { return bytes_written_; }
 
 private:
