@@ -139,11 +139,11 @@ bool ProxyProtocol::ActiveConnection::readLine(int fd, std::string& s) {
       }
     }
 
+    // Read the data upto and including the line feed, if available, but not past it.
+    // This should never fail, as search_index_ - buf_off_ <= nread, so we're asking
+    // only for bytes we have already seen.
     nread = recv(fd, buf_ + buf_off_, search_index_ - buf_off_, 0);
-
-    if (nread < 1) {
-      throw EnvoyException("failed to read proxy protocol");
-    }
+    ASSERT(size_t(nread) == search_index_ - buf_off_);
 
     buf_off_ += nread;
 
