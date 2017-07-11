@@ -558,7 +558,9 @@ private:
     };
 
     Network::FilterStatus onData(Buffer::Instance& data);
-    void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks);
+    void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
+                                          const Router::RouteEntry *route_entry,
+                                          HeaderMap &request_headers);
     void onConnectTimeout();
     void onDownstreamEvent(uint32_t event);
     void onUpstreamData(Buffer::Instance& data);
