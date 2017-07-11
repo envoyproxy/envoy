@@ -70,9 +70,8 @@ public:
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
   void write(Buffer::Instance& data) override;
-  void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
-  uint32_t readBufferLimit() const override { return read_buffer_limit_; }
-  void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) override;
+  void setBufferLimits(uint32_t limit) override;
+  uint32_t bufferLimit() const override { return read_buffer_limit_; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }

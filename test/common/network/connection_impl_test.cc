@@ -253,28 +253,28 @@ TEST_P(ConnectionImplTest, Watermarks) {
     // Go from watermarks being off to being above the high watermark.
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-    client_connection_->setWriteBufferWatermarks(1, buffer_len - 2);
+    client_connection_->setBufferLimits(buffer_len - 3);
   }
 
   {
     // Go from above the high watermark to in between both.
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-    client_connection_->setWriteBufferWatermarks(1, buffer_len + 2);
+    client_connection_->setBufferLimits(buffer_len + 1);
   }
 
   {
     // Go from above the high watermark to below the low watermark.
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
-    client_connection_->setWriteBufferWatermarks(buffer_len + 1, buffer_len * 2);
+    client_connection_->setBufferLimits(buffer_len * 3);
   }
 
   {
     // Go back in between and verify neither callback is called.
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-    client_connection_->setWriteBufferWatermarks(buffer_len - 2, buffer_len * 3);
+    client_connection_->setBufferLimits(buffer_len * 2);
   }
 
   disconnect();
@@ -313,7 +313,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
 
   useMockBuffer();
 
-  client_connection_->setWriteBufferWatermarks(1, 2);
+  client_connection_->setBufferLimits(2);
 
   std::string data_to_write = "hello world";
   Buffer::OwnedImpl first_buffer_to_write(data_to_write);
@@ -362,7 +362,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
 
   connect();
   useMockBuffer();
-  client_connection_->setWriteBufferWatermarks(5, 10);
+  client_connection_->setBufferLimits(10);
 
   Runtime::RandomGeneratorImpl rand;
   int bytes_buffered = 0;
@@ -396,7 +396,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // If the current bytes buffered plus the bytes we write this loop go over
     // the watermark and we're not currently above, we will get a callback for
     // going above.
-    if (bytes_to_write + bytes_buffered > 10 && is_below) {
+    if (bytes_to_write + bytes_buffered > 11 && is_below) {
       ENVOY_LOG_MISC(trace, "Expect onAboveWriteBufferHighWatermark");
       EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
       is_below = false;
@@ -426,9 +426,6 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   disconnect();
 }
 
-// TODO(alyssar) ensure we have a test where we drain the full read buffer,
-// readDisable, new data is sent (and not read) we readEnable and resume.
-
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
@@ -449,7 +446,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     uint32_t filter_seen = 0;

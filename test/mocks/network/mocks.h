@@ -65,9 +65,8 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
-  MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
-  MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
-  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t low_watermark, uint32_t high_watermark));
+  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
+  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
 };
 
 /**
@@ -98,9 +97,8 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
-  MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
-  MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
-  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t low_watermark, uint32_t high_watermark));
+  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
+  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

@@ -164,29 +164,20 @@ public:
   virtual void write(Buffer::Instance& data) PURE;
 
   /**
-   * Set a soft limit on the size of the read buffer prior to flushing to further stages in the
+   * Set a soft limit on the size of buffers for the connection.
+   * For the read buffer, this limits the bytes read prior to flushing to further stages in the
    * processing pipeline.
+   * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
+   * onAboveWriteBufferHighWatermark, which disables reads on the socket which is funneling data to
+   * the write butter.  When enough data is drained from the write buffer,
+   * onBelowWriteBufferHighWatermark is called which results in resuming reads.
    */
-  virtual void setReadBufferLimit(uint32_t limit) PURE;
+  virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
-   * Get the value set with setReadBufferLimit.
+   * Get the value set with setBufferLimits.
    */
-  virtual uint32_t readBufferLimit() const PURE;
-
-  /**
-   * Sets the high and low watermarks which trigger onAboveWriteBufferHighWatermark
-   * and onBelowWriteBufferHighWatermark callbacks.
-   * The connection is assumed to start out with less than high_watermark
-   * worth of data buffered, so onAboveWriteBufferHighWatermark will always be
-   * called before onAboveWriteBufferHighWatermark
-   * @param low_watermark if the connection was above the high watermark and the
-   * connection buffer is drained below this many bytes, onBelowWriteBufferHighWatermark will be
-   * called.
-   * @param high_watermark if the connection has more bytes than this buffered,
-   * onAboveWriteBufferHighWatermark will be called.
-   */
-  virtual void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) PURE;
+  virtual uint32_t bufferLimit() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

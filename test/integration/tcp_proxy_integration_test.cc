@@ -89,7 +89,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
 
 // Test proxying data in both directions with envoy doing TCP and TLS
 // termination.
-void TcpProxyIntegrationTest::SendAndReceiveTlsData(const std::string& data_to_send_upstream,
+void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                                     const std::string& data_to_send_downstream) {
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
@@ -153,11 +153,11 @@ void TcpProxyIntegrationTest::SendAndReceiveTlsData(const std::string& data_to_s
   });
 }
 
-TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { SendAndReceiveTlsData("hello", "world"); }
+TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { sendAndReceiveTlsData("hello", "world"); }
 
 TEST_P(TcpProxyIntegrationTest, LargeBidirectionalTlsWrites) {
   std::string large_data(1024 * 8, 'a');
-  SendAndReceiveTlsData(large_data, large_data);
+  sendAndReceiveTlsData(large_data, large_data);
 }
 
 } // namespace

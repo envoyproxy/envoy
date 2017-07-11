@@ -313,7 +313,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     uint32_t filter_seen = 0;
@@ -360,7 +360,7 @@ public:
     Initialize(read_buffer_limit);
 
     // For watermark testing, stick limits on the client connection as well.
-    client_connection_->setWriteBufferWatermarks(read_buffer_limit / 2, read_buffer_limit + 1);
+    client_connection_->setBufferLimits(read_buffer_limit);
     int times_called = bytes_to_write > read_buffer_limit ? 1 : 0;
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(times_called);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(times_called);
@@ -370,7 +370,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     std::unique_ptr<MockBuffer> buffer_ptr_{new MockBuffer()};

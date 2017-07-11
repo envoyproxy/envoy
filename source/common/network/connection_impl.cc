@@ -274,13 +274,20 @@ void ConnectionImpl::write(Buffer::Instance& data) {
   }
 }
 
-void ConnectionImpl::setWriteBufferWatermarks(uint32_t new_low_watermark,
-                                              uint32_t new_high_watermark) {
-  ENVOY_CONN_LOG(debug, "Setting watermarks: {} {}", *this, new_low_watermark, new_high_watermark);
-  ASSERT(new_low_watermark < new_high_watermark);
+void ConnectionImpl::setBufferLimits(uint32_t limit) {
+  read_buffer_limit_ = limit;
 
-  high_watermark_ = new_high_watermark;
-  low_watermark_ = new_low_watermark;
+  // Due to the fact that writes to the connection and flushing data from the connection are done
+  // asynchronously, we have the option of either setting the watermarks aggressively, and regularly
+  // enabling/disabling reads from the socket, or allowing more data, but then not triggering
+  // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
+  // limits we err on the side of buffering more and having better performace.
+  // If the connection class is changed to write-and-flush the high watermark should be changed to
+  // the buffer limit without the + 1
+  if (limit > 0) {
+    high_watermark_ = limit + 1;
+    low_watermark_ = limit / 2;
+  }
 
   checkForLowWatermark();
   checkForHighWatermark();

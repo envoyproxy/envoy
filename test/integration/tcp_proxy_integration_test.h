@@ -32,7 +32,7 @@ public:
     fake_upstreams_.clear();
   }
 
-  void SendAndReceiveTlsData(const std::string& data_to_send_upstream,
+  void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                              const std::string& data_to_send_downstream);
 };
 } // namespace
