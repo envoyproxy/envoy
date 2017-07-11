@@ -52,8 +52,9 @@
   exceptions such as `main()` functions. When code cannot be placed inside the
   Envoy namespace there should be a comment of the form `// NOLINT(namespace-envoy)` at
   the top of the file.
-* If a public method is only intended to be called from test code then it should
-  have a name that ends in ForTest() such as aMethodForTest().
+* If a method that must be defined outside the `test` directory is intended to be called only
+  from test code then it should have a name that ends in `ForTest()` such as `aMethodForTest()`.
+  In most cases tests can and should be structured so this is not necessary.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 
