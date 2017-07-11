@@ -74,11 +74,14 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void setUpBasicConnection() {
+    if (dispatcher_.get() == nullptr) {
+      dispatcher_.reset(new Event::DispatcherImpl);
+    }
     listener_ =
-        dispatcher_.createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+        dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
+                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-    client_connection_ = dispatcher_.createClientConnection(socket_.localAddress());
+    client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
     client_connection_->addConnectionCallbacks(client_callbacks_);
   }
 
@@ -92,20 +95,21 @@ public:
           server_connection_->addReadFilter(read_filter_);
         }));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   void disconnect() {
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   void useMockBuffer() {
-    ASSERT(client_connection_.get() == nullptr);
+    // This needs to be called before the dispatcher is created.
+    ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new MockBufferFactory;
-    dispatcher_.setBufferFactory(Buffer::FactoryPtr{factory});
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Expect one other call to create a server session which will by default
     // get a normal OwnedImpl.
@@ -125,7 +129,7 @@ public:
   }
 
 protected:
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), true};
   Network::MockListenerCallbacks listener_callbacks_;
@@ -163,9 +167,9 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 struct MockBufferStats {
@@ -226,12 +230,12 @@ TEST_P(ConnectionImplTest, BufferStats) {
       }));
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
 
   Buffer::OwnedImpl data("1234");
   client_connection_->write(data);
   client_connection_->write(data);
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 // Write some data to the connection.  It will automatically attempt to flush
@@ -250,11 +254,11 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   std::string data_written;
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                            Invoke(client_write_buffer_, &MockBuffer::BaseMove)));
+                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::TrackWrites));
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
   client_connection_->write(buffer_to_write);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
 
   disconnect();
@@ -264,14 +268,15 @@ class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
+    dispatcher_.reset(new Event::DispatcherImpl);
     listener_ =
-        dispatcher_.createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
-                                   {.bind_to_port_ = true,
-                                    .use_proxy_proto_ = false,
-                                    .use_original_dst_ = false,
-                                    .per_connection_buffer_limit_bytes_ = read_buffer_limit});
+        dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
+                                    {.bind_to_port_ = true,
+                                     .use_proxy_proto_ = false,
+                                     .use_original_dst_ = false,
+                                     .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
-    client_connection_ = dispatcher_.createClientConnection(socket_.localAddress());
+    client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
     client_connection_->connect();
 
     read_filter_.reset(new NiceMock<MockReadFilter>());
@@ -302,12 +307,12 @@ public:
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
           EXPECT_EQ(buffer_size, filter_seen);
-          dispatcher_.exit();
+          dispatcher_->exit();
         }));
 
     Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
     client_connection_->write(data);
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 };
 

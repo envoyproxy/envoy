@@ -155,13 +155,8 @@ public:
   virtual void run(RunType type) PURE;
 
   /**
-   * Optionally sets a custom buffer factory for the dispatcher.  This factory may be used by new
-   * connections on connection creation.
-   */
-  virtual void setBufferFactory(Buffer::FactoryPtr&& factory) PURE;
-
-  /**
-   * Returns the buffer factory for this dispatcher.
+   * Returns a factory which connections may use for buffer creation.
+   * @return the buffer factory for this dispatcher.
    */
   virtual Buffer::Factory& getBufferFactory() PURE;
 };

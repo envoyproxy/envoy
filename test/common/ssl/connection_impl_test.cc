@@ -279,13 +279,13 @@ TEST_P(SslConnectionImplTest, SslError) {
 class SslReadBufferLimitTest : public SslCertsTest,
                                public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  void Initialize(uint32_t read_buffer_limit) {
+  void initialize(uint32_t read_buffer_limit) {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
     server_ctx_config_.reset(new ContextConfigImpl(*server_ctx_loader_));
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ctx_ = manager_->createSslServerContext(stats_store_, *server_ctx_config_);
 
-    listener_ = dispatcher_.createSslListener(
+    listener_ = dispatcher_->createSslListener(
         connection_handler_, *server_ctx_, socket_, listener_callbacks_, stats_store_,
         {.bind_to_port_ = true,
          .use_proxy_proto_ = false,
@@ -297,7 +297,7 @@ public:
     client_ctx_ = manager_->createSslClientContext(stats_store_, *client_ctx_config_);
 
     client_connection_ =
-        dispatcher_.createSslClientConnection(*client_ctx_, socket_.localAddress());
+        dispatcher_->createSslClientConnection(*client_ctx_, socket_.localAddress());
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
     client_connection_->addConnectionCallbacks(client_callbacks_);
@@ -306,7 +306,7 @@ public:
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
-    Initialize(read_buffer_limit);
+    initialize(read_buffer_limit);
 
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
@@ -333,7 +333,7 @@ public:
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
           EXPECT_EQ((write_size * num_writes), filter_seen);
-          dispatcher_.exit();
+          dispatcher_->exit();
         }));
 
     for (uint32_t i = 0; i < num_writes; i++) {
@@ -351,7 +351,7 @@ public:
       client_connection_->write(data);
     }
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_EQ(0UL, stats_store_.counter("ssl.connection_error").value());
   }
@@ -359,7 +359,7 @@ public:
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
     MockBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new MockBufferFactory;
-    dispatcher_.setBufferFactory(Buffer::FactoryPtr{factory});
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
 
     ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
       return new Buffer::OwnedImpl;
@@ -375,7 +375,7 @@ public:
           return client_write_buffer;
         }));
 
-    Initialize(read_buffer_limit);
+    initialize(read_buffer_limit);
 
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
@@ -393,20 +393,20 @@ public:
     std::string data_written;
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                              Invoke(client_write_buffer, &MockBuffer::BaseMove)));
+                              Invoke(client_write_buffer, &MockBuffer::baseMove)));
     EXPECT_CALL(*client_write_buffer, drain(_))
-        .WillOnce(Invoke(client_write_buffer, &MockBuffer::BaseDrain));
+        .WillOnce(Invoke(client_write_buffer, &MockBuffer::baseDrain));
     client_connection_->write(buffer_to_write);
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     EXPECT_EQ(data_to_write, data_written);
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     client_connection_->close(Network::ConnectionCloseType::NoFlush);
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_{new Event::DispatcherImpl};
   Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;

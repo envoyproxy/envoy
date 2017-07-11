@@ -142,6 +142,7 @@ public:
 
   /**
    * Creates and returns a unique pointer to a new buffer.
+   * @return a newly created InstancePtr.
    */
   virtual InstancePtr create() PURE;
 };
