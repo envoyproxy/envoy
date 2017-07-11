@@ -9,10 +9,7 @@
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/http/rest_api_fetcher.h"
-#include "common/protobuf/descriptor.h"
-#include "common/protobuf/repeated_field.h"
-#include "common/protobuf/string.h"
-#include "common/protobuf/util/json_util.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
 #include "google/api/annotations.pb.h"
@@ -49,16 +46,16 @@ public:
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
     ASSERT(callbacks_ == nullptr);
-    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
-                                                                  resources.end());
+    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
+                                                                       resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
     callbacks_ = &callbacks;
     initialize();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    Protobuf::RepeatedPtrField<Protobuf::String> resources_vector(resources.begin(),
-                                                                  resources.end());
+    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
+                                                                       resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
   }
 
@@ -66,20 +63,20 @@ public:
   void createRequest(Http::Message& request) override {
     ENVOY_LOG(debug, "Sending REST request for {}", path_);
     stats_.update_attempt_.inc();
-    Protobuf::Util::JsonOptions json_options;
-    Protobuf::String request_json;
-    const auto status = Protobuf::Util::MessageToJsonString(request_, &request_json, json_options);
+    Protobuf::util::JsonOptions json_options;
+    ProtobufTypes::String request_json;
+    const auto status = Protobuf::util::MessageToJsonString(request_, &request_json, json_options);
     // If the status isn't OK, we just send an empty body.
     ASSERT(status.ok());
     request.headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
-    request.body().reset(new Buffer::OwnedImpl(Protobuf::FromString(request_json)));
+    request.body().reset(new Buffer::OwnedImpl(ProtobufTypes::FromString(request_json)));
   }
 
   void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
-    const auto status =
-        Protobuf::Util::JsonStringToMessage(Protobuf::ToString(response.bodyAsString()), &message);
+    const auto status = Protobuf::util::JsonStringToMessage(
+        ProtobufTypes::ToString(response.bodyAsString()), &message);
     if (!status.ok()) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
       handleFailure(nullptr);
@@ -88,7 +85,7 @@ public:
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(Protobuf::FromString(message.version_info()));
+      request_.set_version_info(ProtobufTypes::FromString(message.version_info()));
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
@@ -111,7 +108,7 @@ private:
   }
 
   std::string path_;
-  Protobuf::RepeatedPtrField<Protobuf::String> resources_;
+  Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;

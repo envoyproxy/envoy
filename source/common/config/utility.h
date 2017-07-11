@@ -4,7 +4,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/protobuf/repeated_field.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
 

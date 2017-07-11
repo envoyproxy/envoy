@@ -7,9 +7,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 
-#include "common/protobuf/descriptor.h"
-
-#include "google/protobuf/descriptor.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Grpc {

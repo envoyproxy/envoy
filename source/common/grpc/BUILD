@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -87,7 +88,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",
-        "//source/common/protobuf:descriptor",
+        "//source/common/protobuf",
     ],
 )
 
@@ -122,7 +123,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
-        "//source/common/protobuf:descriptor",
+        "//source/common/protobuf",
     ],
 )
 

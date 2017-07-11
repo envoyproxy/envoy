@@ -11,10 +11,9 @@
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
-#include "common/protobuf/repeated_field.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/eds.pb.h"
-#include "google/protobuf/util/time_util.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/protobuf/util:json_util",
+        "//source/common/protobuf",
     ],
 )
 
@@ -32,9 +32,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_lib",
-        "//source/common/protobuf:descriptor",
-        "//source/common/protobuf:repeated_field",
-        "//source/common/protobuf:string",
+        "//source/common/protobuf",
     ],
 )
 
@@ -52,10 +50,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/protobuf:descriptor",
-        "//source/common/protobuf:repeated_field",
-        "//source/common/protobuf:string",
-        "//source/common/protobuf/util:json_util",
+        "//source/common/protobuf",
     ],
 )
 
@@ -69,7 +64,7 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
-        "//source/common/protobuf:descriptor",
+        "//source/common/protobuf",
     ],
 )
 
@@ -89,7 +84,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/protobuf:repeated_field",
-        "//source/common/protobuf/util:time_util",
+        "//source/common/protobuf",
     ],
 )

@@ -6,7 +6,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
-#include "common/protobuf/descriptor.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"

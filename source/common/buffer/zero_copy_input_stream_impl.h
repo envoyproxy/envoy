@@ -5,14 +5,13 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/protobuf/io/zero_copy_stream.h"
-#include "common/protobuf/types.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 
 namespace Buffer {
 
-class ZeroCopyInputStreamImpl : public virtual Protobuf::Io::ZeroCopyInputStream {
+class ZeroCopyInputStreamImpl : public virtual Protobuf::io::ZeroCopyInputStream {
 public:
   // Create input stream with one buffer, and finish immediately
   ZeroCopyInputStreamImpl(Buffer::InstancePtr&& buffer);
@@ -38,7 +37,7 @@ public:
   virtual bool Next(const void** data, int* size) override;
   virtual void BackUp(int count) override;
   virtual bool Skip(int count) override; // Not implemented
-  virtual Protobuf::Int64 ByteCount() const override { return byte_count_; }
+  virtual int64_t ByteCount() const override { return byte_count_; }
 
 protected:
   Buffer::InstancePtr buffer_;

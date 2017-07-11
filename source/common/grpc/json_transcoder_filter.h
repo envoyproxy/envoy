@@ -7,7 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/transcoder_input_stream_impl.h"
-#include "common/protobuf/descriptor.h"
+#include "common/protobuf/protobuf.h"
 
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/io/zero_copy_stream.h"

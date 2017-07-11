@@ -8,7 +8,7 @@
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
-#include "common/protobuf/util/json_util.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
 
@@ -55,11 +55,12 @@ private:
     try {
       const std::string json = Filesystem::fileReadToEnd(path_);
       envoy::api::v2::DiscoveryResponse message;
-      const auto status = Protobuf::Util::JsonStringToMessage(Protobuf::ToString(json), &message);
+      const auto status =
+          Protobuf::util::JsonStringToMessage(ProtobufTypes::ToString(json), &message);
       if (!status.ok()) {
         callbacks_->onConfigUpdateFailed(nullptr);
         ENVOY_LOG(warn, "Filesystem config JSON conversion error: {}",
-                  Protobuf::FromString(status.ToString()));
+                  ProtobufTypes::FromString(status.ToString()));
         stats_.update_failure_.inc();
         return;
       }
