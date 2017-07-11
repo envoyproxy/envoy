@@ -507,6 +507,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                                      Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 
     if (isWsConnection && isWsRoute) {
+      route_entry->finalizeRequestHeaders(*request_headers_);
       ENVOY_STREAM_LOG(trace, "found websocket connection. Creating WsHandlerImpl (end_stream={}):", *this, end_stream);
       connection_manager_.ws_connection_ = std::unique_ptr<ConnectionManagerImpl::WsHandlerImpl>(
           new ConnectionManagerImpl::WsHandlerImpl(route_entry->clusterName(), *this));
@@ -1117,6 +1118,11 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(
   }
   Upstream::Host::CreateConnectionData conn_info =
       cluster_manager_.tcpConnForCluster(cluster_name_);
+
+  // for auto host rewrite
+  // if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
+  //   parent_.downstream_headers_->Host()->value(host->hostname());
+  // }
 
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
