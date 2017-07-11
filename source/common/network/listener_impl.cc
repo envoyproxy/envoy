@@ -49,7 +49,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     // connections that are NOT redirected using iptables. If a connection was not redirected,
     // the address returned by getOriginalDst() matches the local address of the new socket.
     // In this case the listener handles the connection directly and does not hand it off.
-    if (original_local_address && *original_local_address != *final_local_address) {
+    if (original_local_address && (*original_local_address != *final_local_address)) {
       final_local_address = original_local_address;
 
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
