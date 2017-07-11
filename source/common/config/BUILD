@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_library(
     name = "filesystem_subscription_lib",
     hdrs = ["filesystem_subscription_impl.h"],
-    external_deps = ["protobuf"],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",

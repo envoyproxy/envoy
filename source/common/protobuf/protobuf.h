@@ -19,6 +19,7 @@
 namespace Envoy {
 
 namespace Protobuf = google::protobuf;
+namespace ProtobufWkt = google::protobuf;
 
 namespace ProtobufTypes {
 

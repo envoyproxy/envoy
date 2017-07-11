@@ -34,7 +34,6 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = ["protobuf"],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/grpc:status",
@@ -111,7 +110,6 @@ envoy_cc_library(
     name = "rpc_channel_lib",
     srcs = ["rpc_channel_impl.cc"],
     hdrs = ["rpc_channel_impl.h"],
-    external_deps = ["protobuf"],
     deps = [
         ":common_lib",
         "//include/envoy/grpc:rpc_channel_interface",
