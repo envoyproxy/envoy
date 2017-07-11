@@ -41,9 +41,7 @@ def checkNamespace(file_path):
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
-  return len(
-      [path_segment in file_path
-       for path_segment in GOOGLE_PROTOBUF_WHITELIST]) > 0
+  return any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST)
 
 def checkProtobufExternalDepsBuild(file_path):
   if whitelistedForProtobufDeps(file_path):
