@@ -180,6 +180,6 @@ message DeleteBookRequest {
 
 // Request message for GetAuthor method.
 message GetAuthorRequest {
-  // The ID of the shelf resource to retrieve.
+  // The ID of the author resource to retrieve.
   int64 author = 1;
 }
