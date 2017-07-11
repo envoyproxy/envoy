@@ -310,7 +310,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   author.set_gender(bookstore::Author_Gender_MALE);
   author.set_last_name("Shakespeare");
 
-  auto response_data = Common::serializeBody(author);
+  const auto response_data = Common::serializeBody(author);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
@@ -322,20 +322,16 @@ INSTANTIATE_TEST_CASE_P(
     GrpcJsonTranscoderFilterPrintOptions, GrpcJsonTranscoderFilterPrintTest,
     ::testing::Values(
         GrpcJsonTranscoderFilterPrintTestParam{
-            R"(
-    {
+            R"({
      "proto_descriptor": "test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"]
-    }
-			                                           )",
+    })",
             R"({"id":"101","gender":"MALE","lname":"Shakespeare"})"},
-        GrpcJsonTranscoderFilterPrintTestParam{R"(
-    {
+        GrpcJsonTranscoderFilterPrintTestParam{R"({
      "proto_descriptor": "test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"add_whitespace": true}
-    }
-			                                           )",
+    })",
                                                R"({
  "id": "101",
  "gender": "MALE",
@@ -343,31 +339,24 @@ INSTANTIATE_TEST_CASE_P(
 }
 )"},
         GrpcJsonTranscoderFilterPrintTestParam{
-            R"(
-    {
+            R"({
      "proto_descriptor": "test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"always_print_primitive_fields": true}
-    }
-			                                           )",
+    })",
             R"({"id":"101","gender":"MALE","firstName":"","lname":"Shakespeare"})"},
-        GrpcJsonTranscoderFilterPrintTestParam{
-            R"(
-    {
+        GrpcJsonTranscoderFilterPrintTestParam{R"({
      "proto_descriptor": "test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"always_print_enums_as_ints": true}
-    }
-			                                           )",
-            R"({"id":"101","gender":1,"lname":"Shakespeare"})"},
+    })",
+                                               R"({"id":"101","gender":1,"lname":"Shakespeare"})"},
         GrpcJsonTranscoderFilterPrintTestParam{
-            R"(
-    {
+            R"({
      "proto_descriptor": "test/proto/bookstore.descriptor",
      "services": ["bookstore.Bookstore"],
      "print_options":{"preserve_proto_field_names": true}
-    }
-			                                           )",
+    })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
 } // namespace Grpc
