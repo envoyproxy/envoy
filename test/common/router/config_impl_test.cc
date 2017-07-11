@@ -2035,7 +2035,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 }
 
 TEST(CustomRequestHeadersTest, AddNewHeader) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 	{
   "virtual_hosts": [
     {
@@ -2146,6 +2146,11 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   }
 }
 
+bool CheckFormatMessage(const std::string errorMessage) {
+  std::size_t found = errorMessage.find("Incorrect configuration");
+  return (found != std::string::npos);
+}
+
 TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   std::string json = R"EOF(
 	{
@@ -2244,8 +2249,13 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-  EXPECT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
+  ASSERT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
+  try {
+    ConfigImpl config(*loader, runtime, cm, true);
+  } catch (EnvoyException& ex) {
+    EXPECT_PRED1(CheckFormatMessage, ex.what());
+  }
 }
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

@@ -38,6 +38,12 @@ private:
   std::string string_;
 };
 
+struct LowerCaseStringHasher {
+  std::size_t operator()(const LowerCaseString& value) const {
+    return std::hash<std::string>{}(value.get());
+  }
+};
+
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 3 different types of storage and can switch between them:

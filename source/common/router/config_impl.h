@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
@@ -42,7 +41,6 @@ public:
                                       uint64_t random_value) const PURE;
 };
 
-// forward declaration
 class RouteEntryImplBase;
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
 
@@ -203,7 +201,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& requestInfo) const override;
 
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
@@ -253,7 +251,7 @@ private:
     const std::string& clusterName() const override { return cluster_name_; }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                Http::AccessLog::RequestInfo& requestInfo) const override {
+                                const Http::AccessLog::RequestInfo& requestInfo) const override {
       return parent_->finalizeRequestHeaders(headers, requestInfo);
     }
 
@@ -354,7 +352,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& requestInfo) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -373,7 +371,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& requestInfo) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;

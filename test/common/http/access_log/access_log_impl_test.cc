@@ -65,7 +65,6 @@ public:
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  std::string downstream_address_;
   void setDownstreamAddress(std::string address) override { downstream_address_ = address; }
   const std::string& getDownstreamAddress() const override { return downstream_address_; }
 
@@ -76,6 +75,7 @@ public:
   uint64_t duration_{3};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
+  std::string downstream_address_;
 };
 
 class AccessLogImplTest : public testing::Test {

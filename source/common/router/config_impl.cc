@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <regex>
@@ -180,8 +179,8 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                Http::AccessLog::RequestInfo& requestInfo) const {
+void RouteEntryImplBase::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
 
@@ -355,8 +354,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const J
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.getString("prefix")) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                  Http::AccessLog::RequestInfo& requestInfo) const {
+void PrefixRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, prefix_);
@@ -375,8 +374,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json:
                                        Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.getString("path")) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                Http::AccessLog::RequestInfo& requestInfo) const {
+void PathRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, path_);

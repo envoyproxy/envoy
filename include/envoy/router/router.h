@@ -194,7 +194,7 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      Http::AccessLog::RequestInfo& requestInfo) const PURE;
+                                      const Http::AccessLog::RequestInfo& requestInfo) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.
@@ -324,5 +324,5 @@ public:
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy

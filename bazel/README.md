@@ -114,44 +114,6 @@ you can run the test with `--strategy=TestRunner=standalone`, e.g.:
 ```
 bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=standalone --run_under=/some/path/foobar.sh
 ```
-
-# Code Formatter with Bazel
-Envoy code is formatted based on [`clang-format-3.6`](http://releases.llvm.org/3.6.0/tools/clang/docs/ClangFormatStyleOptions.html). 
-
-On Ubuntu machine, run the following command to install `clang-format-3.6` using apt-get
-
-```
- apt-get install clang-format-3.6
-```
-
-The clang-format file [.clang_format](https://github.com/lyft/envoy/blob/master/.clang-format) outlines the formatting specs. 
-There is a handy tool [check_format.py](https://github.com/lyft/envoy/blob/master/tools/check_format.py) that can be run to check and fix the format on the code base. 
-Before you run the tool, you will need to install [`buildifier`](https://github.com/bazelbuild/buildtools) binary, a bazel-based formatting tool.
-
-```
- go get github.com/bazelbuild/buildtools/buildifier
-```
-
-After installing, set the environment variable `BUILDIFIER` to the absolute path of where the buildifier binary is installed.
-
-```
- export BUILDIFIER=<absolute path to buildifier binary>
-```
-
-Run the following command from the envoy root directory to `check` whether to code base is formatted as per the spec
-
-```
- :~/dev/source/envoy$ tools/check_format.py check
-```
-
-Run the following command to `fix` the format
-
-```
- :~/dev/source/envoy$ tools/check_format.py fix 
-``` 
-
-
-
 # Stack trace symbol resolution
 
 Envoy can produce backtraces on demand and from assertions and other fatal

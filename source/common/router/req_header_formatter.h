@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <iostream>
-#include <map>
 #include <string>
+#include <unordered_map>
 
 #include "common/common/logger.h"
 #include "common/http/access_log/access_log_formatter.h"
@@ -40,7 +40,6 @@ public:
 private:
   std::function<std::string(const Envoy::Http::AccessLog::RequestInfo&)> field_extractor_;
 };
-
 /**
  * Returns back the same static header value.
  */
@@ -68,9 +67,9 @@ class RequestHeaderParser;
 typedef std::shared_ptr<RequestHeaderParser> RequestHeaderParserSharedPtr;
 
 /**
-  * This class will hold the parsing logic required during configuration build and
-  * also perform evaluation for the variables at runtime.
-  */
+ * This class will hold the parsing logic required during configuration build and
+ * also perform evaluation for the variables at runtime.
+ */
 class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
 
 public:
@@ -81,10 +80,11 @@ public:
   static HeaderFormatterSharedPtr parseInternal(const std::string& format);
 
   void evaluateRequestHeaders(
-      Http::HeaderMap& headers, Http::AccessLog::RequestInfo& requestInfo,
+      Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
       const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
 
-  std::map<Http::LowerCaseString, HeaderFormatterSharedPtr> headerFormatterMap() {
+  std::unordered_map<Http::LowerCaseString, HeaderFormatterSharedPtr, Http::LowerCaseStringHasher>
+  headerFormatterMap() {
     return header_formatter_map_;
   };
 
@@ -92,8 +92,9 @@ private:
   /**
    * building a map of request header formatters.
    */
-  std::map<Http::LowerCaseString, HeaderFormatterSharedPtr> header_formatter_map_;
+  std::unordered_map<Http::LowerCaseString, HeaderFormatterSharedPtr, Http::LowerCaseStringHasher>
+      header_formatter_map_;
 };
 
-} // Router
-} // Envoy
+} // namespace Router
+} // namespace Envoy
