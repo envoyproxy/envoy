@@ -40,12 +40,12 @@ public:
   /**
    * @return the schema type.
    */
-  Schema::Type schemaType() { return schema_type_; }
+  Schema::Type schemaType() const { return schema_type_; }
 
   /**
    * @return the path to JSON file.
    */
-  const std::string& jsonPath() { return json_path_; }
+  const std::string& jsonPath() const { return json_path_; }
 
 private:
   Schema::Type schema_type_;

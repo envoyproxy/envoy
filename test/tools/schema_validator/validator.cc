@@ -32,7 +32,7 @@ Options::Options(int argc, char** argv) {
     cmd.parse(argc, argv);
   } catch (TCLAP::ArgException& e) {
     std::cerr << "error: " << e.error() << std::endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   if (schema_type.getValue() == Schema::toString(Schema::Type::Route)) {
@@ -48,14 +48,18 @@ Options::Options(int argc, char** argv) {
 void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
 
-  switch(schema_type) {
-    case Schema::Type::Route:
-      std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
-      std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
+  switch (schema_type) {
+  case Schema::Type::Route: {
+    std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
+    std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
         new NiceMock<Upstream::MockClusterManager>());
-      // Construct a Router::ConfigImpl to validate the Route configuration and ignore the
-      // output since nothing will consume it.
-      static_cast<void>(Router::ConfigImpl(*loader, *runtime, *cm, false));
+    // Construct a Router::ConfigImpl to validate the Route configuration and ignore the
+    // output since nothing will consume it.
+    UNREFERENCED_PARAMETER(Router::ConfigImpl(*loader, *runtime, *cm, false));
+    break;
+  }
+  default:
+    NOT_REACHED;
   }
 }
 
