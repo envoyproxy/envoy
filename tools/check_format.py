@@ -11,7 +11,7 @@ EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
 SUFFIXES = (".cc", ".h", "BUILD")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ('./ci/prebuilt', './source/common/protobuf')
+GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG-FORMAT", "clang-format-5.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
@@ -39,8 +39,12 @@ def checkNamespace(file_path):
   return True
 
 
+# To avoid breaking the Lyft import, we just check for path inclusion here.
+def whitelistedForProtobufDeps(file_path):
+  return len([prefix in file_path for prefix in GOOGLE_PROTOBUF_WHITELIST]) > 0
+
 def checkProtobufExternalDepsBuild(file_path):
-  if file_path.startswith(GOOGLE_PROTOBUF_WHITELIST):
+  if whitelistedForProtobufDeps(file_path):
     return True
   with open(file_path) as f:
     if re.search('"protobuf"', f.read(), re.MULTILINE):
@@ -52,7 +56,7 @@ def checkProtobufExternalDepsBuild(file_path):
 
 
 def checkProtobufExternalDeps(file_path):
-  if file_path.startswith(GOOGLE_PROTOBUF_WHITELIST):
+  if whitelistedForProtobufDeps(file_path):
     return True
   with open(file_path) as f:
     text = f.read()

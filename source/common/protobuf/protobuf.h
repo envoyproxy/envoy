@@ -18,15 +18,24 @@
 
 namespace Envoy {
 
+// All references to google::protobuf in Envoy need to be made via the
+// Envoy::Protobuf namespace. This is required to allow remapping of protobuf to
+// alternative implementations during import into other repositories. E.g. at
+// Google we have more than one protobuf implementation.
 namespace Protobuf = google::protobuf;
+
+// Protobuf well-known types (WKT) should be referenced via the ProtobufWkt
+// namespace.
 namespace ProtobufWkt = google::protobuf;
 
+// Alternative protobuf implementations might not use std::string as a string
+// type. Below we provide wrappers to facilitate remapping of the type during
+// import.
 namespace ProtobufTypes {
 
 typedef std::string String;
 
 inline const String ToString(const std::string& s) { return s; }
-
 inline const std::string FromString(const String& s) { return s; }
 
 } // namespace ProtobufTypes
