@@ -100,11 +100,11 @@ envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
     deps = [
-        ":drain_manager_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/network:drain_decision_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -117,6 +117,7 @@ envoy_cc_library(
     name = "listener_manager_interface",
     hdrs = ["listener_manager.h"],
     deps = [
+        ":drain_manager_interface",
         ":filter_config_interface",
         ":guarddog_interface",
         "//include/envoy/json:json_object_interface",

@@ -21,18 +21,19 @@ public:
   DrainManagerImpl(Instance& server);
 
   // Server::DrainManager
-  bool draining() override { return drain_tick_timer_ != nullptr; }
-  bool drainClose() override;
-  void startDrainSequence() override;
+  bool drainClose() const override;
+  void startDrainSequence(std::function<void()> completion) override;
   void startParentShutdownSequence() override;
 
 private:
+  bool draining() const { return drain_tick_timer_ != nullptr; }
   void drainSequenceTick();
 
   Instance& server_;
   Event::TimerPtr drain_tick_timer_;
   std::chrono::seconds drain_time_completed_{};
   Event::TimerPtr parent_shutdown_timer_;
+  std::function<void()> drain_sequence_completion_;
 };
 
 } // namespace Server
