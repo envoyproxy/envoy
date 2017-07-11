@@ -14,9 +14,6 @@ envoy_cc_test_library(
         "main.cc",
         "test_runner.h",
     ],
-    external_deps = [
-        "protobuf",
-    ],
     deps = [
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",

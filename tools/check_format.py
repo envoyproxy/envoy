@@ -10,6 +10,9 @@ EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-")
 SUFFIXES = (".cc", ".h", "BUILD")
 
+# Files in these paths can make reference to protobuf stuff directly
+GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -36,16 +39,50 @@ def checkNamespace(file_path):
   return True
 
 
+# To avoid breaking the Lyft import, we just check for path inclusion here.
+def whitelistedForProtobufDeps(file_path):
+  return len(
+      [path_segment in file_path
+       for path_segment in GOOGLE_PROTOBUF_WHITELIST]) > 0
+
+def checkProtobufExternalDepsBuild(file_path):
+  if whitelistedForProtobufDeps(file_path):
+    return True
+  with open(file_path) as f:
+    if re.search('"protobuf"', f.read(), re.MULTILINE):
+      printError(
+          "%s has unexpected direct external dependency on protobuf, use "
+          "//source/common/protobuf instead." % file_path)
+      return False
+    return True
+
+
+def checkProtobufExternalDeps(file_path):
+  if whitelistedForProtobufDeps(file_path):
+    return True
+  with open(file_path) as f:
+    text = f.read()
+    if re.search('"google/protobuf', text, re.MULTILINE) or re.search(
+        "google::protobuf", text, re.MULTILINE):
+      printError(
+          "%s has unexpected direct external dependency on protobuf, use "
+          "//source/common/protobuf instead." % file_path)
+      return False
+    return True
+
+
 def checkFilePath(file_path):
   if os.path.basename(file_path) == "BUILD":
     if os.system("%s %s | diff -q %s - > /dev/null" %
                  (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-      printError("envoy_build_fixer check failed for file: %s" % (file_path))
+      printError("envoy_build_fixer check failed for file: %s" % file_path)
     if os.system("cat %s | %s -mode=fix | diff -q %s - > /dev/null" %
                  (file_path, BUILDIFIER_PATH, file_path)) != 0:
-      printError("buildifier check failed for file: %s" % (file_path))
+      printError("buildifier check failed for file: %s" % file_path)
+    checkProtobufExternalDepsBuild(file_path)
     return
   checkNamespace(file_path)
+  checkProtobufExternalDeps(file_path)
   command = ("%s %s | diff -q %s - > /dev/null" % (HEADER_ORDER_PATH, file_path,
                                                    file_path))
   if os.system(command) != 0:
@@ -59,11 +96,12 @@ def checkFilePath(file_path):
 def fixFilePath(file_path):
   if os.path.basename(file_path) == "BUILD":
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-      printError("envoy_build_fixer rewrite failed for file: %s" % (file_path))
+      printError("envoy_build_fixer rewrite failed for file: %s" % file_path)
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
-      printError("buildifier rewrite failed for file: %s" % (file_path))
+      printError("buildifier rewrite failed for file: %s" % file_path)
     return
-  if not checkNamespace(file_path):
+  if not checkNamespace(file_path) or not checkProtobufExternalDepsBuild(
+      file_path) or not checkProtobufExternalDeps(file_path):
     printError("This cannot be automatically corrected. Please fix by hand.")
   command = "%s --rewrite %s" % (HEADER_ORDER_PATH, file_path)
   if os.system(command) != 0:

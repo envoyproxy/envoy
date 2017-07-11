@@ -14,9 +14,8 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
-#include "google/protobuf/io/coded_stream.h"
-#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -107,7 +106,7 @@ Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
   }
 }
 
-Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {
+Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
@@ -122,8 +121,8 @@ Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& messa
   const uint32_t nsize = htonl(size);
   std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   current += sizeof(uint32_t);
-  google::protobuf::io::ArrayOutputStream stream(current, size, -1);
-  google::protobuf::io::CodedOutputStream codec_stream(&stream);
+  Protobuf::io::ArrayOutputStream stream(current, size, -1);
+  Protobuf::io::CodedOutputStream codec_stream(&stream);
   message.SerializeWithCachedSizes(&codec_stream);
   body->commit(&iovec, 1);
   return body;

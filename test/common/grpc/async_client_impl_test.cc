@@ -176,7 +176,7 @@ public:
 
   std::vector<Http::MockAsyncClientStream*> dangling_streams_;
   std::vector<std::unique_ptr<Http::MockAsyncClientStream>> http_streams_;
-  const google::protobuf::MethodDescriptor* method_descriptor_;
+  const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   std::unique_ptr<AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>> grpc_client_;

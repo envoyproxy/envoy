@@ -34,7 +34,6 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = ["protobuf"],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/grpc:status",
@@ -52,6 +51,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -87,6 +87,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -109,7 +110,6 @@ envoy_cc_library(
     name = "rpc_channel_lib",
     srcs = ["rpc_channel_impl.cc"],
     hdrs = ["rpc_channel_impl.h"],
-    external_deps = ["protobuf"],
     deps = [
         ":common_lib",
         "//include/envoy/grpc:rpc_channel_interface",
@@ -121,6 +121,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf",
     ],
 )
 
