@@ -103,8 +103,9 @@ private:
     const std::string& addressAsString() const override { return friendly_address_; }
     bool isAnyAddress() const override { return ipv4_.address_.sin_addr.s_addr == INADDR_ANY; }
     bool isUnicastAddress() const override {
-      return !isAnyAddress() && ipv4_.address_.sin_addr.s_addr != INADDR_BROADCAST &&
-             !IN_MULTICAST(ipv4_.address_.sin_addr.s_addr);
+      return !isAnyAddress() && (ipv4_.address_.sin_addr.s_addr != INADDR_BROADCAST) &&
+             // inlined IN_MULTICAST() to avoid byte swapping
+             !((ipv4_.address_.sin_addr.s_addr & htonl(0xf0000000)) == htonl(0xe0000000));
     }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
