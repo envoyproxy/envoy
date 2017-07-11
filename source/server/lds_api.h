@@ -51,7 +51,7 @@ private:
   void onFetchFailure(const EnvoyException* e) override;
 
   const LocalInfo::LocalInfo& local_info_;
-  ListenerManager& lm_;
+  ListenerManager& listener_manager_;
   LdsStats stats_;
   std::function<void()> initialize_callback_;
 };

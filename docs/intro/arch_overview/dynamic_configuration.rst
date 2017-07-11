@@ -26,6 +26,8 @@ via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
 Though simplistic, fairly complicated deployments can be created using static configurations and
 graceful hot restarts.
 
+.. _arch_overview_dynamic_config_sds:
+
 SDS only
 --------
 
@@ -35,6 +37,8 @@ configuration, SDS allows an Envoy deployment to circumvent the limitations of D
 in a response, etc.) as well as consume more information used in load balancing and routing (e.g.,
 canary status, zone, etc.).
 
+.. _arch_overview_dynamic_config_cds:
+
 SDS and CDS
 -----------
 
@@ -42,15 +46,17 @@ The :ref:`cluster discovery service (CDS) API <config_cluster_manager_cds>` laye
 which Envoy can discover upstream clusters used during routing. Envoy will gracefully add, update,
 and remove clusters as specified by the API. This API allows implementors to build a topology in
 which Envoy does not need to be aware of all upstream clusters at initial configuration time.
-Typically, when doing HTTP routing along with CDS (but without route discovery service), implementors will make use of
-the router's ability to forward requests to a cluster specified in an :ref:`HTTP request header
-<config_http_conn_man_route_table_route_cluster_header>`.
+Typically, when doing HTTP routing along with CDS (but without route discovery service),
+implementors will make use of the router's ability to forward requests to a cluster specified in an
+:ref:`HTTP request header <config_http_conn_man_route_table_route_cluster_header>`.
 
 Although it is possible to use CDS without SDS by specifying fully static clusters, we recommend
 still using the SDS API for clusters specified via CDS. Internally, when a cluster definition is
 updated, the operation is graceful. However, all existing connection pools will be drained and
 reconnected. SDS does not suffer from this limitation. When hosts are added and removed via SDS,
 the existing hosts in the cluster are unaffected.
+
+.. _arch_overview_dynamic_config_rds:
 
 SDS, CDS, and RDS
 -----------------
@@ -61,6 +67,8 @@ The route configuration will be gracefully swapped in without affecting existing
 when used alongside SDS and CDS, allows implementors to build a complex routing topology
 (:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
 deployment, etc.) that will not require any Envoy restarts other than to obtain a new Envoy binary.
+
+.. _arch_overview_dynamic_config_lds:
 
 SDS, CDS, RDS, and LDS
 ----------------------

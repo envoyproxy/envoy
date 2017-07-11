@@ -15,6 +15,9 @@ The semantics of listener updates are as follows:
 * When a listener is added, it will be "warmed" before taking traffic. For example, if the listener
   references an :ref:`RDS <config_http_conn_man_rds>` configuration, that configuration will be
   resolved and fetched before the listener is moved to "active."
+* Listeners are effectively constant once created. Thus, when a listener is updated, an entirely
+  new listener is created (with the same listen socket). This listener goes through the same
+  warming process described above for a newly added listener.
 * When a listener is updated or removed, the old listener will be placed into a "draining" state
   much like when the entire server is drained for restart. Connections owned by the listener will
   be gracefully closed (if possible) for some period of time before the listener is removed and any
@@ -60,8 +63,10 @@ JSON schema:
 
 listeners
   *(Required, array)* A list of :ref:`listeners <config_listeners>` that will be
-  dynamically added/modified within the listener manager. Envoy will reconcile this list with the
-  listeners that are currently loaded and either add/modify/remove listeners as necessary.
+  dynamically added/modified within the listener manager. The management server is expected to
+  respond with the complete set of listeners that Envoy should configure during each polling cycle.
+  Envoy will reconcile this list with the listeners that are currently loaded and either
+  add/modify/remove listeners as necessary.
 
 Statistics
 ----------

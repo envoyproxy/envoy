@@ -17,7 +17,7 @@ namespace Server {
 
 class LdsApiTest : public testing::Test {
 public:
-  LdsApiTest() : request_(&cm_.async_client_) {}
+  LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
   void setup() {
     std::string config_json = R"EOF(
@@ -29,23 +29,24 @@ public:
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     EXPECT_CALL(init_, registerTarget(_));
-    lds_.reset(new LdsApi(*config, cm_, dispatcher_, random_, init_, local_info_, store_, lm_));
+    lds_.reset(new LdsApi(*config, cluster_manager_, dispatcher_, random_, init_, local_info_,
+                          store_, listener_manager_));
 
     expectRequest();
     init_.initialize();
   }
 
-  void expectAdd(const std::string& listener_name) {
-    EXPECT_CALL(lm_, addOrUpdateListener(_))
-        .WillOnce(Invoke([listener_name](const Json::Object& config) -> bool {
+  void expectAdd(const std::string& listener_name, bool updated) {
+    EXPECT_CALL(listener_manager_, addOrUpdateListener(_))
+        .WillOnce(Invoke([listener_name, updated](const Json::Object& config) -> bool {
           EXPECT_EQ(listener_name, config.getString("name"));
-          return true;
+          return updated;
         }));
   }
 
   void expectRequest() {
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("foo_cluster"));
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("foo_cluster"));
+    EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
         .WillOnce(
             Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                        const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
@@ -66,16 +67,16 @@ public:
       listeners_.back().name_ = name;
       refs.push_back(listeners_.back());
     }
-    EXPECT_CALL(lm_, listeners()).WillOnce(Return(refs));
+    EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
   }
 
-  Upstream::MockClusterManager cm_;
+  Upstream::MockClusterManager cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Init::MockManager init_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
-  MockListenerManager lm_;
+  MockListenerManager listener_manager_;
   Http::MockAsyncClientRequest request_;
   std::unique_ptr<LdsApi> lds_;
   Event::MockTimer* interval_timer_{new Event::MockTimer(&dispatcher_)};
@@ -108,8 +109,8 @@ TEST_F(LdsApiTest, Basic) {
   message->body().reset(new Buffer::OwnedImpl(response1_json));
 
   makeListenersAndExpectCall({});
-  expectAdd("listener1");
-  expectAdd("listener2");
+  expectAdd("listener1", true);
+  expectAdd("listener2", true);
   EXPECT_CALL(init_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -135,9 +136,9 @@ TEST_F(LdsApiTest, Basic) {
   message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   makeListenersAndExpectCall({"listener1", "listener2"});
-  expectAdd("listener1");
-  expectAdd("listener3");
-  EXPECT_CALL(lm_, removeListener("listener2"));
+  expectAdd("listener1", false);
+  expectAdd("listener3", true);
+  EXPECT_CALL(listener_manager_, removeListener("listener2"));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

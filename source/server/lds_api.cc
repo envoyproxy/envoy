@@ -14,7 +14,7 @@ LdsApi::LdsApi(const Json::Object& config, Upstream::ClusterManager& cm,
     : Json::Validator(config, Json::Schema::LDS_CONFIG_SCHEMA),
       RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
-      local_info_(local_info), lm_(lm),
+      local_info_(local_info), listener_manager_(lm),
       stats_({ALL_LDS_STATS(POOL_COUNTER_PREFIX(scope, "listener_manager.lds."))}) {
   init_manager.registerTarget(*this);
 }
@@ -40,20 +40,22 @@ void LdsApi::parseResponse(const Http::Message& response) {
 
   // We need to keep track of which listeners we might need to remove.
   std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
-  for (const auto& listener : lm_.listeners()) {
+  for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
 
   for (const auto& listener : json_listeners) {
     const std::string listener_name = listener->getString("name");
     listeners_to_remove.erase(listener_name);
-    if (lm_.addOrUpdateListener(*listener)) {
+    if (listener_manager_.addOrUpdateListener(*listener)) {
       ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
+    } else {
+      ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
     }
   }
 
   for (const auto& listener : listeners_to_remove) {
-    if (lm_.removeListener(listener.first)) {
+    if (listener_manager_.removeListener(listener.first)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", listener.first);
     }
   }
