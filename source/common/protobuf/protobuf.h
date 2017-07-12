@@ -38,5 +38,7 @@ typedef std::string String;
 inline const String ToString(const std::string& s) { return s; }
 inline const std::string FromString(const String& s) { return s; }
 
+typedef int64_t Int64;
+
 } // namespace ProtobufTypes
 } // namespace Envoy

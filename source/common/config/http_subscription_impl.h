@@ -78,7 +78,8 @@ public:
     const auto status = Protobuf::util::JsonStringToMessage(
         ProtobufTypes::ToString(response.bodyAsString()), &message);
     if (!status.ok()) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}",
+                ProtobufTypes::FromString(status.ToString()));
       handleFailure(nullptr);
       return;
     }
