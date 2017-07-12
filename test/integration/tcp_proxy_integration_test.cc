@@ -85,6 +85,30 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
       [&]() -> void { fake_rest_connection->close(); },
       [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
+
+  uint32_t upstream_pauses =
+      test_server_->store()
+          .counter("cluster.cluster_with_buffer_limits.upstream_flow_control_paused_reading_total")
+          .value();
+  uint32_t upstream_resumes =
+      test_server_->store()
+          .counter("cluster.cluster_with_buffer_limits.upstream_flow_control_resumed_reading_total")
+          .value();
+  EXPECT_LT(0, upstream_pauses);
+  EXPECT_LT(0, upstream_resumes);
+  EXPECT_EQ(upstream_pauses, upstream_resumes);
+
+  uint32_t downstream_pauses =
+      test_server_->store()
+          .counter("tcp.tcp_with_write_limits.downstream_flow_control_paused_reading_total")
+          .value();
+  uint32_t downstream_resumes =
+      test_server_->store()
+          .counter("tcp.tcp_with_write_limits.downstream_flow_control_resumed_reading_total")
+          .value();
+  EXPECT_LT(0, downstream_pauses);
+  EXPECT_LT(0, downstream_resumes);
+  EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
 // Test proxying data in both directions with envoy doing TCP and TLS

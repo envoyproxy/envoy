@@ -126,18 +126,24 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 void TcpProxy::readDisableUpstream(bool disable) {
   upstream_connection_->readDisable(disable);
   if (disable) {
-    config_->stats().upstream_pause_reading_.inc();
+    read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_flow_control_paused_reading_total_.inc();
   } else {
-    config_->stats().upstream_resume_reading_.inc();
+    read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_flow_control_resumed_reading_total_.inc();
   }
 }
 
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
   if (disable) {
-    config_->stats().downstream_pause_reading_.inc();
+    config_->stats().downstream_flow_control_paused_reading_total_.inc();
   } else {
-    config_->stats().downstream_resume_reading_.inc();
+    config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }
 
