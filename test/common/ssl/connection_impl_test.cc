@@ -13,6 +13,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -316,80 +317,61 @@ TEST_P(SslConnectionImplTest, SslError) {
 class SslReadBufferLimitTest : public SslCertsTest,
                                public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
-                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
-    Stats::IsolatedStoreImpl stats_store;
-    Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
-    Network::MockListenerCallbacks listener_callbacks;
-    Network::MockConnectionHandler connection_handler;
+  void initialize(uint32_t read_buffer_limit) {
+    server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
+    server_ctx_config_.reset(new ContextConfigImpl(*server_ctx_loader_));
+    manager_.reset(new ContextManagerImpl(runtime_));
+    server_ctx_ = manager_->createSslServerContext(stats_store_, *server_ctx_config_);
 
-    std::string server_ctx_json = R"EOF(
-    {
-      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-      "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
-    }
-    )EOF";
-    Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-    ContextConfigImpl server_ctx_config(*server_ctx_loader);
-    Runtime::MockLoader runtime;
-    ContextManagerImpl manager(runtime);
-    ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
-
-    Network::ListenerPtr listener = dispatcher.createSslListener(
-        connection_handler, *server_ctx, socket, listener_callbacks, stats_store,
+    listener_ = dispatcher_->createSslListener(
+        connection_handler_, *server_ctx_, socket_, listener_callbacks_, stats_store_,
         {.bind_to_port_ = true,
          .use_proxy_proto_ = false,
          .use_original_dst_ = false,
          .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
-    std::string client_ctx_json = R"EOF(
-    {
-      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
-      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
-    }
-    )EOF";
+    client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
+    client_ctx_config_.reset(new ContextConfigImpl(*client_ctx_loader_));
+    client_ctx_ = manager_->createSslClientContext(stats_store_, *client_ctx_config_);
 
-    Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-    ContextConfigImpl client_ctx_config(*client_ctx_loader);
-    ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+    client_connection_ =
+        dispatcher_->createSslClientConnection(*client_ctx_, socket_.localAddress());
+    client_connection_->connect();
+    read_filter_.reset(new Network::MockReadFilter());
+    client_connection_->addConnectionCallbacks(client_callbacks_);
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  }
 
-    Network::ClientConnectionPtr client_connection =
-        dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
-    client_connection->connect();
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
+                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
+    initialize(read_buffer_limit);
 
-    Network::ConnectionPtr server_connection;
-    std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
-    EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          server_connection = std::move(conn);
-          server_connection->addReadFilter(read_filter);
-          EXPECT_EQ("", server_connection->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection->readBufferLimit());
+          server_connection_ = std::move(conn);
+          server_connection_->addReadFilter(read_filter_);
+          EXPECT_EQ("", server_connection_->nextProtocol());
+          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
         }));
 
     uint32_t filter_seen = 0;
 
-    EXPECT_CALL(*read_filter, onNewConnection());
-    EXPECT_CALL(*read_filter, onData(_))
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Network::FilterStatus {
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
           if (filter_seen == (write_size * num_writes)) {
-            server_connection->close(Network::ConnectionCloseType::FlushWrite);
+            server_connection_->close(Network::ConnectionCloseType::FlushWrite);
           }
           return Network::FilterStatus::StopIteration;
         }));
 
-    Network::MockConnectionCallbacks client_callbacks;
-    client_connection->addConnectionCallbacks(client_callbacks);
-    EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected));
-    EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
           EXPECT_EQ((write_size * num_writes), filter_seen);
-          dispatcher.exit();
+          dispatcher_->exit();
         }));
 
     for (uint32_t i = 0; i < num_writes; i++) {
@@ -404,13 +386,94 @@ public:
         data.commit(iovecs, 2);
       }
 
-      client_connection->write(data);
+      client_connection_->write(data);
     }
 
-    dispatcher.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-    EXPECT_EQ(0UL, stats_store.counter("ssl.connection_error").value());
+    EXPECT_EQ(0UL, stats_store_.counter("ssl.connection_error").value());
   }
+
+  void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
+    MockBuffer* client_write_buffer = nullptr;
+    MockBufferFactory* factory = new MockBufferFactory;
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
+
+    ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
+      return new Buffer::OwnedImpl;
+    }));
+    // By default, expect 4 buffers to be created - the client and server read and write buffers.
+    EXPECT_CALL(*factory, create_())
+        .Times(4)
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          return new MockBuffer; // client read buffer.
+        }))
+        .WillOnce(Invoke([&]() -> Buffer::Instance* {
+          client_write_buffer = new MockBuffer;
+          return client_write_buffer;
+        }));
+
+    initialize(read_buffer_limit);
+
+    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+          server_connection_ = std::move(conn);
+          server_connection_->addReadFilter(read_filter_);
+          EXPECT_EQ("", server_connection_->nextProtocol());
+          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+        }));
+
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_)).Times(testing::AnyNumber());
+
+    std::string data_to_write(bytes_to_write, 'a');
+    Buffer::OwnedImpl buffer_to_write(data_to_write);
+    std::string data_written;
+    EXPECT_CALL(*client_write_buffer, move(_))
+        .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                              Invoke(client_write_buffer, &MockBuffer::baseMove)));
+    EXPECT_CALL(*client_write_buffer, drain(_))
+        .WillOnce(Invoke(client_write_buffer, &MockBuffer::baseDrain));
+    client_connection_->write(buffer_to_write);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    EXPECT_EQ(data_to_write, data_written);
+
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    client_connection_->close(Network::ConnectionCloseType::NoFlush);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Event::DispatcherPtr dispatcher_{new Event::DispatcherImpl};
+  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), true};
+  Network::MockListenerCallbacks listener_callbacks_;
+  Network::MockConnectionHandler connection_handler_;
+  std::string server_ctx_json_ = R"EOF(
+    {
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+      "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+    }
+    )EOF";
+  std::string client_ctx_json_ = R"EOF(
+    {
+      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+    }
+  )EOF";
+  Runtime::MockLoader runtime_;
+  Json::ObjectSharedPtr server_ctx_loader_;
+  std::unique_ptr<ContextConfigImpl> server_ctx_config_;
+  std::unique_ptr<ContextManagerImpl> manager_;
+  ServerContextPtr server_ctx_;
+  Network::ListenerPtr listener_;
+  Json::ObjectSharedPtr client_ctx_loader_;
+  std::unique_ptr<ContextConfigImpl> client_ctx_config_;
+  ClientContextPtr client_ctx_;
+  Network::ClientConnectionPtr client_connection_;
+  Network::ConnectionPtr server_connection_;
+  std::shared_ptr<Network::MockReadFilter> read_filter_;
+  Network::MockConnectionCallbacks client_callbacks_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
@@ -429,6 +492,10 @@ TEST_P(SslReadBufferLimitTest, NoLimitSmallWrites) {
 TEST_P(SslReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
+
+TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5 * 1024, 1024); }
+
+TEST_P(SslReadBufferLimitTest, WritesLargerThanBufferLimit) { singleWriteTest(1024, 5 * 1024); }
 
 } // namespace Ssl
 } // namespace Envoy
