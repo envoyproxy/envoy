@@ -184,7 +184,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 }
 
 ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
-  std::string final_prefix = "listener_manager.";
+  const std::string final_prefix = "listener_manager.";
   return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
