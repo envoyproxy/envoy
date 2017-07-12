@@ -884,6 +884,34 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "proto_descriptor" : {"type" : "string"},
+      "services" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : { "type" : "string" }
+      },
+      "print_options" : {
+        "type" : "object",
+        "properties" : {
+          "add_whitespace": {"type" : "boolean"},
+          "always_print_primitive_fields": {"type" : "boolean"},
+          "always_print_enums_as_ints": {"type" : "boolean"},
+          "preserve_proto_field_names": {"type" : "boolean"}
+        },
+        "additionalProperties" : false
+      }
+    },
+    "required" : ["proto_descriptor", "services"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1016,6 +1044,40 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::LDS_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "listeners" : {
+        "type" : "array",
+        "items" : {"type" : "object"}
+      }
+    },
+    "required" : ["listeners"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "cluster" : {
+        "type" : "string"
+      },
+      "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required" : ["cluster"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1086,6 +1148,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "array",
         "items" : {"type" : "object"}
       },
+      "lds" : {"type" : "object"},
       "admin" : {
         "type" : "object",
         "properties" : {

@@ -54,7 +54,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
-        .WillOnce(WithArg<3>(Invoke([&](::google::protobuf::Message* raw_response) -> void {
+        .WillOnce(WithArg<3>(Invoke([&](Protobuf::Message* raw_response) -> void {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
         })));
 
@@ -74,7 +74,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
-        .WillOnce(WithArg<3>(Invoke([&](::google::protobuf::Message* raw_response) -> void {
+        .WillOnce(WithArg<3>(Invoke([&](Protobuf::Message* raw_response) -> void {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
         })));
 
@@ -97,7 +97,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         request, "foo",
         {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
-        .WillOnce(WithArg<3>(Invoke([&](::google::protobuf::Message* raw_response) -> void {
+        .WillOnce(WithArg<3>(Invoke([&](Protobuf::Message* raw_response) -> void {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
         })));
 
@@ -115,7 +115,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   pb::lyft::ratelimit::RateLimitResponse* response;
 
   EXPECT_CALL(*channel_, CallMethod(_, _, _, _, nullptr))
-      .WillOnce(WithArg<3>(Invoke([&](::google::protobuf::Message* raw_response) -> void {
+      .WillOnce(WithArg<3>(Invoke([&](Protobuf::Message* raw_response) -> void {
         response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
       })));
 

@@ -66,6 +66,19 @@ public:
     return raw_listener;
   }
 
+  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
+                  uint64_t active, uint64_t draining) {
+    EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
+    EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
+    EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
+    EXPECT_EQ(warming,
+              server_.stats_store_.gauge("listener_manager.total_listeners_warming").value());
+    EXPECT_EQ(active,
+              server_.stats_store_.gauge("listener_manager.total_listeners_active").value());
+    EXPECT_EQ(draining,
+              server_.stats_store_.gauge("listener_manager.total_listeners_draining").value());
+  }
+
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   MockWorker* worker_ = new MockWorker();
@@ -320,6 +333,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener, but with a different address. Should throw.
   std::string listener_foo_different_address_json = R"EOF(
@@ -356,9 +370,11 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener. Should share socket.
   std::string listener_foo_update1_json = R"EOF(
@@ -375,6 +391,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 1, 0, 0, 1, 0);
 
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_));
@@ -383,6 +400,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 1, 0, 0, 1, 0);
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -392,10 +410,13 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 2, 0, 0, 1, 1);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo_update1->drain_manager_->drain_sequence_completion_();
+  checkStats(1, 2, 0, 0, 1, 1);
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   worker_->callRemovalCompletion();
+  checkStats(1, 2, 0, 0, 1, 0);
 
   // Add bar listener.
   std::string listener_bar_json = R"EOF(
@@ -412,6 +433,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(*worker_, addListener(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(2UL, manager_->listeners().size());
+  checkStats(2, 2, 0, 0, 2, 0);
 
   // Add baz listener, this time requiring initializing.
   std::string listener_baz_json = R"EOF(
@@ -428,9 +450,11 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(listener_baz->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(2UL, manager_->listeners().size());
+  checkStats(3, 2, 0, 1, 2, 0);
 
   // Update a duplicate baz that is currently warming.
   EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  checkStats(3, 2, 0, 1, 2, 0);
 
   // Update baz while it is warming.
   std::string listener_baz_update1_json = R"EOF(
@@ -452,11 +476,13 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(listener_baz_update1->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(2UL, manager_->listeners().size());
+  checkStats(3, 3, 0, 1, 2, 0);
 
   // Finish initialization for baz which should make it active.
   EXPECT_CALL(*worker_, addListener(_));
   listener_baz_update1->target_.callback_();
   EXPECT_EQ(3UL, manager_->listeners().size());
+  checkStats(3, 3, 0, 0, 3, 0);
 
   EXPECT_CALL(*listener_foo_update2, onDestroy());
   EXPECT_CALL(*listener_bar, onDestroy());
@@ -487,22 +513,27 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(1, 0, 1, 0, 0, 1);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(1, 0, 1, 0, 0, 1);
 
   // Add foo again. We should use the socket from draining.
   loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo2 = expectListenerCreate(false);
   EXPECT_CALL(*worker_, addListener(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(2, 0, 1, 0, 1, 1);
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
+  checkStats(2, 0, 1, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo2, onDestroy());
 }
@@ -548,6 +579,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
@@ -556,6 +588,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(1, 0, 1, 0, 0, 1);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
@@ -563,6 +596,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(1, 0, 1, 0, 0, 1);
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
@@ -571,6 +605,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
+  checkStats(1, 0, 1, 0, 0, 0);
 }
 
 TEST_F(ListenerManagerImplTest, RemoveListener) {
@@ -597,20 +632,24 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   EXPECT_CALL(listener_foo->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(0UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 1, 0, 0);
 
   // Remove foo.
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->removeListener("foo"));
   EXPECT_EQ(0UL, manager_->listeners().size());
+  checkStats(1, 0, 1, 0, 0, 0);
 
   // Add foo again and initialize it.
   listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_foo->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  checkStats(2, 0, 1, 1, 0, 0);
   EXPECT_CALL(*worker_, addListener(_));
   listener_foo->target_.callback_();
   EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(2, 0, 1, 0, 1, 0);
 
   // Update foo into warming.
   std::string listener_foo_update1_json = R"EOF(
@@ -628,17 +667,21 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   EXPECT_CALL(listener_foo_update1->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(2, 1, 1, 1, 1, 0);
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(2, 1, 2, 0, 0, 1);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(2, 1, 2, 0, 0, 1);
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
+  checkStats(2, 1, 2, 0, 0, 0);
 }
 
 } // namespace Server

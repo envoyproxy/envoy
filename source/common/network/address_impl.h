@@ -102,6 +102,11 @@ private:
   struct IpHelper : public Ip {
     const std::string& addressAsString() const override { return friendly_address_; }
     bool isAnyAddress() const override { return ipv4_.address_.sin_addr.s_addr == INADDR_ANY; }
+    bool isUnicastAddress() const override {
+      return !isAnyAddress() && (ipv4_.address_.sin_addr.s_addr != INADDR_BROADCAST) &&
+             // inlined IN_MULTICAST() to avoid byte swapping
+             !((ipv4_.address_.sin_addr.s_addr & htonl(0xf0000000)) == htonl(0xe0000000));
+    }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
@@ -160,6 +165,9 @@ private:
     const std::string& addressAsString() const override { return friendly_address_; }
     bool isAnyAddress() const override {
       return 0 == memcmp(&ipv6_.address_.sin6_addr, &in6addr_any, sizeof(struct in6_addr));
+    }
+    bool isUnicastAddress() const override {
+      return !isAnyAddress() && !IN6_IS_ADDR_MULTICAST(&ipv6_.address_.sin6_addr);
     }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }

@@ -33,6 +33,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
   }
 
+  int verify_mode = SSL_VERIFY_NONE;
+
   if (!config.caCertFile().empty()) {
     ca_cert_ = loadCert(config.caCertFile());
     ca_file_path_ = config.caCertFile();
@@ -47,8 +49,25 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     rc = SSL_CTX_add_client_CA(ctx_.get(), ca_cert_.get());
     RELEASE_ASSERT(1 == rc);
 
-    // enable peer certificate verification
-    SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER, nullptr);
+    verify_mode = SSL_VERIFY_PEER;
+  }
+
+  if (!config.verifySubjectAltNameList().empty()) {
+    verify_subject_alt_name_list_ = config.verifySubjectAltNameList();
+    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  }
+
+  if (!config.verifyCertificateHash().empty()) {
+    std::string hash = config.verifyCertificateHash();
+    // remove ':' delimiters from hex string
+    hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
+    verify_certificate_hash_ = Hex::decode(hash);
+    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  }
+
+  if (verify_mode != SSL_VERIFY_NONE) {
+    SSL_CTX_set_verify(ctx_.get(), verify_mode, nullptr);
+    SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
   if (!config.certChainFile().empty()) {
@@ -65,15 +84,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
       throw EnvoyException(
           fmt::format("Failed to load private key file {}", config.privateKeyFile()));
     }
-  }
-
-  verify_subject_alt_name_list_ = config.verifySubjectAltNameList();
-
-  if (!config.verifyCertificateHash().empty()) {
-    std::string hash = config.verifyCertificateHash();
-    // remove ':' delimiters from hex string
-    hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
-    verify_certificate_hash_ = Hex::decode(hash);
   }
 
   SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
@@ -137,35 +147,46 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
-bool ContextImpl::verifyPeer(SSL* ssl) const {
-  bool verified = true;
+int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
+  ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
 
+  int ret = X509_verify_cert(store_ctx);
+  if (ret <= 0) {
+    impl->stats_.fail_verify_error_.inc();
+    return ret;
+  }
+
+  SSL* ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+  return impl->verifyCertificate(cert.get());
+}
+
+int ContextImpl::verifyCertificate(X509* cert) {
+  if (!verify_subject_alt_name_list_.empty() &&
+      !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
+    stats_.fail_verify_san_.inc();
+    return 0;
+  }
+
+  if (!verify_certificate_hash_.empty() && !verifyCertificateHash(cert, verify_certificate_hash_)) {
+    stats_.fail_verify_cert_hash_.inc();
+    return 0;
+  }
+
+  return 1;
+}
+
+void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
 
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
-
-  if (!verify_subject_alt_name_list_.empty()) {
-    if (cert.get() == nullptr || !verifySubjectAltName(cert.get(), verify_subject_alt_name_list_)) {
-      stats_.fail_verify_san_.inc();
-      verified = false;
-    }
-  }
-
-  if (!verify_certificate_hash_.empty()) {
-    if (cert.get() == nullptr || !verifyCertificateHash(cert.get(), verify_certificate_hash_)) {
-      stats_.fail_verify_cert_hash_.inc();
-      verified = false;
-    }
-  }
-
-  return verified;
 }
 
 bool ContextImpl::verifySubjectAltName(X509* cert,

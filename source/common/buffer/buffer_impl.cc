@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Buffer {
 
+InstancePtr OwnedImplFactory::create() { return InstancePtr{new OwnedImpl()}; }
+
 // RawSlice is the same structure as evbuffer_iovec. This was put into place to avoid leaking
 // libevent into most code since we will likely replace evbuffer with our own implementation at
 // some point. However, we can avoid a bunch of copies since the structure is the same.

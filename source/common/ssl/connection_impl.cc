@@ -70,7 +70,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);
+    uint64_t num_slices = read_buffer_->reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
       ENVOY_CONN_LOG(trace, "ssl read returns: {}", *this, rc);
@@ -97,7 +97,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     }
 
     if (slices_to_commit > 0) {
-      read_buffer_.commit(slices, slices_to_commit);
+      read_buffer_->commit(slices, slices_to_commit);
       if (shouldDrainReadBuffer()) {
         setReadBufferReady();
         keep_reading = false;
@@ -113,12 +113,8 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", *this);
-    if (!ctx_.verifyPeer(ssl_.get())) {
-      ENVOY_CONN_LOG(debug, "SSL peer verification failed", *this);
-      return PostIoAction::Close;
-    }
-
     handshake_complete_ = true;
+    ctx_.logHandshake(ssl_.get());
     raiseEvents(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
@@ -139,15 +135,24 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 
 void ConnectionImpl::drainErrorQueue() {
   bool saw_error = false;
+  bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
-    if (!saw_error) {
-      ctx_.stats().connection_error_.inc();
-      saw_error = true;
+    if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
+      if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
+        ctx_.stats().fail_verify_no_cert_.inc();
+        saw_counted_error = true;
+      } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
+        saw_counted_error = true;
+      }
     }
+    saw_error = true;
 
     ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
+  }
+  if (saw_error && !saw_counted_error) {
+    ctx_.stats().connection_error_.inc();
   }
 }
 

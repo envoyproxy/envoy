@@ -4,6 +4,7 @@
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -14,7 +15,6 @@
 
 #include "api/eds.pb.h"
 #include "gmock/gmock.h"
-#include "google/protobuf/util/json_util.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;
@@ -29,7 +29,7 @@ typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubsc
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness()
-      : method_descriptor_(google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+      : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
@@ -102,8 +102,7 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_EQ(google::protobuf::util::Status::OK,
-              google::protobuf::util::JsonStringToMessage(response_json, &response_pb));
+    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body().reset(new Buffer::OwnedImpl(response_json));
@@ -133,7 +132,7 @@ public:
   bool request_in_progress_{};
   std::string version_;
   std::vector<std::string> cluster_names_;
-  const google::protobuf::MethodDescriptor* method_descriptor_;
+  const Protobuf::MethodDescriptor* method_descriptor_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;

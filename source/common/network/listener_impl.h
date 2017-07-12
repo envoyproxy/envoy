@@ -37,6 +37,7 @@ public:
   ListenSocket& socket() { return socket_; }
 
 protected:
+  virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
   virtual Address::InstanceConstSharedPtr getOriginalDst(int fd);
 
   Network::ConnectionHandler& connection_handler_;

@@ -29,6 +29,8 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::AnyNumber;
+using testing::Invoke;
 using testing::_;
 
 namespace Envoy {
@@ -179,17 +181,27 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
+                                           MockBufferFactory& factory, uint32_t port,
                                            Network::Address::IpVersion version)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
+  EXPECT_CALL(factory, create_())
+      .Times(2)
+      .WillOnce(Invoke([&]() -> Buffer::Instance* {
+        return new Buffer::OwnedImpl; // client read buffer.
+      }))
+      .WillOnce(Invoke([&]() -> Buffer::Instance* {
+        client_write_buffer_ = new MockBuffer;
+        return client_write_buffer_;
+      }));
+
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
 
-  std::unique_ptr<MockBuffer> buffer{new MockBuffer()};
-  buffer_ = buffer.get();
-  dynamic_cast<Network::ConnectionImpl*>(connection_.get())
-      ->replaceWriteBufferForTest(std::move(buffer));
+  ON_CALL(*client_write_buffer_, drain(_))
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::baseDrain));
+  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
@@ -214,13 +226,13 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
-  EXPECT_CALL(*buffer_, move(_)).Times(1);
-  EXPECT_CALL(*buffer_, write(_)).Times(1);
+  EXPECT_CALL(*client_write_buffer_, move(_)).Times(1);
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(1);
 
-  int bytes_expected = buffer_->bytes_written() + data.size();
+  int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
   connection_->write(buffer);
-  while (buffer_->bytes_written() != bytes_expected) {
+  while (client_write_buffer_->bytes_written() != bytes_expected) {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   }
 }
@@ -234,7 +246,8 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher()),
+      mock_buffer_factory_(new MockBufferFactory),
+      dispatcher_(new Event::DispatcherImpl(Buffer::FactoryPtr{mock_buffer_factory_})),
       default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
@@ -243,6 +256,9 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  ON_CALL(*mock_buffer_factory_, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
+    return new Buffer::OwnedImpl;
+  }));
 }
 
 BaseIntegrationTest::~BaseIntegrationTest() {}
@@ -271,7 +287,8 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port, version_)};
+  return IntegrationTcpClientPtr{
+      new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port, version_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

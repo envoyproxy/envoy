@@ -50,6 +50,26 @@ class ListenerImpl;
 typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
 
 /**
+ * All listener manager stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
+  COUNTER(listener_added)                                                                          \
+  COUNTER(listener_modified)                                                                       \
+  COUNTER(listener_removed)                                                                        \
+  GAUGE  (total_listeners_warming)                                                                 \
+  GAUGE  (total_listeners_active)                                                                  \
+  GAUGE  (total_listeners_draining)
+// clang-format on
+
+/**
+ * Struct definition for all listener manager stats. @see stats_macros.h
+ */
+struct ListenerManagerStats {
+  ALL_LISTENER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
  * Implementation of ListenerManager.
  */
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
@@ -82,6 +102,13 @@ private:
     uint64_t workers_pending_removal_;
   };
 
+  static ListenerManagerStats generateStats(Stats::Scope& scope);
+  void updateWarmingActiveGauges() {
+    // Set is used so hot restart / multiple processes converge to a single value.
+    stats_.total_listeners_warming_.set(warming_listeners_.size());
+    stats_.total_listeners_active_.set(active_listeners_.size());
+  }
+
   /**
    * Mark a listener for draining. The listener will no longer be considered active but will remain
    * present to allow connection draining.
@@ -111,9 +138,9 @@ private:
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   std::mutex draining_listeners_lock_;
+  ListenerManagerStats stats_;
 };
 
-// TODO(mattklein123): Listener manager stats.
 // TODO(mattklein123): Check that addresses for unbound listeners are unique.
 // TODO(mattklein123): Detect runtime worker listener addition failure and handle.
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -150,7 +177,6 @@ public:
   void infoLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
-  const std::string& name() const { return name_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
 
   // Server::Listener
@@ -163,6 +189,7 @@ public:
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() override { return listener_tag_; }
+  const std::string& name() const override { return name_; }
 
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {

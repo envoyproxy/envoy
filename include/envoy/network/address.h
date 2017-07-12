@@ -60,6 +60,12 @@ public:
   virtual bool isAnyAddress() const PURE;
 
   /**
+   * @return whether this address is a valid unicast address, i.e., not an wild card, broadcast, or
+   * multicast address.
+   */
+  virtual bool isUnicastAddress() const PURE;
+
+  /**
    * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;

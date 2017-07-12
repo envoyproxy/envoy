@@ -119,7 +119,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version);
 
   void close();
@@ -144,7 +144,7 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
-  MockBuffer* buffer_;
+  MockBuffer* client_write_buffer_;
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
@@ -181,6 +181,7 @@ public:
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
+  MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
 
 protected:

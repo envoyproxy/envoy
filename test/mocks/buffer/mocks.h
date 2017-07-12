@@ -13,8 +13,8 @@ class MockBuffer : public Buffer::OwnedImpl {
 public:
   MockBuffer() {
     ON_CALL(*this, write(testing::_))
-        .WillByDefault(testing::Invoke(this, &MockBuffer::TrackWrites));
-    ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::BaseMove));
+        .WillByDefault(testing::Invoke(this, &MockBuffer::trackWrites));
+    ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::baseMove));
   }
 
   MOCK_METHOD1(write, int(int fd));
@@ -22,10 +22,10 @@ public:
   MOCK_METHOD2(move, void(Instance& rhs, uint64_t length));
   MOCK_METHOD1(drain, void(uint64_t size));
 
-  void BaseMove(Instance& rhs) { Buffer::OwnedImpl::move(rhs); }
-  void BaseDrain(uint64_t size) { Buffer::OwnedImpl::drain(size); }
+  void baseMove(Instance& rhs) { Buffer::OwnedImpl::move(rhs); }
+  void baseDrain(uint64_t size) { Buffer::OwnedImpl::drain(size); }
 
-  int TrackWrites(int fd) {
+  int trackWrites(int fd) {
     int bytes_written = Buffer::OwnedImpl::write(fd);
     if (bytes_written > 0) {
       bytes_written_ += bytes_written;
@@ -33,7 +33,8 @@ public:
     return bytes_written;
   }
 
-  int FailWrite(int) {
+  // A convenience function to invoke on write() which fails the write with EAGAIN.
+  int failWrite(int) {
     errno = EAGAIN;
     return -1;
   }
@@ -42,6 +43,13 @@ public:
 
 private:
   int bytes_written_{0};
+};
+
+class MockBufferFactory : public Buffer::Factory {
+public:
+  Buffer::InstancePtr create() override { return Buffer::InstancePtr{create_()}; }
+
+  MOCK_METHOD0(create_, Buffer::Instance*());
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
