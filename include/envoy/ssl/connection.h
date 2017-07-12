@@ -4,8 +4,6 @@
 
 #include "envoy/common/pure.h"
 
-#include "openssl/ssl.h"
-
 namespace Envoy {
 namespace Ssl {
 
@@ -44,11 +42,6 @@ public:
    *         certificate, or no SAN field, or no URI.
    **/
   virtual std::string uriSanPeerCertificate() PURE;
-
-  /**
-   * @return underlying SSL object for use with BoringSSL.
-   **/
-  virtual SSL* rawSslForTest() PURE;
 };
 
 } // namespace Ssl

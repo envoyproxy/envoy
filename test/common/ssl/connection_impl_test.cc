@@ -302,7 +302,8 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
 
-  Ssl::Connection* ssl_connection = client_connection->ssl();
+  Ssl::ConnectionImpl* ssl_connection =
+      dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
   ASSERT(ssl_connection != nullptr);
   SSL* ssl = ssl_connection->rawSslForTest();
   ASSERT(ssl != nullptr);

@@ -31,7 +31,8 @@ public:
   std::string sha256PeerCertificateDigest() override;
   std::string subjectPeerCertificate() override;
   std::string uriSanPeerCertificate() override;
-  SSL* rawSslForTest() override { return ssl_.get(); }
+
+  SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
   PostIoAction doHandshake();
