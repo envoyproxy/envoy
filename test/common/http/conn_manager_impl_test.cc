@@ -1092,6 +1092,9 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   setupFilterChain(3, 2);
 
+  // Test route caching.
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route_config_provider_.route_config_->route_,
@@ -1099,11 +1102,6 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
         EXPECT_EQ(ssl_connection_.get(), decoder_filters_[0]->callbacks_->ssl());
         return FilterHeadersStatus::StopIteration;
       }));
-
-  // Test route caching.
-  // TODO (rshriram): HELP: Somehow, enabling this causes assertion failure in
-  // in commonContinue [ ASSERT(stopped_); ]
-  // EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
 
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
