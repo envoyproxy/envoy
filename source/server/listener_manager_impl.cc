@@ -177,10 +177,16 @@ void ListenerImpl::setSocket(const Network::ListenSocketSharedPtr& socket) {
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory) {
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
     workers_.emplace_back(worker_factory.createWorker());
   }
+}
+
+ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
+  const std::string final_prefix = "listener_manager.";
+  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
@@ -220,6 +226,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
     throw EnvoyException(message);
   }
 
+  bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
     // In this case we can just replace inline.
     ASSERT(workers_started_);
@@ -267,6 +274,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
       new_listener->infoLog("add active listener");
       active_listeners_.emplace_back(std::move(new_listener));
     }
+
+    added = true;
+  }
+
+  updateWarmingActiveGauges();
+  if (added) {
+    stats_.listener_added_.inc();
+  } else {
+    stats_.listener_modified_.inc();
   }
 
   new_listener_ref.initialize();
@@ -281,6 +297,9 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
     std::lock_guard<std::mutex> guard(draining_listeners_lock_);
     draining_it = draining_listeners_.emplace(draining_listeners_.begin(), std::move(listener),
                                               workers_.size());
+    // Must be done under lock. Set is used so hot restart / multiple processes converge to a
+    // single value. Same below inside the lambda.
+    stats_.total_listeners_draining_.set(draining_listeners_.size());
   }
 
   // Tell all workers to stop accepting new connections on this listener.
@@ -303,10 +322,13 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         if (--draining_it->workers_pending_removal_ == 0) {
           draining_it->listener_->infoLog("listener removal complete");
           draining_listeners_.erase(draining_it);
+          stats_.total_listeners_draining_.set(draining_listeners_.size());
         }
       });
     }
   });
+
+  updateWarmingActiveGauges();
 }
 
 ListenerManagerImpl::ListenerList::iterator
@@ -350,6 +372,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   }
 
   warming_listeners_.erase(existing_warming_listener);
+  updateWarmingActiveGauges();
 }
 
 uint64_t ListenerManagerImpl::numConnections() {
@@ -384,6 +407,8 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     active_listeners_.erase(existing_active_listener);
   }
 
+  stats_.listener_removed_.inc();
+  updateWarmingActiveGauges();
   return true;
 }
 
