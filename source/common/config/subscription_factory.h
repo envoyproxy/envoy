@@ -6,6 +6,7 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
 
@@ -58,14 +59,12 @@ public:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method),
-            stats));
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::ApiConfigSource::GRPC:
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             node, cm, cluster_name, dispatcher,
-            *google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-            stats));
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats));
         break;
       default:
         NOT_REACHED;

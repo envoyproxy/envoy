@@ -248,6 +248,10 @@
     }
   },
 
+  "lds": {
+    "cluster": "lds"
+  },
+
   "runtime": {
     "symlink_root": "{{ test_rundir }}/test/common/runtime/test_data/current",
     "subdirectory": "envoy",
@@ -267,6 +271,13 @@
     "clusters": [
     {
       "name": "rds",
+      "connect_timeout_ms": 5000,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+    },
+    {
+      "name": "lds",
       "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",

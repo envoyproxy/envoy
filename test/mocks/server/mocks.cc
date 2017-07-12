@@ -54,6 +54,7 @@ MockListener::MockListener() {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
 MockListener::~MockListener() {}
 

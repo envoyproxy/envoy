@@ -29,3 +29,4 @@ Architecture overview
   dynamo
   hot_restart
   dynamic_configuration
+  init

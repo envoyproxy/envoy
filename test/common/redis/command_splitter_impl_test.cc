@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/redis/command_splitter_impl.h"
+#include "common/redis/supported_commands.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/common.h"
@@ -196,7 +197,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerTest,
                         RedisAllParamsToOneServerCommandHandlerTest,
-                        testing::ValuesIn(Commands::allToOneCommands()));
+                        testing::ValuesIn(SupportedCommands::allToOneCommands()));
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerMixedCaseTests,
                         RedisAllParamsToOneServerCommandHandlerTest,

@@ -150,7 +150,6 @@ public:
   void infoLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
-  const std::string& name() const { return name_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
 
   // Server::Listener
@@ -163,6 +162,7 @@ public:
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() override { return listener_tag_; }
+  const std::string& name() const override { return name_; }
 
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {

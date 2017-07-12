@@ -7,14 +7,14 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "google/protobuf/repeated_field.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
 
 template <class ResourceType> class SubscriptionCallbacks {
 public:
-  typedef google::protobuf::RepeatedPtrField<ResourceType> ResourceVector;
+  typedef Protobuf::RepeatedPtrField<ResourceType> ResourceVector;
 
   virtual ~SubscriptionCallbacks() {}
 
