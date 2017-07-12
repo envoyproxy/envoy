@@ -294,15 +294,6 @@
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
       "hosts": [{"url": "tcp://localhost:10009"}]
-    },
-    {
-      "name": "lightstep_saas",
-      "features": "http2",
-      "connect_timeout_ms": 5000,
-      "type": "strict_dns",
-      "lb_type": "round_robin",
-      "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:10010"}]
     }]
   }
 }
