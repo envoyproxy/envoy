@@ -9,6 +9,7 @@
 #include "common/ssl/context_config_impl.h"
 
 #include "server/configuration_impl.h" // TODO(mattklein123): Remove post 1.4.0
+#include "server/drain_manager_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -87,6 +88,10 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   }
 }
 
+DrainManagerPtr ProdListenerComponentFactory::createDrainManager() {
+  return DrainManagerPtr{new DrainManagerImpl(server_)};
+}
+
 ListenerImpl::ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent,
                            const std::string& name, bool workers_started, uint64_t hash)
     : Json::Validator(json, Json::Schema::LISTENER_SCHEMA), parent_(parent),
@@ -98,7 +103,8 @@ ListenerImpl::ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent
       per_connection_buffer_limit_bytes_(
           json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
-      workers_started_(workers_started), hash_(hash) {
+      workers_started_(workers_started), hash_(hash),
+      local_drain_manager_(parent.factory_.createDrainManager()) {
 
   // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
   // later.
@@ -128,6 +134,13 @@ ListenerImpl::~ListenerImpl() {
 
 bool ListenerImpl::createFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
+}
+
+bool ListenerImpl::drainClose() const {
+  // When a listener is draining, the "drain close" decision is the union of the per-listener drain
+  // manager and the server wide drain manager. This allows individual listeners to be drained and
+  // removed independently of a server-wide drain event (e.g., /healthcheck/fail or hot restart).
+  return local_drain_manager_->drainClose() || parent_.server_.drainManager().drainClose();
 }
 
 void ListenerImpl::infoLog(const std::string& message) {
@@ -164,10 +177,16 @@ void ListenerImpl::setSocket(const Network::ListenSocketSharedPtr& socket) {
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory) {
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
     workers_.emplace_back(worker_factory.createWorker());
   }
+}
+
+ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
+  const std::string final_prefix = "listener_manager.";
+  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
@@ -207,6 +226,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
     throw EnvoyException(message);
   }
 
+  bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
     // In this case we can just replace inline.
     ASSERT(workers_started_);
@@ -254,6 +274,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
       new_listener->infoLog("add active listener");
       active_listeners_.emplace_back(std::move(new_listener));
     }
+
+    added = true;
+  }
+
+  updateWarmingActiveGauges();
+  if (added) {
+    stats_.listener_added_.inc();
+  } else {
+    stats_.listener_modified_.inc();
   }
 
   new_listener_ref.initialize();
@@ -261,25 +290,45 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
 }
 
 void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
-  // TODO(mattklein123): Actually implement timed draining in a follow up. Currently we just
-  // correctly synchronize removal across all workers.
+  // First add the listener to the draining list. This must be done under the lock since it
+  // can race with remove completions.
   std::list<DrainingListener>::iterator draining_it;
   {
     std::lock_guard<std::mutex> guard(draining_listeners_lock_);
     draining_it = draining_listeners_.emplace(draining_listeners_.begin(), std::move(listener),
                                               workers_.size());
+    // Must be done under lock. Set is used so hot restart / multiple processes converge to a
+    // single value. Same below inside the lambda.
+    stats_.total_listeners_draining_.set(draining_listeners_.size());
   }
 
-  draining_it->listener_->infoLog("removing listener");
+  // Tell all workers to stop accepting new connections on this listener.
+  draining_it->listener_->infoLog("draining listener");
   for (const auto& worker : workers_) {
-    worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-      std::lock_guard<std::mutex> guard(draining_listeners_lock_);
-      if (--draining_it->workers_pending_removal_ == 0) {
-        draining_it->listener_->infoLog("listener removal complete");
-        draining_listeners_.erase(draining_it);
-      }
-    });
+    worker->stopListener(*draining_it->listener_);
   }
+
+  // The following sets up 2 level lambda. The first completes when the listener's drain manager
+  // has completed draining at whatever the server configured drain times are. Once the drain time
+  // has completed via the drain manager's timer, we tell the workers to remove the listener. The
+  // 2nd lambda acquires the lock and determines when we can remove the listener from the draining
+  // list. This makes sure that we don't destroy the listener while filters might still be using its
+  // context (stats, etc.).
+  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
+    draining_it->listener_->infoLog("removing listener");
+    for (const auto& worker : workers_) {
+      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+        std::lock_guard<std::mutex> guard(draining_listeners_lock_);
+        if (--draining_it->workers_pending_removal_ == 0) {
+          draining_it->listener_->infoLog("listener removal complete");
+          draining_listeners_.erase(draining_it);
+          stats_.total_listeners_draining_.set(draining_listeners_.size());
+        }
+      });
+    }
+  });
+
+  updateWarmingActiveGauges();
 }
 
 ListenerManagerImpl::ListenerList::iterator
@@ -306,6 +355,12 @@ std::vector<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
+  // The warmed listener should be added first so that the worker will accept new connections
+  // when it stops listening on the old listener.
+  for (const auto& worker : workers_) {
+    worker->addListener(listener);
+  }
+
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   (*existing_warming_listener)->infoLog("warm complete. updating active listener");
@@ -317,10 +372,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   }
 
   warming_listeners_.erase(existing_warming_listener);
-
-  for (const auto& worker : workers_) {
-    worker->addListener(listener);
-  }
+  updateWarmingActiveGauges();
 }
 
 uint64_t ListenerManagerImpl::numConnections() {
@@ -355,6 +407,8 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     active_listeners_.erase(existing_active_listener);
   }
 
+  stats_.listener_removed_.inc();
+  updateWarmingActiveGauges();
   return true;
 }
 

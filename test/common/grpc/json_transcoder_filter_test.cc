@@ -6,6 +6,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -15,7 +16,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;
@@ -25,13 +25,14 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
+using Envoy::Protobuf::MethodDescriptor;
+
+using Envoy::Protobuf::FileDescriptorSet;
+using Envoy::Protobuf::util::MessageDifferencer;
+using Envoy::Protobuf::util::Status;
+using Envoy::Protobuf::util::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
-using google::protobuf::FileDescriptorSet;
-using google::protobuf::MethodDescriptor;
-using google::protobuf::util::MessageDifferencer;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {
@@ -148,7 +149,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
-  EXPECT_EQ(google::protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(Protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
             status.error_message());
   EXPECT_FALSE(transcoder);
@@ -284,6 +285,82 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
   EXPECT_EQ(0, request_data.length());
 }
+
+struct GrpcJsonTranscoderFilterPrintTestParam {
+  std::string config_json_;
+  std::string expected_response_;
+};
+
+class GrpcJsonTranscoderFilterPrintTest
+    : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam> {
+public:
+  GrpcJsonTranscoderFilterPrintTest()
+      : config_(
+            *Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_))),
+        filter_(config_) {}
+
+  JsonTranscoderConfig config_;
+  JsonTranscoderFilter filter_;
+};
+
+TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "GET"}, {":path", "/authors/101"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  bookstore::Author author;
+  author.set_id(101);
+  author.set_gender(bookstore::Author_Gender_MALE);
+  author.set_last_name("Shakespeare");
+
+  const auto response_data = Common::serializeBody(author);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  std::string response_json = TestUtility::bufferToString(*response_data);
+  EXPECT_EQ(GetParam().expected_response_, response_json);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    GrpcJsonTranscoderFilterPrintOptions, GrpcJsonTranscoderFilterPrintTest,
+    ::testing::Values(
+        GrpcJsonTranscoderFilterPrintTestParam{
+            R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"]
+    })",
+            R"({"id":"101","gender":"MALE","lname":"Shakespeare"})"},
+        GrpcJsonTranscoderFilterPrintTestParam{R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "print_options":{"add_whitespace": true}
+    })",
+                                               R"({
+ "id": "101",
+ "gender": "MALE",
+ "lname": "Shakespeare"
+}
+)"},
+        GrpcJsonTranscoderFilterPrintTestParam{
+            R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "print_options":{"always_print_primitive_fields": true}
+    })",
+            R"({"id":"101","gender":"MALE","firstName":"","lname":"Shakespeare"})"},
+        GrpcJsonTranscoderFilterPrintTestParam{R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "print_options":{"always_print_enums_as_ints": true}
+    })",
+                                               R"({"id":"101","gender":1,"lname":"Shakespeare"})"},
+        GrpcJsonTranscoderFilterPrintTestParam{
+            R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "print_options":{"preserve_proto_field_names": true}
+    })",
+            R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
 } // namespace Grpc
 } // namespace Envoy

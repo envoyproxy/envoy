@@ -74,7 +74,7 @@ public:
   uint32_t readBufferLimit() const override { return read_buffer_limit_; }
 
   // Network::BufferSource
-  Buffer::Instance& getReadBuffer() override { return read_buffer_; }
+  Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
 protected:
@@ -90,7 +90,7 @@ protected:
   void raiseEvents(uint32_t events);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
-    return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
+    return read_buffer_limit_ > 0 && read_buffer_->length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
   // shouldDrainReadBuffer().
@@ -102,8 +102,8 @@ protected:
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
-  Buffer::OwnedImpl read_buffer_;
-  Buffer::OwnedImpl write_buffer_;
+  Buffer::InstancePtr read_buffer_;
+  Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:

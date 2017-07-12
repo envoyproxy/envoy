@@ -110,6 +110,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv6());
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -120,6 +121,7 @@ TEST(Ipv4InstanceTest, AddressOnly) {
   EXPECT_EQ(0U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("3.4.5.6"), address));
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv4InstanceTest, AddressAndPort) {
@@ -131,6 +133,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("127.0.0.1"), address));
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv4InstanceTest, PortOnly) {
@@ -142,6 +145,30 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("0.0.0.0"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
+}
+
+TEST(Ipv4InstanceTest, Multicast) {
+  Ipv4Instance address("230.0.0.1");
+  EXPECT_EQ("230.0.0.1:0", address.asString());
+  EXPECT_EQ(Type::Ip, address.type());
+  EXPECT_EQ("230.0.0.1", address.ip()->addressAsString());
+  EXPECT_FALSE(address.ip()->isAnyAddress());
+  EXPECT_EQ(0U, address.ip()->port());
+  EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("230.0.0.1"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
+}
+
+TEST(Ipv4InstanceTest, Broadcast) {
+  Ipv4Instance address("255.255.255.255");
+  EXPECT_EQ("255.255.255.255:0", address.asString());
+  EXPECT_EQ(Type::Ip, address.type());
+  EXPECT_EQ("255.255.255.255", address.ip()->addressAsString());
+  EXPECT_EQ(0U, address.ip()->port());
+  EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("255.255.255.255"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv4InstanceTest, BadAddress) {
@@ -164,6 +191,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv4());
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
@@ -175,6 +203,7 @@ TEST(Ipv6InstanceTest, AddressOnly) {
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
   EXPECT_TRUE(addressesEqual(
       Network::Utility::parseInternetAddress("2001:db8:85a3::8a2e:0370:7334"), address));
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv6InstanceTest, AddressAndPort) {
@@ -185,6 +214,7 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("0:0:0:0:0:0:0:1"), address));
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv6InstanceTest, PortOnly) {
@@ -196,6 +226,32 @@ TEST(Ipv6InstanceTest, PortOnly) {
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("::0000"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
+}
+
+TEST(Ipv6InstanceTest, Multicast) {
+  Ipv6Instance address("FF00::");
+  EXPECT_EQ("[ff00::]:0", address.asString());
+  EXPECT_EQ(Type::Ip, address.type());
+  EXPECT_EQ("ff00::", address.ip()->addressAsString());
+  EXPECT_FALSE(address.ip()->isAnyAddress());
+  EXPECT_EQ(0U, address.ip()->port());
+  EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(
+      Network::Utility::parseInternetAddress("FF00:0000:0000:0000:0000:0000:0000:0000"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
+}
+
+TEST(Ipv6InstanceTest, Broadcast) {
+  Ipv6Instance address("FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF");
+  EXPECT_EQ("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:0", address.asString());
+  EXPECT_EQ(Type::Ip, address.type());
+  EXPECT_EQ("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", address.ip()->addressAsString());
+  EXPECT_EQ(0U, address.ip()->port());
+  EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(
+      Network::Utility::parseInternetAddress("FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF"), address));
+  EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
 TEST(Ipv6InstanceTest, BadAddress) {

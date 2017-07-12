@@ -21,6 +21,7 @@ envoy_cc_library(
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
     deps = [
+        ":lds_api_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -117,11 +118,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lds_api_lib",
+    srcs = ["lds_api.cc"],
+    hdrs = ["lds_api.h"],
+    deps = [
+        "//include/envoy/init:init_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/http:rest_api_fetcher_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_validator_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_manager_lib",
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
     deps = [
         ":configuration_lib",
+        ":drain_manager_lib",
         ":init_manager_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

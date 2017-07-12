@@ -278,7 +278,7 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public ServerConnectionCallbacks,
                               public Network::ConnectionCallbacks {
 public:
-  ConnectionManagerImpl(ConnectionManagerConfig& config, Network::DrainDecision& drain_close,
+  ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cm);
@@ -620,7 +620,7 @@ private:
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
-  Network::DrainDecision& drain_close_;
+  const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   Event::TimerPtr idle_timer_;

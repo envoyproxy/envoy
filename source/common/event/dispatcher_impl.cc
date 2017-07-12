@@ -25,7 +25,10 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : base_(event_base_new()),
+    : DispatcherImpl(Buffer::FactoryPtr{new Buffer::OwnedImplFactory}) {}
+
+DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
+    : buffer_factory_(std::move(factory)), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {}

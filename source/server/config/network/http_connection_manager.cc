@@ -33,7 +33,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
       new HttpConnectionManagerConfig(config, context));
   return [http_config, &context](Network::FilterManager& filter_manager) mutable -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *http_config, context.drainManager(), context.random(), context.httpTracer(),
+        *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
   };
 }

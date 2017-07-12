@@ -30,7 +30,7 @@ public:
 
   // Grpc::AsyncClient
   AsyncClientStream<RequestType>*
-  start(const google::protobuf::MethodDescriptor& service_method,
+  start(const Protobuf::MethodDescriptor& service_method,
         AsyncClientCallbacks<ResponseType>& callbacks,
         const Optional<std::chrono::milliseconds>& timeout) override {
     std::unique_ptr<AsyncClientStreamImpl<RequestType, ResponseType>> grpc_stream{

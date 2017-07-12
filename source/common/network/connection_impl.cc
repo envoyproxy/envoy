@@ -58,7 +58,9 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
-      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
+      read_buffer_(dispatcher.getBufferFactory().create()),
+      write_buffer_(dispatcher.getBufferFactory().create()), dispatcher_(dispatcher), fd_(fd),
+      id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -98,7 +100,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  uint64_t data_to_write = write_buffer_.length();
+  uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
@@ -216,7 +218,7 @@ void ConnectionImpl::readDisable(bool disable) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
-    if (read_buffer_.length() > 0) {
+    if (read_buffer_->length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
@@ -254,7 +256,8 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
     // That code assumes that we never change existing write_buffer_ chain elements between calls
     // to SSL_write(). That code will have to change if we ever copy here.
-    write_buffer_.move(data);
+    write_buffer_->move(data);
+
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
     }
@@ -301,7 +304,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     //
     // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
     // ioctl(). The extra syscall is not worth it.
-    int rc = read_buffer_.read(fd_, 16384);
+    int rc = read_buffer_->read(fd_, 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", *this, rc);
 
     // Remote close. Might need to raise data before raising close.
@@ -332,7 +335,7 @@ void ConnectionImpl::onReadReady() {
   ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();
-  uint64_t new_buffer_size = read_buffer_.length();
+  uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   onRead(new_buffer_size);
 
@@ -347,12 +350,11 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
-    if (write_buffer_.length() == 0) {
+    if (write_buffer_->length() == 0) {
       action = PostIoAction::KeepOpen;
       break;
     }
-
-    int rc = write_buffer_.write(fd_);
+    int rc = write_buffer_->write(fd_);
     ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
@@ -400,7 +402,7 @@ void ConnectionImpl::onWriteReady() {
   }
 
   IoResult result = doWriteToSocket();
-  uint64_t new_buffer_size = write_buffer_.length();
+  uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   if (result.action_ == PostIoAction::Close) {

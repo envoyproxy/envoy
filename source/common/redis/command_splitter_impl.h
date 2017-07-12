@@ -118,23 +118,6 @@ struct InstanceStats {
   ALL_COMMAND_SPLITTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-/**
- * Supported commands and how to handle them
- */
-struct Commands {
-  /**
-   * @return commands which hash to a single server
-   */
-  static const std::vector<std::string>& allToOneCommands() {
-    // TODO(danielhochman): DEL should hash to multiple servers and is only added for testing single
-    // key deletes
-    static const std::vector<std::string>* commands = new std::vector<std::string>{
-        "decr", "decrby", "del", "expire", "get", "getset", "incr", "incrby", "set", "setex"};
-    return *commands;
-  }
-  // TODO(danielhochman): static vector of commands that hash to multiple servers: mget, mset, del
-};
-
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
