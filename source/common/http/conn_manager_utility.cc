@@ -42,7 +42,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   request_headers.removeTransferEncoding();
 
   // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
-  // as we forward them verbatim to the client.
+  // as we forward them verbatim to the upstream hosts.
   if (!Utility::isWebSocketUpgradeRequest(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
