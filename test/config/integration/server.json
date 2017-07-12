@@ -236,17 +236,6 @@
   "flags_path": "/invalid_flags",
   "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
   "statsd_tcp_cluster_name": "statsd",
-  "tracing": {
-    "http": {
-      "driver": {
-        "type": "lightstep",
-        "config": {
-          "access_token_file": "{{ test_rundir }}/test/config/integration/lightstep_access_token",
-          "collector_cluster": "lightstep_saas"
-        }
-      }
-    }
-  },
 
   "lds": {
     "cluster": "lds"

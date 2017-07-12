@@ -23,7 +23,6 @@ exports_files([
 filegroup(
     name = "server_config_files",
     srcs = [
-        "lightstep_access_token",
         "server.json",
     ],
 )
