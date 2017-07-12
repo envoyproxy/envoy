@@ -12,6 +12,7 @@ using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
+using testing::Throw;
 using testing::_;
 
 namespace Envoy {
@@ -35,18 +36,19 @@ public:
   Event::TimerPtr no_exit_timer_ = dispatcher_->createTimer([]() -> void {});
 };
 
-TEST_F(WorkerImplTest, All) {
+TEST_F(WorkerImplTest, BasicFlow) {
   InSequence s;
   std::thread::id current_thread_id = std::this_thread::get_id();
 
-  // Before a worker is started adding a listener happens on the current thread.
+  // Before a worker is started adding a listener will be posted and will get added when the
+  // thread starts running.
   NiceMock<MockListener> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1));
   EXPECT_CALL(*handler_, addListener(_, _, _, 1, _))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
-        EXPECT_EQ(current_thread_id, std::this_thread::get_id());
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  worker_.addListener(listener);
+  worker_.addListener(listener, [](bool success) -> void { EXPECT_TRUE(success); });
 
   worker_.start(guard_dog_);
 
@@ -57,7 +59,7 @@ TEST_F(WorkerImplTest, All) {
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  worker_.addListener(listener2);
+  worker_.addListener(listener2, [](bool success) -> void { EXPECT_TRUE(success); });
 
   EXPECT_CALL(*handler_, stopListeners(2))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
@@ -82,7 +84,7 @@ TEST_F(WorkerImplTest, All) {
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
       }));
-  worker_.addListener(listener3);
+  worker_.addListener(listener3, [](bool success) -> void { EXPECT_TRUE(success); });
 
   EXPECT_CALL(*handler_, removeListeners(3))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
@@ -93,6 +95,19 @@ TEST_F(WorkerImplTest, All) {
   }));
   worker_.removeListener(listener3, [&ready]() -> void { ready.ready(); });
 
+  worker_.stop();
+}
+
+TEST_F(WorkerImplTest, ListenerException) {
+  InSequence s;
+
+  NiceMock<MockListener> listener;
+  ON_CALL(listener, listenerTag()).WillByDefault(Return(1));
+  EXPECT_CALL(*handler_, addListener(_, _, _, 1, _))
+      .WillOnce(Throw(Network::CreateListenerException("failed")));
+  worker_.addListener(listener, [](bool success) -> void { EXPECT_FALSE(success); });
+
+  worker_.start(guard_dog_);
   worker_.stop();
 }
 

@@ -266,16 +266,13 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
     // This is an edge case, but may happen if a listener is removed and then added back with a same
     // or different name and intended to listen on the same address. This should work and not fail.
     Network::ListenSocketSharedPtr draining_listener_socket;
-    {
-      std::lock_guard<std::mutex> guard(draining_listeners_lock_);
-      auto existing_draining_listener = std::find_if(
-          draining_listeners_.cbegin(), draining_listeners_.cend(),
-          [&new_listener](const DrainingListener& listener) {
-            return *new_listener->address() == *listener.listener_->socket().localAddress();
-          });
-      if (existing_draining_listener != draining_listeners_.cend()) {
-        draining_listener_socket = existing_draining_listener->listener_->getSocket();
-      }
+    auto existing_draining_listener = std::find_if(
+        draining_listeners_.cbegin(), draining_listeners_.cend(),
+        [&new_listener](const DrainingListener& listener) {
+          return *new_listener->address() == *listener.listener_->socket().localAddress();
+        });
+    if (existing_draining_listener != draining_listeners_.cend()) {
+      draining_listener_socket = existing_draining_listener->listener_->getSocket();
     }
 
     new_listener->setSocket(
@@ -315,17 +312,13 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
 }
 
 void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
-  // First add the listener to the draining list. This must be done under the lock since it
-  // can race with remove completions.
-  std::list<DrainingListener>::iterator draining_it;
-  {
-    std::lock_guard<std::mutex> guard(draining_listeners_lock_);
-    draining_it = draining_listeners_.emplace(draining_listeners_.begin(), std::move(listener),
-                                              workers_.size());
-    // Must be done under lock. Using set() avoids a multiple modifiers problem during the multiple
-    // processes phase of hot restart. Same below inside the lambda.
-    stats_.total_listeners_draining_.set(draining_listeners_.size());
-  }
+  // First add the listener to the draining list.
+  std::list<DrainingListener>::iterator draining_it = draining_listeners_.emplace(
+      draining_listeners_.begin(), std::move(listener), workers_.size());
+
+  // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
+  // restart. Same below inside the lambda.
+  stats_.total_listeners_draining_.set(draining_listeners_.size());
 
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->infoLog("draining listener");
@@ -333,22 +326,24 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
     worker->stopListener(*draining_it->listener_);
   }
 
-  // The following sets up 2 level lambda. The first completes when the listener's drain manager
-  // has completed draining at whatever the server configured drain times are. Once the drain time
-  // has completed via the drain manager's timer, we tell the workers to remove the listener. The
-  // 2nd lambda acquires the lock and determines when we can remove the listener from the draining
-  // list. This makes sure that we don't destroy the listener while filters might still be using its
-  // context (stats, etc.).
+  // Start the drain sequence which completes when the listener's drain manager has completed
+  // draining at whatever the server configured drain times are.
   draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
     draining_it->listener_->infoLog("removing listener");
     for (const auto& worker : workers_) {
+      // Once the drain time has completed via the drain manager's timer, we tell the workers to
+      // remove the listener.
       worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        std::lock_guard<std::mutex> guard(draining_listeners_lock_);
-        if (--draining_it->workers_pending_removal_ == 0) {
-          draining_it->listener_->infoLog("listener removal complete");
-          draining_listeners_.erase(draining_it);
-          stats_.total_listeners_draining_.set(draining_listeners_.size());
-        }
+        // The remove listener completion is called on the worker thread. We post back to the main
+        // thread to avoid locking. This makes sure that we don't destroy the listener while filters
+        // might still be using its context (stats, etc.).
+        server_.dispatcher().post([this, draining_it]() -> void {
+          if (--draining_it->workers_pending_removal_ == 0) {
+            draining_it->listener_->infoLog("listener removal complete");
+            draining_listeners_.erase(draining_it);
+            stats_.total_listeners_draining_.set(draining_listeners_.size());
+          }
+        });
       });
     }
   });
@@ -379,11 +374,33 @@ std::vector<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
   return ret;
 }
 
+void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& listener) {
+  worker.addListener(listener, [this, &listener](bool success) -> void {
+    // The add listener completion runs on the worker thread. Post back to the main thread to
+    // avoid locking.
+    server_.dispatcher().post([this, success, &listener]() -> void {
+      // It is theoretically possible for a listener to get added on 1 worker but not the others.
+      // The following code will yield 1 critical log and 1 stat. It will also cause listener
+      // removal a single time. Note also that that drain/removal can race with addition. It's
+      // guaranteed that workers process remove after add so this should be fine.
+      if (!success && !listener.onListenerCreateFailure()) {
+        // TODO(mattklein123): In addition to a critical log and a stat, we should consider adding
+        //                     a startup option here to cause the server to exit. I think we
+        //                     probably want this at Lyft but I will do it in a follow up.
+        ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
+                  listener.name(), listener.socket().localAddress()->asString());
+        stats_.listener_create_failure_.inc();
+        removeListener(listener.name());
+      }
+    });
+  });
+}
+
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    worker->addListener(listener);
+    addListenerToWorker(*worker, listener);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -444,7 +461,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   for (const auto& worker : workers_) {
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      worker->addListener(*listener);
+      addListenerToWorker(*worker, *listener);
     }
     worker->start(guard_dog);
   }

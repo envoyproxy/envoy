@@ -126,11 +126,11 @@ public:
 
 private:
   void flushStats();
-  void initialize(Options& options, TestHooks& hooks, ComponentFactory& component_factory);
+  void initialize(Options& options, ComponentFactory& component_factory);
   void initializeStatSinks();
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
-  void startWorkers(TestHooks& hooks);
+  void startWorkers();
 
   Options& options_;
   HotRestart& restarter_;

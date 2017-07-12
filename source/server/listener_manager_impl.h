@@ -57,6 +57,7 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_create_failure)                                                                 \
   GAUGE  (total_listeners_warming)                                                                 \
   GAUGE  (total_listeners_active)                                                                  \
   GAUGE  (total_listeners_draining)
@@ -102,6 +103,7 @@ private:
     uint64_t workers_pending_removal_;
   };
 
+  void addListenerToWorker(Worker& worker, ListenerImpl& listener);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
@@ -140,15 +142,11 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
-  std::mutex draining_listeners_lock_;
   ListenerManagerStats stats_;
 };
 
-// TODO(mattklein123): Detect runtime worker listener addition failure and handle.
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
-//                     initializing all listeners after workers are started. This is related to
-//                     correctly dealing with runtime listener addition failure so can be handled in
-//                     the same change.
+//                     initializing all listeners after workers are started.
 
 /**
  * Maps JSON config to runtime config for a listener with a network filter chain.
@@ -172,6 +170,16 @@ public:
   ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent, const std::string& name,
                bool workers_started, uint64_t hash);
   ~ListenerImpl();
+
+  /**
+   * Called when a listener failed to be actually created on a worker.
+   * @return TRUE if this is not the first create failure (via multiple workers).
+   */
+  bool onListenerCreateFailure() {
+    bool ret = saw_listener_create_failure_;
+    saw_listener_create_failure_ = true;
+    return ret;
+  }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
@@ -239,6 +247,7 @@ private:
   bool initialize_canceled_{};
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
   DrainManagerPtr local_drain_manager_;
+  bool saw_listener_create_failure_{};
 };
 
 } // namespace Server
