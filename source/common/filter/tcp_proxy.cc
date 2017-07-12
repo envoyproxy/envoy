@@ -123,10 +123,22 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
                                                 config_->stats().downstream_cx_tx_bytes_buffered_});
 }
 
-void TcpProxy::readDisableUpstream(bool disable) { upstream_connection_->readDisable(disable); }
+void TcpProxy::readDisableUpstream(bool disable) {
+  upstream_connection_->readDisable(disable);
+  if (disable) {
+    config_->stats().upstream_pause_reading_.inc();
+  } else {
+    config_->stats().upstream_resume_reading_.inc();
+  }
+}
 
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
+  if (disable) {
+    config_->stats().downstream_pause_reading_.inc();
+  } else {
+    config_->stats().downstream_resume_reading_.inc();
+  }
 }
 
 void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {

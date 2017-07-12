@@ -30,7 +30,11 @@ namespace Filter {
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_no_route)
+  COUNTER(downstream_cx_no_route)                                                                  \
+  COUNTER(upstream_pause_reading)                                                                  \
+  COUNTER(upstream_resume_reading)                                                                 \
+  COUNTER(downstream_pause_reading)                                                                \
+  COUNTER(downstream_resume_reading)
 // clang-format on
 
 /**
