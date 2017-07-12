@@ -37,7 +37,7 @@ public:
   virtual bool Next(const void** data, int* size) override;
   virtual void BackUp(int count) override;
   virtual bool Skip(int count) override; // Not implemented
-  virtual int64_t ByteCount() const override { return byte_count_; }
+  virtual ProtobufTypes::Int64 ByteCount() const override { return byte_count_; }
 
 protected:
   Buffer::InstancePtr buffer_;
