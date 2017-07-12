@@ -60,6 +60,7 @@ public:
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const Protobuf::MethodDescriptor*& method_descriptor);
 
+private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
@@ -70,6 +71,7 @@ private:
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
+  Protobuf::util::JsonPrintOptions print_options_;
 };
 
 typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
