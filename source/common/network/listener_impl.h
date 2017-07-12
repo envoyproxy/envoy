@@ -29,7 +29,8 @@ public:
    * @param local_address supplies the local address for the new connection.
    */
   virtual void newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
-                             Address::InstanceConstSharedPtr local_address);
+                             Address::InstanceConstSharedPtr local_address,
+                             bool using_original_dst);
 
   /**
    * @return the socket supplied to the listener at construction time
@@ -65,7 +66,8 @@ public:
 
   // ListenerImpl
   void newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
-                     Address::InstanceConstSharedPtr local_address) override;
+                     Address::InstanceConstSharedPtr local_address,
+                     bool using_original_dst) override;
 
 private:
   Ssl::Context& ssl_ctx_;

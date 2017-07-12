@@ -45,7 +45,7 @@ class ConnectionImpl : public virtual Connection,
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address);
+                 Address::InstanceConstSharedPtr local_address, bool using_original_dst);
 
   ~ConnectionImpl();
 
@@ -72,6 +72,7 @@ public:
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
+  bool usingOriginalDst() const override { return using_original_dst_; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
@@ -145,6 +146,7 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
+  bool using_original_dst_;
 };
 
 /**

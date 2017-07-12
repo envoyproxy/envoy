@@ -67,6 +67,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
+  MOCK_CONST_METHOD0(usingOriginalDst, bool());
 };
 
 /**
@@ -99,6 +100,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
+  MOCK_CONST_METHOD0(usingOriginalDst, bool());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
