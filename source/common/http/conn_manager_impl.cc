@@ -497,16 +497,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     ENVOY_STREAM_LOG(trace, "checking for websocket upgrade (end_stream={}):", *this, end_stream);
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     // Websocket route entries cannot be redirects.
-    bool isWsRoute = (route_entry != nullptr) && route_entry->isWebSocket();
-    bool isWsConnection = (request_headers_->Connection() && request_headers_->Upgrade() &&
-                           (0 == StringUtil::caseInsensitiveCompare(
-                                     request_headers_->Connection()->value().c_str(),
-                                     Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
-                           (0 == StringUtil::caseInsensitiveCompare(
-                                     request_headers_->Upgrade()->value().c_str(),
-                                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+    bool websocket_route = (route_entry != nullptr) && route_entry->isWebSocket();
+    bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (isWsConnection && isWsRoute) {
+    if (websocket_upgrade_request && websocket_route) {
       ENVOY_STREAM_LOG(trace, "found websocket connection. Creating WsHandlerImpl (end_stream={}):", *this, end_stream);
       connection_manager_.ws_connection_ = std::unique_ptr<ConnectionManagerImpl::WsHandlerImpl>(
           new ConnectionManagerImpl::WsHandlerImpl(route_entry->clusterName(), *this));
@@ -519,8 +513,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // ASSERT(state_.remote_complete_);
       // state_.remote_complete_ = false;
       return;
-    } else if (isWsConnection || isWsRoute) {
-      if (isWsConnection) {
+    } else if (websocket_upgrade_request || websocket_route) {
+      if (websocket_upgrade_request) {
         // Do not allow WebSocket upgrades if the route does not support it.
         connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       } else {
@@ -532,10 +526,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       return;
     }
   }
-
-  // Remove connection and upgrade headers after the WebSocket logic.
-  request_headers_->removeConnection();
-  request_headers_->removeUpgrade();
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {

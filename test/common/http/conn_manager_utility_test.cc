@@ -371,6 +371,24 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   EXPECT_TRUE(headers.has("x-envoy-internal"));
 }
 
+TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
+  TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
+
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_EQ("upgrade", headers.get_("connection"));
+  EXPECT_EQ("websocket", headers.get_("upgrade"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
+  TestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
+
+  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                 random_, runtime_, local_info_);
+  EXPECT_FALSE(headers.has("connection"));
+  EXPECT_FALSE(headers.has("upgrade"));
+}
+
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
   route_config_.response_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
