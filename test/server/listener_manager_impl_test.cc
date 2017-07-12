@@ -684,5 +684,56 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   checkStats(2, 1, 2, 0, 0, 0);
 }
 
+TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://0.0.0.0:1234",
+    "filters": [],
+    "bind_to_port": false
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
+  ListenerHandle* listener_foo = expectListenerCreate(true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, false));
+  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+
+  // Add bar with same non-binding address. Should fail.
+  const std::string listener_bar_json = R"EOF(
+  {
+    "name": "bar",
+    "address": "tcp://0.0.0.0:1234",
+    "filters": [],
+    "bind_to_port": false
+  }
+  )EOF";
+
+  loader = Json::Factory::loadFromString(listener_bar_json);
+  ListenerHandle* listener_bar = expectListenerCreate(true);
+  EXPECT_CALL(*listener_bar, onDestroy());
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(*loader), EnvoyException,
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+
+  // Move foo to active and then try to add again. This should still fail.
+  EXPECT_CALL(*worker_, addListener(_));
+  listener_foo->target_.callback_();
+  listener_bar = expectListenerCreate(true);
+  EXPECT_CALL(*listener_bar, onDestroy());
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(*loader), EnvoyException,
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 } // namespace Server
 } // namespace Envoy
