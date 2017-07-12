@@ -103,8 +103,11 @@ private:
   };
 
   static ListenerManagerStats generateStats(Stats::Scope& scope);
+  static bool hasListenerWithAddress(const ListenerList& list,
+                                     const Network::Address::Instance& address);
   void updateWarmingActiveGauges() {
-    // Set is used so hot restart / multiple processes converge to a single value.
+    // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
+    // restart.
     stats_.total_listeners_warming_.set(warming_listeners_.size());
     stats_.total_listeners_active_.set(active_listeners_.size());
   }
@@ -141,7 +144,6 @@ private:
   ListenerManagerStats stats_;
 };
 
-// TODO(mattklein123): Check that addresses for unbound listeners are unique.
 // TODO(mattklein123): Detect runtime worker listener addition failure and handle.
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started. This is related to
