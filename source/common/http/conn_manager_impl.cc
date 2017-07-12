@@ -509,9 +509,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                                                                        route_entry,
                                                                        *request_headers_);
       ENVOY_STREAM_LOG(trace, "returning from initializeUpstreamConnection() (end_stream={}):", *this, end_stream);
-      // // Mark remote as not complete, so that reads are not disabled from downstream.
-      // ASSERT(state_.remote_complete_);
-      // state_.remote_complete_ = false;
       return;
     } else if (websocket_upgrade_request || websocket_route) {
       if (websocket_upgrade_request) {
@@ -1060,7 +1057,6 @@ const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddr
 ConnectionManagerImpl::WsHandlerImpl::WsHandlerImpl(const std::string& cluster_name,
                                                     ActiveStream& stream)
     : cluster_name_(cluster_name), stream_(stream), connection_manager_(stream.connection_manager_),
-      //stats_(generateStats(connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_)),
       cluster_manager_(connection_manager_.cm_), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
@@ -1092,7 +1088,6 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(Network:
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name_);
   } else {
-    //stats_.downstream_cx_no_route_.inc();
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
     stream_.encodeHeaders(nullptr, headers, true);
     // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
