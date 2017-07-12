@@ -245,6 +245,21 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
       *existing_active_listener = std::move(new_listener);
     }
   } else {
+    // Typically we catch address issues when we try to bind to the same address multiple times.
+    // However, for listeners that do not bind we must check to make sure we are not duplicating.
+    // This is an edge case and nothing will explicitly break, but there is no possibility that
+    // two listeners that do not bind will ever be used. Only the first one will be used when
+    // searched for by address. Thus we block it.
+    if (!new_listener->bindToPort() &&
+        (hasListenerWithAddress(warming_listeners_, *new_listener->address()) ||
+         hasListenerWithAddress(active_listeners_, *new_listener->address()))) {
+      const std::string message =
+          fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
+                      name, new_listener->address()->asString());
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    }
+
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
     // to see if there is a listener that has a socket bound to the address we are configured for.
@@ -289,6 +304,16 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
   return true;
 }
 
+bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
+                                                 const Network::Address::Instance& address) {
+  for (const auto& listener : list) {
+    if (*listener->address() == address) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // First add the listener to the draining list. This must be done under the lock since it
   // can race with remove completions.
@@ -297,8 +322,8 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
     std::lock_guard<std::mutex> guard(draining_listeners_lock_);
     draining_it = draining_listeners_.emplace(draining_listeners_.begin(), std::move(listener),
                                               workers_.size());
-    // Must be done under lock. Set is used so hot restart / multiple processes converge to a
-    // single value. Same below inside the lambda.
+    // Must be done under lock. Using set() avoids a multiple modifiers problem during the multiple
+    // processes phase of hot restart. Same below inside the lambda.
     stats_.total_listeners_draining_.set(draining_listeners_.size());
   }
 
