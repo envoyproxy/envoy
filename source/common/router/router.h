@@ -135,6 +135,9 @@ public:
     }
     return {};
   }
+  const Network::Connection* downstreamConnection() const override {
+    return callbacks_->connection();
+  }
 
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
