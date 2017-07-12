@@ -14,7 +14,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtoIntegrationTest,
 TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
 
-  Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 255.255.255.255 65535 1234\r\n");
+  Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 254.254.254.254 65535 1234\r\n");
   conn->write(buf);
 
   testRouterRequestAndResponseWithBody(std::move(conn), Http::CodecClient::Type::HTTP1, 1024, 512,
@@ -24,7 +24,7 @@ TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBufferV6) {
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
 
-  Buffer::OwnedImpl buf("PROXY TCP6 1:2:3::4 FF00:: 65535 1234\r\n");
+  Buffer::OwnedImpl buf("PROXY TCP6 1:2:3::4 FE00:: 65535 1234\r\n");
   conn->write(buf);
 
   testRouterRequestAndResponseWithBody(std::move(conn), Http::CodecClient::Type::HTTP1, 1024, 512,
