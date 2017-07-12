@@ -36,12 +36,17 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
                                                     Runtime::Loader& runtime,
                                                     const LocalInfo::LocalInfo& local_info) {
   // Clean proxy headers.
-  request_headers.removeConnection();
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
-  request_headers.removeUpgrade();
+
+  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // as we forward them verbatim to the client.
+  if (!Utility::isWebSocketUpgradeRequest(request_headers)) {
+    request_headers.removeConnection();
+    request_headers.removeUpgrade();
+  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect

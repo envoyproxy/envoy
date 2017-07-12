@@ -138,6 +138,16 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
   return Network::Utility::isInternalAddress(forwarded_for->value().c_str());
 }
 
+bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+  return (headers.Connection() && headers.Upgrade() &&
+          (0 == StringUtil::caseInsensitiveCompare(
+                    headers.Connection()->value().c_str(),
+                    Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
+          (0 == StringUtil::caseInsensitiveCompare(
+                    headers.Upgrade()->value().c_str(),
+                    Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+}
+
 Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   Http2Settings ret;
 
