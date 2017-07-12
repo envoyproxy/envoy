@@ -236,7 +236,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
-  callbacks_->requestInfo().setDownstreamAddress(callbacks_->downstreamAddress());
   log().debug("downstream address: '{}'\n", callbacks_->downstreamAddress());
   route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);

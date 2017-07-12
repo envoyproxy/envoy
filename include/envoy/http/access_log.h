@@ -118,7 +118,7 @@ public:
   /**
    * Set the downstream address
    */
-  virtual void setDownstreamAddress(std::string address) PURE;
+  virtual void setDownstreamAddress(const std::string& address) PURE;
 
   /**
    * Get the down stream address.

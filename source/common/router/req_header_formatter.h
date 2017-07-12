@@ -32,7 +32,7 @@ class RequestHeaderFormatter : public HeaderFormatter, Logger::Loggable<Logger::
 
 public:
   virtual ~RequestHeaderFormatter(){};
-  RequestHeaderFormatter(std::string& field_name);
+  RequestHeaderFormatter(const std::string& field_name);
 
   // HeaderFormatter::format
   std::string format(const Envoy::Http::AccessLog::RequestInfo& request_info) const override;

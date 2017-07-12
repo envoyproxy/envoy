@@ -68,7 +68,7 @@ void RequestHeaderParser::evaluateRequestHeaders(
   }
 }
 
-RequestHeaderFormatter::RequestHeaderFormatter(std::string& field_name) {
+RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::Http::AccessLog::RequestInfo& request_info) {
       return Envoy::Http::AccessLog::AccessLogFormatUtils::protocolToString(

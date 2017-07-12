@@ -59,7 +59,7 @@ public:
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_CONST_METHOD0(getDownstreamAddress, const std::string&());
-  MOCK_METHOD1(setDownstreamAddress, void(std::string downstream_address));
+  MOCK_METHOD1(setDownstreamAddress, void(const std::string& downstream_address));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
