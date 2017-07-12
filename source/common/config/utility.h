@@ -4,6 +4,8 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "api/base.pb.h"
 
 namespace Envoy {
@@ -17,12 +19,12 @@ public:
   /**
    * Extract typed resources from a DiscoveryResponse.
    * @param response reference to DiscoveryResponse.
-   * @return google::protobuf::RepatedPtrField<ResourceType> vector of typed resources in response.
+   * @return Protobuf::RepatedPtrField<ResourceType> vector of typed resources in response.
    */
   template <class ResourceType>
-  static google::protobuf::RepeatedPtrField<ResourceType>
+  static Protobuf::RepeatedPtrField<ResourceType>
   getTypedResources(const envoy::api::v2::DiscoveryResponse& response) {
-    google::protobuf::RepeatedPtrField<ResourceType> typed_resources;
+    Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
       resource.UnpackTo(typed_resource);

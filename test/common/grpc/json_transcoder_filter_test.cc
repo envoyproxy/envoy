@@ -6,6 +6,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -15,7 +16,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;
@@ -25,13 +25,14 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
+using Envoy::Protobuf::MethodDescriptor;
+
+using Envoy::Protobuf::FileDescriptorSet;
+using Envoy::Protobuf::util::MessageDifferencer;
+using Envoy::Protobuf::util::Status;
+using Envoy::Protobuf::util::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
-using google::protobuf::FileDescriptorSet;
-using google::protobuf::MethodDescriptor;
-using google::protobuf::util::MessageDifferencer;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {
@@ -148,7 +149,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
-  EXPECT_EQ(google::protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(Protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
             status.error_message());
   EXPECT_FALSE(transcoder);

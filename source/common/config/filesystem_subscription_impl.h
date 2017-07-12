@@ -8,9 +8,9 @@
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
-#include "google/protobuf/util/json_util.h"
 
 namespace Envoy {
 namespace Config {
@@ -55,10 +55,12 @@ private:
     try {
       const std::string json = Filesystem::fileReadToEnd(path_);
       envoy::api::v2::DiscoveryResponse message;
-      const auto status = google::protobuf::util::JsonStringToMessage(json, &message);
-      if (status != google::protobuf::util::Status::OK) {
+      const auto status =
+          Protobuf::util::JsonStringToMessage(ProtobufTypes::ToString(json), &message);
+      if (!status.ok()) {
         callbacks_->onConfigUpdateFailed(nullptr);
-        ENVOY_LOG(warn, "Filesystem config JSON conversion error: {}", status.ToString());
+        ENVOY_LOG(warn, "Filesystem config JSON conversion error: {}",
+                  ProtobufTypes::FromString(status.ToString()));
         stats_.update_failure_.inc();
         return;
       }

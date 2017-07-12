@@ -46,6 +46,12 @@ void MainImpl::initialize(const Json::Object& json, Instance& server,
     server.listenerManager().addOrUpdateListener(*listeners[i]);
   }
 
+  if (json.hasObject("lds")) {
+    lds_api_.reset(new LdsApi(*json.getObject("lds"), *cluster_manager_, server.dispatcher(),
+                              server.random(), server.initManager(), server.localInfo(),
+                              server.stats(), server.listenerManager()));
+  }
+
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
     throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
                          "are mutually exclusive.");

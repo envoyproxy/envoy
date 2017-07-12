@@ -1,22 +1,20 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/integration/integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/text_format.h"
-#include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
-using google::protobuf::Empty;
-using google::protobuf::Message;
-using google::protobuf::TextFormat;
-using google::protobuf::util::MessageDifferencer;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
+using Envoy::Protobuf::Empty;
+using Envoy::Protobuf::Message;
+using Envoy::Protobuf::TextFormat;
+using Envoy::Protobuf::util::MessageDifferencer;
+using Envoy::Protobuf::util::Status;
+using Envoy::Protobuf::util::error::Code;
 
 namespace Envoy {
 

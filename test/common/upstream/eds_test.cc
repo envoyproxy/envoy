@@ -49,7 +49,7 @@ protected:
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnWrongNameConfigUpdate) {
-  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
   bool initialized = false;
@@ -61,7 +61,7 @@ TEST_F(EdsTest, OnWrongNameConfigUpdate) {
 
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
 TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
-  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   // Too few.
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
@@ -82,7 +82,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
 
 // Validate that onConfigupdate() with the expected cluster accepts config.
 TEST_F(EdsTest, OnSuccessConfigUpdate) {
-  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   bool initialized = false;

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/redis/supported_commands.h"
 
 #include "spdlog/spdlog.h"
 
@@ -146,7 +147,7 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       mget_handler_(*conn_pool_), stats_{ALL_COMMAND_SPLITTER_STATS(
                                       POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
-  for (const std::string& command : Commands::allToOneCommands()) {
+  for (const std::string& command : SupportedCommands::allToOneCommands()) {
     addHandler(scope, stat_prefix, command, all_to_one_handler_);
   }
 

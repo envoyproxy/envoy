@@ -85,6 +85,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "lds_api_test",
+    srcs = ["lds_api_test.cc"],
+    deps = [
+        "//source/server:lds_api_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     data = ["//test/common/ssl/test_data:certs"],

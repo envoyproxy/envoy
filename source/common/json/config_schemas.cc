@@ -1044,6 +1044,40 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::LDS_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "listeners" : {
+        "type" : "array",
+        "items" : {"type" : "object"}
+      }
+    },
+    "required" : ["listeners"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "cluster" : {
+        "type" : "string"
+      },
+      "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required" : ["cluster"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1114,6 +1148,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "array",
         "items" : {"type" : "object"}
       },
+      "lds" : {"type" : "object"},
       "admin" : {
         "type" : "object",
         "properties" : {
