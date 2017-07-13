@@ -168,9 +168,10 @@ public:
    * For the read buffer, this limits the bytes read prior to flushing to further stages in the
    * processing pipeline.
    * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
-   * onAboveWriteBufferHighWatermark, which disables reads on the socket which is funneling data to
-   * the write butter.  When enough data is drained from the write buffer,
-   * onBelowWriteBufferHighWatermark is called which results in resuming reads.
+   * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
+   * reads on the socket funneling data to the write butter.  When enough data is drained from the
+   * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
+   * resuming reading.
    */
   virtual void setBufferLimits(uint32_t limit) PURE;
 
