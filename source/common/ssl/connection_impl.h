@@ -6,6 +6,8 @@
 #include "common/network/connection_impl.h"
 #include "common/ssl/context_impl.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -29,6 +31,8 @@ public:
   std::string sha256PeerCertificateDigest() override;
   std::string subjectPeerCertificate() override;
   std::string uriSanPeerCertificate() override;
+
+  SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
   PostIoAction doHandshake();

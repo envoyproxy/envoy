@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "connection_lib",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
+    external_deps = ["ssl"],
     deps = [
         ":context_lib",
         "//source/common/common:assert_lib",
