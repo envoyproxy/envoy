@@ -113,7 +113,7 @@ ListenerImpl::ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent
   listener_scope_ = parent_.server_.stats().createScope(final_stat_name);
 
   if (json.hasObject("ssl_context")) {
-    Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
+    Ssl::ServerContextConfigImpl context_config(*json.getObject("ssl_context"));
     ssl_context_ = parent_.server_.sslContextManager().createSslServerContext(*listener_scope_,
                                                                               context_config);
   }

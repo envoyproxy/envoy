@@ -24,7 +24,8 @@ public:
   /**
    * Builds an ServerContext from an ContextConfig
    */
-  virtual ServerContextPtr createSslServerContext(Stats::Scope& scope, ContextConfig& config) PURE;
+  virtual ServerContextPtr createSslServerContext(Stats::Scope& scope,
+                                                  ServerContextConfig& config) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire
