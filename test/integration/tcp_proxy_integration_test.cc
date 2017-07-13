@@ -141,7 +141,6 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
                   .WillByDefault(Invoke(client_write_buffer, &MockBuffer::trackDrains));
               return client_write_buffer;
             }));
-        std::cerr << "here1";
         // Set up the SSl client.
         Network::Address::InstanceConstSharedPtr address =
             Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
