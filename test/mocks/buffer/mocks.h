@@ -33,6 +33,11 @@ public:
     return bytes_written;
   }
 
+  void trackDrains(uint64_t size) {
+    bytes_drained_ += size;
+    Buffer::OwnedImpl::drain(size);
+  }
+
   // A convenience function to invoke on write() which fails the write with EAGAIN.
   int failWrite(int) {
     errno = EAGAIN;
@@ -40,9 +45,11 @@ public:
   }
 
   int bytes_written() const { return bytes_written_; }
+  uint64_t bytes_drained() const { return bytes_drained_; }
 
 private:
   int bytes_written_{0};
+  uint64_t bytes_drained_{0};
 };
 
 class MockBufferFactory : public Buffer::Factory {

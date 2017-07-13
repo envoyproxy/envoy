@@ -9,6 +9,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
+using testing::Invoke;
+using testing::_;
+
 namespace Envoy {
 namespace {
 
@@ -119,9 +123,26 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   FakeStreamPtr request;
   Ssl::ClientContextPtr context;
   ConnectionStatusCallbacks connect_callbacks;
+  MockBuffer* client_write_buffer;
   executeActions({
-      // Set up the SSl client.
+      // Set up the mock buffer factory so the newly created SSL client will have a mock write
+      // buffer.  This allows us to track the bytes actually written to the socket.
       [&]() -> void {
+        EXPECT_CALL(*mock_buffer_factory_, create_())
+            .Times(2)
+            .WillOnce(Invoke([&]() -> Buffer::Instance* {
+              return new Buffer::OwnedImpl; // client read buffer.
+            }))
+            .WillOnce(Invoke([&]() -> Buffer::Instance* {
+              client_write_buffer = new MockBuffer;
+              ON_CALL(*client_write_buffer, move(_))
+                  .WillByDefault(Invoke(client_write_buffer, &MockBuffer::baseMove));
+              ON_CALL(*client_write_buffer, drain(_))
+                  .WillByDefault(Invoke(client_write_buffer, &MockBuffer::trackDrains));
+              return client_write_buffer;
+            }));
+
+        // Set up the SSl client.
         Network::Address::InstanceConstSharedPtr address =
             Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
         context = Ssl::createClientSslContext(false, false, *context_manager);
@@ -141,7 +162,6 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
       [&]() -> void {
         ssl_client->connect();
         ssl_client->addConnectionCallbacks(connect_callbacks);
-        ssl_client->connect();
         while (!connect_callbacks.connected()) {
           dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
         }
@@ -150,7 +170,9 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
       [&]() -> void {
         Buffer::OwnedImpl buffer(data_to_send_upstream);
         ssl_client->write(buffer);
-        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+        while (client_write_buffer->bytes_drained() != data_to_send_upstream.size()) {
+          dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+        }
       },
       // Make sure the data makes it upstream.
       [&]() -> void { fake_upstream_connection = fake_upstreams_[2]->waitForRawConnection(); },
