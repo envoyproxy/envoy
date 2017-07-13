@@ -95,7 +95,7 @@ public:
 class ConditionalInitializer {
 public:
   /**
-   * Set the conditional to ready, should only be called once.
+   * Set the conditional to ready.
    */
   void setReady();
 

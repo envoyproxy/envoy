@@ -127,11 +127,13 @@ void ConditionalInitializer::setReady() {
 void ConditionalInitializer::waitReady() {
   std::unique_lock<std::mutex> lock(mutex_);
   if (ready_) {
+    ready_ = false;
     return;
   }
 
   cv_.wait(lock);
   EXPECT_TRUE(ready_);
+  ready_ = false;
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
