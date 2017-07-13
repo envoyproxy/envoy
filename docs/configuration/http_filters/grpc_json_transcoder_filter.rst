@@ -64,7 +64,7 @@ services
 print_options
   *(optional, object)* Control options for response json. These options are passed directly to
   `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
-  google.protobuf.util.json_util#JsonPrintOptions>`. Valid options are:
+  google.protobuf.util.json_util#JsonPrintOptions>`_. Valid options are:
 
   add_whitespace
     *(optional, boolean)* Whether to add spaces, line breaks and indentation to make the JSON

@@ -196,17 +196,6 @@
   "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
   "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
   "statsd_tcp_cluster_name": "statsd",
-  "tracing": {
-    "http": {
-      "driver": {
-        "type": "lightstep",
-        "config": {
-          "collector_cluster": "lightstep_saas",
-          "access_token_file": "{{ test_rundir }}/test/config/integration/lightstep_access_token"
-        }
-      }
-    }
-  },
 
   "runtime": {
     "symlink_root": "{{ test_rundir }}/test/common/runtime/test_data/current",
@@ -238,15 +227,6 @@
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
       "hosts": [{"url": "tcp://localhost:10009"}]
-    },
-    {
-      "name": "lightstep_saas",
-      "features": "http2",
-      "connect_timeout_ms": 5000,
-      "type": "strict_dns",
-      "lb_type": "round_robin",
-      "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:10010"}]
     }]
   }
 }
