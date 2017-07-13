@@ -28,13 +28,11 @@ uint64_t ConnectionManagerUtility::generateStreamId(const Router::Config& route_
   }
 }
 
-void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_headers,
-                                                    Network::Connection& connection,
-                                                    ConnectionManagerConfig& config,
-                                                    const Router::Config& route_config,
-                                                    Runtime::RandomGenerator& random,
-                                                    Runtime::Loader& runtime,
-                                                    const LocalInfo::LocalInfo& local_info) {
+void ConnectionManagerUtility::mutateRequestHeaders(
+    Http::HeaderMap& request_headers, Protocol protocol, Network::Connection& connection,
+    ConnectionManagerConfig& config, const Router::Config& route_config,
+    Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+    const LocalInfo::LocalInfo& local_info) {
   // Clean proxy headers.
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
@@ -43,7 +41,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
   // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (!Utility::isWebSocketUpgradeRequest(request_headers)) {
+  if (protocol != Protocol::Http11 || !Utility::isWebSocketUpgradeRequest(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
   }
