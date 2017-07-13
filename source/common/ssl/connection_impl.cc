@@ -251,8 +251,16 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   if (!cert) {
     return "";
   }
-  bssl::UniquePtr<char> buf(X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0));
-  return std::string(buf.get());
+
+  // Format settings for a single line in RFC 2253 format.
+  constexpr int indent = 0;
+  constexpr unsigned long flags = XN_FLAG_RFC2253;
+
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), indent, flags);
+  char *buf_data;
+  long buf_data_len = BIO_get_mem_data(buf.get(), &buf_data);
+  return std::string(buf_data, buf_data_len);
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
