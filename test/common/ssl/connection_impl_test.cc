@@ -304,10 +304,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
 
   Ssl::ConnectionImpl* ssl_connection =
       dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
-  ASSERT(ssl_connection != nullptr);
-  SSL* ssl = ssl_connection->rawSslForTest();
-  ASSERT(ssl != nullptr);
-  SSL_set_cert_cb(ssl,
+  SSL_set_cert_cb(ssl_connection->rawSslForTest(),
                   [](SSL* ssl, void*) -> int {
                     STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
                     EXPECT_NE(nullptr, list);
