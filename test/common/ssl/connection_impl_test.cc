@@ -302,6 +302,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
 
+  // Verify that server sent list with 2 acceptable client certificate CA names.
   Ssl::ConnectionImpl* ssl_connection =
       dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
   SSL_set_cert_cb(ssl_connection->rawSslForTest(),
