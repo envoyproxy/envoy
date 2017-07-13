@@ -132,7 +132,7 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config,
+  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ServerContextConfig& config,
                     Runtime::Loader& runtime);
 
 private:
