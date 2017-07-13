@@ -169,7 +169,7 @@ public:
    * processing pipeline.
    * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
    * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
-   * reads on the socket funneling data to the write butter.  When enough data is drained from the
+   * reads on the socket funneling data to the write buffer.  When enough data is drained from the
    * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
    * resuming reading.
    */
