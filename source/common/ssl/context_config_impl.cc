@@ -45,9 +45,8 @@ ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
 }
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
-    : ContextConfigImpl(config) {
-  require_client_certificate_ = config.getBoolean("require_client_certificate", false);
-}
+    : ContextConfigImpl(config),
+      require_client_certificate_(config.getBoolean("require_client_certificate", false)) {}
 
 } // namespace Ssl
 } // namespace Envoy

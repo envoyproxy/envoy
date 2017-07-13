@@ -48,10 +48,11 @@ class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextCo
 public:
   ServerContextConfigImpl(const Json::Object& config);
 
+  // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
 
 private:
-  bool require_client_certificate_;
+  const bool require_client_certificate_;
 };
 
 } // namespace Ssl
