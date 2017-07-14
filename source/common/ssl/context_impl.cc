@@ -344,7 +344,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 }
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ContextConfig& config, Runtime::Loader& runtime)
+                                     ServerContextConfig& config, Runtime::Loader& runtime)
     : ContextImpl(parent, scope, config), runtime_(runtime) {
   if (!config.caCertFile().empty()) {
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
@@ -352,7 +352,11 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
       throw EnvoyException(fmt::format("Failed to load client CA file {}", config.caCertFile()));
     }
     SSL_CTX_set_client_CA_list(ctx_.get(), list.release());
-    // SSL_CTX_set_verify() was already set in ContextImpl::ContextImpl().
+
+    // SSL_VERIFY_PEER or stronger mode was already set in ContextImpl::ContextImpl().
+    if (config.requireClientCertificate()) {
+      SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+    }
   }
 
   parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());

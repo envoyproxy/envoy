@@ -70,5 +70,13 @@ public:
   virtual const std::string& serverNameIndication() const PURE;
 };
 
+class ServerContextConfig : public virtual ContextConfig {
+public:
+  /**
+   * @return True if client certificate is required, false otherwise.
+   */
+  virtual bool requireClientCertificate() const PURE;
+};
+
 } // namespace Ssl
 } // namespace Envoy

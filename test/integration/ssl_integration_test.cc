@@ -65,7 +65,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  ServerContextConfigImpl cfg(*loader);
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
