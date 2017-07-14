@@ -89,11 +89,11 @@ private:
 
 TEST_F(LdsApiTest, UnknownCluster) {
   const std::string config_json = R"EOF(
-    {
-      "cluster": "foo_cluster",
-      "refresh_delay_ms": 1000
-    }
-    )EOF";
+  {
+    "cluster": "foo_cluster",
+    "refresh_delay_ms": 1000
+  }
+  )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
@@ -104,11 +104,11 @@ TEST_F(LdsApiTest, UnknownCluster) {
 
 TEST_F(LdsApiTest, BadLocalInfo) {
   const std::string config_json = R"EOF(
-    {
-      "cluster": "foo_cluster",
-      "refresh_delay_ms": 1000
-    }
-    )EOF";
+  {
+    "cluster": "foo_cluster",
+    "refresh_delay_ms": 1000
+  }
+  )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRefOfCopy(std::string()));
