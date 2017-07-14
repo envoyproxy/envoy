@@ -70,8 +70,4 @@ public:
 };
 
 } // namespace Grpc
-
-MATCHER_P(ProtoMessageEqual, rhs, "") {
-  return arg->SerializeAsString() == rhs->SerializeAsString();
-}
 } // namespace Envoy

@@ -9,7 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/grpc/rpc_channel_impl.h"
+#include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 
 #include "spdlog/spdlog.h"
@@ -17,16 +17,20 @@
 namespace Envoy {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RpcChannelFactory& factory,
+GrpcClientImpl::GrpcClientImpl(RateLimitAsyncClientPtr&& async_client,
                                const Optional<std::chrono::milliseconds>& timeout)
-    : channel_(factory.create(*this, timeout)), service_(channel_.get()) {}
+    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit")),
+      async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
 void GrpcClientImpl::cancel() {
-  ASSERT(callbacks_);
-  channel_->cancel();
+  ASSERT(callbacks_ != nullptr);
+  ASSERT(stream_ != nullptr);
+  stream_->resetStream();
   callbacks_ = nullptr;
+  stream_ = nullptr;
 }
 
 void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& request,
@@ -46,39 +50,55 @@ void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& reques
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Descriptor>& descriptors,
                            const Tracing::TransportContext& context) {
-  ASSERT(!callbacks_);
+  ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
   context_ = context;
 
   pb::lyft::ratelimit::RateLimitRequest request;
   createRequest(request, domain, descriptors);
-  service_.ShouldRateLimit(nullptr, &request, &response_, nullptr);
+
+  stream_ = async_client_->start(service_method_, *this, timeout_);
+  if (stream_ == nullptr) {
+    callbacks_->complete(LimitStatus::Error);
+    callbacks_ = nullptr;
+    return;
+  }
+  stream_->sendMessage(request);
 }
 
-void GrpcClientImpl::onPreRequestCustomizeHeaders(Http::HeaderMap& headers) {
+void GrpcClientImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
   if (!context_.request_id_.empty()) {
-    headers.insertRequestId().value(context_.request_id_);
+    metadata.insertRequestId().value(context_.request_id_);
   }
 
   if (!context_.span_context_.empty()) {
-    headers.insertOtSpanContext().value(context_.span_context_);
+    metadata.insertOtSpanContext().value(context_.span_context_);
   }
 }
 
-void GrpcClientImpl::onSuccess() {
-  LimitStatus status = LimitStatus::OK;
-  ASSERT(response_.overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
-  if (response_.overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
-    status = LimitStatus::OverLimit;
-  }
-
-  callbacks_->complete(status);
-  callbacks_ = nullptr;
+void GrpcClientImpl::onReceiveMessage(
+    std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& message) {
+  response_ = std::move(message);
 }
 
-void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
-  callbacks_->complete(LimitStatus::Error);
+void GrpcClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status) {
+  if (status != Grpc::Status::GrpcStatus::Ok) {
+    callbacks_->complete(LimitStatus::Error);
+    callbacks_ = nullptr;
+    stream_ = nullptr;
+    return;
+  }
+
+  LimitStatus limit_status = LimitStatus::OK;
+  ASSERT(response_->overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
+  if (response_->overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
+    limit_status = LimitStatus::OverLimit;
+  }
+
+  callbacks_->complete(limit_status);
   callbacks_ = nullptr;
+  stream_->closeStream();
+  stream_ = nullptr;
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)
@@ -89,12 +109,11 @@ GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterMa
 }
 
 ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& timeout) {
-  return ClientPtr{new GrpcClientImpl(*this, timeout)};
-}
-
-Grpc::RpcChannelPtr GrpcFactoryImpl::create(Grpc::RpcChannelCallbacks& callbacks,
-                                            const Optional<std::chrono::milliseconds>& timeout) {
-  return Grpc::RpcChannelPtr{new Grpc::RpcChannelImpl(cm_, cluster_name_, callbacks, timeout)};
+  return ClientPtr{new GrpcClientImpl(
+      RateLimitAsyncClientPtr{
+          new Grpc::AsyncClientImpl<pb::lyft::ratelimit::RateLimitRequest,
+                                    pb::lyft::ratelimit::RateLimitResponse>(cm_, cluster_name_)},
+      timeout)};
 }
 
 } // namespace RateLimit
