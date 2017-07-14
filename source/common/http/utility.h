@@ -64,6 +64,14 @@ public:
   static bool isInternalRequest(const HeaderMap& headers);
 
   /**
+   * Determine whether this is a WebSocket Upgrade request.
+   * This function returns true if the following HTTP headers and values are present:
+   * - Connection: Upgrade
+   * - Upgrade: websocket
+   */
+  static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+
+  /**
    * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
    *         "http2_settings" JSON fields.
    */
