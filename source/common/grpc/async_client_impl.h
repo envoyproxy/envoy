@@ -46,11 +46,11 @@ public:
 
     grpc_stream->set_stream(http_stream);
 
-    Http::MessagePtr message = Common::prepareHeaders(
+    headers_msg_ = Common::prepareHeaders(
         remote_cluster_name_, service_method.service()->full_name(), service_method.name());
-    callbacks.onCreateInitialMetadata(message->headers());
+    callbacks.onCreateInitialMetadata(headers_msg_->headers());
 
-    http_stream->sendHeaders(message->headers(), false);
+    http_stream->sendHeaders(headers_msg_->headers(), false);
     // If sendHeaders() caused a reset, onRemoteClose() has been called inline and we should bail.
     if (grpc_stream->http_reset_) {
       return nullptr;
@@ -61,6 +61,7 @@ public:
   }
 
 private:
+  Http::MessagePtr headers_msg_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   std::list<std::unique_ptr<AsyncClientStreamImpl<RequestType, ResponseType>>> active_streams_;

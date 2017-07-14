@@ -163,10 +163,17 @@ public:
           stream->http_callbacks_ = &callbacks;
           return stream->http_stream_;
         }));
-    EXPECT_CALL(*(stream->http_stream_), sendHeaders(HeaderMapEqualRef(&headers), _));
+    const Http::HeaderMapImpl* active_header_map = nullptr;
+    EXPECT_CALL(*(stream->http_stream_), sendHeaders(HeaderMapEqualRef(&headers), _))
+        .WillOnce(Invoke([&active_header_map](Http::HeaderMap& headers, bool) {
+          active_header_map = dynamic_cast<const Http::HeaderMapImpl*>(&headers);
+        }));
     stream->grpc_stream_ =
         grpc_client_->start(*method_descriptor_, *stream, Optional<std::chrono::milliseconds>());
     EXPECT_NE(stream->grpc_stream_, nullptr);
+    // The header map should still be valid after grpc_client_->start() returns, since it is
+    // retained by the HTTP async client for the deferred send.
+    EXPECT_EQ(*active_header_map, headers);
     return stream;
   }
 
