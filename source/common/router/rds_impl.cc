@@ -6,10 +6,9 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
-
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Router {
@@ -56,14 +55,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       route_config_name_(config.getString("route_config_name")),
       stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}) {
 
-  if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
-    throw EnvoyException("rds: setting --service-cluster and --service-node are required");
-  }
-
-  if (!cm.get(remote_cluster_name_)) {
-    throw EnvoyException(fmt::format("rds: unknown remote cluster '{}'", remote_cluster_name_));
-  }
-
+  ::Envoy::Config::Utility::checkClusterAndLocalInfo("rds", remote_cluster_name_, cm, local_info);
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_.set(tls_slot_,
            [initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {

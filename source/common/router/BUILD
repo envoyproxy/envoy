@@ -60,6 +60,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
     ],
