@@ -1,5 +1,6 @@
 #include "server/lds_api.h"
 
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -16,14 +17,8 @@ LdsApi::LdsApi(const Json::Object& config, Upstream::ClusterManager& cm,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info), listener_manager_(lm),
       stats_({ALL_LDS_STATS(POOL_COUNTER_PREFIX(scope, "listener_manager.lds."))}) {
-  if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
-    throw EnvoyException("lds: setting --service-cluster and --service-node are required");
-  }
 
-  if (!cm.get(remote_cluster_name_)) {
-    throw EnvoyException(fmt::format("lds: unknown remote cluster '{}'", remote_cluster_name_));
-  }
-
+  Config::Utility::checkClusterAndLocalInfo("lds", remote_cluster_name_, cm, local_info);
   init_manager.registerTarget(*this);
 }
 

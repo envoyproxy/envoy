@@ -2,8 +2,24 @@
 
 #include "common/protobuf/protobuf.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Envoy {
 namespace Config {
+
+void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
+                                       const std::string& cluster_name,
+                                       Upstream::ClusterManager& cm,
+                                       const LocalInfo::LocalInfo& local_info) {
+  if (!cm.get(cluster_name)) {
+    throw EnvoyException(fmt::format("{}: unknown cluster: {}", error_prefix, cluster_name));
+  }
+
+  if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
+    throw EnvoyException(
+        fmt::format("{}: setting --service-cluster and --service-node is required", error_prefix));
+  }
+}
 
 void Utility::localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node) {
   node.set_id(local_info.nodeName());

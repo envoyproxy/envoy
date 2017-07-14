@@ -39,6 +39,14 @@ public:
   apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
 
   /**
+   * fixfix
+   */
+  static void checkClusterAndLocalInfo(const std::string& error_prefix,
+                                       const std::string& cluster_name,
+                                       Upstream::ClusterManager& cm,
+                                       const LocalInfo::LocalInfo& local_info);
+
+  /**
    * Convert LocalInfo::LocalInfo to v2 envoy::api::v2::Node identifier.
    * @param local_info source LocalInfo::LocalInfo.
    * @param node destination envoy::api::Node.

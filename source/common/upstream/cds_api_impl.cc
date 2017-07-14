@@ -5,11 +5,10 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
-
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -32,9 +31,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info),
       stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}) {
-  if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
-    throw EnvoyException("cds: setting --service-cluster and --service-node are required");
-  }
+  Config::Utility::checkClusterAndLocalInfo("cds", remote_cluster_name_, cm, local_info);
 }
 
 void CdsApiImpl::createRequest(Http::Message& request) {
