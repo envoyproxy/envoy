@@ -73,7 +73,7 @@ void IntegrationTestServer::onWorkerListenerAdded() {
     on_worker_listener_added_cb_();
   }
 
-  std::unique_lock<std::mutex> gaurd(listeners_mutex_);
+  std::unique_lock<std::mutex> guard(listeners_mutex_);
   if (pending_listeners_ > 0) {
     pending_listeners_--;
     listeners_cv_.notify_one();

@@ -380,9 +380,10 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
     // avoid locking.
     server_.dispatcher().post([this, success, &listener]() -> void {
       // It is theoretically possible for a listener to get added on 1 worker but not the others.
-      // The following code will yield 1 critical log and 1 stat. It will also cause listener
-      // removal a single time. Note also that that drain/removal can race with addition. It's
-      // guaranteed that workers process remove after add so this should be fine.
+      // The below check with onListenerCreateFailure() is there to ensure we execute the
+      // removal/logging/stats at most once on failure. Note also that that drain/removal can race
+      // with addition. It's guaranteed that workers process remove after add so this should be
+      // fine.
       if (!success && !listener.onListenerCreateFailure()) {
         // TODO(mattklein123): In addition to a critical log and a stat, we should consider adding
         //                     a startup option here to cause the server to exit. I think we

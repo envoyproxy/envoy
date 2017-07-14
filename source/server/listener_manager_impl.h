@@ -173,7 +173,7 @@ public:
 
   /**
    * Called when a listener failed to be actually created on a worker.
-   * @return TRUE if this is not the first create failure (via multiple workers).
+   * @return TRUE if we have seen more than one worker failure.
    */
   bool onListenerCreateFailure() {
     bool ret = saw_listener_create_failure_;
