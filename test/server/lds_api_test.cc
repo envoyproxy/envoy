@@ -99,7 +99,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
   ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
-                            EnvoyException, "lds: unknown remote cluster 'foo_cluster'");
+                            EnvoyException, "lds: unknown cluster 'foo_cluster'");
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
@@ -115,7 +115,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
                             EnvoyException,
-                            "lds: setting --service-cluster and --service-node are required");
+                            "lds: setting --service-cluster and --service-node is required");
 }
 
 TEST_F(LdsApiTest, Basic) {

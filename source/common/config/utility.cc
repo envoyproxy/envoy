@@ -12,9 +12,14 @@ void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
                                        Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info) {
   if (!cm.get(cluster_name)) {
-    throw EnvoyException(fmt::format("{}: unknown cluster: {}", error_prefix, cluster_name));
+    throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
+  checkLocalInfo(error_prefix, local_info);
+}
+
+void Utility::checkLocalInfo(const std::string& error_prefix,
+                             const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
         fmt::format("{}: setting --service-cluster and --service-node is required", error_prefix));

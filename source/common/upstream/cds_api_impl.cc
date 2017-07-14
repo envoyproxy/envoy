@@ -31,7 +31,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info),
       stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}) {
-  Config::Utility::checkClusterAndLocalInfo("cds", remote_cluster_name_, cm, local_info);
+  Config::Utility::checkLocalInfo("cds", local_info);
 }
 
 void CdsApiImpl::createRequest(Http::Message& request) {
