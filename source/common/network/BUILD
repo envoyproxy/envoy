@@ -45,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",

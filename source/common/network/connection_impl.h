@@ -8,7 +8,7 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -99,29 +99,15 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
-  // Called when data is drained from the write buffer, to see if onBelowWriteBufferLowWatermark
-  // should be called.
-  void checkForLowWatermark();
-  // Called when data is added to the write buffer, to see if onAboveWriteBufferHighWatermark should
-  // be called.
-  void checkForHighWatermark();
+  void onLowWatermark();
+  void onHighWatermark();
 
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   Buffer::InstancePtr read_buffer_;
-  Buffer::InstancePtr write_buffer_;
+  Buffer::WatermarkBuffer write_buffer_;
   uint32_t read_buffer_limit_ = 0;
-  // Used for network level buffer limits (off by default).  If these are non-zero, when the write
-  // buffer passes |high_watermark_|, onAboveWriteBufferHighWatermark will be called to disable
-  // reading further data.  When the buffer drains below |low_watermark_|,
-  // onBelowWriteBufferLowWatermark will be called to resume reads.
-  uint32_t high_watermark_{0};
-  uint32_t low_watermark_{0};
-  // Tracks the latest state of watermark callbacks.
-  // True between the time onAboveWriteBufferHighWatermark is called until the next call to
-  // onBelowLowWatermark.
-  bool above_high_watermark_called_{false};
 
 private:
   // clang-format off

@@ -9,6 +9,16 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "watermark_buffer_lib",
+    srcs = ["watermark_buffer.cc"],
+    hdrs = ["watermark_buffer.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "buffer_lib",
     srcs = ["buffer_impl.cc"],
     hdrs = ["buffer_impl.h"],
