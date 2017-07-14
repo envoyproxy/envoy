@@ -258,7 +258,7 @@ std::string ConnectionImpl::subjectPeerCertificate() {
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), indent, flags);
-  char *buf_data;
+  char* buf_data;
   long buf_data_len = BIO_get_mem_data(buf.get(), &buf_data);
   return std::string(buf_data, buf_data_len);
 }
