@@ -23,9 +23,9 @@ public:
   const std::string current_xfcc_by_hash_ =
       "By=spiffe://lyft.com/"
       "backend-team;Hash=9ed6533649269c694f717e8729a1c8b55006fd51013c0e0d4294916e00d7ea04";
-  const std::string client_subject_ = "Subject=\"/C=US/ST=California/L=San Francisco/"
-                                      "O=Lyft/OU=Lyft Engineering/CN=Test Frontend Team/"
-                                      "emailAddress=frontend-team@lyft.com\"";
+  const std::string client_subject_ = "Subject=\""
+      "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"
+      "OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US\"";
   const std::string client_san_ = "SAN=spiffe://lyft.com/frontend-team";
 
   XfccIntegrationTest() : BaseIntegrationTest(GetParam()) {}
