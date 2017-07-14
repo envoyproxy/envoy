@@ -43,13 +43,17 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_.reset(new Thread::Thread([version, this]() -> void { threadRoutine(version); }));
-  // First, we want to wait until we know the server's worker threads are all
-  // started.
-  server_initialized_.waitReady();
-  // Then we need to make sure the thread with
-  // IntegrationTestServer::threadRoutine has set server_, since integration
-  // tests might rely on the value of server().
+
+  // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
+
+  // Now wait for the initial listeners to actually be listening on the worker. At this point
+  // the server is up and ready for testing.
+  std::unique_lock<std::mutex> guard(listeners_mutex_);
+  while (pending_listeners_ != 0) {
+    listeners_cv_.wait(guard);
+  }
+  ENVOY_LOG(info, "listener wait complete");
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
@@ -64,6 +68,24 @@ IntegrationTestServer::~IntegrationTestServer() {
   thread_->join();
 }
 
+void IntegrationTestServer::onWorkerListenerAdded() {
+  if (on_worker_listener_added_cb_) {
+    on_worker_listener_added_cb_();
+  }
+
+  std::unique_lock<std::mutex> guard(listeners_mutex_);
+  if (pending_listeners_ > 0) {
+    pending_listeners_--;
+    listeners_cv_.notify_one();
+  }
+}
+
+void IntegrationTestServer::onWorkerListenerRemoved() {
+  if (on_worker_listener_removed_cb_) {
+    on_worker_listener_removed_cb_();
+  }
+}
+
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
   Server::TestOptionsImpl options(config_path_);
   Server::TestHotRestart restarter;
@@ -72,6 +94,8 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                                       "cluster_name", "node_name");
   server_.reset(
       new Server::InstanceImpl(options, *this, restarter, stats_store_, lock, *this, local_info));
+  pending_listeners_ = server_->listenerManager().listeners().size();
+  ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   server_set_.setReady();
   server_->run();
   server_.reset();

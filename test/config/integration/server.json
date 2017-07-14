@@ -254,7 +254,7 @@
         "connect_timeout_ms": 5000,
         "type": "static",
         "lb_type": "round_robin",
-        "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+        "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
       }
     },
     "clusters": [
@@ -263,14 +263,14 @@
       "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
     },
     {
       "name": "lds",
       "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
     },
     {
       "name": "cluster_1",
@@ -293,7 +293,7 @@
       "type": "strict_dns",
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:10009"}]
+      "hosts": [{"url": "tcp://localhost:4"}]
     }]
   }
 }

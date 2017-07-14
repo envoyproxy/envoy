@@ -13,10 +13,20 @@ public:
   virtual ~Worker() {}
 
   /**
+   * Completion called when a listener has been added on a worker and is listening for new
+   * connections.
+   * @param success supplies whether the addition was successful or not. FALSE can be returned
+   *                when there is a race condition between bind() and listen().
+   */
+  typedef std::function<void(bool success)> AddListenerCompletion;
+
+  /**
    * Add a listener to the worker.
    * @param listener supplies the listener to add.
+   * @param completion supplies the completion to call when the listener has been added (or not) on
+   *                   the worker.
    */
-  virtual void addListener(Listener& listener) PURE;
+  virtual void addListener(Listener& listener, AddListenerCompletion completion) PURE;
 
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.

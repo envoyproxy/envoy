@@ -394,9 +394,10 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   checkStats(1, 1, 0, 0, 1, 0);
 
   // Start workers.
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
+  worker_->callAddCompletion(true);
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
@@ -406,11 +407,13 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   // removal.
   loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false);
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  worker_->callAddCompletion(true);
   checkStats(1, 2, 0, 0, 1, 1);
+
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo_update1->drain_manager_->drain_sequence_completion_();
   checkStats(1, 2, 0, 0, 1, 1);
@@ -430,9 +433,10 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   loader = Json::Factory::loadFromString(listener_bar_json);
   ListenerHandle* listener_bar = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   EXPECT_EQ(2UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
 
   // Add baz listener, this time requiring initializing.
@@ -479,9 +483,10 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   checkStats(3, 3, 0, 1, 2, 0);
 
   // Finish initialization for baz which should make it active.
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   listener_baz_update1->target_.callback_();
   EXPECT_EQ(3UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
   checkStats(3, 3, 0, 0, 3, 0);
 
   EXPECT_CALL(*listener_foo_update2, onDestroy());
@@ -511,8 +516,9 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Remove foo into draining.
@@ -527,8 +533,9 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   // Add foo again. We should use the socket from draining.
   loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo2 = expectListenerCreate(false);
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  worker_->callAddCompletion(true);
   checkStats(2, 0, 1, 0, 1, 1);
 
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -577,8 +584,9 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
@@ -646,8 +654,9 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   EXPECT_CALL(listener_foo->target_, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
   checkStats(2, 0, 1, 1, 0, 0);
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   listener_foo->target_.callback_();
+  worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(2, 0, 1, 0, 1, 0);
 
@@ -682,6 +691,40 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(2, 1, 2, 0, 0, 0);
+}
+
+TEST_F(ListenerManagerImplTest, AddListenerFailure) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into active.
+  const std::string listener_foo_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://0.0.0.0:1234",
+    "filters": []
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+
+  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  worker_->callAddCompletion(false);
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
 }
 
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
@@ -724,8 +767,10 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   // Move foo to active and then try to add again. This should still fail.
-  EXPECT_CALL(*worker_, addListener(_));
+  EXPECT_CALL(*worker_, addListener(_, _));
   listener_foo->target_.callback_();
+  worker_->callAddCompletion(true);
+
   listener_bar = expectListenerCreate(true);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(

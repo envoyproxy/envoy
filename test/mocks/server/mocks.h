@@ -193,6 +193,12 @@ public:
   MockWorker();
   ~MockWorker();
 
+  void callAddCompletion(bool success) {
+    EXPECT_NE(nullptr, add_listener_completion_);
+    add_listener_completion_(success);
+    add_listener_completion_ = nullptr;
+  }
+
   void callRemovalCompletion() {
     EXPECT_NE(nullptr, remove_listener_completion_);
     remove_listener_completion_();
@@ -200,7 +206,7 @@ public:
   }
 
   // Server::Worker
-  MOCK_METHOD1(addListener, void(Listener& listener));
+  MOCK_METHOD2(addListener, void(Listener& listener, AddListenerCompletion completion));
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD2(removeListener, void(Listener& listener, std::function<void()> completion));
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
@@ -208,6 +214,7 @@ public:
   MOCK_METHOD1(stopListener, void(Listener& listener));
   MOCK_METHOD0(stopListeners, void());
 
+  AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
 };
 
