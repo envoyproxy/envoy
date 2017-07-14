@@ -46,22 +46,22 @@ public:
 
     grpc_stream->set_stream(http_stream);
 
-    headers_msg_ = Common::prepareHeaders(
+    Http::MessagePtr message = Common::prepareHeaders(
         remote_cluster_name_, service_method.service()->full_name(), service_method.name());
-    callbacks.onCreateInitialMetadata(headers_msg_->headers());
+    callbacks.onCreateInitialMetadata(message->headers());
 
-    http_stream->sendHeaders(headers_msg_->headers(), false);
+    http_stream->sendHeaders(message->headers(), false);
     // If sendHeaders() caused a reset, onRemoteClose() has been called inline and we should bail.
     if (grpc_stream->http_reset_) {
       return nullptr;
     }
 
+    grpc_stream->set_headers_msg(std::move(message));
     grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
     return active_streams_.front().get();
   }
 
 private:
-  Http::MessagePtr headers_msg_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   std::list<std::unique_ptr<AsyncClientStreamImpl<RequestType, ResponseType>>> active_streams_;
@@ -168,6 +168,9 @@ public:
 
   void set_stream(Http::AsyncClient::Stream* stream) { stream_ = stream; }
 
+  // We need to keep ownership of this past stream start() for Http::AsyncClient sendHeaders().
+  void set_headers_msg(Http::MessagePtr headers_msg) { headers_msg_ = std::move(headers_msg); }
+
 private:
   void streamError(Status::GrpcStatus grpc_status) {
     callbacks_.onRemoteClose(grpc_status);
@@ -204,6 +207,7 @@ private:
 
   bool complete() const { return local_closed_ && remote_closed_; }
 
+  Http::MessagePtr headers_msg_;
   AsyncClientImpl<RequestType, ResponseType>& parent_;
   AsyncClientCallbacks<ResponseType>& callbacks_;
   bool local_closed_{};
