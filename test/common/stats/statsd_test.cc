@@ -26,7 +26,6 @@ namespace Statsd {
 class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
-    EXPECT_CALL(cluster_manager_, get("fake_cluster"));
     sink_.reset(
         new TcpStatsdSink(local_info_, "fake_cluster", tls_, cluster_manager_,
                           cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
@@ -46,7 +45,7 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Upstream::MockClusterManager cluster_manager_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<TcpStatsdSink> sink_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::MockClientConnection* connection_{};

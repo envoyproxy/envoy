@@ -169,7 +169,6 @@ envoy_cc_library(
         "//include/envoy/event:signal_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
-        "//include/envoy/network:listener_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",

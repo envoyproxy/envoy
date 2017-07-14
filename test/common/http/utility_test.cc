@@ -57,6 +57,21 @@ TEST(HttpUtility, isInternalRequest) {
   EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "127.0.0.1"}}));
 }
 
+TEST(HttpUtility, isWebSocketUpgradeRequest) {
+  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{}));
+  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"connection", "upgrade"}}));
+  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"upgrade", "websocket"}}));
+  EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(
+      TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "websocket"}}));
+
+  EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
+      TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "websocket"}}));
+  EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
+      TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "websocket"}}));
+  EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
+      TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
+}
+
 TEST(HttpUtility, appendXff) {
   {
     TestHeaderMapImpl headers;

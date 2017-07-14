@@ -62,6 +62,12 @@ MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}
 
 MockWorker::MockWorker() {
+  ON_CALL(*this, addListener(_, _))
+      .WillByDefault(Invoke([this](Listener&, AddListenerCompletion completion) -> void {
+        EXPECT_EQ(nullptr, add_listener_completion_);
+        add_listener_completion_ = completion;
+      }));
+
   ON_CALL(*this, removeListener(_, _))
       .WillByDefault(Invoke([this](Listener&, std::function<void()> completion) -> void {
         EXPECT_EQ(nullptr, remove_listener_completion_);

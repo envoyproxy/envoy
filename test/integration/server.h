@@ -194,17 +194,8 @@ public:
   Stats::Store& store() { return stats_store_; }
 
   // TestHooks
-  void onServerInitialized() override { server_initialized_.setReady(); }
-  void onWorkerListenerAdded() override {
-    if (on_worker_listener_added_cb_) {
-      on_worker_listener_added_cb_();
-    }
-  }
-  void onWorkerListenerRemoved() override {
-    if (on_worker_listener_removed_cb_) {
-      on_worker_listener_removed_cb_();
-    }
-  }
+  void onWorkerListenerAdded() override;
+  void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
@@ -227,7 +218,9 @@ private:
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;
-  ConditionalInitializer server_initialized_;
+  std::condition_variable listeners_cv_;
+  std::mutex listeners_mutex_;
+  uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};

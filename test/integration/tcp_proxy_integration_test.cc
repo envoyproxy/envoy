@@ -30,11 +30,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->close(); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
       [&]() -> void { tcp_client->waitForDisconnect(); },
-
-      // Clean up unused client_ssl_auth
-      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 
   EXPECT_EQ("world", tcp_client->data());
@@ -57,11 +52,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
       [&]() -> void { tcp_client->close(); },
       [&]() -> void { fake_upstream_connection->waitForData(10); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-
-      // Clean up unused client_ssl_auth
-      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 }
 
@@ -70,10 +60,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  FakeHttpConnectionPtr fake_rest_connection;
   testing::NiceMock<Runtime::MockLoader> runtime;
   std::unique_ptr<Ssl::ContextManager> context_manager(new Ssl::ContextManagerImpl(runtime));
-  FakeStreamPtr request;
   Ssl::ClientContextPtr context;
   ConnectionStatusCallbacks connect_callbacks;
   executeActions({
@@ -83,15 +71,6 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
             Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
         context = Ssl::createClientSslContext(false, false, *context_manager);
         ssl_client = dispatcher_->createSslClientConnection(*context, address);
-      },
-      // Set up the initial REST response for the ssl_auth filter to avoid the async client doing
-      // reconnects.  Loopback is whitelisted by default so no response payload is necessary.
-      [&]() -> void {
-        fake_rest_connection = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-        request = fake_rest_connection->waitForNewStream();
-        request->waitForEndStream(*dispatcher_);
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-        request->encodeData(0, true);
       },
       // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
       // filter so there will be no pause waiting on auth data.
@@ -125,8 +104,6 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) {
       [&]() -> void { ssl_client->close(Network::ConnectionCloseType::NoFlush); },
       [&]() -> void { fake_upstream_connection->close(); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(); },
   });
 }
 
