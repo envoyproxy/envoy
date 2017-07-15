@@ -15,6 +15,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "alpn_protocols" : {"type" : "string"},
           "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
+          "require_client_certificate" : {"type" : "boolean"},
           "verify_certificate_hash" : {"type" : "string"},
           "verify_subject_alt_name" : {
             "type" : "array",

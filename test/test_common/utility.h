@@ -95,13 +95,14 @@ public:
 class ConditionalInitializer {
 public:
   /**
-   * Set the conditional to ready, should only be called once.
+   * Set the conditional to ready.
    */
   void setReady();
 
   /**
-   * Block until the conditional is ready, will return immediately if it is already ready.
-   *
+   * Block until the conditional is ready, will return immediately if it is already ready. This
+   * routine will also reset ready_ so that the initializer can be used again. setReady() should
+   * only be called once in between a call to waitReady().
    */
   void waitReady();
 

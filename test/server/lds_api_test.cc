@@ -10,6 +10,7 @@
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRefOfCopy;
 using testing::_;
 
 namespace Envoy {
@@ -20,7 +21,7 @@ public:
   LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
   void setup() {
-    std::string config_json = R"EOF(
+    const std::string config_json = R"EOF(
     {
       "cluster": "foo_cluster",
       "refresh_delay_ms": 1000
@@ -70,7 +71,7 @@ public:
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
   }
 
-  Upstream::MockClusterManager cluster_manager_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Init::MockManager init_;
@@ -85,6 +86,37 @@ public:
 private:
   std::list<NiceMock<MockListener>> listeners_;
 };
+
+TEST_F(LdsApiTest, UnknownCluster) {
+  const std::string config_json = R"EOF(
+  {
+    "cluster": "foo_cluster",
+    "refresh_delay_ms": 1000
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+  ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
+  EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
+                                   local_info_, store_, listener_manager_),
+                            EnvoyException, "lds: unknown cluster 'foo_cluster'");
+}
+
+TEST_F(LdsApiTest, BadLocalInfo) {
+  const std::string config_json = R"EOF(
+  {
+    "cluster": "foo_cluster",
+    "refresh_delay_ms": 1000
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+  ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRefOfCopy(std::string()));
+  EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
+                                   local_info_, store_, listener_manager_),
+                            EnvoyException,
+                            "lds: setting --service-cluster and --service-node is required");
+}
 
 TEST_F(LdsApiTest, Basic) {
   InSequence s;

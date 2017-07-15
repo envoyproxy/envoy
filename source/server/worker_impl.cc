@@ -25,18 +25,19 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
   tls_.registerThread(*dispatcher_, false);
 }
 
-void WorkerImpl::addListener(Listener& listener) {
-  // If the worker thread is already started, post to it. Otherwise do it inline. The reason we do
-  // this is that there is a race condition where 2 processes can successfully bind to an address,
-  // but then fail to listen() with EADDRINUSE. During initial startup, we want to surface this on
-  // the main thread so that we can exit quickly.
-  // TODO(mattklein123): 1) Try to better figure out how this happens. 2) Need to potentially deal
-  // with this case in the runtime addListener() case.
-  if (thread_) {
-    dispatcher_->post([this, &listener]() -> void { addListenerWorker(listener); });
-  } else {
-    addListenerWorker(listener);
-  }
+void WorkerImpl::addListener(Listener& listener, AddListenerCompletion completion) {
+  // All listener additions happen via post. However, we must deal with the case where the listener
+  // can not be created on the worker. There is a race condition where 2 processes can successfully
+  // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
+  // to surface this.
+  dispatcher_->post([this, &listener, completion]() -> void {
+    try {
+      addListenerWorker(listener);
+      completion(true);
+    } catch (const Network::CreateListenerException& e) {
+      completion(false);
+    }
+  });
 }
 
 void WorkerImpl::addListenerWorker(Listener& listener) {

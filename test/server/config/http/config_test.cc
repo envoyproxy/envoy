@@ -8,7 +8,6 @@
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
-#include "server/config/http/lightstep_http_tracer.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/config/http/zipkin_http_tracer.h"
@@ -237,25 +236,6 @@ TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
       EnvoyException, "Double registration for name: 'router'");
-}
-
-TEST(HttpTracerConfigTest, LightstepHttpTracer) {
-  NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_CALL(cm, get("fake_cluster")).WillRepeatedly(Return(&cm.thread_local_cluster_));
-  ON_CALL(*cm.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
-  std::string valid_config = R"EOF(
-  {
-    "collector_cluster": "fake_cluster",
-    "access_token_file": "fake_file"
-  }
-  )EOF";
-  Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
-  NiceMock<MockInstance> server;
-  LightstepHttpTracerFactory factory;
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*valid_json, server, cm);
-  EXPECT_NE(nullptr, lightstep_tracer);
 }
 
 TEST(HttpTracerConfigTest, ZipkinHttpTracer) {

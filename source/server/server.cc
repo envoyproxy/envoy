@@ -10,7 +10,6 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
-#include "envoy/network/listener.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -59,7 +58,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   drain_manager_ = component_factory.createDrainManager(*this);
 
   try {
-    initialize(options, hooks, component_factory);
+    initialize(options, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
@@ -125,8 +124,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_.live_.value() == 0; }
 
-void InstanceImpl::initialize(Options& options, TestHooks& hooks,
-                              ComponentFactory& component_factory) {
+void InstanceImpl::initialize(Options& options, ComponentFactory& component_factory) {
   ENVOY_LOG(warn, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
@@ -204,34 +202,15 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // started and before our own run() loop runs.
   guard_dog_.reset(
       new Server::GuardDogImpl(stats_store_, *config_, ProdMonotonicTimeSource::instance_));
-
-  // Register for cluster manager init notification. We don't start serving worker traffic until
-  // upstream clusters are initialized which may involve running the event loop. Note however that
-  // this can fire immediately if all clusters have already initialized.
-  clusterManager().setInitializedCb([this, &hooks]() -> void {
-    ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
-    init_manager_.initialize([this, &hooks]() -> void { startWorkers(hooks); });
-  });
 }
 
-void InstanceImpl::startWorkers(TestHooks& hooks) {
-  try {
-    listener_manager_->startWorkers(*guard_dog_);
-  } catch (const Network::CreateListenerException& e) {
-    // It is possible that we fail to start listening on a port, even though we were able to
-    // bind to it above. This happens when there is a race between two applications to listen
-    // on the same port. In general if we can't initialize the worker configuration just print
-    // the error and exit cleanly without crashing.
-    ENVOY_LOG(critical, "shutting down due to error initializing worker configuration: {}",
-              e.what());
-    shutdown();
-  }
+void InstanceImpl::startWorkers() {
+  listener_manager_->startWorkers(*guard_dog_);
 
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
   drain_manager_->startParentShutdownSequence();
-  hooks.onServerInitialized();
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
@@ -294,6 +273,14 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
 void InstanceImpl::run() {
+  // Register for cluster manager init notification. We don't start serving worker traffic until
+  // upstream clusters are initialized which may involve running the event loop. Note however that
+  // this can fire immediately if all clusters have already initialized.
+  clusterManager().setInitializedCb([this]() -> void {
+    ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
+    init_manager_.initialize([this]() -> void { startWorkers(); });
+  });
+
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(warn, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
