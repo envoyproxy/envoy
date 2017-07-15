@@ -27,10 +27,16 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
         [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           regenerateZoneRoutingStructures();
         });
-    local_host_set_->addMemberUpdateCb(
+    local_host_set_member_update_cb_handle_ = local_host_set_->addMemberUpdateCb(
         [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           regenerateZoneRoutingStructures();
         });
+  }
+}
+
+LoadBalancerBase::~LoadBalancerBase() {
+  if (local_host_set_member_update_cb_handle_ != nullptr) {
+    local_host_set_->removeMemberUpdateCb(local_host_set_member_update_cb_handle_);
   }
 }
 

@@ -8,11 +8,11 @@
 #include "test/mocks/redis/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -24,6 +24,7 @@ using testing::Return;
 using testing::WithArg;
 using testing::_;
 
+namespace Envoy {
 namespace Redis {
 
 TEST(RedisProxyFilterConfigTest, Normal) {
@@ -55,7 +56,26 @@ TEST(RedisProxyFilterConfigTest, InvalidCluster) {
   NiceMock<Upstream::MockClusterManager> cm;
   Stats::IsolatedStoreImpl store;
   EXPECT_CALL(cm, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(ProxyFilterConfig(*json_config, cm, store), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(*json_config, cm, store), EnvoyException,
+                            "redis filter config: unknown cluster 'fake_cluster'");
+}
+
+TEST(RedisProxyFilterConfigTest, InvalidAddedByApi) {
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {}
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Upstream::MockClusterManager> cm;
+  Stats::IsolatedStoreImpl store;
+  ON_CALL(*cm.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(*json_config, cm, store), EnvoyException,
+                            "redis filter config: invalid cluster 'fake_cluster': currently only "
+                            "static (non-CDS) clusters are supported");
 }
 
 TEST(RedisProxyFilterConfigTest, BadRedisProxyConfig) {

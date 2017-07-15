@@ -8,9 +8,9 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 // TODO(mattklein123): Graceful drain support.
 
+namespace Envoy {
 namespace Redis {
 
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm,
@@ -19,9 +19,15 @@ ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::Clust
       cluster_name_(config.getString("cluster_name")),
       stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
       stats_(generateStats(stat_prefix_, scope)) {
-  if (!cm.get(cluster_name_)) {
-    throw EnvoyException(
-        fmt::format("redis filter config: unknown cluster name '{}'", cluster_name_));
+  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name_);
+  if (cluster == nullptr) {
+    throw EnvoyException(fmt::format("redis filter config: unknown cluster '{}'", cluster_name_));
+  }
+
+  if (cluster->info()->addedViaApi()) {
+    throw EnvoyException(fmt::format("redis filter config: invalid cluster '{}': currently only "
+                                     "static (non-CDS) clusters are supported",
+                                     cluster_name_));
   }
 }
 

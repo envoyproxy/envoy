@@ -24,6 +24,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/cluster_utility.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -146,18 +147,25 @@ public:
   const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
     return *healthy_hosts_per_zone_;
   }
-  void addMemberUpdateCb(MemberUpdateCb callback) const override;
+  const MemberUpdateCbHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+    return member_update_cb_helper_.add(callback);
+  }
+  void removeMemberUpdateCb(const MemberUpdateCbHandle* handle) const override {
+    return member_update_cb_helper_.remove(handle);
+  }
 
 protected:
   virtual void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                  const std::vector<HostSharedPtr>& hosts_removed);
+                                  const std::vector<HostSharedPtr>& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
 
 private:
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_zone_;
   HostListsConstSharedPtr healthy_hosts_per_zone_;
-  mutable std::list<MemberUpdateCb> callbacks_;
+  mutable MemberUpdateCbHelper member_update_cb_helper_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -168,11 +176,12 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 class ClusterInfoImpl : public ClusterInfo {
 public:
   ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager);
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
+  bool addedViaApi() const override { return added_via_api_; }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
@@ -215,6 +224,7 @@ private:
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   LoadBalancerType lb_type_;
+  const bool added_via_api_;
 };
 
 /**
@@ -231,7 +241,7 @@ public:
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                            const Optional<envoy::api::v2::ConfigSource>& eds_config,
                            const LocalInfo::LocalInfo& local_info,
-                           Outlier::EventLoggerSharedPtr outlier_event_logger);
+                           Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -252,7 +262,7 @@ public:
 
 protected:
   ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager);
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
@@ -280,7 +290,7 @@ private:
 class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager);
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -323,7 +333,8 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager,
-                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher);
+                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher,
+                       bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}

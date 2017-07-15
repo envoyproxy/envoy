@@ -73,8 +73,8 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
   // It is possible that the cluster we are removing has already been initialized, and is not
   // present in the initializer list. If so, this is fine.
   cluster_list->remove(&cluster);
-  ENVOY_LOG(info, "cm init: removing: cluster={} primary={} secondary={}", cluster.info()->name(),
-            primary_init_clusters_.size(), secondary_init_clusters_.size());
+  ENVOY_LOG(info, "cm init: init complete: cluster={} primary={} secondary={}",
+            cluster.info()->name(), primary_init_clusters_.size(), secondary_init_clusters_.size());
   maybeFinishInitialize();
 }
 
@@ -118,6 +118,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
     state_ = State::WaitingForCdsInitialize;
     cds_->initialize();
   } else {
+    ENVOY_LOG(info, "cm init: all clusters initialized");
     state_ = State::AllClustersInitialized;
     if (initialized_callback_) {
       initialized_callback_();
@@ -222,7 +223,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
-  std::string final_prefix = "cluster_manager.";
+  const std::string final_prefix = "cluster_manager.";
   return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
@@ -238,7 +239,7 @@ void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
 bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_config) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
-  std::string cluster_name = new_config.getString("name");
+  const std::string cluster_name = new_config.getString("name");
   auto existing_cluster = primary_clusters_.find(cluster_name);
   if (existing_cluster != primary_clusters_.end() &&
       (!existing_cluster->second.added_via_api_ ||
@@ -252,9 +253,16 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
 
   loadCluster(new_config, true);
   ClusterInfoConstSharedPtr new_cluster = primary_clusters_.at(cluster_name).cluster_->info();
+  ENVOY_LOG(info, "add/update cluster {}", cluster_name);
   tls_.runOnAllThreads([this, new_cluster]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
         tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+
+    if (cluster_manager.thread_local_clusters_.count(new_cluster->name())) {
+      ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+    } else {
+      ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+    }
 
     cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
         new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster));
@@ -274,10 +282,13 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
   primary_clusters_.erase(existing_cluster);
   cm_stats_.cluster_removed_.inc();
   cm_stats_.total_clusters_.set(primary_clusters_.size());
+  ENVOY_LOG(info, "removing cluster {}", cluster_name);
   tls_.runOnAllThreads([this, cluster_name]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
         tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
+    ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
+    ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
     cluster_manager.thread_local_clusters_.erase(cluster_name);
   });
 
@@ -286,7 +297,7 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
 
 void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via_api) {
   ClusterPtr new_cluster =
-      factory_.clusterFromJson(cluster, *this, sds_config_, outlier_event_logger_);
+      factory_.clusterFromJson(cluster, *this, sds_config_, outlier_event_logger_, added_via_api);
 
   init_helper_.addCluster(*new_cluster);
   if (!added_via_api) {
@@ -401,6 +412,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     : parent_(parent), thread_local_dispatcher_(dispatcher) {
   // If local cluster is defined then we need to initialize it first.
   if (local_cluster_name.valid()) {
+    ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.primary_clusters_.at(local_cluster_name.value()).cluster_;
     thread_local_clusters_[local_cluster_name.value()].reset(
         new ClusterEntry(*this, local_cluster->info()));
@@ -416,6 +428,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
       continue;
     }
 
+    ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
+    ASSERT(thread_local_clusters_.count(cluster.first) == 0);
     thread_local_clusters_[cluster.first].reset(
         new ClusterEntry(*this, cluster.second.cluster_->info()));
   }
@@ -479,8 +493,17 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
   // Clear out connection pools as well as the thread local cluster map so that we release all
-  // primary cluster pointers.
+  // primary cluster pointers. Currently we have to free all non-local clusters before we free
+  // the local cluster. This is because non-local clusters have a member update callback registered
+  // with the local cluster.
+  // TODO(mattklein123): The above is sub-optimal and is related to the TODO in
+  //                     redis/conn_pool_impl.cc. Will fix at the same time.
   host_http_conn_pool_map_.clear();
+  for (auto& cluster : thread_local_clusters_) {
+    if (&cluster.second->host_set_ != local_host_set_) {
+      cluster.second.reset();
+    }
+  }
   thread_local_clusters_.clear();
 }
 
@@ -574,17 +597,16 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostC
   }
 }
 
-ClusterPtr
-ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                                           const Optional<SdsConfig>& sds_config,
-                                           Outlier::EventLoggerSharedPtr outlier_event_logger) {
+ClusterPtr ProdClusterManagerFactory::clusterFromJson(
+    const Json::Object& cluster, ClusterManager& cm, const Optional<SdsConfig>& sds_config,
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   Optional<envoy::api::v2::ConfigSource> eds_config((envoy::api::v2::ConfigSource()));
   if (sds_config.valid()) {
     Config::Utility::sdsConfigToEdsConfig(sds_config.value(), eds_config.value());
   }
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, eds_config, local_info_,
-                                 outlier_event_logger);
+                                 outlier_event_logger, added_via_api);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, ClusterManager& cm) {

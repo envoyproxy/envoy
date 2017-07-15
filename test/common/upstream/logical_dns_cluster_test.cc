@@ -30,7 +30,7 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
-                                         dns_resolver_, tls_, dispatcher_));
+                                         dns_resolver_, tls_, dispatcher_, false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
