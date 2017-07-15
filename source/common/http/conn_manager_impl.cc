@@ -10,7 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
-#include  "envoy/router/router.h"
+#include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/stats.h"
 #include "envoy/tracing/http_tracer.h"
@@ -103,7 +103,6 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    ENVOY_CONN_LOG(trace, "connman deferred close. Closing downstream", read_callbacks_->connection());
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -176,13 +175,12 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
 
-  // Send the data through WebSocket handlers if this connection is a WebSocket connection.
-  // N.B. The first request from the client to Envoy will still be processed as a
-  // normal HTTP/1.1 request, where Envoy will detect the WebSocket upgrade and establish a
-  // connection to the upstream (ws_connection_ variable).
-  ENVOY_CONN_LOG(trace, "connman received {} bytes", read_callbacks_->connection(), data.length());
+  // Send the data through WebSocket handlers if this connection is a
+  // WebSocket connection.  N.B. The first request from the client to Envoy
+  // will still be processed as a normal HTTP/1.1 request, where Envoy will
+  // detect the WebSocket upgrade and establish a connection to the
+  // upstream.
   if (isWebSocketConnection()) {
-    ENVOY_CONN_LOG(trace, "sending to wsHandler {} bytes", read_callbacks_->connection(), data.length());
     return ws_connection_->onData(data);
   }
 
@@ -195,7 +193,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
       stats_.named_.downstream_cx_http1_total_.inc();
       stats_.named_.downstream_cx_http1_active_.inc();
     }
-    ENVOY_CONN_LOG(trace, "connman creating new codec of type http1: {}", read_callbacks_->connection(), (codec_->protocol() != Protocol::Http2));
   }
 
   bool redispatch;
@@ -203,9 +200,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     redispatch = false;
 
     try {
-      ENVOY_CONN_LOG(trace, "connman dispatching data", read_callbacks_->connection());
       codec_->dispatch(data);
-      ENVOY_CONN_LOG(trace, "connman successfully parsed data", read_callbacks_->connection());
     } catch (const CodecProtocolException& e) {
       // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
       // GOAWAY.
@@ -225,23 +220,22 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     checkForDeferredClose();
 
     // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
-    // either redispatch if there are no streams and we have more data, or if we have a single
-    // complete stream but have not responded yet we will pause socket reads to apply back pressure.
+    // either redispatch if there are no streams and we have more data. If we have a single
+    // complete non-WebSocket stream but have not responded yet we will pause socket reads
+    // to apply back pressure.
     if (codec_->protocol() != Protocol::Http2) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
-	ENVOY_CONN_LOG(trace, "connman streams empty. redispatching..", read_callbacks_->connection());
         redispatch = true;
       }
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_ && !isWebSocketConnection()) {
-	ENVOY_CONN_LOG(trace, "connman streams NOT empty and remote_complete_ is true. Disabling reads..", read_callbacks_->connection());
+      if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
+          !isWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
     }
   } while (redispatch);
 
-  ENVOY_CONN_LOG(trace, "connman stopping iteration..", read_callbacks_->connection());
   return Network::FilterStatus::StopIteration;
 }
 
@@ -488,27 +482,22 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_);
 
-  // If this is a websocket upgrade request, check if the corresponding route supports Websockets.
   if (!cached_route_.valid()) {
     cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
   }
 
-  // If route doesn't exist, we fall through to the http connection manager filter where a 404 would
-  // be sent, and stats recorded.
-  if (cached_route_.value()) {
-    ENVOY_STREAM_LOG(trace, "checking for websocket upgrade (end_stream={}):", *this, end_stream);
+  // Check for WebSocket upgrade request if the route is valid and there
+  // are no pending responses except for the current one.
+  if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
     if (websocket_upgrade_request && (connection_manager_.pending_responses_ == 1)) {
-      ENVOY_STREAM_LOG(trace, "found websocket connection. Creating WsHandlerImpl (end_stream={}):", *this, end_stream);
+      ENVOY_STREAM_LOG(trace, "found websocket connection. (end_stream={}):", *this, end_stream);
       connection_manager_.ws_connection_ = std::unique_ptr<ConnectionManagerImpl::WsHandlerImpl>(
           new ConnectionManagerImpl::WsHandlerImpl(route_entry->clusterName(), *this));
-      ENVOY_STREAM_LOG(trace, "calling initializeUpstreamConnection() (end_stream={}):", *this, end_stream);
-      connection_manager_.ws_connection_->initializeUpstreamConnection(*connection_manager_.read_callbacks_,
-                                                                       route_entry,
-                                                                       *request_headers_);
-      ENVOY_STREAM_LOG(trace, "returning from initializeUpstreamConnection() (end_stream={}):", *this, end_stream);
+      connection_manager_.ws_connection_->initializeUpstreamConnection(
+          *connection_manager_.read_callbacks_, route_entry, *request_headers_);
       return;
     }
   }
@@ -855,7 +844,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     --connection_manager_.pending_responses_;
-    ASSERT(connection_manager_.pending_responses_ >=0);
+    ASSERT(connection_manager_.pending_responses_ >= 0);
     request_timer_->complete();
     connection_manager_.doEndStream(*this);
   }
@@ -1065,35 +1054,32 @@ ConnectionManagerImpl::WsHandlerImpl::~WsHandlerImpl() {
   }
 }
 
-void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
-                                                                        const Router::RouteEntry *route_entry,
-                                                                        HeaderMap &request_headers) {
+void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(
+    Network::ReadFilterCallbacks& callbacks, const Router::RouteEntry* route_entry,
+    HeaderMap& request_headers) {
   read_callbacks_ = &callbacks;
-
-  ENVOY_CONN_LOG(trace, "websocket initializing upstream", read_callbacks_->connection());
-
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name_);
 
   if (thread_local_cluster) {
-    ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
-                   cluster_name_);
+    ENVOY_CONN_LOG(debug, "websocket - creating connection to upstream cluster {}",
+                   read_callbacks_->connection(), cluster_name_);
   } else {
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
     stream_.encodeHeaders(nullptr, headers, true);
-    // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return; //Network::FilterStatus::StopIteration;
+    return;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
+
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
     HeaderMapImpl headers{
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
     stream_.encodeHeaders(nullptr, headers, true);
-    // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return;// Network::FilterStatus::StopIteration;
+    return;
   }
+
   Upstream::Host::CreateConnectionData conn_info =
       cluster_manager_.tcpConnForCluster(cluster_name_);
 
@@ -1101,7 +1087,7 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(Network:
   route_entry->finalizeRequestHeaders(request_headers);
   // for auto host rewrite
   if (route_entry->autoHostRewrite() && !conn_info.host_description_->hostname().empty()) {
-     request_headers.Host()->value(conn_info.host_description_->hostname());
+    request_headers.Host()->value(conn_info.host_description_->hostname());
   }
 
   upstream_connection_ = std::move(conn_info.connection_);
@@ -1110,11 +1096,10 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(Network:
     HeaderMapImpl headers{
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
     stream_.encodeHeaders(nullptr, headers, true);
-    // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return;// Network::FilterStatus::StopIteration;
+    return;
   }
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
-  ENVOY_CONN_LOG(info, "adding upstream_connection_ callbacks", read_callbacks_->connection());
+
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
   upstream_connection_->setBufferStats(
@@ -1137,23 +1122,18 @@ void ConnectionManagerImpl::WsHandlerImpl::initializeUpstreamConnection(Network:
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   connected_timespan_ =
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_.allocateSpan();
-  ENVOY_CONN_LOG(trace, "end of initializeupstream", read_callbacks_->connection());
-  return;// Network::FilterStatus::Continue;
+  return;
 }
 
 void ConnectionManagerImpl::WsHandlerImpl::onConnectTimeout() {
-  ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-
   upstream_connection_.get()->close(Network::ConnectionCloseType::NoFlush);
   HeaderMapImpl headers{
       {Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout))}};
   stream_.encodeHeaders(nullptr, headers, true);
-  // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 Network::FilterStatus ConnectionManagerImpl::WsHandlerImpl::onData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "wshandlerImpl received {} bytes", read_callbacks_->connection(), data.length());
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;
@@ -1163,9 +1143,6 @@ void ConnectionManagerImpl::WsHandlerImpl::onDownstreamEvent(uint32_t event) {
   if ((event & Network::ConnectionEvent::RemoteClose ||
        event & Network::ConnectionEvent::LocalClose) &&
       upstream_connection_) {
-    bool remote_close = event & Network::ConnectionEvent::RemoteClose;
-    bool local_close = event & Network::ConnectionEvent::LocalClose;
-    ENVOY_CONN_LOG(trace, "wshandlerImpl onDownstreamEvent remote_close {} local_close {}", read_callbacks_->connection(), remote_close, local_close);
     // TODO(mattklein123): If we close without flushing here we may drop some data. The downstream
     // connection is about to go away. So to support this we need to either have a way for the
     // downstream connection to stick around, or, we need to be able to pass this connection to a
@@ -1175,7 +1152,6 @@ void ConnectionManagerImpl::WsHandlerImpl::onDownstreamEvent(uint32_t event) {
 }
 
 void ConnectionManagerImpl::WsHandlerImpl::onUpstreamData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamData received {} bytes", read_callbacks_->connection(), data.length());
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
 }
@@ -1183,12 +1159,10 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamData(Buffer::Instance& data
 void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
   if (event & Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
-    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent remote close", read_callbacks_->connection());
   }
 
   if (event & Network::ConnectionEvent::LocalClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
-    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent local close", read_callbacks_->connection());
   }
 
   if (event & Network::ConnectionEvent::RemoteClose) {
@@ -1200,11 +1174,11 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (event & Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
-    ENVOY_CONN_LOG(trace, "wshandlerImpl onUpstreamEvent connected", read_callbacks_->connection());
     // Wrap upstream connection in HTTP Connection, so that we can re-use the HTTP1 codec to
     // send upgrade headers to upstream host.
     Http1::ClientConnectionImpl upstream_http(*upstream_connection_, *upstream_callbacks_);
-    Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
+    Http1::RequestStreamEncoderImpl upstream_request =
+        Http1::RequestStreamEncoderImpl(upstream_http);
     upstream_request.encodeHeaders(*stream_.request_headers_, false);
   }
 
@@ -1214,5 +1188,5 @@ void ConnectionManagerImpl::WsHandlerImpl::onUpstreamEvent(uint32_t event) {
   }
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

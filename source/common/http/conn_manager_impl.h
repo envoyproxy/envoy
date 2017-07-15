@@ -23,10 +23,10 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
-#include "common/network/filter_impl.h"
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
+#include "common/network/filter_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -497,11 +497,11 @@ private:
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
 
   /**
- * An implementation of a WebSocket proxy based on TCP proxy. This filter will instantiate a
- * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
- * All data will be proxied back and forth between the two connections, without any knowledge of
- * the underlying WebSocket protocol.
- */
+   * An implementation of a WebSocket proxy based on TCP proxy. This filter will instantiate a
+   * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
+   * All data will be proxied back and forth between the two connections, without any knowledge of
+   * the underlying WebSocket protocol.
+   */
   struct WsHandlerImpl : Logger::Loggable<Logger::Id::websocket> {
     WsHandlerImpl(const std::string& cluster_name, ActiveStream& stream);
     ~WsHandlerImpl();
@@ -524,7 +524,7 @@ private:
       void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
 
       // Http::ConnectionCallbacks
-      void onGoAway() override  {};
+      void onGoAway() override{};
 
       // Network::ReadFilter
       Network::FilterStatus onData(Buffer::Instance& data) override {
@@ -537,8 +537,8 @@ private:
 
     Network::FilterStatus onData(Buffer::Instance& data);
     void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
-                                          const Router::RouteEntry *route_entry,
-                                          HeaderMap &request_headers);
+                                      const Router::RouteEntry* route_entry,
+                                      HeaderMap& request_headers);
     void onConnectTimeout();
     void onDownstreamEvent(uint32_t event);
     void onUpstreamData(Buffer::Instance& data);
@@ -582,7 +582,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isWebSocketConnection() { return ws_connection_ != nullptr ; }
+  bool isWebSocketConnection() { return ws_connection_ != nullptr; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 
