@@ -416,6 +416,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
 
+  // Track all inflight HTTP requests (HTTP/1 or HTTP/2).
+  connection_manager_.pending_responses_++;
   request_headers_ = std::move(headers);
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NVLOG
@@ -498,7 +500,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_upgrade_request) {
+    if (websocket_upgrade_request && (connection_manager_.pending_responses_ == 1)) {
       ENVOY_STREAM_LOG(trace, "found websocket connection. Creating WsHandlerImpl (end_stream={}):", *this, end_stream);
       connection_manager_.ws_connection_ = std::unique_ptr<ConnectionManagerImpl::WsHandlerImpl>(
           new ConnectionManagerImpl::WsHandlerImpl(route_entry->clusterName(), *this));
@@ -852,6 +854,8 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    --connection_manager_.pending_responses_;
+    ASSERT(connection_manager_.pending_responses_ >=0);
     request_timer_->complete();
     connection_manager_.doEndStream(*this);
   }
