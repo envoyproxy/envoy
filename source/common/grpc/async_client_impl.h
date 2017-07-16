@@ -14,7 +14,8 @@
 namespace Envoy {
 namespace Grpc {
 
-template <class RequestType, class ResponseType> class AsyncClientStreamImpl;
+template <class RequestType, class ResponseType> class AsyncStreamImpl;
+template <class RequestType, class ResponseType> class AsyncRequestImpl;
 
 template <class RequestType, class ResponseType>
 class AsyncClientImpl final : public AsyncClient<RequestType, ResponseType> {
@@ -29,34 +30,34 @@ public:
   }
 
   // Grpc::AsyncClient
-  AsyncClientStream<RequestType>*
-  start(const Protobuf::MethodDescriptor& service_method,
-        AsyncClientCallbacks<ResponseType>& callbacks,
-        const Optional<std::chrono::milliseconds>& timeout) override {
-    std::unique_ptr<AsyncClientStreamImpl<RequestType, ResponseType>> grpc_stream{
-        new AsyncClientStreamImpl<RequestType, ResponseType>(*this, callbacks)};
-    Http::AsyncClient::Stream* http_stream =
-        cm_.httpAsyncClientForCluster(remote_cluster_name_)
-            .start(*grpc_stream, Optional<std::chrono::milliseconds>(timeout));
+  AsyncRequest* send(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
+                     AsyncRequestCallbacks<ResponseType>& callbacks,
+                     const Optional<std::chrono::milliseconds>& timeout) override {
+    std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{
+        new AsyncRequestImpl<RequestType, ResponseType>(*this, service_method, request, callbacks,
+                                                        timeout)};
 
-    if (http_stream == nullptr) {
-      callbacks.onRemoteClose(Status::GrpcStatus::Unavailable);
+    grpc_stream->initialize();
+    if (grpc_stream->hasResetStream()) {
       return nullptr;
     }
 
-    grpc_stream->set_stream(http_stream);
+    grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+    return dynamic_cast<AsyncRequestImpl<RequestType, ResponseType>*>(
+        active_streams_.front().get());
+  }
 
-    Http::MessagePtr message = Common::prepareHeaders(
-        remote_cluster_name_, service_method.service()->full_name(), service_method.name());
-    callbacks.onCreateInitialMetadata(message->headers());
+  AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
+                                  AsyncStreamCallbacks<ResponseType>& callbacks,
+                                  const Optional<std::chrono::milliseconds>& timeout) override {
+    std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{
+        new AsyncStreamImpl<RequestType, ResponseType>(*this, service_method, callbacks, timeout)};
 
-    http_stream->sendHeaders(message->headers(), false);
-    // If sendHeaders() caused a reset, onRemoteClose() has been called inline and we should bail.
-    if (grpc_stream->http_reset_) {
+    grpc_stream->initialize();
+    if (grpc_stream->hasResetStream()) {
       return nullptr;
     }
 
-    grpc_stream->set_headers_msg(std::move(message));
     grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
     return active_streams_.front().get();
   }
@@ -64,19 +65,39 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
-  std::list<std::unique_ptr<AsyncClientStreamImpl<RequestType, ResponseType>>> active_streams_;
+  std::list<std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>>> active_streams_;
 
-  friend class AsyncClientStreamImpl<RequestType, ResponseType>;
+  friend class AsyncStreamImpl<RequestType, ResponseType>;
 };
 
 template <class RequestType, class ResponseType>
-class AsyncClientStreamImpl : public AsyncClientStream<RequestType>,
-                              Http::AsyncClient::StreamCallbacks,
-                              LinkedObject<AsyncClientStreamImpl<RequestType, ResponseType>> {
+class AsyncStreamImpl : public AsyncStream<RequestType>,
+                        Http::AsyncClient::StreamCallbacks,
+                        LinkedObject<AsyncStreamImpl<RequestType, ResponseType>> {
 public:
-  AsyncClientStreamImpl(AsyncClientImpl<RequestType, ResponseType>& parent,
-                        AsyncClientCallbacks<ResponseType>& callbacks)
-      : parent_(parent), callbacks_(callbacks) {}
+  AsyncStreamImpl(AsyncClientImpl<RequestType, ResponseType>& parent,
+                  const Protobuf::MethodDescriptor& service_method,
+                  AsyncStreamCallbacks<ResponseType>& callbacks,
+                  const Optional<std::chrono::milliseconds>& timeout)
+      : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {
+  }
+
+  virtual void initialize() {
+    stream_ = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_)
+                  .start(*this, Optional<std::chrono::milliseconds>(timeout_));
+
+    if (stream_ == nullptr) {
+      callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable);
+      http_reset_ = true;
+      return;
+    }
+
+    headers_message_ =
+        Common::prepareHeaders(parent_.remote_cluster_name_, service_method_.service()->full_name(),
+                               service_method_.name());
+    callbacks_.onCreateInitialMetadata(headers_message_->headers());
+    stream_->sendHeaders(headers_message_->headers(), false);
+  }
 
   // Http::AsyncClient::StreamCallbacks
   void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override {
@@ -151,7 +172,7 @@ public:
     streamError(Status::GrpcStatus::Internal);
   }
 
-  // Grpc::AsyncClientStream
+  // Grpc::AsyncStream
   void sendMessage(const RequestType& request) override {
     stream_->sendData(*Common::serializeBody(request), false);
   }
@@ -166,10 +187,7 @@ public:
     cleanup();
   }
 
-  void set_stream(Http::AsyncClient::Stream* stream) { stream_ = stream; }
-
-  // We need to keep ownership of this past stream start() for Http::AsyncClient sendHeaders().
-  void set_headers_msg(Http::MessagePtr headers_msg) { headers_msg_ = std::move(headers_msg); }
+  bool hasResetStream() const { return http_reset_; }
 
 private:
   void streamError(Status::GrpcStatus grpc_status) {
@@ -185,8 +203,8 @@ private:
 
     // This will destroy us, but only do so if we are actually in a list. This does not happen in
     // the immediate failure case.
-    if (LinkedObject<AsyncClientStreamImpl<RequestType, ResponseType>>::inserted()) {
-      LinkedObject<AsyncClientStreamImpl<RequestType, ResponseType>>::removeFromList(
+    if (LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::inserted()) {
+      LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::removeFromList(
           parent_.active_streams_);
     }
   }
@@ -207,9 +225,11 @@ private:
 
   bool complete() const { return local_closed_ && remote_closed_; }
 
-  Http::MessagePtr headers_msg_;
+  Http::MessagePtr headers_message_;
   AsyncClientImpl<RequestType, ResponseType>& parent_;
-  AsyncClientCallbacks<ResponseType>& callbacks_;
+  const Protobuf::MethodDescriptor& service_method_;
+  AsyncStreamCallbacks<ResponseType>& callbacks_;
+  const Optional<std::chrono::milliseconds>& timeout_;
   bool local_closed_{};
   bool remote_closed_{};
   bool http_reset_{};
@@ -219,6 +239,58 @@ private:
   std::vector<Frame> decoded_frames_;
 
   friend class AsyncClientImpl<RequestType, ResponseType>;
+};
+
+template <class RequestType, class ResponseType>
+class AsyncRequestImpl : public AsyncRequest,
+                         public AsyncStreamImpl<RequestType, ResponseType>,
+                         AsyncStreamCallbacks<ResponseType> {
+public:
+  AsyncRequestImpl(AsyncClientImpl<RequestType, ResponseType>& parent,
+                   const Protobuf::MethodDescriptor& service_method, const RequestType& request,
+                   AsyncRequestCallbacks<ResponseType>& callbacks,
+                   const Optional<std::chrono::milliseconds>& timeout)
+      : AsyncStreamImpl<RequestType, ResponseType>(parent, service_method, *this, timeout),
+        request_(request), callbacks_(callbacks) {}
+
+  void initialize() override {
+    AsyncStreamImpl<RequestType, ResponseType>::initialize();
+    if (this->hasResetStream()) {
+      return;
+    }
+    this->sendMessage(request_);
+  }
+
+  // Grpc::AsyncRequest
+  void cancel() override { this->resetStream(); }
+
+private:
+  // Grpc::AsyncStreamCallbacks
+  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+    callbacks_.onCreateInitialMetadata(metadata);
+  }
+
+  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+
+  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
+    response_ = std::move(message);
+  }
+
+  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+
+  void onRemoteClose(Grpc::Status::GrpcStatus status) override {
+    if (status != Grpc::Status::GrpcStatus::Ok) {
+      callbacks_.onFailure(status);
+      return;
+    }
+
+    callbacks_.onSuccess(std::move(response_));
+    this->closeStream();
+  }
+
+  const RequestType& request_;
+  AsyncRequestCallbacks<ResponseType>& callbacks_;
+  std::unique_ptr<ResponseType> response_;
 };
 
 } // namespace Grpc

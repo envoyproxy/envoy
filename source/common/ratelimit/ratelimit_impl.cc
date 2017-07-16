@@ -27,10 +27,8 @@ GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
 void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
-  ASSERT(stream_ != nullptr);
-  stream_->resetStream();
+  request_->cancel();
   callbacks_ = nullptr;
-  stream_ = nullptr;
 }
 
 void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& request,
@@ -57,13 +55,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   pb::lyft::ratelimit::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  stream_ = async_client_->start(service_method_, *this, timeout_);
-  if (stream_ == nullptr) {
-    callbacks_->complete(LimitStatus::Error);
-    callbacks_ = nullptr;
-    return;
-  }
-  stream_->sendMessage(request);
+  request_ = async_client_->send(service_method_, request, *this, timeout_);
 }
 
 void GrpcClientImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
@@ -76,29 +68,21 @@ void GrpcClientImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
   }
 }
 
-void GrpcClientImpl::onReceiveMessage(
-    std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& message) {
-  response_ = std::move(message);
+void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response) {
+  LimitStatus status = LimitStatus::OK;
+  ASSERT(response->overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
+  if (response->overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
+    status = LimitStatus::OverLimit;
+  }
+  callbacks_->complete(status);
+  callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status) {
-  if (status != Grpc::Status::GrpcStatus::Ok) {
-    callbacks_->complete(LimitStatus::Error);
-    callbacks_ = nullptr;
-    stream_ = nullptr;
-    return;
-  }
-
-  LimitStatus limit_status = LimitStatus::OK;
-  ASSERT(response_->overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
-  if (response_->overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
-    limit_status = LimitStatus::OverLimit;
-  }
-
-  callbacks_->complete(limit_status);
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status) {
+  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
+  UNREFERENCED_PARAMETER(status);
+  callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
-  stream_->closeStream();
-  stream_ = nullptr;
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)

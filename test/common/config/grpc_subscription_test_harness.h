@@ -104,7 +104,7 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  Grpc::MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
 };
 

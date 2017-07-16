@@ -21,7 +21,7 @@ namespace Envoy {
 namespace Grpc {
 
 template class AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>;
-template class AsyncClientStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>;
+template class AsyncStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>;
 
 namespace {
 
@@ -40,7 +40,7 @@ MATCHER_P(HelloworldReplyEq, rhs, "") { return arg.message() == rhs; }
 
 typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
 
-class HelloworldStream : public MockAsyncClientCallbacks<helloworld::HelloReply> {
+class HelloworldStream : public MockAsyncStreamCallbacks<helloworld::HelloReply> {
 public:
   HelloworldStream(Http::MockAsyncClientStream* http_stream) : http_stream_(http_stream) {
     ON_CALL(*http_stream_, reset()).WillByDefault(Invoke([this]() { http_callbacks_->onReset(); }));
@@ -121,7 +121,33 @@ public:
 
   Http::AsyncClient::StreamCallbacks* http_callbacks_{};
   Http::MockAsyncClientStream* http_stream_;
-  AsyncClientStream<helloworld::HelloRequest>* grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest>* grpc_stream_{};
+};
+
+class HelloworldRequest : public MockAsyncRequestCallbacks<helloworld::HelloReply> {
+public:
+  HelloworldRequest(Http::MockAsyncClientStream* http_stream) : http_stream_(http_stream) {}
+
+  ~HelloworldRequest() { Mock::VerifyAndClear(http_stream_); }
+
+  void sendReply() {
+    Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    http_callbacks_->onHeaders(std::move(reply_headers), false);
+
+    Buffer::OwnedImpl reply_buffer(HELLO_REPLY_DATA, HELLO_REPLY_SIZE);
+    helloworld::HelloReply reply;
+    reply.set_message(HELLO_REPLY);
+    http_callbacks_->onData(reply_buffer, false);
+
+    Http::HeaderMapPtr reply_trailers{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}};
+    EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY)));
+    EXPECT_CALL(*http_stream_, reset());
+    http_callbacks_->onTrailers(std::move(reply_trailers));
+  }
+
+  Http::AsyncClient::StreamCallbacks* http_callbacks_{};
+  Http::MockAsyncClientStream* http_stream_;
+  AsyncRequest* grpc_request_{};
 };
 
 class GrpcAsyncClientImplTest : public testing::Test {
@@ -139,16 +165,7 @@ public:
     }
   }
 
-  std::unique_ptr<HelloworldStream> createStream(TestMetadata& initial_metadata) {
-    http_streams_.emplace_back(new Http::MockAsyncClientStream());
-    std::unique_ptr<HelloworldStream> stream(new HelloworldStream(http_streams_.back().get()));
-    std::vector<Http::LowerCaseString> keys;
-    EXPECT_CALL(*stream, onCreateInitialMetadata(_))
-        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
-          for (auto& value : initial_metadata) {
-            headers.addStatic(value.first, value.second);
-          }
-        }));
+  Http::TestHeaderMapImpl expectedHeaders(const TestMetadata& initial_metadata) const {
     Http::TestHeaderMapImpl headers{{":method", "POST"},
                                     {":path", "/helloworld.Greeter/SayHello"},
                                     {":authority", "test_cluster"},
@@ -156,6 +173,57 @@ public:
     for (auto& value : initial_metadata) {
       headers.addStatic(value.first, value.second);
     }
+
+    return headers;
+  }
+
+  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
+    http_streams_.emplace_back(new Http::MockAsyncClientStream());
+    std::unique_ptr<HelloworldRequest> request(new HelloworldRequest(http_streams_.back().get()));
+    EXPECT_CALL(*request, onCreateInitialMetadata(_))
+        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+          for (auto& value : initial_metadata) {
+            headers.addStatic(value.first, value.second);
+          }
+        }));
+    const auto headers = expectedHeaders(initial_metadata);
+    EXPECT_CALL(http_client_, start(_, _))
+        .WillOnce(Invoke([&request](Http::AsyncClient::StreamCallbacks& callbacks,
+                                    const Optional<std::chrono::milliseconds>& timeout) {
+          UNREFERENCED_PARAMETER(timeout);
+          request->http_callbacks_ = &callbacks;
+          return request->http_stream_;
+        }));
+
+    const Http::HeaderMapImpl* active_header_map = nullptr;
+    EXPECT_CALL(*(request->http_stream_), sendHeaders(HeaderMapEqualRef(&headers), _))
+        .WillOnce(Invoke([&active_header_map](Http::HeaderMap& headers, bool) {
+          active_header_map = dynamic_cast<const Http::HeaderMapImpl*>(&headers);
+        }));
+    helloworld::HelloRequest request_msg;
+    request_msg.set_name(HELLO_REQUEST);
+    EXPECT_CALL(
+        *(request->http_stream_),
+        sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), false));
+    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
+                                                Optional<std::chrono::milliseconds>());
+    EXPECT_NE(request->grpc_request_, nullptr);
+    // The header map should still be valid after grpc_client_->start() returns, since it is
+    // retained by the HTTP async client for the deferred send.
+    EXPECT_EQ(*active_header_map, headers);
+    return request;
+  }
+
+  std::unique_ptr<HelloworldStream> createStream(TestMetadata& initial_metadata) {
+    http_streams_.emplace_back(new Http::MockAsyncClientStream());
+    std::unique_ptr<HelloworldStream> stream(new HelloworldStream(http_streams_.back().get()));
+    EXPECT_CALL(*stream, onCreateInitialMetadata(_))
+        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+          for (auto& value : initial_metadata) {
+            headers.addStatic(value.first, value.second);
+          }
+        }));
+    const auto headers = expectedHeaders(initial_metadata);
     EXPECT_CALL(http_client_, start(_, _))
         .WillOnce(Invoke([&stream](Http::AsyncClient::StreamCallbacks& callbacks,
                                    const Optional<std::chrono::milliseconds>& timeout) {
@@ -200,6 +268,13 @@ TEST_F(GrpcAsyncClientImplTest, BasicStream) {
   stream->closeStream();
 }
 
+// Validate that a simple request-reply unary RPC works.
+TEST_F(GrpcAsyncClientImplTest, BasicRequest) {
+  TestMetadata empty_metadata;
+  auto request = createRequest(empty_metadata);
+  request->sendReply();
+}
+
 // Validate that multiple streams work.
 TEST_F(GrpcAsyncClientImplTest, MultiStream) {
   TestMetadata empty_metadata;
@@ -214,10 +289,19 @@ TEST_F(GrpcAsyncClientImplTest, MultiStream) {
   stream_0->closeStream();
 }
 
+// Validate that multiple request-reply unary RPCs works.
+TEST_F(GrpcAsyncClientImplTest, MultiRequest) {
+  TestMetadata empty_metadata;
+  auto request_0 = createRequest(empty_metadata);
+  auto request_1 = createRequest(empty_metadata);
+  request_1->sendReply();
+  request_0->sendReply();
+}
+
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
-TEST_F(GrpcAsyncClientImplTest, HttpStartFail) {
-  MockAsyncClientCallbacks<helloworld::HelloReply> grpc_callbacks;
+TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
@@ -225,10 +309,22 @@ TEST_F(GrpcAsyncClientImplTest, HttpStartFail) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validate that a failure in the HTTP client returns immediately with status
+// UNAVAILABLE.
+TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
+  MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
+  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
+  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable));
+  helloworld::HelloRequest request_msg;
+  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
+                                          Optional<std::chrono::milliseconds>());
+  EXPECT_EQ(grpc_request, nullptr);
+}
+
 // Validate that a failure to sendHeaders() in the HTTP client returns
 // immediately with status INTERNAL.
-TEST_F(GrpcAsyncClientImplTest, HttpSendHeadersFail) {
-  MockAsyncClientCallbacks<helloworld::HelloReply> grpc_callbacks;
+TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _))
@@ -250,6 +346,34 @@ TEST_F(GrpcAsyncClientImplTest, HttpSendHeadersFail) {
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                           Optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validate that a failure to sendHeaders() in the HTTP client returns
+// immediately with status INTERNAL.
+TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
+  MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const Optional<std::chrono::milliseconds>& timeout) {
+            UNREFERENCED_PARAMETER(timeout);
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
+        UNREFERENCED_PARAMETER(headers);
+        UNREFERENCED_PARAMETER(end_stream);
+        http_callbacks->onReset();
+      }));
+  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Internal));
+  helloworld::HelloRequest request_msg;
+  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
+                                          Optional<std::chrono::milliseconds>());
+  EXPECT_EQ(grpc_request, nullptr);
 }
 
 // Validate that a non-200 HTTP status results in the gRPC error as per
@@ -347,13 +471,23 @@ TEST_F(GrpcAsyncClientImplTest, ReplyNoTrailers) {
 }
 
 // Validate that send client initial metadata works.
-TEST_F(GrpcAsyncClientImplTest, ClientInitialMetadata) {
+TEST_F(GrpcAsyncClientImplTest, StreamClientInitialMetadata) {
   TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
   };
   auto stream = createStream(initial_metadata);
   expectResetOn(stream.get());
+}
+
+// Validate that send client initial metadata works.
+TEST_F(GrpcAsyncClientImplTest, RequestClientInitialMetadata) {
+  TestMetadata initial_metadata = {
+      {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("baz"), "blah"},
+  };
+  auto request = createRequest(initial_metadata);
+  dangling_streams_.push_back(request->http_stream_);
 }
 
 // Validate that receiving server initial metadata works.
@@ -424,7 +558,7 @@ TEST_F(GrpcAsyncClientImplTest, SendAfterRemoteClose) {
 }
 
 // Validate that reset() doesn't explode on a half-closed stream (local).
-TEST_F(GrpcAsyncClientImplTest, resetAfterCloseLocal) {
+TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseLocal) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
   stream->grpc_stream_->closeStream();
@@ -434,13 +568,21 @@ TEST_F(GrpcAsyncClientImplTest, resetAfterCloseLocal) {
 }
 
 // Validate that reset() doesn't explode on a half-closed stream (remote).
-TEST_F(GrpcAsyncClientImplTest, resetAfterCloseRemote) {
+TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseRemote) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
   stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
   EXPECT_CALL(*stream->http_stream_, reset());
   stream->grpc_stream_->resetStream();
   stream->clearStream();
+}
+
+// Validate that request cancel() works.
+TEST_F(GrpcAsyncClientImplTest, CancelRequest) {
+  TestMetadata empty_metadata;
+  auto request = createRequest(empty_metadata);
+  EXPECT_CALL(*request->http_stream_, reset());
+  request->grpc_request_->cancel();
 }
 
 } // namespace

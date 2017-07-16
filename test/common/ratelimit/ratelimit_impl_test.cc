@@ -38,7 +38,7 @@ public:
 
   Grpc::MockAsyncClient<pb::lyft::ratelimit::RateLimitRequest,
                         pb::lyft::ratelimit::RateLimitResponse>* async_client_;
-  Grpc::MockAsyncClientStream<pb::lyft::ratelimit::RateLimitRequest> async_stream_;
+  Grpc::MockAsyncRequest async_request_;
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
 };
@@ -50,16 +50,16 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     pb::lyft::ratelimit::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
-    EXPECT_CALL(*async_client_, start(_, Ref(client_), _))
-        .WillOnce(Invoke([this](const Protobuf::MethodDescriptor& service_method,
-                                Grpc::AsyncClientCallbacks<pb::lyft::ratelimit::RateLimitResponse>&,
-                                const Optional<std::chrono::milliseconds>&)
-                             -> Grpc::AsyncClientStream<pb::lyft::ratelimit::RateLimitRequest>* {
+    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _))
+        .WillOnce(Invoke([this](
+                             const Protobuf::MethodDescriptor& service_method,
+                             const pb::lyft::ratelimit::RateLimitRequest&,
+                             Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse>&,
+                             const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
           EXPECT_EQ("pb.lyft.ratelimit.RateLimitService", service_method.service()->full_name());
           EXPECT_EQ("ShouldRateLimit", service_method.name());
-          return &async_stream_;
+          return &async_request_;
         }));
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request)));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::EMPTY_CONTEXT);
 
@@ -69,17 +69,14 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT);
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::OverLimit));
-    client_.onReceiveMessage(std::move(response));
-    EXPECT_CALL(async_stream_, closeStream());
-    client_.onRemoteClose(Grpc::Status::Ok);
+    client_.onSuccess(std::move(response));
   }
 
   {
     pb::lyft::ratelimit::RateLimitRequest request;
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request)));
+    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _)).WillOnce(Return(&async_request_));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}},
                   {"requestid", "context"});
@@ -91,9 +88,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OK);
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::OK));
-    client_.onReceiveMessage(std::move(response));
-    EXPECT_CALL(async_stream_, closeStream());
-    client_.onRemoteClose(Grpc::Status::Ok);
+    client_.onSuccess(std::move(response));
   }
 
   {
@@ -101,8 +96,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     GrpcClientImpl::createRequest(
         request, "foo",
         {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}});
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(request)));
+    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _)).WillOnce(Return(&async_request_));
 
     client_.limit(request_callbacks_, "foo",
                   {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
@@ -110,19 +104,18 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::Error));
-    client_.onRemoteClose(Grpc::Status::Unknown);
+    client_.onFailure(Grpc::Status::Unknown);
   }
 }
 
 TEST_F(RateLimitGrpcClientTest, Cancel) {
   std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse> response;
 
-  EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(async_stream_, sendMessage(_));
+  EXPECT_CALL(*async_client_, send(_, _, _, _)).WillOnce(Return(&async_request_));
 
   client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::EMPTY_CONTEXT);
 
-  EXPECT_CALL(async_stream_, resetStream());
+  EXPECT_CALL(async_request_, cancel());
   client_.cancel();
 }
 

@@ -21,8 +21,7 @@ typedef Grpc::AsyncClient<pb::lyft::ratelimit::RateLimitRequest,
     RateLimitAsyncClient;
 typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
 
-typedef Grpc::AsyncClientStream<pb::lyft::ratelimit::RateLimitRequest> RateLimitAsyncStream;
-typedef Grpc::AsyncClientCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
+typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
 
 class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
 public:
@@ -39,20 +38,17 @@ public:
              const std::vector<Descriptor>& descriptors,
              const Tracing::TransportContext& context) override;
 
-  // Grpc::AsyncClientCallbacks
+  // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-  void onReceiveMessage(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& message) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
-  void onRemoteClose(Grpc::Status::GrpcStatus status) override;
+  void onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response) override;
+  void onFailure(Grpc::Status::GrpcStatus status) override;
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
   std::unique_ptr<RateLimitAsyncClient> async_client_;
-  RateLimitAsyncStream* stream_{};
+  Grpc::AsyncRequest* request_{};
   Optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
-  std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse> response_;
   Tracing::TransportContext context_;
 };
 

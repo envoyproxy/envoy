@@ -13,11 +13,24 @@ namespace Envoy {
 namespace Grpc {
 
 /**
+ * An in-flight gRPC unary RPC.
+ */
+class AsyncRequest {
+public:
+  virtual ~AsyncRequest() {}
+
+  /**
+   * Signals that the request should be cancelled.
+   */
+  virtual void cancel() PURE;
+};
+
+/**
  * An in-flight gRPC stream.
  */
-template <class RequestType> class AsyncClientStream {
+template <class RequestType> class AsyncStream {
 public:
-  virtual ~AsyncClientStream() {}
+  virtual ~AsyncStream() {}
 
   /**
    * Send request message to the stream.
@@ -38,16 +51,39 @@ public:
   virtual void resetStream() PURE;
 };
 
+template <class ResponseType> class AsyncRequestCallbacks {
+public:
+  virtual ~AsyncRequestCallbacks() {}
+
+  /**
+   * Called when populating the headers to send with initial metadata.
+   * @param metadata initial metadata reference.
+   */
+  virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
+
+  /**
+   * Called when the async gRPC request succeeds.
+   * @param response the gRPC response.
+   */
+  virtual void onSuccess(std::unique_ptr<ResponseType>&& response) PURE;
+
+  /**
+   * Called when the async gRPC request fails.
+   * @param status the gRPC status.
+   */
+  virtual void onFailure(Status::GrpcStatus status) PURE;
+};
+
 /**
  * Notifies caller of async gRPC stream status.
  * Note the gRPC stream is full-duplex, even if the local to remote stream has been ended by
- * AsyncClientStream.close(), AsyncClientCallbacks can continue to receive events until the remote
+ * AsyncStream.close(), AsyncStreamCallbacks can continue to receive events until the remote
  * to local stream is closed (onRemoteClose), and vice versa. Once the stream is closed remotely, no
  * further callbacks will be invoked.
  */
-template <class ResponseType> class AsyncClientCallbacks {
+template <class ResponseType> class AsyncStreamCallbacks {
 public:
-  virtual ~AsyncClientCallbacks() {}
+  virtual ~AsyncStreamCallbacks() {}
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -92,6 +128,21 @@ public:
   virtual ~AsyncClient() {}
 
   /**
+   * Start a gRPC unary RPC asynchronously.
+   * @param service_method protobuf descriptor of gRPC service method.
+   * @param request protobuf serializable message.
+   * @param callbacks the callbacks to be notified of RPC status.
+   * @param timeout supplies the request timeout.
+   * @return a request handle or nullptr if no request could be started. NOTE: In this case
+   *         onFailure() has already been called inline. The client owns the request and the
+   *         handle should just be used to cancel.
+   */
+  virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
+                             const RequestType& request,
+                             AsyncRequestCallbacks<ResponseType>& callbacks,
+                             const Optional<std::chrono::milliseconds>& timeout) PURE;
+
+  /**
    * Start a gRPC stream asynchronously.
    * @param service_method protobuf descriptor of gRPC service method.
    * @param callbacks the callbacks to be notified of stream status.
@@ -100,13 +151,12 @@ public:
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onRemoteClose() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or finish the stream. It is expected that
-   *         finish() is invoked by the caller to notify the client that the stream resources may
-   *         be reclaimed.
+   *         closeStream() is invoked by the caller to notify the client that the stream resources
+   *         may be reclaimed.
    */
-  virtual AsyncClientStream<RequestType>*
-  start(const Protobuf::MethodDescriptor& service_method,
-        AsyncClientCallbacks<ResponseType>& callbacks,
-        const Optional<std::chrono::milliseconds>& timeout) PURE;
+  virtual AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
+                                          AsyncStreamCallbacks<ResponseType>& callbacks,
+                                          const Optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
 } // namespace Grpc

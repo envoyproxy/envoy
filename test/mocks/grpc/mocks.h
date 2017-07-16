@@ -11,7 +11,15 @@
 namespace Envoy {
 namespace Grpc {
 
-template <class RequestType> class MockAsyncClientStream : public AsyncClientStream<RequestType> {
+class MockAsyncRequest : public AsyncRequest {
+public:
+  MockAsyncRequest();
+  ~MockAsyncRequest();
+
+  MOCK_METHOD0(cancel, void());
+};
+
+template <class RequestType> class MockAsyncStream : public AsyncStream<RequestType> {
 public:
   MOCK_METHOD1_T(sendMessage, void(const RequestType& request));
   MOCK_METHOD0_T(closeStream, void());
@@ -19,7 +27,17 @@ public:
 };
 
 template <class ResponseType>
-class MockAsyncClientCallbacks : public AsyncClientCallbacks<ResponseType> {
+class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
+public:
+  void onSuccess(std::unique_ptr<ResponseType>&& response) { onSuccess_(*response); }
+
+  MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
+  MOCK_METHOD1_T(onSuccess_, void(const ResponseType& response));
+  MOCK_METHOD1_T(onFailure, void(Status::GrpcStatus status));
+};
+
+template <class ResponseType>
+class MockAsyncStreamCallbacks : public AsyncStreamCallbacks<ResponseType> {
 public:
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
     onReceiveInitialMetadata_(*metadata);
@@ -41,10 +59,14 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD3_T(
-      start, AsyncClientStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
-                                             AsyncClientCallbacks<ResponseType>& callbacks,
-                                             const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD4_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
+                                     const RequestType& request,
+                                     AsyncRequestCallbacks<ResponseType>& callbacks,
+                                     const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3_T(start,
+                 AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
+                                           AsyncStreamCallbacks<ResponseType>& callbacks,
+                                           const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockRpcChannelCallbacks : public RpcChannelCallbacks {
