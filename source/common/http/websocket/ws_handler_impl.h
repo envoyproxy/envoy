@@ -20,16 +20,21 @@ namespace WebSocket {
  * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
  * All data will be proxied back and forth between the two connections, without any knowledge of
  * the underlying WebSocket protocol.
+ *
+ * N.B. This class implements Network::ReadFilter interfaces purely for sake of consistency
+ * with TcpProxy filter. WsHandlerImpl it is not used as a network filter in any way.
  */
-class WsHandlerImpl : Logger::Loggable<Logger::Id::websocket> {
+class WsHandlerImpl : public Network::ReadFilter, Logger::Loggable<Logger::Id::websocket> {
 public:
   WsHandlerImpl(const std::string& cluster_name, Http::HeaderMap& request_headers,
-                StreamDecoderFilterCallbacks& stream, Upstream::ClusterManager& cluster_manager);
+                const Router::RouteEntry* route_entry, StreamDecoderFilterCallbacks& stream,
+                Upstream::ClusterManager& cluster_manager);
   ~WsHandlerImpl();
 
-  Network::FilterStatus onData(Buffer::Instance& data);
-  void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
-                                    const Router::RouteEntry* route_entry);
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
 private:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -68,6 +73,7 @@ private:
 
   const std::string& cluster_name_;
   Http::HeaderMap& request_headers_;
+  const Router::RouteEntry* route_entry_;
   Http::StreamDecoderFilterCallbacks& stream_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};

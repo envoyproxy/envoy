@@ -505,11 +505,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // a handle over the stream decoder filter callback instead of ** ?
       std::list<ActiveStreamDecoderFilterPtr>::iterator entry = decoder_filters_.begin();
       if (entry != decoder_filters_.end()) {
-        connection_manager_.ws_connection_ =
-            std::unique_ptr<WebSocket::WsHandlerImpl>(new WebSocket::WsHandlerImpl(
-                route_entry->clusterName(), *request_headers_, **entry, connection_manager_.cm_));
-        connection_manager_.ws_connection_->initializeUpstreamConnection(
-            *connection_manager_.read_callbacks_, route_entry);
+        connection_manager_.ws_connection_ = std::unique_ptr<WebSocket::WsHandlerImpl>(
+            new WebSocket::WsHandlerImpl(route_entry->clusterName(), *request_headers_, route_entry,
+                                         **entry, connection_manager_.cm_));
+        connection_manager_.ws_connection_->initializeReadFilterCallbacks(
+            *connection_manager_.read_callbacks_);
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
         connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
       } else {

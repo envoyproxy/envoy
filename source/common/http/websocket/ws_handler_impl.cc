@@ -23,10 +23,11 @@ namespace Http {
 namespace WebSocket {
 
 WsHandlerImpl::WsHandlerImpl(const std::string& cluster_name, Http::HeaderMap& request_headers,
+                             const Router::RouteEntry* route_entry,
                              StreamDecoderFilterCallbacks& stream,
                              Upstream::ClusterManager& cluster_manager)
-    : cluster_name_(cluster_name), request_headers_(request_headers), stream_(stream),
-      cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+    : cluster_name_(cluster_name), request_headers_(request_headers), route_entry_(route_entry),
+      stream_(stream), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
 WsHandlerImpl::~WsHandlerImpl() {
@@ -43,8 +44,7 @@ WsHandlerImpl::~WsHandlerImpl() {
   }
 }
 
-void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
-                                                 const Router::RouteEntry* route_entry) {
+void WsHandlerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name_);
@@ -74,9 +74,9 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
       cluster_manager_.tcpConnForCluster(cluster_name_);
 
   // path and host rewrites
-  route_entry->finalizeRequestHeaders(request_headers_);
+  route_entry_->finalizeRequestHeaders(request_headers_);
   // for auto host rewrite
-  if (route_entry->autoHostRewrite() && !conn_info.host_description_->hostname().empty()) {
+  if (route_entry_->autoHostRewrite() && !conn_info.host_description_->hostname().empty()) {
     request_headers_.Host()->value(conn_info.host_description_->hostname());
   }
 
