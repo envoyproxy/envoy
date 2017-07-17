@@ -93,6 +93,9 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
     } else {
+      if (isWebSocketConnection()) {
+        stats_.named_.downstream_cx_websocket_active_.dec();
+      }
       stats_.named_.downstream_cx_http1_active_.dec();
     }
   }
@@ -507,6 +510,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                 route_entry->clusterName(), *request_headers_, **entry, connection_manager_.cm_));
         connection_manager_.ws_connection_->initializeUpstreamConnection(
             *connection_manager_.read_callbacks_, route_entry);
+        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+        connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
       } else {
         // TODO (rshriram) - this can only happen if someone has no router filter. Not sure if its
         // valid in the config.
