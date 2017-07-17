@@ -104,6 +104,36 @@ TEST_F(WatermarkBufferTest, MoveOneByte) {
   EXPECT_EQ(11, buffer_.length());
 }
 
+TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
+  int pipe_fds[2] = {0, 0};
+  ASSERT_EQ(0, pipe(pipe_fds));
+
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  int bytes_written_total = 0;
+  while (bytes_written_total < 20) {
+    int bytes_written = buffer_.write(pipe_fds[1]);
+    if (bytes_written < 0) {
+      ASSERT_EQ(EAGAIN, errno);
+    } else {
+      bytes_written_total += bytes_written;
+    }
+  }
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  EXPECT_EQ(0, buffer_.length());
+
+  int bytes_read_total = 0;
+  while (bytes_read_total < 20) {
+    bytes_read_total += buffer_.read(pipe_fds[0], 20);
+  }
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(20, buffer_.length());
+}
+
 TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
@@ -119,6 +149,26 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.setWatermarks(8, 20);
   buffer_.setWatermarks(10, 20);
   EXPECT_EQ(1, times_low_watermark_called_);
+}
+
+TEST_F(WatermarkBufferTest, GetRawSlices) {
+  buffer_.add(TEN_BYTES, 10);
+
+  RawSlice slices[2];
+  ASSERT_EQ(1, buffer_.getRawSlices(&slices[0], 2));
+  EXPECT_EQ(10, slices[0].len_);
+  EXPECT_EQ(0, memcmp(slices[0].mem_, &TEN_BYTES[0], 10));
+
+  void* data_pointer = buffer_.linearize(10);
+  EXPECT_EQ(data_pointer, slices[0].mem_);
+}
+
+TEST_F(WatermarkBufferTest, Search) {
+  buffer_.add(TEN_BYTES, 10);
+
+  EXPECT_EQ(1, buffer_.search(&TEN_BYTES[1], 2, 0));
+
+  EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
 }
 
 } // namespace
