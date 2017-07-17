@@ -44,11 +44,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
       throw EnvoyException(
           fmt::format("Failed to load verify locations file {}", config.caCertFile()));
     }
-
-    // This will send an acceptable CA list to browsers which will prevent pop ups.
-    rc = SSL_CTX_add_client_CA(ctx_.get(), ca_cert_.get());
-    RELEASE_ASSERT(1 == rc);
-
     verify_mode = SSL_VERIFY_PEER;
   }
 
@@ -349,8 +344,21 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 }
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ContextConfig& config, Runtime::Loader& runtime)
+                                     ServerContextConfig& config, Runtime::Loader& runtime)
     : ContextImpl(parent, scope, config), runtime_(runtime) {
+  if (!config.caCertFile().empty()) {
+    bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
+    if (nullptr == list) {
+      throw EnvoyException(fmt::format("Failed to load client CA file {}", config.caCertFile()));
+    }
+    SSL_CTX_set_client_CA_list(ctx_.get(), list.release());
+
+    // SSL_VERIFY_PEER or stronger mode was already set in ContextImpl::ContextImpl().
+    if (config.requireClientCertificate()) {
+      SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+    }
+  }
+
   parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {

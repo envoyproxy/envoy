@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Ssl {
 
-class ContextConfigImpl final : public Ssl::ContextConfig {
+class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
   ContextConfigImpl(const Json::Object& config);
 
@@ -42,6 +42,17 @@ private:
   std::vector<std::string> verify_subject_alt_name_list_;
   std::string verify_certificate_hash_;
   std::string server_name_indication_;
+};
+
+class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
+public:
+  ServerContextConfigImpl(const Json::Object& config);
+
+  // Ssl::ServerContextConfig
+  bool requireClientCertificate() const override { return require_client_certificate_; }
+
+private:
+  const bool require_client_certificate_;
 };
 
 } // namespace Ssl

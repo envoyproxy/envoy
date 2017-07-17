@@ -114,7 +114,6 @@ private:
   // Somewhat arbitrary 16MiB limit for buffered stats.
   static constexpr uint32_t MaxBufferedStatsBytes = (1024 * 1024 * 16);
 
-  const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;

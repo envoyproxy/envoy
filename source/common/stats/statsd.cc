@@ -10,6 +10,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -82,20 +83,12 @@ void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::mil
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::Instance& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
-    : local_info_(local_info), tls_(tls), tls_slot_(tls.allocateSlot()),
-      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
+    : tls_(tls), tls_slot_(tls.allocateSlot()), cluster_manager_(cluster_manager),
+      cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
-  Upstream::ThreadLocalCluster* cluster = cluster_manager.get(cluster_name);
-  if (!cluster) {
-    throw EnvoyException(fmt::format("unknown TCP statsd upstream cluster: {}", cluster_name));
-  }
-
-  cluster_info_ = cluster->info();
-  if (local_info_.clusterName().empty() || local_info_.nodeName().empty()) {
-    throw EnvoyException(
-        fmt::format("TCP statsd requires setting --service-cluster and --service-node"));
-  }
-
+  Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
+                                            local_info);
+  cluster_info_ = cluster_manager.get(cluster_name)->info();
   tls.set(tls_slot_,
           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
             return std::make_shared<TlsSink>(*this, dispatcher);

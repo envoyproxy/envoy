@@ -56,6 +56,7 @@ public:
       return nullptr;
     }
 
+    grpc_stream->set_headers_msg(std::move(message));
     grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
     return active_streams_.front().get();
   }
@@ -167,6 +168,9 @@ public:
 
   void set_stream(Http::AsyncClient::Stream* stream) { stream_ = stream; }
 
+  // We need to keep ownership of this past stream start() for Http::AsyncClient sendHeaders().
+  void set_headers_msg(Http::MessagePtr headers_msg) { headers_msg_ = std::move(headers_msg); }
+
 private:
   void streamError(Status::GrpcStatus grpc_status) {
     callbacks_.onRemoteClose(grpc_status);
@@ -203,6 +207,7 @@ private:
 
   bool complete() const { return local_closed_ && remote_closed_; }
 
+  Http::MessagePtr headers_msg_;
   AsyncClientImpl<RequestType, ResponseType>& parent_;
   AsyncClientCallbacks<ResponseType>& callbacks_;
   bool local_closed_{};

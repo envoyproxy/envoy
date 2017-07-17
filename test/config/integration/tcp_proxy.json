@@ -86,7 +86,7 @@
       "type": "strict_dns",
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:{{ ssl_auth }}"}]
+      "hosts": [{"url": "tcp://localhost:4"}]
     },
     {
       "name": "cluster_with_buffer_limits",

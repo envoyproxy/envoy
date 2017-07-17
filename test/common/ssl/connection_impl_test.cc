@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 using testing::Invoke;
@@ -41,7 +42,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Runtime::MockLoader runtime;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
@@ -183,7 +184,7 @@ TEST_P(SslConnectionImplTest, NoCert) {
   testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.no_certificate", true, GetParam());
 }
 
-TEST_P(SslConnectionImplTest, FailedClientAuthNoClientCert) {
+TEST_P(SslConnectionImplTest, FailedClientAuthCaVerificationNoClientCert) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "",
@@ -196,7 +197,7 @@ TEST_P(SslConnectionImplTest, FailedClientAuthNoClientCert) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_subject_alt_name": [ "example.com" ]
+    "require_client_certificate": true
   }
   )EOF";
 
@@ -222,6 +223,26 @@ TEST_P(SslConnectionImplTest, FailedClientAuthCaVerification) {
   testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_error", false, GetParam());
 }
 
+TEST_P(SslConnectionImplTest, FailedClientAuthSanVerificationNoClientCert) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "",
+    "private_key_file": ""
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_subject_alt_name": [ "example.com" ]
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
+}
+
 TEST_P(SslConnectionImplTest, FailedClientAuthSanVerification) {
   std::string client_ctx_json = R"EOF(
   {
@@ -240,6 +261,26 @@ TEST_P(SslConnectionImplTest, FailedClientAuthSanVerification) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_san", false, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, FailedClientAuthHashVerificationNoClientCert) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "",
+    "private_key_file": ""
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
@@ -263,6 +304,79 @@ TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
            GetParam());
 }
 
+TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ContextManagerImpl manager(runtime);
+  ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
+
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::MockListenerCallbacks callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  ContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
+
+  // Verify that server sent list with 2 acceptable client certificate CA names.
+  Ssl::ConnectionImpl* ssl_connection =
+      dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+  SSL_set_cert_cb(ssl_connection->rawSslForTest(),
+                  [](SSL* ssl, void*) -> int {
+                    STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
+                    EXPECT_NE(nullptr, list);
+                    EXPECT_EQ(2U, sk_X509_NAME_num(list));
+                    return 1;
+                  },
+                  nullptr);
+
+  client_connection->connect();
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](uint32_t) -> void {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(1UL, stats_store.counter("ssl.handshake").value());
+}
+
 TEST_P(SslConnectionImplTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
@@ -277,7 +391,7 @@ TEST_P(SslConnectionImplTest, SslError) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
@@ -319,7 +433,7 @@ class SslReadBufferLimitTest : public SslCertsTest,
 public:
   void initialize(uint32_t read_buffer_limit) {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
-    server_ctx_config_.reset(new ContextConfigImpl(*server_ctx_loader_));
+    server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ctx_ = manager_->createSslServerContext(stats_store_, *server_ctx_config_);
 
@@ -463,7 +577,7 @@ public:
   )EOF";
   Runtime::MockLoader runtime_;
   Json::ObjectSharedPtr server_ctx_loader_;
-  std::unique_ptr<ContextConfigImpl> server_ctx_config_;
+  std::unique_ptr<ServerContextConfigImpl> server_ctx_config_;
   std::unique_ptr<ContextManagerImpl> manager_;
   ServerContextPtr server_ctx_;
   Network::ListenerPtr listener_;

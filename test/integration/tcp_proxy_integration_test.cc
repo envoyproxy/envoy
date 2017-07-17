@@ -34,11 +34,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->close(); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
       [&]() -> void { tcp_client->waitForDisconnect(); },
-
-      // Clean up unused client_ssl_auth
-      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 
   EXPECT_EQ("world", tcp_client->data());
@@ -61,11 +56,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
       [&]() -> void { tcp_client->close(); },
       [&]() -> void { fake_upstream_connection->waitForData(10); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-
-      // Clean up unused client_ssl_auth
-      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 }
 
@@ -77,17 +67,12 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   executeActions({
       [&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy_with_write_limits")); },
       [&]() -> void { tcp_client->write(data); },
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[2]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection(); },
       [&]() -> void { fake_upstream_connection->waitForData(data.size()); },
       [&]() -> void { fake_upstream_connection->write(data); },
       [&]() -> void { tcp_client->waitForData(data); },
       [&]() -> void { tcp_client->close(); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-
-      // Clean up unused client_ssl_auth
-      [&]() -> void { fake_rest_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(true); },
   });
 
   uint32_t upstream_pauses =
@@ -117,10 +102,8 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
                                                     const std::string& data_to_send_downstream) {
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  FakeHttpConnectionPtr fake_rest_connection;
   testing::NiceMock<Runtime::MockLoader> runtime;
   std::unique_ptr<Ssl::ContextManager> context_manager(new Ssl::ContextManagerImpl(runtime));
-  FakeStreamPtr request;
   Ssl::ClientContextPtr context;
   ConnectionStatusCallbacks connect_callbacks;
   MockBuffer* client_write_buffer;
@@ -147,15 +130,6 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
         context = Ssl::createClientSslContext(false, false, *context_manager);
         ssl_client = dispatcher_->createSslClientConnection(*context, address);
       },
-      // Set up the initial REST response for the ssl_auth filter to avoid the async client doing
-      // reconnects.  Loopback is whitelisted by default so no response payload is necessary.
-      [&]() -> void {
-        fake_rest_connection = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-        request = fake_rest_connection->waitForNewStream();
-        request->waitForEndStream(*dispatcher_);
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-        request->encodeData(0, true);
-      },
       // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
       // filter so there will be no pause waiting on auth data.
       [&]() -> void {
@@ -174,7 +148,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
         }
       },
       // Make sure the data makes it upstream.
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[2]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection(); },
       [&]() -> void { fake_upstream_connection->waitForData(data_to_send_upstream.size()); },
       // Now send data downstream and make sure it arrives.
       [&]() -> void {
@@ -189,8 +163,6 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
       [&]() -> void { ssl_client->close(Network::ConnectionCloseType::NoFlush); },
       [&]() -> void { fake_upstream_connection->close(); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-      [&]() -> void { fake_rest_connection->close(); },
-      [&]() -> void { fake_rest_connection->waitForDisconnect(); },
   });
 }
 

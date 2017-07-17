@@ -11,11 +11,6 @@ public:
   virtual ~TestHooks() {}
 
   /**
-   * Called when the server is initialized and about to start event loops.
-   */
-  virtual void onServerInitialized() PURE;
-
-  /**
    * Called when a worker has added a listener and it is listening.
    */
   virtual void onWorkerListenerAdded() PURE;
@@ -32,7 +27,6 @@ public:
 class DefaultTestHooks : public TestHooks {
 public:
   // TestHooks
-  void onServerInitialized() override {}
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
 };
