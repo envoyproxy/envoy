@@ -21,7 +21,7 @@ public:
 
 template <class RequestType> class MockAsyncStream : public AsyncStream<RequestType> {
 public:
-  MOCK_METHOD1_T(sendMessage, void(const RequestType& request));
+  MOCK_METHOD2_T(sendMessage, void(const RequestType& request, bool end_stream));
   MOCK_METHOD0_T(closeStream, void());
   MOCK_METHOD0_T(resetStream, void());
 };

@@ -54,7 +54,8 @@ private:
 
 class GrpcFactoryImpl : public ClientFactory {
 public:
-  GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm);
+  GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
+                  Event::Dispatcher& dispatcher);
 
   // RateLimit::ClientFactory
   ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
@@ -62,6 +63,7 @@ public:
 private:
   const std::string cluster_name_;
   Upstream::ClusterManager& cm_;
+  Event::Dispatcher& dispatcher_;
 };
 
 class NullClientImpl : public Client {

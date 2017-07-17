@@ -26,7 +26,7 @@ public:
             std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
                                                   envoy::api::v2::DiscoveryResponse>>(
                 new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                          envoy::api::v2::DiscoveryResponse>(cm,
+                                          envoy::api::v2::DiscoveryResponse>(cm, dispatcher,
                                                                              remote_cluster_name)),
             dispatcher, service_method, stats) {}
 
@@ -61,7 +61,7 @@ public:
     if (stream_ == nullptr) {
       return;
     }
-    stream_->sendMessage(request_);
+    stream_->sendMessage(request_, false);
   }
 
   // Config::Subscription

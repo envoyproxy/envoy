@@ -20,8 +20,9 @@ template <class RequestType, class ResponseType> class AsyncRequestImpl;
 template <class RequestType, class ResponseType>
 class AsyncClientImpl final : public AsyncClient<RequestType, ResponseType> {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name)
-      : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
+  AsyncClientImpl(Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                  const std::string& remote_cluster_name)
+      : cm_(cm), dispatcher_(dispatcher), remote_cluster_name_(remote_cluster_name) {}
 
   ~AsyncClientImpl() override {
     while (!active_streams_.empty()) {
@@ -64,6 +65,7 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
+  Event::Dispatcher& dispatcher_;
   const std::string remote_cluster_name_;
   std::list<std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>>> active_streams_;
 
@@ -73,6 +75,7 @@ private:
 template <class RequestType, class ResponseType>
 class AsyncStreamImpl : public AsyncStream<RequestType>,
                         Http::AsyncClient::StreamCallbacks,
+                        public Event::DeferredDeletable,
                         LinkedObject<AsyncStreamImpl<RequestType, ResponseType>> {
 public:
   AsyncStreamImpl(AsyncClientImpl<RequestType, ResponseType>& parent,
@@ -136,11 +139,13 @@ public:
     for (auto& frame : decoded_frames_) {
       std::unique_ptr<ResponseType> response(new ResponseType());
       // TODO(htuch): Need to add support for compressed responses as well here.
-      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+      if (frame.length_ > 0) {
+        Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
 
-      if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
-        streamError(Status::GrpcStatus::Internal);
-        return;
+        if (frame.flags_ != GRPC_FH_DEFAULT || !response->ParseFromZeroCopyStream(&stream)) {
+          streamError(Status::GrpcStatus::Internal);
+          return;
+        }
       }
       callbacks_.onReceiveMessage(std::move(response));
     }
@@ -173,11 +178,18 @@ public:
   }
 
   // Grpc::AsyncStream
-  void sendMessage(const RequestType& request) override {
-    stream_->sendData(*Common::serializeBody(request), false);
+  void sendMessage(const RequestType& request, bool end_stream) override {
+    stream_->sendData(*Common::serializeBody(request), end_stream);
+    if (end_stream) {
+      closeLocal();
+    }
   }
 
-  void closeStream() override { closeLocal(); }
+  void closeStream() override {
+    Buffer::OwnedImpl empty_buffer;
+    stream_->sendData(empty_buffer, true);
+    closeLocal();
+  }
 
   void resetStream() override {
     // Both closeLocal() and closeRemote() might self-destruct the object. We don't use these below
@@ -204,8 +216,9 @@ private:
     // This will destroy us, but only do so if we are actually in a list. This does not happen in
     // the immediate failure case.
     if (LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::inserted()) {
-      LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::removeFromList(
-          parent_.active_streams_);
+      parent_.dispatcher_.deferredDelete(
+          LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::removeFromList(
+              parent_.active_streams_));
     }
   }
 
@@ -258,7 +271,7 @@ public:
     if (this->hasResetStream()) {
       return;
     }
-    this->sendMessage(request_);
+    this->sendMessage(request_, true);
   }
 
   // Grpc::AsyncRequest
@@ -283,9 +296,12 @@ private:
       callbacks_.onFailure(status);
       return;
     }
+    if (response_ == nullptr) {
+      callbacks_.onFailure(Status::Internal);
+      return;
+    }
 
     callbacks_.onSuccess(std::move(response_));
-    this->closeStream();
   }
 
   const RequestType& request_;

@@ -216,6 +216,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ratelimit_integration_test",
+    srcs = ["ratelimit_integration_test.cc"],
+    data = ["//test/config/integration:server_ratelimit.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/ratelimit:ratelimit_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [
         "ssl_integration_test.cc",

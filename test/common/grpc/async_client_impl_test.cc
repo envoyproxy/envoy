@@ -1,6 +1,7 @@
 #include "common/grpc/async_client_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -48,14 +49,14 @@ public:
 
   ~HelloworldStream() { Mock::VerifyAndClear(http_stream_); }
 
-  void sendRequest() {
+  void sendRequest(bool end_stream = false) {
     helloworld::HelloRequest request;
     request.set_name(HELLO_REQUEST);
 
-    EXPECT_CALL(
-        *http_stream_,
-        sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), false));
-    grpc_stream_->sendMessage(request);
+    EXPECT_CALL(*http_stream_,
+                sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)),
+                         end_stream));
+    grpc_stream_->sendMessage(request, end_stream);
     Mock::VerifyAndClearExpectations(http_stream_);
   }
 
@@ -112,6 +113,7 @@ public:
   }
 
   void closeStream() {
+    EXPECT_CALL(*http_stream_, sendData(BufferStringEqual(""), true));
     EXPECT_CALL(*http_stream_, reset());
     grpc_stream_->closeStream();
     clearStream();
@@ -155,7 +157,7 @@ public:
   GrpcAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         grpc_client_(new AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>(
-            cm_, "test_cluster")) {
+            cm_, dispatcher_, "test_cluster")) {
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
@@ -204,7 +206,7 @@ public:
     request_msg.set_name(HELLO_REQUEST);
     EXPECT_CALL(
         *(request->http_stream_),
-        sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), false));
+        sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), true));
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 Optional<std::chrono::milliseconds>());
     EXPECT_NE(request->grpc_request_, nullptr);
@@ -254,6 +256,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>> grpc_client_;
 };
 
@@ -539,10 +542,10 @@ TEST_F(GrpcAsyncClientImplTest, ResourceExhaustedError) {
 TEST_F(GrpcAsyncClientImplTest, ReceiveAfterLocalClose) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  stream->sendRequest();
-  stream->closeStream();
+  stream->sendRequest(true);
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
+  EXPECT_CALL(*stream->http_stream_, reset());
   stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
 }
 
@@ -561,6 +564,7 @@ TEST_F(GrpcAsyncClientImplTest, SendAfterRemoteClose) {
 TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseLocal) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
+  EXPECT_CALL(*stream->http_stream_, sendData(BufferStringEqual(""), true));
   stream->grpc_stream_->closeStream();
   EXPECT_CALL(*stream->http_stream_, reset());
   stream->grpc_stream_->resetStream();

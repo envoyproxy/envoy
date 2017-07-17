@@ -52,7 +52,7 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request)));
+    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {

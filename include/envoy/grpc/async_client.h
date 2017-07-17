@@ -20,7 +20,7 @@ public:
   virtual ~AsyncRequest() {}
 
   /**
-   * Signals that the request should be cancelled.
+   * Signals that the request should be cancelled. No further callbacks will be invoked.
    */
   virtual void cancel() PURE;
 };
@@ -35,12 +35,16 @@ public:
   /**
    * Send request message to the stream.
    * @param request protobuf serializable message.
+   * @param end_stream close the stream locally. No further methods may be invoked on the stream
+   *                   object, but callbacks may still be received until the stream is closed
+   *                   remotely.
    */
-  virtual void sendMessage(const RequestType& request) PURE;
+  virtual void sendMessage(const RequestType& request, bool end_stream) PURE;
 
   /**
-   * Close the stream locally. No further methods may be invoked on the
-   * stream object, but callbacks may still be received until the stream is closed remotely.
+   * Close the stream locally and send an empty DATA frame to the remote. No further methods may be
+   * invoked on the stream object, but callbacks may still be received until the stream is closed
+   * remotely.
    */
   virtual void closeStream() PURE;
 
@@ -62,13 +66,13 @@ public:
   virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
 
   /**
-   * Called when the async gRPC request succeeds.
+   * Called when the async gRPC request succeeds. No further callbacks will be invoked.
    * @param response the gRPC response.
    */
   virtual void onSuccess(std::unique_ptr<ResponseType>&& response) PURE;
 
   /**
-   * Called when the async gRPC request fails.
+   * Called when the async gRPC request fails. No further callbacks will be invoked.
    * @param status the gRPC status.
    */
   virtual void onFailure(Status::GrpcStatus status) PURE;
