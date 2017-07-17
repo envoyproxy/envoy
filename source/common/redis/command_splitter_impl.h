@@ -45,6 +45,13 @@ public:
     }
   }
 
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks) {
+    SplitRequestPtr request_ptr =
+        SplitRequestPtr{new SimpleRequest(conn_pool, incoming_request, callbacks)};
+    return request_ptr;
+  }
+
   void onResponse(RespValuePtr&& response) {
     handle_ = nullptr;
     callbacks_.onResponse(std::move(response));
@@ -96,6 +103,13 @@ public:
         pending_request.onResponse(Utility::makeError("no upstream host"));
       }
     }
+  }
+
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks) {
+    SplitRequestPtr request_ptr =
+        SplitRequestPtr{new MGETRequest(conn_pool, incoming_request, callbacks)};
+    return request_ptr;
   }
 
   void onChildResponse(RespValuePtr&& value, uint32_t index) {
@@ -164,8 +178,7 @@ class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
   SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
-    return SplitRequestPtr{new RequestClass(conn_pool_, request, callbacks)};
-    // return RequestClass::create(conn_pool_, request, callbacks);
+    return RequestClass::create(conn_pool_, request, callbacks);
   }
 };
 
