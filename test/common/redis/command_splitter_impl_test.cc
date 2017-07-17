@@ -95,9 +95,8 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
 
-class RedisAllParamsToOneServerCommandHandlerTest
-    : public RedisCommandSplitterImplTest,
-      public testing::WithParamInterface<std::string> {
+class RedisSimpleRequestCommandHandlerTest : public RedisCommandSplitterImplTest,
+                                             public testing::WithParamInterface<std::string> {
 public:
   void makeRequest(const std::string& hash_key, const RespValue& request) {
     EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
@@ -124,7 +123,7 @@ public:
   ConnPool::MockPoolRequest pool_request_;
 };
 
-TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Success) {
+TEST_P(RedisSimpleRequestCommandHandlerTest, Success) {
   InSequence s;
 
   RespValue request;
@@ -141,7 +140,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Success) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_P(RedisAllParamsToOneServerCommandHandlerTest, SuccessMultipleArgs) {
+TEST_P(RedisSimpleRequestCommandHandlerTest, SuccessMultipleArgs) {
   InSequence s;
 
   RespValue request;
@@ -158,7 +157,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, SuccessMultipleArgs) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Fail) {
+TEST_P(RedisSimpleRequestCommandHandlerTest, Fail) {
   InSequence s;
 
   RespValue request;
@@ -169,7 +168,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Fail) {
   fail();
 };
 
-TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Cancel) {
+TEST_P(RedisSimpleRequestCommandHandlerTest, Cancel) {
   InSequence s;
 
   RespValue request;
@@ -181,7 +180,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, Cancel) {
   handle_->cancel();
 };
 
-TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
+TEST_P(RedisSimpleRequestCommandHandlerTest, NoUpstream) {
   InSequence s;
 
   RespValue request;
@@ -195,13 +194,11 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
   EXPECT_EQ(nullptr, handle_);
 };
 
-INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerTest,
-                        RedisAllParamsToOneServerCommandHandlerTest,
+INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerTest, RedisSimpleRequestCommandHandlerTest,
                         testing::ValuesIn(SupportedCommands::allToOneCommands()));
 
-INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerMixedCaseTests,
-                        RedisAllParamsToOneServerCommandHandlerTest,
-                        testing::Values("INCR", "inCrBY"));
+INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
+                        RedisSimpleRequestCommandHandlerTest, testing::Values("INCR", "inCrBY"));
 
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
 public:

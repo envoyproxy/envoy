@@ -34,6 +34,9 @@ protected:
   ConnPool::Instance& conn_pool_;
 };
 
+/**
+ * SimpleRequest hashes the first argument as the key and sends the request to a single Redis.
+ */
 class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,

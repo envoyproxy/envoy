@@ -31,6 +31,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
     request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    return nullptr;
   }
 
   return std::move(request_ptr);
