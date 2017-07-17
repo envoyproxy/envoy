@@ -20,7 +20,7 @@ RespValuePtr Utility::makeError(const std::string& error) {
   response->asString() = error;
   return response;
 }
-  
+
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                            const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),

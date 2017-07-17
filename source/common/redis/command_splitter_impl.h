@@ -35,135 +35,138 @@ protected:
 };
 
 class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
-  public:
-    SimpleRequest(ConnPool::Instance& conn_pool, const RespValue& request, SplitCallbacks& callbacks) : callbacks_(callbacks) {
-      handle_ = conn_pool.makeRequest(request.asArray()[1].asString(), request, *this);
+public:
+  SimpleRequest(ConnPool::Instance& conn_pool, const RespValue& request, SplitCallbacks& callbacks)
+      : callbacks_(callbacks) {
+    handle_ = conn_pool.makeRequest(request.asArray()[1].asString(), request, *this);
 
-      if (!handle_) {
-        callbacks_.onResponse(Utility::makeError("no upstream host"));
-      }
+    if (!handle_) {
+      callbacks_.onResponse(Utility::makeError("no upstream host"));
     }
+  }
 
-    void onResponse(RespValuePtr&& response) {
-      handle_ = nullptr;
-      callbacks_.onResponse(std::move(response));
-    }
+  void onResponse(RespValuePtr&& response) {
+    handle_ = nullptr;
+    callbacks_.onResponse(std::move(response));
+  }
 
-    void onFailure() {
-      handle_ = nullptr;
-      callbacks_.onResponse(Utility::makeError("upstream failure"));
-    }
+  void onFailure() {
+    handle_ = nullptr;
+    callbacks_.onResponse(Utility::makeError("upstream failure"));
+  }
 
-    void cancel() {
-      handle_->cancel();
-      handle_ = nullptr;
-    }
+  void cancel() {
+    handle_->cancel();
+    handle_ = nullptr;
+  }
 
-  private:
-    SplitCallbacks& callbacks_;
-    ConnPool::PoolRequest* handle_{};
+private:
+  SplitCallbacks& callbacks_;
+  ConnPool::PoolRequest* handle_{};
 };
 
 class MGETRequest : public SplitRequest {
-  public:
-    MGETRequest(ConnPool::Instance& conn_pool, const RespValue& request, SplitCallbacks& callbacks) : callbacks_(callbacks) {
-      num_pending_responses_ = request.asArray().size() - 1;
+public:
+  MGETRequest(ConnPool::Instance& conn_pool, const RespValue& request, SplitCallbacks& callbacks)
+      : callbacks_(callbacks) {
+    num_pending_responses_ = request.asArray().size() - 1;
 
-      pending_response_.reset(new RespValue());
-      pending_response_->type(RespType::Array);
-      std::vector<RespValue> responses(num_pending_responses_);
-      pending_response_->asArray().swap(responses);
-      pending_requests_.reserve(num_pending_responses_);
+    pending_response_.reset(new RespValue());
+    pending_response_->type(RespType::Array);
+    std::vector<RespValue> responses(num_pending_responses_);
+    pending_response_->asArray().swap(responses);
+    pending_requests_.reserve(num_pending_responses_);
 
-      std::vector<RespValue> values(2);
-      values[0].type(RespType::BulkString);
-      values[0].asString() = "get";
-      values[1].type(RespType::BulkString);
-      RespValue single_mget;
-      single_mget.type(RespType::Array);
-      single_mget.asArray().swap(values);
+    std::vector<RespValue> values(2);
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "get";
+    values[1].type(RespType::BulkString);
+    RespValue single_mget;
+    single_mget.type(RespType::Array);
+    single_mget.asArray().swap(values);
 
-      for (uint64_t i = 1; i < request.asArray().size(); i++) {
-        pending_requests_.emplace_back(*this, i - 1);
-        PendingRequest& pending_request = pending_requests_.back();
+    for (uint64_t i = 1; i < request.asArray().size(); i++) {
+      pending_requests_.emplace_back(*this, i - 1);
+      PendingRequest& pending_request = pending_requests_.back();
 
-        single_mget.asArray()[1].asString() = request.asArray()[i].asString();
-        pending_request.handle_ = conn_pool.makeRequest(request.asArray()[i].asString(), single_mget, pending_request);
-        if (!pending_request.handle_) {
-           pending_request.onResponse(Utility::makeError("no upstream host"));
-        }
+      single_mget.asArray()[1].asString() = request.asArray()[i].asString();
+      pending_request.handle_ =
+          conn_pool.makeRequest(request.asArray()[i].asString(), single_mget, pending_request);
+      if (!pending_request.handle_) {
+        pending_request.onResponse(Utility::makeError("no upstream host"));
       }
     }
+  }
 
-    void onChildResponse(RespValuePtr&& value, uint32_t index) {
-      pending_requests_[index].handle_ = nullptr;
+  void onChildResponse(RespValuePtr&& value, uint32_t index) {
+    pending_requests_[index].handle_ = nullptr;
 
-      pending_response_->asArray()[index].type(value->type());
-      switch (value->type()) {
-      case RespType::Array:
-      case RespType::Integer: {
-        pending_response_->asArray()[index].type(RespType::Error);
-        pending_response_->asArray()[index].asString() = "upstream protocol error";
-        break;
-      }
-      case RespType::SimpleString:
-      case RespType::BulkString:
-      case RespType::Error: {
-        pending_response_->asArray()[index].asString().swap(value->asString());
-        break;
-      }
-      case RespType::Null:
-        break;
-      }
-
-      // ASSERT(num_pending_responses_ > 0);
-      if (--num_pending_responses_ == 0) {
-        // ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
-        callbacks_.onResponse(std::move(pending_response_));
-      }
+    pending_response_->asArray()[index].type(value->type());
+    switch (value->type()) {
+    case RespType::Array:
+    case RespType::Integer: {
+      pending_response_->asArray()[index].type(RespType::Error);
+      pending_response_->asArray()[index].asString() = "upstream protocol error";
+      break;
+    }
+    case RespType::SimpleString:
+    case RespType::BulkString:
+    case RespType::Error: {
+      pending_response_->asArray()[index].asString().swap(value->asString());
+      break;
+    }
+    case RespType::Null:
+      break;
     }
 
-    void onChildFailure(uint32_t index) {
-      onChildResponse(Utility::makeError("upstream failure"), index);
+    // ASSERT(num_pending_responses_ > 0);
+    if (--num_pending_responses_ == 0) {
+      // ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
+      callbacks_.onResponse(std::move(pending_response_));
     }
+  }
 
-    void cancel() override {
-      for (PendingRequest& request : pending_requests_) {
-        if (request.handle_) {
-          request.handle_->cancel();
-          request.handle_ = nullptr;
-        }
+  void onChildFailure(uint32_t index) {
+    onChildResponse(Utility::makeError("upstream failure"), index);
+  }
+
+  void cancel() override {
+    for (PendingRequest& request : pending_requests_) {
+      if (request.handle_) {
+        request.handle_->cancel();
+        request.handle_ = nullptr;
       }
     }
+  }
 
-  private:
-    struct PendingRequest : public ConnPool::PoolCallbacks {
-      PendingRequest(MGETRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
+private:
+  struct PendingRequest : public ConnPool::PoolCallbacks {
+    PendingRequest(MGETRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-      void onResponse(RespValuePtr&& value) override {
-        parent_.onChildResponse(std::move(value), index_);
-      }
-      void onFailure() override { parent_.onChildFailure(index_); }
+    void onResponse(RespValuePtr&& value) override {
+      parent_.onChildResponse(std::move(value), index_);
+    }
+    void onFailure() override { parent_.onChildFailure(index_); }
 
-      MGETRequest& parent_;
-      const uint32_t index_;
-      ConnPool::PoolRequest* handle_{};
-    };
+    MGETRequest& parent_;
+    const uint32_t index_;
+    ConnPool::PoolRequest* handle_{};
+  };
 
-    SplitCallbacks& callbacks_;
-    RespValuePtr pending_response_;
-    std::vector<PendingRequest> pending_requests_;
-    uint32_t num_pending_responses_;
+  SplitCallbacks& callbacks_;
+  RespValuePtr pending_response_;
+  std::vector<PendingRequest> pending_requests_;
+  uint32_t num_pending_responses_;
 };
 
 template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
-  public:
-    CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
-    SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
-      return SplitRequestPtr{new RequestClass(conn_pool_, request, callbacks)};
-      // return RequestClass::create(conn_pool_, request, callbacks); 
-    }
+public:
+  CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
+    return SplitRequestPtr{new RequestClass(conn_pool_, request, callbacks)};
+    // return RequestClass::create(conn_pool_, request, callbacks);
+  }
 };
 
 /**
