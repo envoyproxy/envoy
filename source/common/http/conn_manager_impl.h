@@ -26,12 +26,13 @@
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
-#include "common/network/filter_impl.h"
+#include "common/http/websocket/ws_handler_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
 
+// TODO (rshriram): Add guages and counters for downstream_websocket_active|total
 /**
  * All stats for the connection manager. @see stats_macros.h
  */
@@ -497,70 +498,6 @@ private:
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
 
   /**
-   * An implementation of a WebSocket proxy based on TCP proxy. This filter will instantiate a
-   * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
-   * All data will be proxied back and forth between the two connections, without any knowledge of
-   * the underlying WebSocket protocol.
-   */
-  struct WsHandlerImpl : Logger::Loggable<Logger::Id::websocket> {
-    WsHandlerImpl(const std::string& cluster_name, ActiveStream& stream);
-    ~WsHandlerImpl();
-
-    struct DownstreamCallbacks : public Network::ConnectionCallbacks {
-      DownstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
-
-      // Network::ConnectionCallbacks
-      void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
-
-      WsHandlerImpl& parent_;
-    };
-
-    struct UpstreamCallbacks : public Network::ConnectionCallbacks,
-                               public Http::ConnectionCallbacks,
-                               public Network::ReadFilterBaseImpl {
-      UpstreamCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
-
-      // Network::ConnectionCallbacks
-      void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
-
-      // Http::ConnectionCallbacks
-      void onGoAway() override{};
-
-      // Network::ReadFilter
-      Network::FilterStatus onData(Buffer::Instance& data) override {
-        parent_.onUpstreamData(data);
-        return Network::FilterStatus::StopIteration;
-      }
-
-      WsHandlerImpl& parent_;
-    };
-
-    Network::FilterStatus onData(Buffer::Instance& data);
-    void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks,
-                                      const Router::RouteEntry* route_entry,
-                                      HeaderMap& request_headers);
-    void onConnectTimeout();
-    void onDownstreamEvent(uint32_t event);
-    void onUpstreamData(Buffer::Instance& data);
-    void onUpstreamEvent(uint32_t event);
-
-    const std::string& cluster_name_;
-    ActiveStream& stream_;
-    ConnectionManagerImpl& connection_manager_;
-    Upstream::ClusterManager& cluster_manager_;
-    Network::ReadFilterCallbacks* read_callbacks_{};
-    Network::ClientConnectionPtr upstream_connection_;
-    DownstreamCallbacks downstream_callbacks_;
-    Event::TimerPtr connect_timeout_timer_;
-    Stats::TimespanPtr connect_timespan_;
-    Stats::TimespanPtr connected_timespan_;
-    std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
-    // read filter.
-  };
-
-  typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;
-
-  /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
    * data.
    */
@@ -605,7 +542,7 @@ private:
   // To keep track of the number of outstanding HTTP responses in a connection.
   // WebSocket upgrade cannot happen when responses are due.
   int pending_responses_;
-  WsHandlerImplPtr ws_connection_{};
+  WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
