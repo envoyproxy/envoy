@@ -21,6 +21,113 @@ RespValuePtr Utility::makeError(const std::string& error) {
   return response;
 }
 
+SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
+                                      const RespValue& incoming_request,
+                                      SplitCallbacks& callbacks) {
+  std::unique_ptr<SimpleRequest> request_ptr =
+      std::unique_ptr<SimpleRequest>{new SimpleRequest(callbacks)};
+
+  request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
+                                               incoming_request, *request_ptr);
+  if (!request_ptr->handle_) {
+    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+  }
+
+  return std::move(request_ptr);
+}
+
+void SimpleRequest::onResponse(RespValuePtr&& response) {
+  handle_ = nullptr;
+  callbacks_.onResponse(std::move(response));
+}
+
+void SimpleRequest::onFailure() {
+  handle_ = nullptr;
+  callbacks_.onResponse(Utility::makeError("upstream failure"));
+}
+
+void SimpleRequest::cancel() {
+  handle_->cancel();
+  handle_ = nullptr;
+}
+
+SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
+                                    const RespValue& incoming_request, SplitCallbacks& callbacks) {
+  std::unique_ptr<MGETRequest> request_ptr =
+      std::unique_ptr<MGETRequest>{new MGETRequest(callbacks)};
+
+  request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
+
+  request_ptr->pending_response_.reset(new RespValue());
+  request_ptr->pending_response_->type(RespType::Array);
+  std::vector<RespValue> responses(request_ptr->num_pending_responses_);
+  request_ptr->pending_response_->asArray().swap(responses);
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  std::vector<RespValue> values(2);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "get";
+  values[1].type(RespType::BulkString);
+  RespValue single_mget;
+  single_mget.type(RespType::Array);
+  single_mget.asArray().swap(values);
+
+  for (uint64_t i = 1; i < incoming_request.asArray().size(); i++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    single_mget.asArray()[1].asString() = incoming_request.asArray()[i].asString();
+    pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
+                                                    single_mget, pending_request);
+    if (!pending_request.handle_) {
+      pending_request.onResponse(Utility::makeError("no upstream host"));
+    }
+  }
+
+  return request_ptr->num_pending_responses_ > 0 ? std::move(request_ptr) : nullptr;
+}
+
+void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
+  pending_requests_[index].handle_ = nullptr;
+
+  pending_response_->asArray()[index].type(value->type());
+  switch (value->type()) {
+  case RespType::Array:
+  case RespType::Integer: {
+    pending_response_->asArray()[index].type(RespType::Error);
+    pending_response_->asArray()[index].asString() = "upstream protocol error";
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    pending_response_->asArray()[index].asString().swap(value->asString());
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ == 0) {
+    // ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
+    callbacks_.onResponse(std::move(pending_response_));
+  }
+}
+
+void MGETRequest::onChildFailure(uint32_t index) {
+  onChildResponse(Utility::makeError("upstream failure"), index);
+}
+
+void MGETRequest::cancel() {
+  for (PendingRequest& request : pending_requests_) {
+    if (request.handle_) {
+      request.handle_->cancel();
+      request.handle_ = nullptr;
+    }
+  }
+}
+
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                            const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),
