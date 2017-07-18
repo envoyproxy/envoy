@@ -531,7 +531,8 @@ TEST_F(GrpcAsyncClientImplTest, StreamTrailersOnly) {
 TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
   TestMetadata empty_metadata;
   auto request = createRequest(empty_metadata);
-  Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
+  Http::HeaderMapPtr reply_headers{
+      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
   EXPECT_CALL(*request, onFailure(Status::Internal));
   EXPECT_CALL(*request->http_stream_, reset());
   request->http_callbacks_->onTrailers(std::move(reply_headers));
