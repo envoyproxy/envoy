@@ -1,5 +1,6 @@
 #include "server/lds_api.h"
 
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -16,6 +17,8 @@ LdsApi::LdsApi(const Json::Object& config, Upstream::ClusterManager& cm,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info), listener_manager_(lm),
       stats_({ALL_LDS_STATS(POOL_COUNTER_PREFIX(scope, "listener_manager.lds."))}) {
+
+  Config::Utility::checkClusterAndLocalInfo("lds", remote_cluster_name_, cm, local_info);
   init_manager.registerTarget(*this);
 }
 

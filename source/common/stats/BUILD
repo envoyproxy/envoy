@@ -33,6 +33,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
     ],

@@ -125,6 +125,7 @@ envoy_cc_library(
         "//include/envoy/init:init_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/config:utility_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
