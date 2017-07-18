@@ -21,6 +21,8 @@ namespace Filter {
 namespace Auth {
 namespace ClientSsl {
 
+// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
+//                     up.
 Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
                Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,

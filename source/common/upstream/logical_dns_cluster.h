@@ -31,7 +31,7 @@ public:
   LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::Instance& tls,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher, bool added_via_api);
 
   ~LogicalDnsCluster();
 

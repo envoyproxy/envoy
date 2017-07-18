@@ -39,6 +39,15 @@ public:
   apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
 
   /**
+   * Check cluster info for API config sanity. Throws on error.
+   * @param error_prefix supplies the prefix to use in error messages.
+   * @param cluster_name supplies the cluster name to check.
+   * @param cm supplies the cluster manager.
+   */
+  static void checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+                           Upstream::ClusterManager& cm);
+
+  /**
    * Check cluster/local info for API config sanity. Throws on error.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param cluster_name supplies the cluster name to check.

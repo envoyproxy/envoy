@@ -423,7 +423,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -438,7 +438,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -459,7 +459,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
   // also sends the XFCC
   // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
@@ -486,7 +486,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
   // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
   // also sends the XFCC
   // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(""));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
@@ -513,7 +513,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
   // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
   // calling foo.com/fe).
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
@@ -543,7 +543,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
   // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
   // calling foo.com/fe).
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).Times(2).WillRepeatedly(Return("abcdefg"));
@@ -570,7 +570,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
 
 TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
   // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -586,7 +586,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
 
 TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
   // always_forward_only works regardless whether the connection is TLS/mTLS.
-  Ssl::MockConnection ssl;
+  NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())

@@ -26,3 +26,8 @@ envoy_cc_library(
     name = "optional",
     hdrs = ["optional.h"],
 )
+
+envoy_cc_library(
+    name = "callback",
+    hdrs = ["callback.h"],
+)

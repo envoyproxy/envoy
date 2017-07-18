@@ -51,3 +51,9 @@ envoy_cc_test(
     srcs = ["to_lower_table_test.cc"],
     deps = ["//source/common/common:to_lower_table_lib"],
 )
+
+envoy_cc_test(
+    name = "callback_impl_test",
+    srcs = ["callback_impl_test.cc"],
+    deps = ["//source/common/common:callback_impl_lib"],
+)

@@ -11,11 +11,13 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/callback_impl.h"
+
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 
-#include "cluster_info.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -31,13 +33,11 @@ public:
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
-    for (const MemberUpdateCb& cb : callbacks_) {
-      cb(added, removed);
-    }
+    member_update_cb_helper_.runCallbacks(added, removed);
   }
 
   // Upstream::HostSet
-  MOCK_CONST_METHOD1(addMemberUpdateCb, void(MemberUpdateCb callback));
+  MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(hostsPerZone, const std::vector<std::vector<HostSharedPtr>>&());
@@ -54,7 +54,8 @@ public:
   std::vector<HostSharedPtr> healthy_hosts_;
   std::vector<std::vector<HostSharedPtr>> hosts_per_zone_;
   std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_zone_;
-  std::list<MemberUpdateCb> callbacks_;
+  Common::CallbackManager<const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
 };

@@ -4,13 +4,14 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 // TODO(mattklein123): Graceful drain support.
 
+namespace Envoy {
 namespace Redis {
 
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm,
@@ -19,10 +20,7 @@ ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::Clust
       cluster_name_(config.getString("cluster_name")),
       stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
       stats_(generateStats(stat_prefix_, scope)) {
-  if (!cm.get(cluster_name_)) {
-    throw EnvoyException(
-        fmt::format("redis filter config: unknown cluster name '{}'", cluster_name_));
-  }
+  Config::Utility::checkCluster("redis", cluster_name_, cm);
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {

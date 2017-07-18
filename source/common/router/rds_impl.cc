@@ -43,6 +43,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(const Json::Object&
                                                              Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
+// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
+//                     up. (The global HTTP route manager will also fix this).
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,

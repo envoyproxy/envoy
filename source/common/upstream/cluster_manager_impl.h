@@ -49,7 +49,8 @@ public:
                                                      ResourcePriority priority) override;
   ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                              const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerSharedPtr outlier_event_logger) override;
+                             Outlier::EventLoggerSharedPtr outlier_event_logger,
+                             bool added_via_api) override;
   CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
 
 private:
@@ -116,7 +117,7 @@ struct ClusterManagerStats {
  * Implementation of ClusterManager that reads from a JSON configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
-class ClusterManagerImpl : public ClusterManager {
+class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
                      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,

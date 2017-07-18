@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -118,8 +119,9 @@ public:
   /**
    * Install a callback that will be invoked when the cluster membership changes.
    * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* the callback handle.
    */
-  virtual void addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * @return all hosts that make up the set at the current time.
@@ -230,6 +232,12 @@ public:
   };
 
   virtual ~ClusterInfo() {}
+
+  /**
+   * @return bool whether the cluster was added via API (if false the cluster was present in the
+   *         initial configuration and cannot be removed or updated).
+   */
+  virtual bool addedViaApi() const PURE;
 
   /**
    * @return the connect timeout for upstream hosts that belong to this cluster.

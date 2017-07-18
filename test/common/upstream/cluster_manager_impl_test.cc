@@ -21,7 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -32,6 +31,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 
 // The tests in this file are split between testing with real clusters and some with mock clusters.
@@ -40,15 +40,17 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() {
-    ON_CALL(*this, clusterFromJson_(_, _, _, _))
+    ON_CALL(*this, clusterFromJson_(_, _, _, _, _))
         .WillByDefault(Invoke([&](const Json::Object& cluster, ClusterManager& cm,
                                   const Optional<SdsConfig>& sds_config,
-                                  Outlier::EventLoggerSharedPtr outlier_event_logger) -> Cluster* {
+                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                  bool added_via_api) -> Cluster* {
           UNREFERENCED_PARAMETER(sds_config);
           Optional<envoy::api::v2::ConfigSource> eds_config;
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         eds_config, local_info_, outlier_event_logger)
+                                         eds_config, local_info_, outlier_event_logger,
+                                         added_via_api)
               .release();
         }));
   }
@@ -60,8 +62,10 @@ public:
 
   ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                              const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerSharedPtr outlier_event_logger) override {
-    return ClusterPtr{clusterFromJson_(cluster, cm, sds_config, outlier_event_logger)};
+                             Outlier::EventLoggerSharedPtr outlier_event_logger,
+                             bool added_via_api) override {
+    return ClusterPtr{
+        clusterFromJson_(cluster, cm, sds_config, outlier_event_logger, added_via_api)};
   }
 
   CdsApiPtr createCds(const Json::Object&, ClusterManager&) override {
@@ -84,9 +88,10 @@ public:
                                const LocalInfo::LocalInfo& local_info,
                                AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD4(clusterFromJson_, Cluster*(const Json::Object& cluster, ClusterManager& cm,
-                                          const Optional<SdsConfig>& sds_config,
-                                          Outlier::EventLoggerSharedPtr outlier_event_logger));
+  MOCK_METHOD5(clusterFromJson_,
+               Cluster*(const Json::Object& cluster, ClusterManager& cm,
+                        const Optional<SdsConfig>& sds_config,
+                        Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -114,7 +119,7 @@ public:
 };
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "outlier_detection": {
       "event_log_path": "foo"
@@ -129,7 +134,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -146,7 +151,7 @@ TEST_F(ClusterManagerImplTest, NoSdsConfig) {
 }
 
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -163,7 +168,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "local_cluster_name": "new_cluster",
     "clusters": [
@@ -189,7 +194,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
 }
 
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "outlier_detection": {
       "event_log_path": "foo"
@@ -204,7 +209,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "local_cluster_name": "new_cluster",
     "clusters": [
@@ -242,7 +247,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -267,7 +272,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, UnknownHcType) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -288,7 +293,7 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
 }
 
 TEST_F(ClusterManagerImplTest, MaxClusterName) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -305,7 +310,7 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
 }
 
 TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -322,7 +327,7 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -358,7 +363,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -385,7 +390,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
  * Test that buffer limits are set on new TCP connections.
  */
 TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -410,7 +415,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -441,7 +446,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "cds": {
       "cluster": {
@@ -468,15 +473,15 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cds_cluster));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cds_cluster));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cds_cluster, initialize());
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
   EXPECT_CALL(*cds, setInitializedCb(_));
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
@@ -500,37 +505,37 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   MockCluster* cluster5 = new NiceMock<MockCluster>();
   cluster5->info_->name_ = "cluster5";
 
-  std::string json_api = R"EOF(
+  const std::string json_api_1 = R"EOF(
   {
     "name": "cluster3"
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster3));
+  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api_1);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
 
-  json_api = R"EOF(
+  const std::string json_api_2 = R"EOF(
   {
     "name": "cluster4"
   }
   )EOF";
 
-  loader_api = Json::Factory::loadFromString(json_api);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster4));
+  loader_api = Json::Factory::loadFromString(json_api_2);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize());
   cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
 
-  json_api = R"EOF(
+  const std::string json_api_3 = R"EOF(
   {
     "name": "cluster5"
   }
   )EOF";
 
-  loader_api = Json::Factory::loadFromString(json_api);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster5));
+  loader_api = Json::Factory::loadFromString(json_api_3);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
 
@@ -548,8 +553,67 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
+  InSequence s;
+
+  // Setup a cluster manager with a static local cluster.
+  const std::string json = R"EOF(
+  {
+    "local_cluster_name": "foo",
+    "clusters": [
+      {"name": "fake"}
+    ]
+  }
+  )EOF";
+
+  MockCluster* foo = new NiceMock<MockCluster>();
+  foo->info_->name_ = "foo";
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, false)).WillOnce(Return(foo));
+  ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*foo, initialize());
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  create(*loader);
+  foo->initialize_callback_();
+
+  // Now add a dynamic cluster. This cluster will have a member update callback from the local
+  // cluster in its load balancer.
+  const std::string json_api_1 = R"EOF(
+  {
+    "name": "cluster1"
+  }
+  )EOF";
+
+  MockCluster* cluster1 = new NiceMock<MockCluster>();
+  cluster1->info_->name_ = "cluster1";
+  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api_1);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, true)).WillOnce(Return(cluster1));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize());
+  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+
+  // Add another update callback on foo so we make sure callbacks keep working.
+  ReadyWatcher membership_updated;
+  foo->addMemberUpdateCb([&membership_updated](const std::vector<HostSharedPtr>&,
+                                               const std::vector<HostSharedPtr>&) -> void {
+    membership_updated.ready();
+  });
+
+  // Remove the new cluster.
+  cluster_manager_->removePrimaryCluster("cluster1");
+
+  // Fire a member callback on the local cluster, which should not call any update callbacks on
+  // the deleted cluster.
+  foo->hosts_ = {HostSharedPtr{new HostImpl(
+      foo->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  EXPECT_CALL(membership_updated, ready());
+  foo->runCallbacks(foo->hosts_, {});
+
+  factory_.tls_.shutdownThread();
+}
+
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": []
   }
@@ -563,7 +627,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  std::string json_api = R"EOF(
+  const std::string json_api = R"EOF(
   {
     "name": "fake_cluster"
   }
@@ -571,7 +635,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
   MockCluster* cluster1 = new NiceMock<MockCluster>();
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
@@ -580,7 +644,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 
   // Now try to update again but with the same hash (different white space).
-  std::string json_api_2 = R"EOF(
+  const std::string json_api_2 = R"EOF(
   {
       "name":   "fake_cluster"
   }
@@ -590,7 +654,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
 
   // Now do it again with a different hash.
-  std::string json_api_3 = R"EOF(
+  const std::string json_api_3 = R"EOF(
   {
       "name":   "fake_cluster",
       "blah": ""
@@ -601,7 +665,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->hosts_ = {HostSharedPtr{new HostImpl(
       cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
@@ -632,7 +696,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -643,7 +707,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
 
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
 
@@ -656,7 +720,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  std::string json_api = R"EOF(
+  const std::string json_api = R"EOF(
   {
     "name": "fake_cluster"
   }
@@ -672,7 +736,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
 }
 
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "clusters": [
     {
@@ -697,6 +761,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",

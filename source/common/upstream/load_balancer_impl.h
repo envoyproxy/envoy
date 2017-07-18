@@ -30,6 +30,7 @@ class LoadBalancerBase {
 protected:
   LoadBalancerBase(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+  ~LoadBalancerBase();
 
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
@@ -69,10 +70,10 @@ private:
 
   const HostSet& host_set_;
   const HostSet* local_host_set_;
-
   uint64_t local_percent_to_route_{};
   ZoneRoutingState zone_routing_state_{ZoneRoutingState::NoZoneRouting};
   std::vector<uint64_t> residual_capacity_;
+  Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
 };
 
 /**
