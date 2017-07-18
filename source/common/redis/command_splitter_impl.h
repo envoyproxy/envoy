@@ -39,14 +39,17 @@ protected:
  */
 class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
+  ~SimpleRequest();
+
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
                                 SplitCallbacks& callbacks);
 
-  void onResponse(RespValuePtr&& response);
+  // Redis::ConnPool::PoolCallbacks
+  void onResponse(RespValuePtr&& response) override;
+  void onFailure() override;
 
-  void onFailure();
-
-  void cancel();
+  // Redis::CommandSplitter::SplitRequest
+  void cancel() override;
 
 private:
   SimpleRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
@@ -55,15 +58,21 @@ private:
   ConnPool::PoolRequest* handle_{};
 };
 
-class MGETRequest : public SplitRequest {
+/**
+ * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
+ * server.
+ */
+class MGETRequest : public SplitRequest, Logger::Loggable<Logger::Id::redis> {
 public:
+  ~MGETRequest();
+
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
                                 SplitCallbacks& callbacks);
 
   void onChildResponse(RespValuePtr&& value, uint32_t index);
-
   void onChildFailure(uint32_t index);
 
+  // Redis::CommandSplitter::SplitRequest
   void cancel() override;
 
 private:
@@ -72,6 +81,7 @@ private:
   struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(MGETRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
+    // Redis::ConnPool::PoolCallbacks
     void onResponse(RespValuePtr&& value) override {
       parent_.onChildResponse(std::move(value), index_);
     }
@@ -88,6 +98,10 @@ private:
   uint32_t num_pending_responses_;
 };
 
+/**
+ * CommandHandlerFactory is placed in the command lookup map for each supported command and is used
+ * to create Request objects.
+ */
 template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:

@@ -21,11 +21,12 @@ RespValuePtr Utility::makeError(const std::string& error) {
   return response;
 }
 
+SimpleRequest::~SimpleRequest() { ASSERT(!handle_); }
+
 SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                       const RespValue& incoming_request,
                                       SplitCallbacks& callbacks) {
-  std::unique_ptr<SimpleRequest> request_ptr =
-      std::unique_ptr<SimpleRequest>{new SimpleRequest(callbacks)};
+  std::unique_ptr<SimpleRequest> request_ptr{new SimpleRequest(callbacks)};
 
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
                                                incoming_request, *request_ptr);
@@ -52,10 +53,17 @@ void SimpleRequest::cancel() {
   handle_ = nullptr;
 }
 
+MGETRequest::~MGETRequest() {
+#ifndef NDEBUG
+  for (const PendingRequest& request : pending_requests_) {
+    ASSERT(!request.handle_);
+  }
+#endif
+}
+
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks) {
-  std::unique_ptr<MGETRequest> request_ptr =
-      std::unique_ptr<MGETRequest>{new MGETRequest(callbacks)};
+  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
 
@@ -111,7 +119,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
-    // ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
+    ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
 }
