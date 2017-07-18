@@ -103,6 +103,7 @@ public:
 private:
   MGETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
 
+  // Redis::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
   void onChildFailure(uint32_t index) override;
 };
