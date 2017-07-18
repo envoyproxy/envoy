@@ -34,72 +34,81 @@ protected:
   ConnPool::Instance& conn_pool_;
 };
 
-class AllParamsToOneServerCommandHandler : public CommandHandler,
-                                           CommandHandlerBase,
-                                           Logger::Loggable<Logger::Id::redis> {
+/**
+ * SimpleRequest hashes the first argument as the key and sends the request to a single Redis.
+ */
+class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
-  AllParamsToOneServerCommandHandler(ConnPool::Instance& conn_pool)
-      : CommandHandlerBase(conn_pool) {}
+  ~SimpleRequest();
 
-  // Redis::CommandSplitter::CommandHandler
-  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) override;
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+  // Redis::ConnPool::PoolCallbacks
+  void onResponse(RespValuePtr&& response) override;
+  void onFailure() override;
+
+  // Redis::CommandSplitter::SplitRequest
+  void cancel() override;
 
 private:
-  struct SplitRequestImpl : public SplitRequest, public ConnPool::PoolCallbacks {
-    SplitRequestImpl(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
-    ~SplitRequestImpl();
+  SimpleRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
-    // Redis::CommandSplitter::SplitRequest
-    void cancel() override;
-
-    // Redis::ConnPool::PoolCallbacks
-    void onResponse(RespValuePtr&& value) override;
-    void onFailure() override;
-
-    SplitCallbacks& callbacks_;
-    ConnPool::PoolRequest* handle_{};
-  };
+  SplitCallbacks& callbacks_;
+  ConnPool::PoolRequest* handle_{};
 };
 
-class MGETCommandHandler : public CommandHandler,
-                           CommandHandlerBase,
-                           Logger::Loggable<Logger::Id::redis> {
+/**
+ * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
+ * server.
+ */
+class MGETRequest : public SplitRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  MGETCommandHandler(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  ~MGETRequest();
 
-  // Redis::CommandSplitter::CommandHandler
-  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) override;
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+  // Redis::CommandSplitter::SplitRequest
+  void cancel() override;
 
 private:
-  struct SplitRequestImpl : public SplitRequest {
-    struct PendingRequest : public ConnPool::PoolCallbacks {
-      PendingRequest(SplitRequestImpl& parent, uint32_t index) : parent_(parent), index_(index) {}
+  MGETRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
-      // Redis::ConnPool::PoolCallbacks
-      void onResponse(RespValuePtr&& value) override {
-        parent_.onResponse(std::move(value), index_);
-      }
-      void onFailure() override { parent_.onFailure(index_); }
+  struct PendingRequest : public ConnPool::PoolCallbacks {
+    PendingRequest(MGETRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-      SplitRequestImpl& parent_;
-      const uint32_t index_;
-      ConnPool::PoolRequest* handle_{};
-    };
+    // Redis::ConnPool::PoolCallbacks
+    void onResponse(RespValuePtr&& value) override {
+      parent_.onChildResponse(std::move(value), index_);
+    }
+    void onFailure() override { parent_.onChildFailure(index_); }
 
-    SplitRequestImpl(SplitCallbacks& callbacks, uint32_t num_responses);
-    ~SplitRequestImpl();
-
-    void onResponse(RespValuePtr&& value, uint32_t index);
-    void onFailure(uint32_t index);
-
-    // Redis::CommandSplitter::SplitRequest
-    void cancel() override;
-
-    SplitCallbacks& callbacks_;
-    RespValuePtr pending_response_;
-    std::vector<PendingRequest> pending_requests_;
-    uint32_t pending_responses_;
+    MGETRequest& parent_;
+    const uint32_t index_;
+    ConnPool::PoolRequest* handle_{};
   };
+
+  void onChildResponse(RespValuePtr&& value, uint32_t index);
+  void onChildFailure(uint32_t index);
+
+  SplitCallbacks& callbacks_;
+  RespValuePtr pending_response_;
+  std::vector<PendingRequest> pending_requests_;
+  uint32_t num_pending_responses_;
+};
+
+/**
+ * CommandHandlerFactory is placed in the command lookup map for each supported command and is used
+ * to create Request objects.
+ */
+template <class RequestClass>
+class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
+public:
+  CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
+    return RequestClass::create(conn_pool_, request, callbacks);
+  }
 };
 
 /**
@@ -137,8 +146,8 @@ private:
   void onInvalidRequest(SplitCallbacks& callbacks);
 
   ConnPool::InstancePtr conn_pool_;
-  AllParamsToOneServerCommandHandler all_to_one_handler_;
-  MGETCommandHandler mget_handler_;
+  CommandHandlerFactory<SimpleRequest> simple_command_handler_;
+  CommandHandlerFactory<MGETRequest> mget_handler_;
   std::unordered_map<std::string, HandlerData> command_map_;
   InstanceStats stats_;
   const ToLowerTable to_lower_table_;
