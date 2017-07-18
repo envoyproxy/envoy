@@ -147,7 +147,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
-    removeFromList(parent_.active_streams_);
+    dispatcher().deferredDelete(removeFromList(parent_.active_streams_));
   }
 }
 

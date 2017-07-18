@@ -64,6 +64,7 @@ private:
  */
 class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
+                        public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
                         LinkedObject<AsyncStreamImpl> {
 public:
