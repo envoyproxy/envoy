@@ -125,5 +125,8 @@ cc_library(
 cc_library(
     name = "zlib",
     srcs = ["thirdparty_build/lib/libz.a"],
-    hdrs = ["thirdparty_build/include/zlib.h"],
+    hdrs = [
+        "thirdparty_build/include/zlib.h",
+        "thirdparty_build/include/zconf.h"
+    ],
 )
