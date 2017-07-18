@@ -246,7 +246,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      mock_buffer_factory_(new MockBufferFactory),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(new Event::DispatcherImpl(Buffer::FactoryPtr{mock_buffer_factory_})),
       default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
