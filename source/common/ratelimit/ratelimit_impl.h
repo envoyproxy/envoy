@@ -23,6 +23,9 @@ typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
 
 typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
 
+// TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
+// This will require support for more than one outstanding request per client (limit() assumes only
+// one today).
 class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
 public:
   GrpcClientImpl(RateLimitAsyncClientPtr&& async_client,
