@@ -58,25 +58,18 @@ private:
   ConnPool::PoolRequest* handle_{};
 };
 
-/**
- * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
- * server.
- */
-class MGETRequest : public SplitRequest, Logger::Loggable<Logger::Id::redis> {
+class FragmentedRequest : public SplitRequest {
 public:
-  ~MGETRequest();
-
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+  ~FragmentedRequest();
 
   // Redis::CommandSplitter::SplitRequest
   void cancel() override;
 
-private:
-  MGETRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+protected:
+  FragmentedRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
   struct PendingRequest : public ConnPool::PoolCallbacks {
-    PendingRequest(MGETRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
+    PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
     // Redis::ConnPool::PoolCallbacks
     void onResponse(RespValuePtr&& value) override {
@@ -84,18 +77,34 @@ private:
     }
     void onFailure() override { parent_.onChildFailure(index_); }
 
-    MGETRequest& parent_;
+    FragmentedRequest& parent_;
     const uint32_t index_;
     ConnPool::PoolRequest* handle_{};
   };
 
-  void onChildResponse(RespValuePtr&& value, uint32_t index);
-  void onChildFailure(uint32_t index);
+  virtual void onChildResponse(RespValuePtr&& value, uint32_t index) PURE;
+  virtual void onChildFailure(uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
   RespValuePtr pending_response_;
   std::vector<PendingRequest> pending_requests_;
   uint32_t num_pending_responses_;
+};
+
+/**
+ * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
+ * server.
+ */
+class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  MGETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+
+  void onChildResponse(RespValuePtr&& value, uint32_t index) override;
+  void onChildFailure(uint32_t index) override;
 };
 
 /**

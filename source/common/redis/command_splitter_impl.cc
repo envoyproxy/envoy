@@ -53,12 +53,21 @@ void SimpleRequest::cancel() {
   handle_ = nullptr;
 }
 
-MGETRequest::~MGETRequest() {
+FragmentedRequest::~FragmentedRequest() {
 #ifndef NDEBUG
   for (const PendingRequest& request : pending_requests_) {
     ASSERT(!request.handle_);
   }
 #endif
+}
+
+void FragmentedRequest::cancel() {
+  for (PendingRequest& request : pending_requests_) {
+    if (request.handle_) {
+      request.handle_->cancel();
+      request.handle_ = nullptr;
+    }
+  }
 }
 
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
@@ -127,15 +136,6 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
 void MGETRequest::onChildFailure(uint32_t index) {
   onChildResponse(Utility::makeError("upstream failure"), index);
-}
-
-void MGETRequest::cancel() {
-  for (PendingRequest& request : pending_requests_) {
-    if (request.handle_) {
-      request.handle_->cancel();
-      request.handle_ = nullptr;
-    }
-  }
 }
 
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
