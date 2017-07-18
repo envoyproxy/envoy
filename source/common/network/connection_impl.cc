@@ -286,10 +286,11 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
   // limits we err on the side of buffering more triggering watermark callbacks less often.
   //
-  // Given the current implementation, if the connection class buffers |limit| bytes it will
-  // immediately trigger high watermarks, and the common case where |limit| bytes are almost
-  // immediately flushed to the socket in the subsequent call will trigger low watermarks.  We avoid
-  // this by setting the high watermark to limit + 1.
+  // Given the current implementation for straight up TCP proxying, the common case is reading
+  // |limit| bytes through the socket, passing |limit| bytes to the connection (triggering the high
+  // watermarks) and the immediately draining |limit| bytes to the socket (triggering the low
+  // watermarks).  We avoid this by setting the high watermark to limit + 1 so a single read will
+  // not trigger watermarks if the socket is not blocked.
   //
   // If the connection class is changed to write to the buffer and flush to the socket in the same
   // stack then instead of checking watermarks after the write and again after the flush it can
