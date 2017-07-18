@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["watermark_buffer.cc"],
     hdrs = ["watermark_buffer.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
     ],
 )

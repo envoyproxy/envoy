@@ -67,15 +67,15 @@ void OwnedImpl::move(Instance& rhs) {
   // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
   // This is a reasonable compromise in a high performance path where we want to maintain an
   // abstraction in case we get rid of evbuffer later.
-  int rc = evbuffer_add_buffer(buffer_.get(), static_cast<OwnedImpl&>(rhs).buffer_.get());
+  int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
   // See move() above for why we do the static cast.
-  int rc =
-      evbuffer_remove_buffer(static_cast<OwnedImpl&>(rhs).buffer_.get(), buffer_.get(), length);
+  int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
+                                  length);
   ASSERT(static_cast<uint64_t>(rc) == length);
   UNREFERENCED_PARAMETER(rc);
 }

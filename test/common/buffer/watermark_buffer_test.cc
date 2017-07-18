@@ -171,6 +171,15 @@ TEST_F(WatermarkBufferTest, Search) {
   EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
 }
 
+TEST_F(WatermarkBufferTest, MoveBack) {
+  buffer_.add(TEN_BYTES, 10);
+  OwnedImpl data("a");
+
+  EXPECT_EQ(0, times_high_watermark_called_);
+  buffer_.move(data);
+  data.move(buffer_);
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

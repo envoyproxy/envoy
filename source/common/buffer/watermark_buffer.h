@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/buffer/buffer.h"
+#include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -13,7 +13,7 @@ namespace Buffer {
 // transitions from under the low watermark to above the high watermark, the above_high_watermark
 // function is called one time. It will not be called again until the buffer is drained below the
 // low watermark, at which point the below_low_watermark function is called.
-class WatermarkBuffer : public Instance {
+class WatermarkBuffer : public LibEventInstance {
 public:
   WatermarkBuffer(InstancePtr&& buffer, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
@@ -39,6 +39,9 @@ public:
     return wrapped_buffer_->search(data, size, start);
   }
   int write(int fd) override;
+  Event::Libevent::BufferPtr& buffer() override {
+    return static_cast<LibEventInstance&>(*wrapped_buffer_).buffer();
+  }
 
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
 

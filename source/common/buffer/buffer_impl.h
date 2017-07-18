@@ -16,17 +16,22 @@ public:
   InstancePtr create() override;
 };
 
+class LibEventInstance : public Instance {
+public:
+  virtual Event::Libevent::BufferPtr& buffer() PURE;
+};
+
 /**
  * Wraps an allocated and owned evbuffer.
  */
-class OwnedImpl : public Instance {
+class OwnedImpl : public LibEventInstance {
 public:
   OwnedImpl();
   OwnedImpl(const std::string& data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
 
-  // Instance
+  // LibEventInstance
   void add(const void* data, uint64_t size) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
@@ -41,6 +46,8 @@ public:
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
   int write(int fd) override;
+
+  Event::Libevent::BufferPtr& buffer() override { return buffer_; }
 
 private:
   Event::Libevent::BufferPtr buffer_;
