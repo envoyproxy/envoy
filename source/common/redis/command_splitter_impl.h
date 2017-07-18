@@ -69,9 +69,6 @@ public:
   static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
                                 SplitCallbacks& callbacks);
 
-  void onChildResponse(RespValuePtr&& value, uint32_t index);
-  void onChildFailure(uint32_t index);
-
   // Redis::CommandSplitter::SplitRequest
   void cancel() override;
 
@@ -91,6 +88,9 @@ private:
     const uint32_t index_;
     ConnPool::PoolRequest* handle_{};
   };
+
+  void onChildResponse(RespValuePtr&& value, uint32_t index);
+  void onChildFailure(uint32_t index);
 
   SplitCallbacks& callbacks_;
   RespValuePtr pending_response_;

@@ -86,6 +86,7 @@ SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
     single_mget.asArray()[1].asString() = incoming_request.asArray()[i].asString();
+    ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_mget, pending_request);
     if (!pending_request.handle_) {
