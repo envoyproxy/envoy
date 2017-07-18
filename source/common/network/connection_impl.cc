@@ -284,9 +284,19 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // asynchronously, we have the option of either setting the watermarks aggressively, and regularly
   // enabling/disabling reads from the socket, or allowing more data, but then not triggering
   // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
-  // limits we err on the side of buffering more and having better performace.
+  // limits we err on the side of buffering more triggering watermark callbacks less often.
+  //
+  // Given the current implementation, if the connection class buffers |limit| bytes it will
+  // immediately trigger high watermarks, and the common case where |limit| bytes are almost
+  // immediately flushed to the socket in the subsequent call will trigger low watermarks.  We avoid
+  // this by setting the high watermark to limit + 1.
+  //
   // If the connection class is changed to write to the buffer and flush to the socket in the same
-  // stack, the high watermark should be changed from |limit + 1| to |limit|.
+  // stack then instead of checking watermarks after the write and again after the flush it can
+  // check once after both operations complete.  At that point it would be better to change the high
+  // watermark from |limit + 1| to |limit| as the common case (move |limit| bytes, flush |limit|
+  // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
+  // would result in respecting the exact buffer limit.
   if (limit > 0) {
     write_buffer_.setWatermarks(limit / 2, limit + 1);
   }
