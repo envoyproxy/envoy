@@ -176,6 +176,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
@@ -277,6 +279,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override { parent_.onEvent(events); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {
@@ -354,6 +358,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthCheckerImpl& parent_;
     Redis::ConnPool::ClientPtr client_;

@@ -123,6 +123,58 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
                                                 config_->stats().downstream_cx_tx_bytes_buffered_});
 }
 
+void TcpProxy::readDisableUpstream(bool disable) {
+  upstream_connection_->readDisable(disable);
+  if (disable) {
+    read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_flow_control_paused_reading_total_.inc();
+  } else {
+    read_callbacks_->upstreamHost()
+        ->cluster()
+        .stats()
+        .upstream_flow_control_resumed_reading_total_.inc();
+  }
+}
+
+void TcpProxy::readDisableDownstream(bool disable) {
+  read_callbacks_->connection().readDisable(disable);
+  if (disable) {
+    config_->stats().downstream_flow_control_paused_reading_total_.inc();
+  } else {
+    config_->stats().downstream_flow_control_resumed_reading_total_.inc();
+  }
+}
+
+void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  ASSERT(!on_high_watermark_called_);
+  on_high_watermark_called_ = true;
+  // If downstream has too much data buffered, stop reading on the upstream connection.
+  parent_.readDisableUpstream(true);
+}
+
+void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  ASSERT(on_high_watermark_called_);
+  on_high_watermark_called_ = false;
+  // The downstream buffer has been drained.  Resume reading from upstream.
+  parent_.readDisableUpstream(false);
+}
+
+void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  ASSERT(!on_high_watermark_called_);
+  on_high_watermark_called_ = true;
+  // There's too much data buffered in the upstream write buffer, so stop reading.
+  parent_.readDisableDownstream(true);
+}
+
+void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  ASSERT(on_high_watermark_called_);
+  on_high_watermark_called_ = false;
+  // The upstream write buffer is drained.  Resume reading.
+  parent_.readDisableDownstream(false);
+}
+
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
 

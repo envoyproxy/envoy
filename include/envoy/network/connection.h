@@ -45,6 +45,17 @@ public:
    * @param events supplies the ConnectionEvent events that occurred as a bitmask.
    */
   virtual void onEvent(uint32_t events) PURE;
+
+  /**
+   * Called when the write buffer for a connection goes over its high watermark.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the write buffer for a connection goes from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -153,15 +164,21 @@ public:
   virtual void write(Buffer::Instance& data) PURE;
 
   /**
-   * Set a soft limit on the size of the read buffer prior to flushing to further stages in the
+   * Set a soft limit on the size of buffers for the connection.
+   * For the read buffer, this limits the bytes read prior to flushing to further stages in the
    * processing pipeline.
+   * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
+   * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
+   * reads on the socket funneling data to the write buffer.  When enough data is drained from the
+   * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
+   * resuming reading.
    */
-  virtual void setReadBufferLimit(uint32_t limit) PURE;
+  virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
-   * Get the value set with setReadBufferLimit.
+   * Get the value set with setBufferLimits.
    */
-  virtual uint32_t readBufferLimit() const PURE;
+  virtual uint32_t bufferLimit() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

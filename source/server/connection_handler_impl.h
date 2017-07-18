@@ -121,6 +121,8 @@ private:
         listener_.removeConnection(*this);
       }
     }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ActiveListener& listener_;
     Network::ConnectionPtr connection_;

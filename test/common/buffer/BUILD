@@ -9,6 +9,15 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "watermark_buffer_test",
+    srcs = ["watermark_buffer_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "zero_copy_input_stream_test",
     srcs = ["zero_copy_input_stream_test.cc"],
     deps = [

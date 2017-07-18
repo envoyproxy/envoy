@@ -208,7 +208,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
-  EXPECT_CALL(*conn_pool_.test_clients_.back().connection_, setReadBufferLimit(8192));
+  EXPECT_CALL(*conn_pool_.test_clients_.back().connection_, setBufferLimits(8192));
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
