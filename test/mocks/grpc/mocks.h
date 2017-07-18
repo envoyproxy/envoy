@@ -63,10 +63,8 @@ public:
                                      const RequestType& request,
                                      AsyncRequestCallbacks<ResponseType>& callbacks,
                                      const Optional<std::chrono::milliseconds>& timeout));
-  MOCK_METHOD3_T(start,
-                 AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
-                                           AsyncStreamCallbacks<ResponseType>& callbacks,
-                                           const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD2_T(start, AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
+                                                  AsyncStreamCallbacks<ResponseType>& callbacks));
 };
 
 class MockRpcChannelCallbacks : public RpcChannelCallbacks {

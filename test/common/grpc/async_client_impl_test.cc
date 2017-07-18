@@ -238,8 +238,7 @@ public:
         .WillOnce(Invoke([&active_header_map](Http::HeaderMap& headers, bool) {
           active_header_map = dynamic_cast<const Http::HeaderMapImpl*>(&headers);
         }));
-    stream->grpc_stream_ =
-        grpc_client_->start(*method_descriptor_, *stream, Optional<std::chrono::milliseconds>());
+    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream);
     EXPECT_NE(stream->grpc_stream_, nullptr);
     // The header map should still be valid after grpc_client_->start() returns, since it is
     // retained by the HTTP async client for the deferred send.
@@ -307,8 +306,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
-                                          Optional<std::chrono::milliseconds>());
+  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -346,8 +344,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
         http_callbacks->onReset();
       }));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
-                                          Optional<std::chrono::milliseconds>());
+  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 

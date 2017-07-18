@@ -13,7 +13,7 @@ class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public test
 // Validate that stream creation results in a timer based retry and can recover.
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   InSequence s;
-  EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   subscription_->start({"cluster0", "cluster1"}, callbacks_);
@@ -22,7 +22,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   // have a gRPC stream.
   subscription_->updateResources({"cluster2"});
   // Retry and succeed.
-  EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster2"}, "");
   timer_cb_();
   verifyStats(2, 0, 0, 1);
@@ -39,7 +39,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled);
   verifyStats(1, 0, 0, 1);
   // Retry and succeed.
-  EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
   timer_cb_();
   verifyStats(2, 0, 0, 1);

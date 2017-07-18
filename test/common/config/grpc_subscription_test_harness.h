@@ -56,7 +56,7 @@ public:
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(cluster_names, "");
     subscription_->start(cluster_names, callbacks_);
     // These are just there to add coverage to the null implementations of these

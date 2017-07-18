@@ -48,7 +48,7 @@ public:
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}",
               ProtobufTypes::FromString(service_method_.DebugString()));
     stats_.update_attempt_.inc();
-    stream_ = async_client_->start(service_method_, *this, Optional<std::chrono::milliseconds>());
+    stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       handleFailure();

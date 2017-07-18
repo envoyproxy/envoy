@@ -150,8 +150,6 @@ public:
    * Start a gRPC stream asynchronously.
    * @param service_method protobuf descriptor of gRPC service method.
    * @param callbacks the callbacks to be notified of stream status.
-   * @param timeout supplies the stream timeout, measured since when the frame with end_stream
-   *        flag is sent until when the first frame is received.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onRemoteClose() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or finish the stream. It is expected that
@@ -159,8 +157,7 @@ public:
    *         may be reclaimed.
    */
   virtual AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
-                                          AsyncStreamCallbacks<ResponseType>& callbacks,
-                                          const Optional<std::chrono::milliseconds>& timeout) PURE;
+                                          AsyncStreamCallbacks<ResponseType>& callbacks) PURE;
 };
 
 } // namespace Grpc

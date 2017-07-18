@@ -49,10 +49,9 @@ public:
   }
 
   AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
-                                  AsyncStreamCallbacks<ResponseType>& callbacks,
-                                  const Optional<std::chrono::milliseconds>& timeout) override {
+                                  AsyncStreamCallbacks<ResponseType>& callbacks) override {
     std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{
-        new AsyncStreamImpl<RequestType, ResponseType>(*this, service_method, callbacks, timeout)};
+        new AsyncStreamImpl<RequestType, ResponseType>(*this, service_method, callbacks, Optional<std::chrono::milliseconds>())};
 
     grpc_stream->initialize();
     if (grpc_stream->hasResetStream()) {
