@@ -21,10 +21,10 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/stats/stats_impl.h"
-#include "common/upstream/cluster_utility.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -147,11 +147,8 @@ public:
   const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
     return *healthy_hosts_per_zone_;
   }
-  const MemberUpdateCbHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+  CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
-  }
-  void removeMemberUpdateCb(const MemberUpdateCbHandle* handle) const override {
-    return member_update_cb_helper_.remove(handle);
   }
 
 protected:
@@ -165,7 +162,9 @@ private:
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_zone_;
   HostListsConstSharedPtr healthy_hosts_per_zone_;
-  mutable MemberUpdateCbHelper member_update_cb_helper_;
+  mutable CallbackManager<HostSet::MemberUpdateCb, const std::vector<HostSharedPtr>&,
+                          const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;

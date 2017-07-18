@@ -36,7 +36,7 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
 
 LoadBalancerBase::~LoadBalancerBase() {
   if (local_host_set_member_update_cb_handle_ != nullptr) {
-    local_host_set_->removeMemberUpdateCb(local_host_set_member_update_cb_handle_);
+    local_host_set_member_update_cb_handle_->remove();
   }
 }
 

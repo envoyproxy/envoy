@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -116,26 +117,11 @@ public:
       MemberUpdateCb;
 
   /**
-   * Abstract handle for a member update callback.
-   */
-  class MemberUpdateCbHandle {
-  public:
-    virtual ~MemberUpdateCbHandle() {}
-  };
-
-  /**
    * Install a callback that will be invoked when the cluster membership changes.
    * @param callback supplies the callback to invoke.
-   * @return const MemberUpdateCbHandle* a handle that can be used to remove the callback via
-   *         removeMemberUpdateCb().
+   * @return CallbackHandle* the callback handle.
    */
-  virtual const MemberUpdateCbHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
-
-  /**
-   * Remove a member update callback added via addMemberUpdateCb().
-   * @param handle supplies the callback handle to remove.
-   */
-  virtual void removeMemberUpdateCb(const MemberUpdateCbHandle* handle) const PURE;
+  virtual CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * @return all hosts that make up the set at the current time.

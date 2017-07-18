@@ -76,6 +76,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_type_interface",
         ":resource_manager_interface",
+        "//include/envoy/common:callback",
         "//include/envoy/common:optional",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",

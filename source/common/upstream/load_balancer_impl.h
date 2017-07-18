@@ -73,7 +73,7 @@ private:
   uint64_t local_percent_to_route_{};
   ZoneRoutingState zone_routing_state_{ZoneRoutingState::NoZoneRouting};
   std::vector<uint64_t> residual_capacity_;
-  const HostSet::MemberUpdateCbHandle* local_host_set_member_update_cb_handle_{};
+  CallbackHandle* local_host_set_member_update_cb_handle_{};
 };
 
 /**

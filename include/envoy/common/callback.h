@@ -1,0 +1,21 @@
+#pragma once
+
+#include "envoy/common/pure.h"
+
+namespace Envoy {
+
+/**
+ * Handle for a callback that can be removed. Destruction of the handle does NOT remove the
+ * callback.
+ */
+class CallbackHandle {
+public:
+  virtual ~CallbackHandle() {}
+
+  /**
+   * Remove the callback. After this routine returns the callback will no longer be called.
+   */
+  virtual void remove() PURE;
+};
+
+} // namespace Envoy

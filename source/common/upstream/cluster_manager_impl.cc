@@ -258,7 +258,7 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
     ThreadLocalClusterManagerImpl& cluster_manager =
         tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
-    if (cluster_manager.thread_local_clusters_.count(new_cluster->name())) {
+    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
       ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
     } else {
       ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());

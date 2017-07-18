@@ -203,11 +203,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cluster_utility_lib",
-    hdrs = ["cluster_utility.h"],
-)
-
-envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     external_deps = ["envoy_base"],
@@ -238,7 +233,6 @@ envoy_cc_library(
     hdrs = ["upstream_impl.h"],
     external_deps = ["envoy_base"],
     deps = [
-        ":cluster_utility_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",
         "//include/envoy/event:timer_interface",
@@ -251,6 +245,7 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/stats:stats_lib",
