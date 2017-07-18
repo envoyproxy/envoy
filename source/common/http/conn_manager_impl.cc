@@ -490,13 +490,26 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Check for WebSocket upgrade request if the route is valid and there
-  // are no pending responses except for the current one.
+  // are no pending responses except for the current one. This is not the
+  // expected behavior, as a client can pipeline several requests - the tail
+  // end of which can be a WebSocket upgrade. However, handling this edge scenario
+  // would require us to check for upgrades in encodeHeaders where the machinery
+  // gets lot more complicated. So, for the moment, when we have outstanding responses,
+  // we reject the upgrade request. From a browser point of view, Chrome/Mozilla disable
+  // pipelining, while IE11+ does not even support pipelining. So this limitation should
+  // not be an issue in modern browsers.
   if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_upgrade_request && (connection_manager_.pending_responses_ == 1)) {
+    if (websocket_upgrade_request) {
       ENVOY_STREAM_LOG(trace, "found websocket connection. (end_stream={}):", *this, end_stream);
+      if (connection_manager_.pending_responses_ > 1) {
+        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+        encodeHeaders(nullptr, headers, true);
+        return;
+      }
+
       // A very kludgey way to get a handle over the stream
       // decoder! WsHandlerImpl needs the stream decoder in order to
       // properly terminate connections with HTTP error codes when

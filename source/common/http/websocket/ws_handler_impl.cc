@@ -165,8 +165,21 @@ void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (event & Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
-    // Wrap upstream connection in HTTP Connection, so that we can re-use the HTTP1 codec to
-    // send upgrade headers to upstream host.
+    // Wrap upstream connection in HTTP Connection, so that we can
+    // re-use the HTTP1 codec to send upgrade headers to upstream
+    // host.
+
+    // TODO (rshriram): This is a not the strictest WebSocket
+    // implementation, as we do not really check the response headers
+    // to ensure that the upstream really accepted the upgrade
+    // request.  Doing so requires re-doing bunch of HTTP/1.1 req-resp
+    // pair stuff and that is going to just complicate this code. The
+    // client could technically send a body along with the request.
+    // The server could send a body along with the upgrade response,
+    // or even send a redirect. A simpler way to handle all of this would be
+    // to expose the TCP connection associated with the response object, in encodeHeaders.
+    // Once we see a 101 switching protocols, we could remove the connection from
+    // the connection pool
     Http::Http1::ClientConnectionImpl upstream_http(*upstream_connection_, *upstream_callbacks_);
     Http::Http1::RequestStreamEncoderImpl upstream_request =
         Http1::RequestStreamEncoderImpl(upstream_http);
