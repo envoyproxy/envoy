@@ -8,7 +8,7 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -70,8 +70,8 @@ public:
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
   void write(Buffer::Instance& data) override;
-  void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
-  uint32_t readBufferLimit() const override { return read_buffer_limit_; }
+  void setBufferLimits(uint32_t limit) override;
+  uint32_t bufferLimit() const override { return read_buffer_limit_; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
@@ -99,11 +99,14 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
+  void onLowWatermark();
+  void onHighWatermark();
+
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   Buffer::InstancePtr read_buffer_;
-  Buffer::InstancePtr write_buffer_;
+  Buffer::WatermarkBuffer write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:
@@ -138,6 +141,10 @@ private:
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
   std::unique_ptr<BufferStats> buffer_stats_;
+  // Tracks the number of times reads have been disabled.  If N different components call
+  // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
+  // has been called N times.
+  uint32_t read_disable_count_{0};
 };
 
 /**

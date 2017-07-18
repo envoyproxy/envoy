@@ -402,7 +402,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(*connection, setReadBufferLimit(8192));
+  EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_)).WillOnce(Return(connection));
   auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1");
   EXPECT_EQ(connection, conn_data.connection_.get());

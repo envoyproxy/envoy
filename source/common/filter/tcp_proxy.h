@@ -30,7 +30,9 @@ namespace Filter {
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_no_route)
+  COUNTER(downstream_cx_no_route)                                                                  \
+  COUNTER(downstream_flow_control_paused_reading_total)                                            \
+  COUNTER(downstream_flow_control_resumed_reading_total)
 // clang-format on
 
 /**
@@ -94,14 +96,22 @@ public:
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
+  // These two functions allow enabling/disabling reads on the upstream and downstream connections.
+  // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
+  void readDisableUpstream(bool disable);
+  void readDisableDownstream(bool disable);
+
 private:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
 
   struct UpstreamCallbacks : public Network::ConnectionCallbacks,
@@ -110,6 +120,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {
@@ -118,6 +130,7 @@ private:
     }
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
 
   Network::FilterStatus initializeUpstreamConnection();

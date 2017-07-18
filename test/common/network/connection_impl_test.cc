@@ -19,6 +19,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -111,14 +112,13 @@ public:
     MockBufferFactory* factory = new MockBufferFactory;
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
-    // Expect one other call to create a server session which will by default
-    // get a normal OwnedImpl.
+    // Other calls for server sessions will by default get a normal OwnedImpl.
     ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
       return new Buffer::OwnedImpl;
     }));
-    // By default, expect 4 buffers to be created - the client and server read and write buffers.
+    // Create a mock client write buffer for the first client connection created.
     EXPECT_CALL(*factory, create_())
-        .Times(4)
+        .Times(AnyNumber())
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
           return new MockBuffer; // client read buffer.
         }))
@@ -238,6 +238,73 @@ TEST_P(ConnectionImplTest, BufferStats) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Ensure the new counter logic in ReadDisable avoids tripping asserts in ReadDisable guarding
+// against actual enabling twice in a row.
+TEST_P(ConnectionImplTest, ReadDisable) {
+  setUpBasicConnection();
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
+
+  disconnect();
+}
+
+// Test that as watermark levels are changed, the appropriate callbacks are triggered.
+TEST_P(ConnectionImplTest, Watermarks) {
+  useMockBuffer();
+
+  setUpBasicConnection();
+
+  // Stick 5 bytes in the connection buffer.
+  std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
+  int buffer_len = buffer->length();
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::failWrite));
+  client_write_buffer_->move(*buffer);
+
+  {
+    // Go from watermarks being off to being above the high watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len - 3);
+  }
+
+  {
+    // Go from above the high watermark to in between both.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len + 1);
+  }
+
+  {
+    // Go from above the high watermark to below the low watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+    client_connection_->setBufferLimits(buffer_len * 3);
+  }
+
+  {
+    // Go back in between and verify neither callback is called.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len * 2);
+  }
+
+  disconnect();
+}
+
 // Write some data to the connection.  It will automatically attempt to flush
 // it to the upstream file descriptor via a write() call to buffer_, which is
 // configured to succeed and accept all bytes read.
@@ -264,6 +331,133 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   disconnect();
 }
 
+// Similar to BasicWrite, only with watermarks set.
+TEST_P(ConnectionImplTest, WriteWithWatermarks) {
+  useMockBuffer();
+
+  setUpBasicConnection();
+
+  connect();
+
+  client_connection_->setBufferLimits(2);
+
+  std::string data_to_write = "hello world";
+  Buffer::OwnedImpl first_buffer_to_write(data_to_write);
+  std::string data_written;
+  EXPECT_CALL(*client_write_buffer_, move(_))
+      .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
+  // The write() call on the connection will buffer enough data to bring the connection above the
+  // high watermark but the subsequent drain immediately brings it back below.
+  // A nice future performance optimization would be to latch if the socket is writable in the
+  // connection_impl, and try an immediate drain inside of write() to avoid thrashing here.
+  EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+  client_connection_->write(first_buffer_to_write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(data_to_write, data_written);
+
+  // Now do the write again, but this time configure buffer_ to reject the write
+  // with errno set to EAGAIN via failWrite().  This should result in going above the high
+  // watermark and not returning.
+  Buffer::OwnedImpl second_buffer_to_write(data_to_write);
+  EXPECT_CALL(*client_write_buffer_, move(_))
+      .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::failWrite));
+  // The write() call on the connection will buffer enough data to bring the connection above the
+  // high watermark and as the data will not flush it should not return below the watermark.
+  EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+  client_connection_->write(second_buffer_to_write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Clean up the connection.  The close() will attempt to flush.  The call to
+  // write() will succeed, bringing the connection back under the low watermark.
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  client_connection_->close(ConnectionCloseType::NoFlush);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+// Read and write random bytes and ensure we don't encounter issues.
+TEST_P(ConnectionImplTest, WatermarkFuzzing) {
+  useMockBuffer();
+  setUpBasicConnection();
+
+  connect();
+  client_connection_->setBufferLimits(10);
+
+  TestRandomGenerator rand;
+  int bytes_buffered = 0;
+  int new_bytes_buffered = 0;
+
+  bool is_below = true;
+  bool is_above = false;
+
+  ON_CALL(*client_write_buffer_, write(_))
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::failWrite));
+  ON_CALL(*client_write_buffer_, drain(_))
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::baseDrain));
+  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
+
+  // Randomly write 1-20 bytes and read 1-30 bytes per loop.
+  for (int i = 0; i < 50; ++i) {
+    // The bytes to read this loop.
+    int bytes_to_write = rand.random() % 20 + 1;
+    // The bytes buffered at the begining of this loop.
+    bytes_buffered = new_bytes_buffered;
+    // Bytes to flush upstream.
+    int bytes_to_flush = std::min<int>(rand.random() % 30 + 1, bytes_to_write + bytes_buffered);
+    // The number of bytes buffered at the end of this loop.
+    new_bytes_buffered = bytes_buffered + bytes_to_write - bytes_to_flush;
+    ENVOY_LOG_MISC(trace,
+                   "Loop iteration {} bytes_to_write {} bytes_to_flush {} bytes_buffered is {} and "
+                   "will be be {}",
+                   i, bytes_to_write, bytes_to_flush, bytes_buffered, new_bytes_buffered);
+
+    std::string data(bytes_to_write, 'a');
+    Buffer::OwnedImpl buffer_to_write(data);
+
+    // If the current bytes buffered plus the bytes we write this loop go over
+    // the watermark and we're not currently above, we will get a callback for
+    // going above.
+    if (bytes_to_write + bytes_buffered > 11 && is_below) {
+      ENVOY_LOG_MISC(trace, "Expect onAboveWriteBufferHighWatermark");
+      EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+      is_below = false;
+      is_above = true;
+    }
+    // If after the bytes are flushed upstream the number of bytes remaining is
+    // below the low watermark and the bytes were not previously below the low
+    // watermark, expect the callback for going below.
+    if (new_bytes_buffered < 5 && is_above) {
+      ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
+      EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+      is_below = true;
+      is_above = false;
+    }
+
+    // Do the actual work.  Write |buffer_to_write| bytes to the connection and
+    // drain |bytes_to_flush| before having the buffer failWrite()
+    EXPECT_CALL(*client_write_buffer_, move(_))
+        .WillOnce(Invoke(client_write_buffer_, &MockBuffer::baseMove));
+    EXPECT_CALL(*client_write_buffer_, write(_))
+        .WillOnce(DoAll(Invoke([&](int) -> void { client_write_buffer_->drain(bytes_to_flush); }),
+                        Return(bytes_to_flush)))
+        .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockBuffer::failWrite));
+    client_connection_->write(buffer_to_write);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  disconnect();
+}
+
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
@@ -285,7 +479,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     uint32_t filter_seen = 0;

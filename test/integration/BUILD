@@ -162,6 +162,7 @@ envoy_cc_test_library(
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//source/server/http:health_check_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

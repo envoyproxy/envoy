@@ -140,7 +140,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
 TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   expectClientCreate();
   EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
-  EXPECT_CALL(*test_clients_.back().connection_, setReadBufferLimit(8192));
+  EXPECT_CALL(*test_clients_.back().connection_, setBufferLimits(8192));
 
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
