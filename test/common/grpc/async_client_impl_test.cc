@@ -518,12 +518,23 @@ TEST_F(GrpcAsyncClientImplTest, ServerTrailingMetadata) {
   expectResetOn(stream.get());
 }
 
-// Validate that a trailers-only response is handled.
-TEST_F(GrpcAsyncClientImplTest, TrailersOnly) {
+// Validate that a trailers-only response is handled for streams.
+TEST_F(GrpcAsyncClientImplTest, StreamTrailersOnly) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
   stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
   stream->closeStream();
+}
+
+// Validate that a trailers-only response is handled for requests, where it is
+// an error.
+TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
+  TestMetadata empty_metadata;
+  auto request = createRequest(empty_metadata);
+  Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
+  EXPECT_CALL(*request, onFailure(Status::Internal));
+  EXPECT_CALL(*request->http_stream_, reset());
+  request->http_callbacks_->onTrailers(std::move(reply_headers));
 }
 
 // Validate that a trailers RESOURCE_EXHAUSTED reply is handled.
