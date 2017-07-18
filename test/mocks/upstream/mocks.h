@@ -37,7 +37,7 @@ public:
   }
 
   // Upstream::HostSet
-  MOCK_CONST_METHOD1(addMemberUpdateCb, CallbackHandle*(MemberUpdateCb callback));
+  MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(hostsPerZone, const std::vector<std::vector<HostSharedPtr>>&());
@@ -54,8 +54,7 @@ public:
   std::vector<HostSharedPtr> healthy_hosts_;
   std::vector<std::vector<HostSharedPtr>> hosts_per_zone_;
   std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_zone_;
-  CallbackManager<HostSet::MemberUpdateCb, const std::vector<HostSharedPtr>&,
-                  const std::vector<HostSharedPtr>&>
+  Common::CallbackManager<const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;

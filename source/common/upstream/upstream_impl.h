@@ -147,7 +147,7 @@ public:
   const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
     return *healthy_hosts_per_zone_;
   }
-  CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -162,8 +162,8 @@ private:
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_zone_;
   HostListsConstSharedPtr healthy_hosts_per_zone_;
-  mutable CallbackManager<HostSet::MemberUpdateCb, const std::vector<HostSharedPtr>&,
-                          const std::vector<HostSharedPtr>&>
+  mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
+                                  const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
 };
 

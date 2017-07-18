@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
+namespace Common {
 
 /**
  * Handle for a callback that can be removed. Destruction of the handle does NOT remove the
@@ -18,4 +19,5 @@ public:
   virtual void remove() PURE;
 };
 
+} // namespace Common
 } // namespace Envoy

@@ -78,7 +78,7 @@ MockClusterInfo::~MockClusterInfo() {}
 
 MockCluster::MockCluster() {
   ON_CALL(*this, addMemberUpdateCb(_))
-      .WillByDefault(Invoke([this](MemberUpdateCb cb) -> CallbackHandle* {
+      .WillByDefault(Invoke([this](MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));

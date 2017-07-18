@@ -119,9 +119,9 @@ public:
   /**
    * Install a callback that will be invoked when the cluster membership changes.
    * @param callback supplies the callback to invoke.
-   * @return CallbackHandle* the callback handle.
+   * @return Common::CallbackHandle* the callback handle.
    */
-  virtual CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * @return all hosts that make up the set at the current time.

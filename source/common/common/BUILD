@@ -130,4 +130,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "callback_impl_lib",
     hdrs = ["callback_impl.h"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:callback",
+    ],
 )

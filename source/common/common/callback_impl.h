@@ -1,19 +1,25 @@
 #pragma once
 
+#include <list>
+
+#include "envoy/common/callback.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Common {
 
 /**
  * Utility class for managing callbacks.
  */
-template <class Callback, typename... CallbackArgs> class CallbackManager {
+template <typename... CallbackArgs> class CallbackManager {
 public:
+  typedef std::function<void(CallbackArgs...)> Callback;
+
   /**
    * Add a callback.
    * @param callback supplies the callback to add.
-   * @return const CallbackHandle* a handle that can be used to remove the callback.
+   * @return CallbackHandle* a handle that can be used to remove the callback.
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
@@ -22,17 +28,21 @@ public:
 
   /**
    * Run all registered callbacks.
+   * NOTE: This code is currently safe if a callback deletes ITSELF from within a callback. It is
+   *       not safe if a callback deletes other callbacks. If that is required the code will need
+   *       to change (specifically, it will crash if the next callback in the list is deleted).
    * @param args supplies the callback arguments.
    */
   void runCallbacks(CallbackArgs... args) {
-    for (const auto& cb : callbacks_) {
-      cb.cb_(args...);
+    for (auto it = callbacks_.begin(); it != callbacks_.end();) {
+      auto current = it++;
+      current->cb_(args...);
     }
   }
 
 private:
-  struct UpdateCbHolder : public CallbackHandle {
-    UpdateCbHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
+  struct CallbackHolder : public CallbackHandle {
+    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
 
     // CallbackHandle
     void remove() override { parent_.remove(this); }
@@ -47,15 +57,15 @@ private:
    */
   void remove(CallbackHandle* handle) {
     ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
-                        [handle](const UpdateCbHolder& holder) -> bool {
+                        [handle](const CallbackHolder& holder) -> bool {
                           return handle == &holder;
                         }) != callbacks_.end());
     callbacks_.remove_if(
-        [handle](const UpdateCbHolder& holder) -> bool { return handle == &holder; });
+        [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
   }
 
-  std::list<UpdateCbHolder> callbacks_;
+  std::list<CallbackHolder> callbacks_;
 };
 
-} // namespace Upstream
+} // namespace Common
 } // namespace Envoy
