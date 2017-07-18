@@ -29,6 +29,8 @@ namespace Envoy {
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
 
+// Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
+// one can run the test with --test_arg=--gtest_filter=[seed]
 class TestRandomGenerator {
 public:
   TestRandomGenerator();

@@ -23,14 +23,18 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::GTEST_FLAG(random_seed);
+
 namespace Envoy {
 
-static const uint64_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 std::chrono::system_clock::now().time_since_epoch())
-                                 .count();
+static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
 
-TestRandomGenerator::TestRandomGenerator() : generator_(SEED) {
-  std::cerr << "TestRandomGenerator running with seed " << SEED;
+TestRandomGenerator::TestRandomGenerator()
+    : generator_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)) {
+  const int32_t seed = GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed);
+  std::cerr << "TestRandomGenerator running with seed " << seed;
 }
 
 uint64_t TestRandomGenerator::random() { return generator_(); }
