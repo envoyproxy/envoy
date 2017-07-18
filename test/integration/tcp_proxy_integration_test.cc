@@ -11,6 +11,7 @@
 
 using testing::AnyNumber;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::_;
 
 namespace Envoy {
@@ -117,7 +118,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
               return new Buffer::OwnedImpl; // client read buffer.
             }))
             .WillOnce(Invoke([&]() -> Buffer::Instance* {
-              client_write_buffer = new MockBuffer;
+              client_write_buffer = new NiceMock<MockBuffer>;
               ON_CALL(*client_write_buffer, move(_))
                   .WillByDefault(Invoke(client_write_buffer, &MockBuffer::baseMove));
               ON_CALL(*client_write_buffer, drain(_))
