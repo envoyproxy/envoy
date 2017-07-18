@@ -34,9 +34,9 @@ public:
   AsyncRequest* send(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
                      AsyncRequestCallbacks<ResponseType>& callbacks,
                      const Optional<std::chrono::milliseconds>& timeout) override {
-    std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{
-        new AsyncRequestImpl<RequestType, ResponseType>(*this, service_method, request, callbacks,
-                                                        timeout)};
+    auto* const async_request = new AsyncRequestImpl<RequestType, ResponseType>(
+        *this, service_method, request, callbacks, timeout);
+    std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{async_request};
 
     grpc_stream->initialize();
     if (grpc_stream->hasResetStream()) {
@@ -44,8 +44,7 @@ public:
     }
 
     grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
-    return dynamic_cast<AsyncRequestImpl<RequestType, ResponseType>*>(
-        active_streams_.front().get());
+    return async_request;
   }
 
   AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
