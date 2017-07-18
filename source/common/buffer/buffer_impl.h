@@ -23,6 +23,9 @@ public:
 
 /**
  * Wraps an allocated and owned evbuffer.
+ *
+ * Note that due to the internals of move() accessing buffer(), OwnedImpl is not
+ * compatible with non-LibEventInstance buffers.
  */
 class OwnedImpl : public LibEventInstance {
 public:

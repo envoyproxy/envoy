@@ -13,6 +13,14 @@ namespace Buffer {
 // transitions from under the low watermark to above the high watermark, the above_high_watermark
 // function is called one time. It will not be called again until the buffer is drained below the
 // low watermark, at which point the below_low_watermark function is called.
+//
+// Because the internals of OwnedImpl::move() require accessing the underlying data, OwnedImpl is
+// not compatible with generic Buffer::Impls.  To allow compatability between WatermarkBuffer and
+// OwnedImpl::move, WatermarkBuffer must implement LibEventInstance and is also not compatible
+// with generic Buffer::Impls.
+//
+// WatermarkBuffer takes a pointer to a generic InstancePtr in the constructor to allow test mocks
+// which overrides move() in any case.
 class WatermarkBuffer : public LibEventInstance {
 public:
   WatermarkBuffer(InstancePtr&& buffer, std::function<void()> below_low_watermark,

@@ -60,8 +60,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
       write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
-                    [&]() -> void { this->onLowWatermark(); },
-                    [&]() -> void { this->onHighWatermark(); }),
+                    [this]() -> void { this->onLowWatermark(); },
+                    [this]() -> void { this->onHighWatermark(); }),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
@@ -286,7 +286,7 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
   // limits we err on the side of buffering more and having better performace.
   // If the connection class is changed to write to the buffer and flush to the socket in the same
-  // stack, the high watermark should be changed to the buffer limit without the + 1
+  // stack, the high watermark should be changed from |limit + 1| to |limit|.
   if (limit > 0) {
     write_buffer_.setWatermarks(limit / 2, limit + 1);
   }
