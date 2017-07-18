@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <iostream>
 #include <list>
 #include <mutex>
 #include <stdexcept>
@@ -23,6 +24,16 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+
+static const uint64_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::system_clock::now().time_since_epoch())
+                                 .count();
+
+TestRandomGenerator::TestRandomGenerator() : generator_(SEED) {
+  std::cerr << "TestRandomGenerator running with seed " << SEED;
+}
+
+uint64_t TestRandomGenerator::random() { return generator_(); }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {

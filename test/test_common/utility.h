@@ -1,8 +1,11 @@
 #pragma once
 
+#include <stdlib.h>
+
 #include <condition_variable>
 #include <list>
 #include <mutex>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -25,6 +28,16 @@ namespace Envoy {
   } catch (expected_exception & e) {                                                               \
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
+
+class TestRandomGenerator {
+public:
+  TestRandomGenerator();
+
+  uint64_t random();
+
+private:
+  std::ranlux48 generator_;
+};
 
 class TestUtility {
 public:

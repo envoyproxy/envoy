@@ -19,6 +19,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -392,7 +393,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   connect();
   client_connection_->setBufferLimits(10);
 
-  Runtime::RandomGeneratorImpl rand;
+  TestRandomGenerator rand;
   int bytes_buffered = 0;
   int new_bytes_buffered = 0;
 
