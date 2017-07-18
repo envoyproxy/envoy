@@ -57,7 +57,7 @@ TEST(RedisProxyFilterConfigTest, InvalidCluster) {
   Stats::IsolatedStoreImpl store;
   EXPECT_CALL(cm, get("fake_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(*json_config, cm, store), EnvoyException,
-                            "redis filter config: unknown cluster 'fake_cluster'");
+                            "redis: unknown cluster 'fake_cluster'");
 }
 
 TEST(RedisProxyFilterConfigTest, InvalidAddedByApi) {
@@ -74,7 +74,7 @@ TEST(RedisProxyFilterConfigTest, InvalidAddedByApi) {
   Stats::IsolatedStoreImpl store;
   ON_CALL(*cm.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
   EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(*json_config, cm, store), EnvoyException,
-                            "redis filter config: invalid cluster 'fake_cluster': currently only "
+                            "redis: invalid cluster 'fake_cluster': currently only "
                             "static (non-CDS) clusters are supported");
 }
 

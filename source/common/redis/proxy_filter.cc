@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 
 #include "spdlog/spdlog.h"
@@ -19,16 +20,7 @@ ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::Clust
       cluster_name_(config.getString("cluster_name")),
       stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
       stats_(generateStats(stat_prefix_, scope)) {
-  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name_);
-  if (cluster == nullptr) {
-    throw EnvoyException(fmt::format("redis filter config: unknown cluster '{}'", cluster_name_));
-  }
-
-  if (cluster->info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("redis filter config: invalid cluster '{}': currently only "
-                                     "static (non-CDS) clusters are supported",
-                                     cluster_name_));
-  }
+  Config::Utility::checkCluster("redis", cluster_name_, cm);
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {

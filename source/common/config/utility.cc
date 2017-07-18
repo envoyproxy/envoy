@@ -7,14 +7,25 @@
 namespace Envoy {
 namespace Config {
 
+void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+                           Upstream::ClusterManager& cm) {
+  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
+  if (cluster == nullptr) {
+    throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
+  }
+
+  if (cluster->info()->addedViaApi()) {
+    throw EnvoyException(fmt::format("{}: invalid cluster '{}': currently only "
+                                     "static (non-CDS) clusters are supported",
+                                     error_prefix, cluster_name));
+  }
+}
+
 void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
                                        const std::string& cluster_name,
                                        Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info) {
-  if (!cm.get(cluster_name)) {
-    throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
-  }
-
+  checkCluster(error_prefix, cluster_name, cm);
   checkLocalInfo(error_prefix, local_info);
 }
 
