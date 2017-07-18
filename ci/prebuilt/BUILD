@@ -121,3 +121,12 @@ cc_library(
     hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
     strip_include_prefix = "thirdparty_build/include",
 )
+
+cc_library(
+    name = "zlib",
+    srcs = ["thirdparty_build/lib/libz.a"],
+    hdrs = [
+        "thirdparty_build/include/zconf.h",
+        "thirdparty_build/include/zlib.h",
+    ],
+)
