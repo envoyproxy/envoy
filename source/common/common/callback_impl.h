@@ -34,7 +34,7 @@ public:
    * @param args supplies the callback arguments.
    */
   void runCallbacks(CallbackArgs... args) {
-    for (auto it = callbacks_.begin(); it != callbacks_.end();) {
+    for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
       auto current = it++;
       current->cb_(args...);
     }
