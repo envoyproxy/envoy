@@ -38,6 +38,7 @@ public:
   uint64_t random();
 
 private:
+  const int32_t seed_;
   std::ranlux48 generator_;
 };
 

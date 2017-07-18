@@ -32,9 +32,8 @@ static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>
                                 .count();
 
 TestRandomGenerator::TestRandomGenerator()
-    : generator_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)) {
-  const int32_t seed = GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed);
-  std::cerr << "TestRandomGenerator running with seed " << seed;
+    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+  std::cerr << "TestRandomGenerator running with seed " << seed_;
 }
 
 uint64_t TestRandomGenerator::random() { return generator_(); }
