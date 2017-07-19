@@ -79,6 +79,9 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
       },
       nullptr);
 #endif
+  if (remote_closed_) {
+    return;
+  }
 
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
@@ -87,6 +90,18 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "async http request response data (length={} end_stream={})", data.length(),
             end_stream);
+  // It's possible we have been reset by the client but the router is still
+  // sending data on its way out. This happens for example when
+  // Utility::sendLocalReply() tells the gRPC async client that it has a non-200
+  // via encodeHeaders(), gRPC async client resets the HTTP async stream but on
+  // return to Utility::sendLocalReply() it unconditionally sends a body with
+  // encodeData().
+  // TODO(htuch): This is the only case we catch today, but conceivably we could
+  // see encodeTrailers() as well (or encodeHeaders()?) from router on its way
+  // out.
+  if (remote_closed_) {
+    return;
+  }
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
 }
@@ -144,6 +159,10 @@ void AsyncStreamImpl::reset() {
 }
 
 void AsyncStreamImpl::cleanup() {
+  // While deletion may be deferred below, the caller may have decided that its contract with the
+  // HTTP async stream is over and not expect further callbacks. We need to make sure that the
+  // stream is closed if we continue to receive callbacks.
+  local_closed_ = remote_closed_ = true;
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
