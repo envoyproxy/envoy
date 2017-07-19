@@ -20,10 +20,44 @@ def envoy_copts(repository, test = False):
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
+        "//bazel/osx:darwin": [],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+    })
+
+# Compute the final linkopts based on various options.
+def envoy_linkopts():
+    return select({
+        "//bazel/osx:darwin": [],
+        "//conditions:default": [
+            "-pthread",
+            "-lrt",
+            "-luuid",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
+            "-static-libstdc++",
+            "-static-libgcc",
+        ],
+    })
+
+# Compute the test linkopts based on various options.
+def envoy_test_linkopts():
+    return select({
+        "//bazel/osx:darwin": [],
+
+        # TODO(mattklein123): It's not great that we universally link against the following libs.
+        # In particular, -latomic is not needed on all platforms. Make this more granular.
+        "//conditions:default": ["-pthread", "-latomic", "-luuid"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
@@ -125,22 +159,7 @@ def envoy_cc_binary(name,
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository),
-        linkopts = [
-            "-pthread",
-            "-lrt",
-            # Force MD5 hash in build. This is part of the workaround for
-            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
-            # does this by itself prior to
-            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
-            # Ironically, forcing it here so that in future releases we will
-            # have the same behavior. When everyone is using an updated version
-            # of Bazel, we can use linkopts to set the git SHA1 directly in the
-            # --build-id and avoid doing the following.
-            '-Wl,--build-id=md5',
-            '-Wl,--hash-style=gnu',
-            "-static-libstdc++",
-            "-static-libgcc",
-        ],
+        linkopts = envoy_linkopts(),
         testonly = testonly,
         linkstatic = 1,
         visibility = visibility,
@@ -177,9 +196,7 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
-        # TODO(mattklein123): It's not great that we universally link against the following libs.
-        # In particular, -latomic is not needed on all platforms. Make this more granular.
-        linkopts = ["-pthread", "-latomic"],
+        linkopts = envoy_test_linkopts(),
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [

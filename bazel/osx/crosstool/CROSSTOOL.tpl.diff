@@ -1,0 +1,26 @@
+diff --git a/../../../../bazel/tools/osx/crosstool/CROSSTOOL.tpl b/CROSSTOOL.tpl
+index 5faa8849c..5dfa2c883 100644
+--- a/../../../../bazel/tools/osx/crosstool/CROSSTOOL.tpl
++++ b/CROSSTOOL.tpl
+@@ -107,7 +107,7 @@ toolchain {
+   }
+   tool_path {
+     name: "strip"
+-    path: "/usr/bin/strip"
++    path: "wrapped_strip"
+   }
+   needsPic: false
+   compiler_flag: "-D_FORTIFY_SOURCE=1"
+@@ -156,9 +156,10 @@ toolchain {
+   unfiltered_cxx_flag: "-D__TIMESTAMP__=\"redacted\""
+   unfiltered_cxx_flag: "-D__TIME__=\"redacted\""
+   default_python_version: "python2.7"
+-  ar_flag: "-static"
++  ar_flag: "-r"
++#  ar_flag: "-static"
+   ar_flag: "-s"
+-  ar_flag: "-o"
++#  ar_flag: "-o"
+   feature {
+     name: "fastbuild"
+   }

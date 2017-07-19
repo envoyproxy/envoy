@@ -1,0 +1,12 @@
+diff --git a/../../../../bazel/tools/osx/crosstool/BUILD.tpl b/BUILD.tpl
+index 8f5376766..fa2a967df 100644
+--- a/../../../../bazel/tools/osx/crosstool/BUILD.tpl
++++ b/BUILD.tpl
+@@ -39,6 +39,7 @@ cc_toolchain_suite(
+           ":make_hashed_objlist.py",
+           ":wrapped_clang",
+           ":wrapped_ar",
++          ":wrapped_strip",
+           ":xcrunwrapper.sh",
+         ],
+     )

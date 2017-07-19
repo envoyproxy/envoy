@@ -1,0 +1,6 @@
+The files in this directory were imported from
+https://github.com/bazelbuild/bazel/tools/osx at 7b85122. We apply a
+number of local modifications to deal with known issues in Bazel
+0.5.2.
+
+Each modified file has a matching diff file to show the changes.
