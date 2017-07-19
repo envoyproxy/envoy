@@ -238,6 +238,7 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
+  // TODO(htuch): Switch this to Utility::sendLocalReply().
   Http::HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, abortHttpStatus()}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);

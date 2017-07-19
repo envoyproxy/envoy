@@ -206,7 +206,8 @@ public:
    * sure that any async events are cleaned up in the context of this routine. This includes timers,
    * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
    * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
-   * complications.
+   * complications. Filters must not invoke either encoder or decoder filter callbacks after having
+   * onDestroy() invoked.
    */
   virtual void onDestroy() PURE;
 };
@@ -240,7 +241,7 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter decoder callbacks that the
-   * filter should use.
+   * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
 };
@@ -320,7 +321,7 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
-   * use.
+   * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
 };

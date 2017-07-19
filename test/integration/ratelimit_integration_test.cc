@@ -101,8 +101,10 @@ public:
 
   void cleanup() {
     codec_client_->close();
-    fake_ratelimit_connection_->close();
-    fake_ratelimit_connection_->waitForDisconnect();
+    if (fake_ratelimit_connection_ != nullptr) {
+      fake_ratelimit_connection_->close();
+      fake_ratelimit_connection_->waitForDisconnect();
+    }
     if (fake_upstream_connection_ != nullptr) {
       fake_upstream_connection_->close();
       fake_upstream_connection_->waitForDisconnect();
@@ -151,12 +153,51 @@ TEST_P(RatelimitIntegrationTest, Error) {
   initiateClientConnection();
   waitForRatelimitRequest();
   ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, true);
+  // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
   EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.ok").value());
   EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.over_limit").value());
   EXPECT_EQ(1, test_server_->store().counter("cluster.traffic.ratelimit.error").value());
+}
+
+TEST_P(RatelimitIntegrationTest, Timeout) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  // Keep polling stats until the HTTP ratelimit wait times out.
+  const uint32_t sleep_ms = 100;
+  for (int32_t timeout_wait_ms = 50000; timeout_wait_ms > 0; timeout_wait_ms -= sleep_ms) {
+    if (test_server_->store().counter("cluster.ratelimit.upstream_rq_timeout").value() > 0) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+  }
+  // Rate limiter fails open
+  waitForSuccessfulUpstreamResponse();
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_timeout").value());
+  EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_504").value());
+}
+
+TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
+  initiateClientConnection();
+  fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  fake_ratelimit_connection_->close();
+  fake_ratelimit_connection_->waitForDisconnect();
+  fake_ratelimit_connection_ = nullptr;
+  // Rate limiter fails open
+  waitForSuccessfulUpstreamResponse();
+  cleanup();
+}
+
+TEST_P(RatelimitIntegrationTest, FailedConnect) {
+  fake_upstreams_[1].reset();
+  initiateClientConnection();
+  // Rate limiter fails open
+  waitForSuccessfulUpstreamResponse();
+  cleanup();
 }
 
 } // namespace
