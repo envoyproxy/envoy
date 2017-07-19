@@ -53,11 +53,11 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
-                                             Upstream::ClusterManager& cm)
+                                             Upstream::ClusterManager& cluster_manager)
     : config_(config), stats_(config_.stats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
-      runtime_(runtime), local_info_(local_info), cm_(cm) {}
+      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -520,7 +520,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       if (entry != decoder_filters_.end()) {
         connection_manager_.ws_connection_ = std::unique_ptr<WebSocket::WsHandlerImpl>(
             new WebSocket::WsHandlerImpl(route_entry->clusterName(), *request_headers_, route_entry,
-                                         **entry, connection_manager_.cm_));
+                                         **entry, connection_manager_.cluster_manager_));
         connection_manager_.ws_connection_->initializeReadFilterCallbacks(
             *connection_manager_.read_callbacks_);
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();

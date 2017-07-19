@@ -141,6 +141,97 @@ TEST_P(IntegrationTest, OverlyLongHeaders) {
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
+TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+  // WebSocket upgrade, send some data and disconnect downstream
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                                      "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  executeActions({
+      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
+      // Send websocket upgrade request
+      [&]() -> void { tcp_client->write(upgrade_req_str); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection->waitForData(190); },
+      // Accept websocket upgrade request
+      [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
+      [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
+      // Standard TCP proxy semantics post upgrade
+      [&]() -> void { tcp_client->write("hello"); },
+      [&]() -> void { fake_upstream_connection->waitForData(195); },
+      [&]() -> void { fake_upstream_connection->write("world"); },
+      [&]() -> void { tcp_client->waitForData(upgrade_resp_str + "world"); },
+      [&]() -> void { tcp_client->write("bye!"); },
+      // downstream disconnect
+      [&]() -> void { tcp_client->close(); },
+      [&]() -> void { fake_upstream_connection->waitForData(199); },
+      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+  });
+}
+
+#if 0
+  // HELP: Eventhough the initial part of this test is identical to the other websocket
+  // tests, this test alone hangs in waitForRawConnection.
+TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
+  // WebSocket upgrade, send some data and disconnect upstream
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  executeActions({
+      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
+      // Send websocket upgrade request
+      [&]() -> void { tcp_client->write(upgrade_req_str); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection->waitForData(190); },
+      // Accept websocket upgrade request
+      [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
+      [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
+      // Standard TCP proxy semantics post upgrade
+      [&]() -> void { tcp_client->write("hello"); },
+      [&]() -> void { fake_upstream_connection->waitForData(195); },
+      [&]() -> void { fake_upstream_connection->write("world"); },
+      // upstream disconnect
+      [&]() -> void { fake_upstream_connection->close(); },
+      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+      [&]() -> void { tcp_client->waitForDisconnect(); }});
+
+    EXPECT_EQ(upgrade_resp_str+"world", tcp_client->data());
+}
+#endif
+
+// TODO (rshriram): Since we are doing plain tcp proxying when we
+// see upgrade headers from downstream, we are relying on the
+// upstream to reject bad upgrade requests and close the
+// connection. A better implementation would be one where we look at
+// the upstream response headers and then switch the upstream and
+// downstream to standard TCP proxy mode. Since this is a
+// non-trivial change, a temporary solution could require the user
+// to explicitly mark a route as websocket route.
+TEST_P(IntegrationTest, WebSocketConnectionUpgradeRejected) {
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str =
+      "GET /test/foo HTTP/1.1\r\nHost: host\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str = "HTTP/1.1 400 Bad Request\r\n\r\n";
+  executeActions(
+      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
+       // Send websocket upgrade request
+       [&]() -> void { tcp_client->write(upgrade_req_str); },
+       [&]() -> void { fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection(); },
+       [&]() -> void { fake_upstream_connection->waitForData(184); },
+       // Reject websocket upgrade request
+       [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
+       // upstream disconnect
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+       [&]() -> void { tcp_client->waitForDisconnect(); }});
+
+  EXPECT_EQ(upgrade_resp_str, tcp_client->data());
+}
+
 TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;

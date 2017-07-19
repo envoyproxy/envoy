@@ -72,6 +72,10 @@
                 {
                   "prefix": "/test/",
                   "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "cluster": "cluster_1"
                 }
               ]
             }
@@ -165,6 +169,10 @@
                 {
                   "prefix": "/test/",
                   "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "cluster": "cluster_1"
                 }
               ]
             }

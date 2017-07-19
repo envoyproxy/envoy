@@ -261,7 +261,7 @@ public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                        Upstream::ClusterManager& cm);
+                        Upstream::ClusterManager& cluster_manager);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -520,7 +520,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isWebSocketConnection() { return ws_connection_ != nullptr; }
+  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 
@@ -539,7 +539,7 @@ private:
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
-  Upstream::ClusterManager& cm_;
+  Upstream::ClusterManager& cluster_manager_;
   // To keep track of the number of outstanding HTTP responses in a connection.
   // WebSocket upgrade cannot happen when responses are due.
   int pending_responses_;
