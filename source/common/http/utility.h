@@ -87,7 +87,7 @@ public:
    * @param body_text supplies the optional body text which is sent using the text/plain content
    *                  type.
    */
-  static void sendLocalReply(StreamDecoderFilterCallbacks& callbacks, bool& is_reset,
+  static void sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, const std::string& body_text);
 
   /**

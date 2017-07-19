@@ -184,7 +184,7 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   return ret;
 }
 
-void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, bool& is_reset,
+void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, const std::string& body_text) {
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
