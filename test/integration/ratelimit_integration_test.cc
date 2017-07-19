@@ -101,8 +101,10 @@ public:
 
   void cleanup() {
     codec_client_->close();
-    fake_ratelimit_connection_->close();
-    fake_ratelimit_connection_->waitForDisconnect();
+    if (fake_ratelimit_connection_ != nullptr) {
+      fake_ratelimit_connection_->close();
+      fake_ratelimit_connection_->waitForDisconnect();
+    }
     if (fake_upstream_connection_ != nullptr) {
       fake_upstream_connection_->close();
       fake_upstream_connection_->waitForDisconnect();
@@ -177,6 +179,25 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 
   EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_timeout").value());
   EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_504").value());
+}
+
+TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
+  initiateClientConnection();
+  fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  fake_ratelimit_connection_->close();
+  fake_ratelimit_connection_->waitForDisconnect();
+  fake_ratelimit_connection_ = nullptr;
+  // Rate limiter fails open
+  waitForSuccessfulUpstreamResponse();
+  cleanup();
+}
+
+TEST_P(RatelimitIntegrationTest, FailedConnect) {
+  fake_upstreams_[1].reset();
+  initiateClientConnection();
+  // Rate limiter fails open
+  waitForSuccessfulUpstreamResponse();
+  cleanup();
 }
 
 } // namespace
