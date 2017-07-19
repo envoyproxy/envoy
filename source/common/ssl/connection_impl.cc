@@ -258,9 +258,13 @@ std::string ConnectionImpl::subjectPeerCertificate() {
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), indent, flags);
-  char* buf_data;
-  long buf_data_len = BIO_get_mem_data(buf.get(), &buf_data);
-  return std::string(buf_data, buf_data_len);
+  const uint8_t* buf_data;
+  size_t buf_data_len;
+  int mem_content_rc = BIO_mem_contents(buf.get(), &buf_data, &buf_data_len);
+  // It should be impossible for BIO_mem_contents to fail when called with a BIO
+  // created using BIO_s_mem().
+  ASSERT(mem_content_rc == 1);
+  return std::string(reinterpret_cast<const char*>(buf_data), buf_data_len);
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
