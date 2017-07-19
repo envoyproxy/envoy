@@ -79,9 +79,6 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
       },
       nullptr);
 #endif
-  if (remote_closed_) {
-    return;
-  }
 
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);

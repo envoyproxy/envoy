@@ -196,6 +196,8 @@ void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, Code respo
   callbacks.encodeHeaders(std::move(response_headers), body_text.empty());
   if (!body_text.empty()) {
     Buffer::OwnedImpl buffer(body_text);
+    // TODO(htuch): We shouldn't encodeData() if the stream is reset in the encodeHeaders() above,
+    // see https://github.com/lyft/envoy/issues/1283.
     callbacks.encodeData(buffer, true);
   }
 }
