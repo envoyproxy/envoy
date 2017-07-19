@@ -532,13 +532,9 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  // This is similar to what Http::Utility::sendLocalReply() does, we don't need
-  // this behavior when https://github.com/lyft/envoy/issues/1283 is resolved.
-  // TODO(htuch): Remove the encodeData() below when #1283 is resolved.
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
-  filter_callbacks->encodeData(*body, false);
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {

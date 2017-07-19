@@ -208,7 +208,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
-    Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
+    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
+                                  "maintenance mode");
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -277,7 +278,8 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
-  Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "no healthy upstream");
+  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
+                                "no healthy upstream");
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -368,7 +370,7 @@ void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
-
+  stream_destroyed_ = true;
   cleanup();
 }
 
@@ -437,7 +439,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     }
 
     chargeUpstreamCode(code, upstream_host);
-    Http::Utility::sendLocalReply(*callbacks_, code, body);
+    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
   }
 }
 

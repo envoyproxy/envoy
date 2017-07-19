@@ -232,6 +232,7 @@ private:
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
   std::unique_ptr<LoadBalancerContextImpl> lb_context_;
+  bool stream_destroyed_{};
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
