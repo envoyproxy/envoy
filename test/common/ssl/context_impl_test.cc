@@ -30,6 +30,17 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", ""));
 }
 
+TEST_F(SslContextImplTest, TestURIMatch) {
+  EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/foo", "spiffe://lyft.com/foo"));
+  EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.com/foo"));
+  EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/foo/*", "spiffe://lyft.com/foo/bar"));
+  EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/foo", "spiffe://lyft.com/foo/bar"));
+  EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", ""));
+  EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.net/foo"));
+  EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com*", "spiffe://lyft.com/foo"));
+  EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.comfoo"));
+}
+
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   FILE* fp = fopen(
       TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
@@ -52,6 +63,11 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
+
+  verify_subject_alt_name_list.clear();
+  verify_subject_alt_name_list.push_back("spiffe://lyft.com/*");
+  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
+
   X509_free(cert);
   fclose(fp);
 }

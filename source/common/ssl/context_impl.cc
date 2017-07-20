@@ -209,7 +209,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
         ASN1_STRING* str = altname->d.uniformResourceIdentifier;
         char* crt_san = reinterpret_cast<char*>(ASN1_STRING_data(str));
         for (auto& config_san : subject_alt_names) {
-          if (config_san.compare(crt_san) == 0) {
+          if (uriMatch(config_san, crt_san)) {
             verified = true;
             break;
           }
@@ -221,6 +221,22 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   }
 
   return verified;
+}
+
+bool ContextImpl::uriMatch(const std::string& uriPattern, const char* uri) {
+  if (uriPattern == uri) {
+    return true;
+  }
+
+  size_t pattern_len = uriPattern.length();
+  if (pattern_len > 1 && uriPattern[pattern_len - 1] == '*' && uriPattern[pattern_len - 2] == '/') {
+    size_t uri_len = strlen(uri);
+    if (uri_len > pattern_len - 1) {
+      return uriPattern.compare(0, pattern_len - 1, uri, pattern_len - 1) == 0;
+    }
+  }
+
+  return false;
 }
 
 bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
