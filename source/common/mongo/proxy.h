@@ -107,6 +107,8 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   struct ActiveQuery {

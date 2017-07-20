@@ -3,6 +3,9 @@
 namespace Envoy {
 namespace Grpc {
 
+MockAsyncRequest::MockAsyncRequest() {}
+MockAsyncRequest::~MockAsyncRequest() {}
+
 MockRpcChannelCallbacks::MockRpcChannelCallbacks() {}
 MockRpcChannelCallbacks::~MockRpcChannelCallbacks() {}
 

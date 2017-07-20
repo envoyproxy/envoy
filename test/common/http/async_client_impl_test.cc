@@ -499,6 +499,44 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   stream->reset();
 }
 
+// Validate behavior when the stream's onHeaders() callback performs a stream
+// reset.
+TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addViaCopy("x-envoy-internal", "true");
+  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
+  headers.addViaCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
+
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+
+  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false))
+      .WillOnce(Invoke([&stream](HeaderMap&, bool) { stream->reset(); }));
+  EXPECT_CALL(stream_callbacks_, onData(_, _)).Times(0);
+  EXPECT_CALL(stream_callbacks_, onReset());
+
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, false);
+
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  filter_callbacks->encodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+}
+
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
 

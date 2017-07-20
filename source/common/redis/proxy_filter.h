@@ -80,6 +80,8 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   // Redis::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;

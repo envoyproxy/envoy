@@ -245,6 +245,7 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/stats:stats_lib",

@@ -52,11 +52,11 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request)));
+    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(cluster_names, "");
     subscription_->start(cluster_names, callbacks_);
     // These are just there to add coverage to the null implementations of these
@@ -104,7 +104,7 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  Grpc::MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
 };
 

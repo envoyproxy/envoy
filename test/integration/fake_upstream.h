@@ -89,10 +89,12 @@ public:
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) {
+  void onEvent(uint32_t events) override {
     RELEASE_ASSERT(parented_ || (!(events & Network::ConnectionEvent::RemoteClose) &&
                                  !(events & Network::ConnectionEvent::LocalClose)));
   }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   Network::Connection& connection_;
@@ -115,6 +117,8 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)

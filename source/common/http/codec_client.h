@@ -180,6 +180,8 @@ private:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};

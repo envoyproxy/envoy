@@ -59,8 +59,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
-      write_buffer_(dispatcher.getBufferFactory().create()), dispatcher_(dispatcher), fd_(fd),
-      id_(++next_global_id_) {
+      write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
+                    [this]() -> void { this->onLowWatermark(); },
+                    [this]() -> void { this->onHighWatermark(); }),
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -100,7 +102,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  uint64_t data_to_write = write_buffer_->length();
+  uint64_t data_to_write = write_buffer_.length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
@@ -209,15 +211,26 @@ void ConnectionImpl::readDisable(bool disable) {
   // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
   // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
+    if (!read_enabled) {
+      ++read_disable_count_;
+      return;
+    }
     ASSERT(read_enabled);
     state_ &= ~InternalState::ReadEnabled;
     file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
   } else {
+    if (read_disable_count_ > 0) {
+      --read_disable_count_;
+      return;
+    }
     ASSERT(!read_enabled);
     state_ |= InternalState::ReadEnabled;
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    // If the connection has data buffered there's no guarantee there's also data in the kernel
+    // which will kick off the filter chain.  Instead fake an event to make sure the buffered data
+    // gets processed regardless.
     if (read_buffer_->length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
@@ -256,11 +269,51 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
     // That code assumes that we never change existing write_buffer_ chain elements between calls
     // to SSL_write(). That code will have to change if we ever copy here.
-    write_buffer_->move(data);
+    write_buffer_.move(data);
 
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
     }
+  }
+}
+
+void ConnectionImpl::setBufferLimits(uint32_t limit) {
+  read_buffer_limit_ = limit;
+
+  // Due to the fact that writes to the connection and flushing data from the connection are done
+  // asynchronously, we have the option of either setting the watermarks aggressively, and regularly
+  // enabling/disabling reads from the socket, or allowing more data, but then not triggering
+  // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
+  // limits we err on the side of buffering more triggering watermark callbacks less often.
+  //
+  // Given the current implementation for straight up TCP proxying, the common case is reading
+  // |limit| bytes through the socket, passing |limit| bytes to the connection (triggering the high
+  // watermarks) and the immediately draining |limit| bytes to the socket (triggering the low
+  // watermarks).  We avoid this by setting the high watermark to limit + 1 so a single read will
+  // not trigger watermarks if the socket is not blocked.
+  //
+  // If the connection class is changed to write to the buffer and flush to the socket in the same
+  // stack then instead of checking watermarks after the write and again after the flush it can
+  // check once after both operations complete.  At that point it would be better to change the high
+  // watermark from |limit + 1| to |limit| as the common case (move |limit| bytes, flush |limit|
+  // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
+  // would result in respecting the exact buffer limit.
+  if (limit > 0) {
+    write_buffer_.setWatermarks(limit / 2, limit + 1);
+  }
+}
+
+void ConnectionImpl::onLowWatermark() {
+  ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onBelowWriteBufferLowWatermark();
+  }
+}
+
+void ConnectionImpl::onHighWatermark() {
+  ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onAboveWriteBufferHighWatermark();
   }
 }
 
@@ -350,11 +403,11 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
-    if (write_buffer_->length() == 0) {
+    if (write_buffer_.length() == 0) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    int rc = write_buffer_->write(fd_);
+    int rc = write_buffer_.write(fd_);
     ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
@@ -402,7 +455,7 @@ void ConnectionImpl::onWriteReady() {
   }
 
   IoResult result = doWriteToSocket();
-  uint64_t new_buffer_size = write_buffer_->length();
+  uint64_t new_buffer_size = write_buffer_.length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   if (result.action_ == PostIoAction::Close) {

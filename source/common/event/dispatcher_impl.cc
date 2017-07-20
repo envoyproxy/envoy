@@ -10,6 +10,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
@@ -36,6 +37,7 @@ DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
+  ASSERT(isThreadSafe());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
 
   size_t num_to_delete = to_delete->size();
@@ -68,26 +70,31 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
 Network::ClientConnectionPtr
 DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address) {
+  ASSERT(isThreadSafe());
   return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
 }
 
 Network::ClientConnectionPtr
 DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                                           Network::Address::InstanceConstSharedPtr address) {
+  ASSERT(isThreadSafe());
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+  ASSERT(isThreadSafe());
   return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
+  ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
+  ASSERT(isThreadSafe());
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
@@ -96,6 +103,7 @@ DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
                                Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                Stats::Scope& scope,
                                const Network::ListenerOptions& listener_options) {
+  ASSERT(isThreadSafe());
   return Network::ListenerPtr{
       new Network::ListenerImpl(conn_handler, *this, socket, cb, scope, listener_options)};
 }
@@ -105,13 +113,20 @@ DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
                                   Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                   Network::ListenerCallbacks& cb, Stats::Scope& scope,
                                   const Network::ListenerOptions& listener_options) {
+  ASSERT(isThreadSafe());
   return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
                                                            scope, listener_options)};
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+  // TODO(htuch): Figure out why we can't set this assertion, see
+  // https://github.com/lyft/envoy/issues/1294.
+  // ASSERT(isThreadSafe());
+  return TimerPtr{new TimerImpl(*this, cb)};
+}
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
+  ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
@@ -122,6 +137,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+  ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
@@ -139,6 +155,8 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
+  run_tid_ = Thread::Thread::currentThreadId();
+
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not gaurantee that events are run in any particular order. So even if we post() and call

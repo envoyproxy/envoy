@@ -351,6 +351,10 @@ public:
 
   MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
                               const Optional<std::chrono::milliseconds>& timeout));
+
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {

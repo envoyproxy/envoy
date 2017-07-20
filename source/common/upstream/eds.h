@@ -21,7 +21,8 @@ public:
                  Ssl::ContextManager& ssl_context_manager,
                  const envoy::api::v2::ConfigSource& eds_config,
                  const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random);
+                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                 bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override;

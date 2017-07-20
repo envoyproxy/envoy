@@ -164,7 +164,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
   }
 
-  uint64_t original_buffer_length = write_buffer_->length();
+  uint64_t original_buffer_length = write_buffer_.length();
   uint64_t total_bytes_written = 0;
   bool keep_writing = true;
   while ((original_buffer_length != total_bytes_written) && keep_writing) {
@@ -175,7 +175,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const uint64_t MAX_SLICES = 32;
     Buffer::RawSlice slices[MAX_SLICES];
-    uint64_t num_slices = write_buffer_->getRawSlices(slices, MAX_SLICES);
+    uint64_t num_slices = write_buffer_.getRawSlices(slices, MAX_SLICES);
 
     uint64_t inner_bytes_written = 0;
     for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
@@ -210,7 +210,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // Draining must be done within the inner loop, otherwise we will keep getting the same slices
     // at the beginning of the buffer.
     if (inner_bytes_written > 0) {
-      write_buffer_->drain(inner_bytes_written);
+      write_buffer_.drain(inner_bytes_written);
     }
   }
 

@@ -111,7 +111,7 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
 void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
                                  Address::InstanceConstSharedPtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
-  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+  new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -120,7 +120,7 @@ void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remo
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));
-  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+  new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 

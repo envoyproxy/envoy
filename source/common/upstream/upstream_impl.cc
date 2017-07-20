@@ -44,29 +44,19 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   Network::ClientConnectionPtr connection =
       cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
                            : dispatcher.createClientConnection(address);
-  connection->setReadBufferLimit(cluster.perConnectionBufferLimitBytes());
+  connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(100U, new_weight)); }
 
-void HostSetImpl::addMemberUpdateCb(MemberUpdateCb callback) const {
-  callbacks_.emplace_back(callback);
-}
-
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
-void HostSetImpl::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                     const std::vector<HostSharedPtr>& hosts_removed) {
-  for (MemberUpdateCb& callback : callbacks_) {
-    callback(hosts_added, hosts_removed);
-  }
-}
-
 ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime,
-                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
+                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                                 bool added_via_api)
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
@@ -76,7 +66,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
       stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config)),
       resource_managers_(config, runtime, name_),
-      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
+      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
+      added_via_api_(added_via_api) {
 
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
@@ -101,15 +92,14 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
     new std::vector<std::vector<HostSharedPtr>>()};
 
-ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm,
-                                   Stats::Store& stats, ThreadLocal::Instance& tls,
-                                   Network::DnsResolverSharedPtr dns_resolver,
-                                   Ssl::ContextManager& ssl_context_manager,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                   Event::Dispatcher& dispatcher,
-                                   const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                                   const LocalInfo::LocalInfo& local_info,
-                                   Outlier::EventLoggerSharedPtr outlier_event_logger) {
+ClusterPtr
+ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
+                        ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+                        Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                        Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                        const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                        const LocalInfo::LocalInfo& local_info,
+                        Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
 
   cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
@@ -134,13 +124,14 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   }
 
   if (string_type == "static") {
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
+    new_cluster.reset(
+        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api));
   } else if (string_type == "strict_dns") {
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               selected_dns_resolver, dispatcher));
+                                               selected_dns_resolver, dispatcher, added_via_api));
   } else if (string_type == "logical_dns") {
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
-                                            selected_dns_resolver, tls, dispatcher));
+                                            selected_dns_resolver, tls, dispatcher, added_via_api));
   } else {
     ASSERT(string_type == "sds");
     if (!eds_config.valid()) {
@@ -149,7 +140,8 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
     new_cluster.reset(new EdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                         eds_config.value(), local_info, cm, dispatcher, random));
+                                         eds_config.value(), local_info, cm, dispatcher, random,
+                                         added_via_api));
   }
 
   if (cluster.hasObject("health_check")) {
@@ -163,8 +155,10 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
 }
 
 ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
-                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
-    : runtime_(runtime), info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager)) {}
+                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                                 bool added_via_api)
+    : runtime_(runtime),
+      info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager, added_via_api)) {}
 
 HostVectorConstSharedPtr
 ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
@@ -285,8 +279,9 @@ ResourceManagerImplPtr ClusterInfoImpl::ResourceManagers::load(const Json::Objec
 }
 
 StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
-                                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
-    : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
+                                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                                     bool added_via_api)
+    : ClusterImplBase(config, runtime, stats, ssl_context_manager, added_via_api) {
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const Json::ObjectSharedPtr& host : hosts_json) {
@@ -385,8 +380,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                            Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolverSharedPtr dns_resolver,
-                                           Event::Dispatcher& dispatcher)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
+                                           Event::Dispatcher& dispatcher, bool added_via_api)
+    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager, added_via_api),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
 

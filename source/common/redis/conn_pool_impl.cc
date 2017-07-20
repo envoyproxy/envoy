@@ -174,6 +174,8 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                             config);
 }
 
+// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
+//                     up.
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
                            ClientFactory& client_factory, ThreadLocal::Instance& tls,
                            const Json::Object& config)
@@ -195,6 +197,15 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
                                                const std::string& cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_(parent_.cm_.get(cluster_name)) {
 
+  // TODO(mattklein123): Redis is not currently safe for use with CDS. In order to make this work
+  //                     we will need to add thread local cluster removal callbacks so that we can
+  //                     safely clean things up and fail requests.
+  // TODO(mattklein123): This is also currently broken for LDS. If this gets destroyed we need to
+  //                     remove member update callbacks on the cluster. However, if we do this
+  //                     universally right now there is no guaranteed order between TLS shutdown
+  //                     operations. It's not immediately clear how to fix this. Will fix in a
+  //                     follow up.
+  ASSERT(!cluster_->info()->addedViaApi());
   cluster_->hostSet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {

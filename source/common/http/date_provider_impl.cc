@@ -8,6 +8,8 @@ namespace Http {
 
 DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
 
+// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
+//                     up.
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
                                                        ThreadLocal::Instance& tls)
     : tls_(tls), tls_slot_(tls.allocateSlot()),

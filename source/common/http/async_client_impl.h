@@ -48,6 +48,8 @@ public:
   Stream* start(StreamCallbacks& callbacks,
                 const Optional<std::chrono::milliseconds>& timeout) override;
 
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
 private:
   const Upstream::ClusterInfo& cluster_;
   Router::FilterConfig config_;
@@ -64,6 +66,7 @@ private:
  */
 class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
+                        public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
                         LinkedObject<AsyncStreamImpl> {
 public:

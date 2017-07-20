@@ -15,7 +15,7 @@ namespace Config {
 
 template <class ResourceType>
 class GrpcSubscriptionImpl : public Config::Subscription<ResourceType>,
-                             Grpc::AsyncClientCallbacks<envoy::api::v2::DiscoveryResponse>,
+                             Grpc::AsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                              Logger::Loggable<Logger::Id::config> {
 public:
   GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
@@ -48,7 +48,7 @@ public:
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}",
               ProtobufTypes::FromString(service_method_.DebugString()));
     stats_.update_attempt_.inc();
-    stream_ = async_client_->start(service_method_, *this, Optional<std::chrono::milliseconds>());
+    stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       handleFailure();
@@ -61,7 +61,7 @@ public:
     if (stream_ == nullptr) {
       return;
     }
-    stream_->sendMessage(request_);
+    stream_->sendMessage(request_, false);
   }
 
   // Config::Subscription
@@ -82,7 +82,7 @@ public:
     sendDiscoveryRequest();
   }
 
-  // Grpc::AsyncClientCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
@@ -136,7 +136,7 @@ private:
   Event::TimerPtr retry_timer_;
   Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
-  Grpc::AsyncClientStream<envoy::api::v2::DiscoveryRequest>* stream_{};
+  Grpc::AsyncStream<envoy::api::v2::DiscoveryRequest>* stream_{};
   envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;
 };

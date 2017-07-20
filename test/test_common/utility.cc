@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <iostream>
 #include <list>
 #include <mutex>
 #include <stdexcept>
@@ -22,7 +23,20 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::GTEST_FLAG(random_seed);
+
 namespace Envoy {
+
+static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+
+TestRandomGenerator::TestRandomGenerator()
+    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+  std::cerr << "TestRandomGenerator running with seed " << seed_;
+}
+
+uint64_t TestRandomGenerator::random() { return generator_(); }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {

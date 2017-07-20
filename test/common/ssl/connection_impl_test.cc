@@ -465,7 +465,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     uint32_t filter_seen = 0;
@@ -534,7 +534,7 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
-          EXPECT_EQ(read_buffer_limit, server_connection_->readBufferLimit());
+          EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
     EXPECT_CALL(*read_filter_, onNewConnection());

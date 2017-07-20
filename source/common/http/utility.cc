@@ -184,8 +184,8 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   return ret;
 }
 
-void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, Code response_code,
-                             const std::string& body_text) {
+void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
+                             Code response_code, const std::string& body_text) {
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
@@ -194,8 +194,10 @@ void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, Code respo
   }
 
   callbacks.encodeHeaders(std::move(response_headers), body_text.empty());
-  if (!body_text.empty()) {
+  if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
+    // TODO(htuch): We shouldn't encodeData() if the stream is reset in the encodeHeaders() above,
+    // see https://github.com/lyft/envoy/issues/1283.
     callbacks.encodeData(buffer, true);
   }
 }

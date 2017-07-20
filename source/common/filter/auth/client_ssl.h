@@ -119,6 +119,8 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   ConfigSharedPtr config_;

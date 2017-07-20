@@ -1,8 +1,11 @@
 #pragma once
 
+#include <stdlib.h>
+
 #include <condition_variable>
 #include <list>
 #include <mutex>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -25,6 +28,19 @@ namespace Envoy {
   } catch (expected_exception & e) {                                                               \
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
+
+// Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
+// one can run the test with --test_arg=--gtest_filter=[seed]
+class TestRandomGenerator {
+public:
+  TestRandomGenerator();
+
+  uint64_t random();
+
+private:
+  const int32_t seed_;
+  std::ranlux48 generator_;
+};
 
 class TestUtility {
 public:

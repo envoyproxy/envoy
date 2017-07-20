@@ -76,6 +76,8 @@ protected:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override { parent_.onConnectionEvent(*this, events); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ConnPoolImpl& parent_;
     CodecClientPtr codec_client_;

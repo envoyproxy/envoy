@@ -16,9 +16,10 @@ EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                const envoy::api::v2::ConfigSource& eds_config,
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager), local_info_(local_info),
-      cluster_name_(config.getString("service_name")) {
+                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                               bool added_via_api)
+    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager, added_via_api),
+      local_info_(local_info), cluster_name_(config.getString("service_name")) {
   envoy::api::v2::Node node;
   Config::Utility::localInfoToNode(local_info, node);
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<

@@ -122,6 +122,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
       {":authority", "eds_cluster"},
       {"content-type", "application/grpc"}};
   EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
+  EXPECT_CALL(cm_.async_client_.dispatcher_, deferredDelete_(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 
