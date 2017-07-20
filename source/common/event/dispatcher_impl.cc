@@ -37,6 +37,7 @@ DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
+  ASSERT(run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
 
   size_t num_to_delete = to_delete->size();
@@ -113,6 +114,7 @@ DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
+  ASSERT(run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId());
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
@@ -140,6 +142,8 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
+  run_tid_ = Thread::Thread::currentThreadId();
+
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not gaurantee that events are run in any particular order. So even if we post() and call

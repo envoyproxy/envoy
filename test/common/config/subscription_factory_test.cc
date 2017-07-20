@@ -113,7 +113,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   api_config_source->add_cluster_name("eds_cluster");
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster")).Times(2);
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cm_.async_client_, start(_, _)).WillOnce(Return(&stream));
   Http::TestHeaderMapImpl headers{
@@ -122,7 +122,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
       {":authority", "eds_cluster"},
       {"content-type", "application/grpc"}};
   EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(cm_.async_client_.dispatcher_, deferredDelete_(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 

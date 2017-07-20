@@ -1,7 +1,6 @@
 #include "common/grpc/async_client_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -157,7 +156,7 @@ public:
   GrpcAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         grpc_client_(new AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>(
-            cm_, dispatcher_, "test_cluster")) {
+            cm_, "test_cluster")) {
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
@@ -255,7 +254,6 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>> grpc_client_;
 };
 

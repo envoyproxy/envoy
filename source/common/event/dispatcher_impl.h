@@ -11,6 +11,7 @@
 #include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -71,6 +72,7 @@ private:
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
   bool deferred_deleting_{};
+  Thread::ThreadId run_tid_{};
 };
 
 } // namespace Event

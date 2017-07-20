@@ -120,7 +120,9 @@ MockStreamFilter::MockStreamFilter() {
 
 MockStreamFilter::~MockStreamFilter() {}
 
-MockAsyncClient::MockAsyncClient() {}
+MockAsyncClient::MockAsyncClient() {
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+}
 MockAsyncClient::~MockAsyncClient() {}
 
 MockAsyncClientCallbacks::MockAsyncClientCallbacks() {}
