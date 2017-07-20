@@ -96,7 +96,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
       if (isWebSocketConnection()) {
         stats_.named_.downstream_cx_websocket_active_.dec();
       } else {
-	stats_.named_.downstream_cx_http1_active_.dec();
+        stats_.named_.downstream_cx_http1_active_.dec();
       }
     }
   }
