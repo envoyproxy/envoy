@@ -113,7 +113,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   api_config_source->add_cluster_name("eds_cluster");
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster")).Times(2);
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cm_.async_client_, start(_, _)).WillOnce(Return(&stream));
   Http::TestHeaderMapImpl headers{

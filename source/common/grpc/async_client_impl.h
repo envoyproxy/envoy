@@ -80,13 +80,13 @@ public:
                   const Protobuf::MethodDescriptor& service_method,
                   AsyncStreamCallbacks<ResponseType>& callbacks,
                   const Optional<std::chrono::milliseconds>& timeout)
-      : dispatcher_(parent.cm_.httpAsyncClientForCluster(parent.remote_cluster_name_).dispatcher()),
-        parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {
+      : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {
   }
 
   virtual void initialize() {
-    stream_ = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_)
-                  .start(*this, Optional<std::chrono::milliseconds>(timeout_));
+    auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
+    dispatcher_ = &http_async_client.dispatcher();
+    stream_ = http_async_client.start(*this, Optional<std::chrono::milliseconds>(timeout_));
 
     if (stream_ == nullptr) {
       callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable);
@@ -215,7 +215,7 @@ private:
     // This will destroy us, but only do so if we are actually in a list. This does not happen in
     // the immediate failure case.
     if (LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::inserted()) {
-      dispatcher_.deferredDelete(
+      dispatcher_->deferredDelete(
           LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::removeFromList(
               parent_.active_streams_));
     }
@@ -237,7 +237,7 @@ private:
 
   bool complete() const { return local_closed_ && remote_closed_; }
 
-  Event::Dispatcher& dispatcher_;
+  Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
   AsyncClientImpl<RequestType, ResponseType>& parent_;
   const Protobuf::MethodDescriptor& service_method_;
