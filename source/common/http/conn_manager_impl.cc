@@ -95,8 +95,9 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     } else {
       if (isWebSocketConnection()) {
         stats_.named_.downstream_cx_websocket_active_.dec();
+      } else {
+	stats_.named_.downstream_cx_http1_active_.dec();
       }
-      stats_.named_.downstream_cx_http1_active_.dec();
     }
   }
 
@@ -528,6 +529,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
             *connection_manager_.read_callbacks_);
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
         connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+	connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       } else {
         // TODO (rshriram) - this can only happen if someone has no router filter. Not sure if its
         // valid in the config.
