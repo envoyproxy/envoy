@@ -136,6 +136,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "original_dst_cluster_test",
+    srcs = ["original_dst_cluster_test.cc"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:original_dst_cluster_lib",
+        "//source/common/upstream:upstream_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
     deps = [

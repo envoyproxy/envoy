@@ -26,6 +26,7 @@
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
+#include "common/upstream/original_dst_cluster.h"
 
 #include "spdlog/spdlog.h"
 
@@ -84,6 +85,13 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     lb_type_ = LoadBalancerType::Random;
   } else if (string_lb_type == "ring_hash") {
     lb_type_ = LoadBalancerType::RingHash;
+  } else if (string_lb_type == "original_dst_lb") {
+    if (config.getString("type") != "original_dst") {
+      throw EnvoyException(
+          fmt::format("cluster: LB type '{}' may only be used with cluser type 'original_dst'",
+                      string_lb_type));
+    }
+    lb_type_ = LoadBalancerType::OriginalDst;
   } else {
     throw EnvoyException(fmt::format("cluster: unknown LB type '{}'", string_lb_type));
   }
@@ -132,6 +140,14 @@ ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm, Stats::
   } else if (string_type == "logical_dns") {
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
                                             selected_dns_resolver, tls, dispatcher, added_via_api));
+  } else if (string_type == "original_dst") {
+    if (cluster.getString("lb_type") != "original_dst_lb") {
+      throw EnvoyException(
+          fmt::format("cluster: cluster type '{}' may only be used with LB type 'original_dst_lb'",
+                      string_type));
+    }
+    new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager,
+                                             dispatcher, added_via_api));
   } else {
     ASSERT(string_type == "sds");
     if (!eds_config.valid()) {
