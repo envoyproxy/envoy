@@ -14,7 +14,6 @@ envoy_cc_test(
     deps = [
         "//source/common/grpc:async_client_lib",
         "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",

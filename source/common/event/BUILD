@@ -50,6 +50,7 @@ envoy_cc_library(
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:connection_handler_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 
