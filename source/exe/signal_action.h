@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <signal.h>
 #include <unistd.h>
 
@@ -47,7 +48,9 @@ namespace Envoy {
 class SignalAction : NonCopyable {
 public:
   SignalAction()
-      : guard_size_(sysconf(_SC_PAGE_SIZE)), altstack_size_(guard_size_ * 4), altstack_(nullptr) {
+      : guard_size_(sysconf(_SC_PAGE_SIZE)),
+        altstack_size_(std::max(guard_size_ * 4, static_cast<size_t>(MINSIGSTKSZ))),
+        altstack_(nullptr) {
     mapAndProtectStackMemory();
     installSigHandlers();
   }
