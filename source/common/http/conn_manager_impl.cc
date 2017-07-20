@@ -503,8 +503,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
     if (websocket_upgrade_request) {
-      ENVOY_STREAM_LOG(trace, "found websocket connection. (end_stream={}):", *this, end_stream);
+      ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
       if (connection_manager_.pending_responses_ > 1) {
+        ENVOY_STREAM_LOG(
+            debug, "Rejecting websocket request (end_stream={}, pending_responses={}):", *this,
+            end_stream, connection_manager_.pending_responses_);
         HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
         encodeHeaders(nullptr, headers, true);
         return;
