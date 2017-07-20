@@ -180,7 +180,7 @@ private:
     LoadBalancerContextImpl(const Optional<uint64_t>& hash) : hash_(hash) {}
 
     // Upstream::LoadBalancerContext
-    const Optional<uint64_t>& hashKey() const override { return hash_; }
+    Optional<uint64_t> hashKey() const override { return hash_; }
 
     const Optional<uint64_t> hash_;
   };
