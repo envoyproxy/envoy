@@ -42,6 +42,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override {};
+    void onBelowWriteBufferLowWatermark() override {};
 
     WsHandlerImpl& parent_;
   };
@@ -53,6 +55,8 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override {};
+    void onBelowWriteBufferLowWatermark() override {};
 
     // Http::ConnectionCallbacks
     void onGoAway() override{};

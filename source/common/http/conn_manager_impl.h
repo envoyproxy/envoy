@@ -542,9 +542,6 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  // To keep track of the number of outstanding HTTP responses in a connection.
-  // WebSocket upgrade cannot happen when responses are due.
-  int pending_responses_{0};
   WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
