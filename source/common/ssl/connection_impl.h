@@ -22,7 +22,7 @@ public:
   ~ConnectionImpl();
 
   // Network::Connection
-  std::string nextProtocol() override;
+  std::string nextProtocol() const override;
   Ssl::Connection* ssl() override { return this; }
 
   // Ssl::Connection

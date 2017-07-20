@@ -59,16 +59,16 @@ public:
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
-  uint64_t id() override;
-  std::string nextProtocol() override { return ""; }
+  uint64_t id() const override;
+  std::string nextProtocol() const override { return ""; }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
-  bool readEnabled() override;
-  const Address::Instance& remoteAddress() override { return *remote_address_; }
-  const Address::Instance& localAddress() override { return *local_address_; }
+  bool readEnabled() const override;
+  const Address::Instance& remoteAddress() const override { return *remote_address_; }
+  const Address::Instance& localAddress() const override { return *local_address_; }
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
-  State state() override;
+  State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }

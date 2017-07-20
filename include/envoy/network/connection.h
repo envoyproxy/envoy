@@ -100,14 +100,14 @@ public:
   /**
    * @return uint64_t the unique local ID of this connection.
    */
-  virtual uint64_t id() PURE;
+  virtual uint64_t id() const PURE;
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
    *         ALPN). If network level negotation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
-  virtual std::string nextProtocol() PURE;
+  virtual std::string nextProtocol() const PURE;
 
   /**
    * Enable/Disable TCP NO_DELAY on the connection.
@@ -125,12 +125,12 @@ public:
   /**
    * @return bool whether reading is enabled on the connection.
    */
-  virtual bool readEnabled() PURE;
+  virtual bool readEnabled() const PURE;
 
   /**
    * @return The address of the remote client.
    */
-  virtual const Address::Instance& remoteAddress() PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -138,7 +138,7 @@ public:
    * it can be different from the proxy address if the downstream connection has been redirected or
    * the proxy is operating in transparent mode.
    */
-  virtual const Address::Instance& localAddress() PURE;
+  virtual const Address::Instance& localAddress() const PURE;
 
   /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that
@@ -155,7 +155,7 @@ public:
   /**
    * @return State the current state of the connection.
    */
-  virtual State state() PURE;
+  virtual State state() const PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
