@@ -269,6 +269,7 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
 }
+
 void TcpProxy::onUpstreamEvent(uint32_t event) {
   if (event & Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
