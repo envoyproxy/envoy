@@ -28,7 +28,6 @@ namespace Logger {
   FUNCTION(hc)                   \
   FUNCTION(http)                 \
   FUNCTION(http2)                \
-  FUNCTION(websocket)            \
   FUNCTION(main)                 \
   FUNCTION(mongo)                \
   FUNCTION(pool)                 \

@@ -140,6 +140,10 @@ void TcpProxy::readDisableUpstream(bool disable) {
 
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
+  if (!config_) {
+    return;
+  }
+
   if (disable) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
   } else {
@@ -175,6 +179,32 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   parent_.readDisableDownstream(false);
 }
 
+void TcpProxy::commonInitializeUpstreamConnection(Upstream::ClusterInfoConstSharedPtr cluster) {
+  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
+  upstream_connection_->addReadFilter(upstream_callbacks_);
+  upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
+  upstream_connection_->setBufferStats(
+      {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_});
+  upstream_connection_->connect();
+  upstream_connection_->noDelay(true);
+
+  connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+      [this]() -> void { onConnectTimeout(); });
+  connect_timeout_timer_->enableTimer(cluster->connectTimeout());
+
+  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_total_.inc();
+  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();
+  read_callbacks_->upstreamHost()->stats().cx_total_.inc();
+  read_callbacks_->upstreamHost()->stats().cx_active_.inc();
+  connect_timespan_ =
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
+  connected_timespan_ =
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_.allocateSpan();
+}
+
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
 
@@ -203,31 +233,8 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
-  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
 
-  upstream_connection_->addReadFilter(upstream_callbacks_);
-  upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
-  upstream_connection_->setBufferStats(
-      {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
-       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
-       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_,
-       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_});
-  upstream_connection_->connect();
-  upstream_connection_->noDelay(true);
-
-  connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-      [this]() -> void { onConnectTimeout(); });
-  connect_timeout_timer_->enableTimer(cluster->connectTimeout());
-
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_total_.inc();
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();
-  read_callbacks_->upstreamHost()->stats().cx_total_.inc();
-  read_callbacks_->upstreamHost()->stats().cx_active_.inc();
-  connect_timespan_ =
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
-  connected_timespan_ =
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_.allocateSpan();
-
+  commonInitializeUpstreamConnection(cluster);
   return Network::FilterStatus::Continue;
 }
 
@@ -262,7 +269,6 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
 }
-
 void TcpProxy::onUpstreamEvent(uint32_t event) {
   if (event & Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
