@@ -36,12 +36,12 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerCont
 
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
-  uint64_t h;
-  if (!context || !context->hashKey().valid()) {
-    h = random.random();
-  } else {
-    h = context->hashKey().value();
+  // hashKey() may be computed on demand, so get it only once.
+  Optional<uint64_t> hash;
+  if (context) {
+    hash = context->hashKey();
   }
+  const uint64_t h = hash.valid() ? hash.value() : random.random();
 
   // Ported from https://github.com/RJ/ketama/blob/master/libketama/ketama.c (ketama_get_server)
   // I've generally kept the variable names to make the code easier to compare.

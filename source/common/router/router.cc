@@ -214,14 +214,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // See if we need to set up for hashing.
-  if (route_entry_->hashPolicy()) {
-    Optional<uint64_t> hash = route_entry_->hashPolicy()->generateHash(headers);
-    if (hash.valid()) {
-      lb_context_.reset(new LoadBalancerContextImpl(hash));
-    }
-  }
-
   // Fetch a connection pool for the upstream cluster.
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
@@ -271,8 +263,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 }
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority(),
-                                            lb_context_.get());
+  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority(), this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
