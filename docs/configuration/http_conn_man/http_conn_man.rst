@@ -20,6 +20,7 @@ HTTP connection manager
       "add_user_agent": "...",
       "tracing": "{...}",
       "http_codec_options": "...",
+      "http1_settings": "{...}",
       "http2_settings": "{...}",
       "server_name": "...",
       "idle_timeout_s": "...",
@@ -105,6 +106,14 @@ http_codec_options (Warning: DEPRECATED and will be removed in 1.4.0)
   These are the same options available in the upstream cluster :ref:`http_codec_options
   <config_cluster_manager_cluster_http_codec_options>` option. See the comment there about
   disabling HTTP/2 header compression.
+
+.. _config_http_conn_man_http1_settings:
+
+http1_settings
+  *(optional, object)* Additional HTTP/1 settings that are passed to the HTTP/1 codec.
+
+  allow_absolute_url
+  *(optional, boolean)* Handle http requests with absolute urls in the requests. These requests are generally sent by clients to forward/explicit proxies. 
 
 .. _config_http_conn_man_http2_settings:
 
