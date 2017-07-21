@@ -46,11 +46,3 @@ export THIRDPARTY_BUILD=/thirdparty_build
 export CPPFLAGS="-DNDEBUG"
 echo "Building opt deps ${DEPS}"
 "$(dirname "$0")"/build_and_install_deps.sh ${DEPS}
-
-ln -sf /thirdparty_build /thirdparty_build_opt
-
-export THIRDPARTY_BUILD=/thirdparty_build_dbg
-export CPPFLAGS=""
-echo "Building dbg deps ${DEPS}"
-rm -f /tmp/*.dep
-"$(dirname "$0")"/build_and_install_deps.sh ${DEPS}
