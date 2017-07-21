@@ -492,12 +492,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
   }
 
-  // Check for WebSocket upgrade request if the route is valid.
+  // Check for WebSocket upgrade request if the route is valid, and supports WebSockets.
   if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+    // Websocket route entries cannot be redirects.
+    bool websocket_route = (route_entry != nullptr) && route_entry->isWebSocket();
     bool websocket_upgrade_request = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_upgrade_request) {
+    if (websocket_upgrade_request && websocket_route) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
       // A very kludgey way to get a handle over the stream
@@ -522,6 +524,17 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
         encodeHeaders(nullptr, headers, true);
       }
+      return;
+    } else if (websocket_upgrade_request || websocket_route) {
+      if (websocket_upgrade_request) {
+        // Do not allow WebSocket upgrades if the route does not support it.
+        connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      } else {
+        // Do not allow normal connections on WebSocket routes.
+        connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
+      }
+      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+      encodeHeaders(nullptr, headers, true);
       return;
     }
   }

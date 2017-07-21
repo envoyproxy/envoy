@@ -108,7 +108,9 @@ void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     // or even send a redirect. A simpler way to handle all of this would be
     // to expose the TCP connection associated with the response object, in encodeHeaders.
     // Once we see a 101 switching protocols, we could remove the connection from
-    // the connection pool
+    // the connection pool. The current approach is a stop gap solution, where
+    // we put the onus on the user to tell us if a route (and corresponding upstream)
+    // is supposed to allow websocket upgrades or not.
     Http::Http1::ClientConnectionImpl upstream_http(*upstream_connection_, http_conn_callbacks_);
     Http::Http1::RequestStreamEncoderImpl upstream_request =
         Http1::RequestStreamEncoderImpl(upstream_http);
