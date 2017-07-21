@@ -71,8 +71,8 @@ public:
   virtual ~StreamFilterCallbacks() {}
 
   /**
-   * DEPRECATED: Do not call this function. It will be removed in the 1.5.0 release cycle. Use the
-   * connection() callback instead.
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
    */
   virtual uint64_t connectionId() PURE;
 
@@ -82,7 +82,8 @@ public:
   virtual const Network::Connection* connection() PURE;
 
   /**
-   * @return Ssl::Connection* the ssl connection.
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
    */
   virtual Ssl::Connection* ssl() PURE;
 

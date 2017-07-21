@@ -14,8 +14,6 @@ The following features have been DEPRECATED and will be removed in the specified
   `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
   `stream_log_debug`, `stream_log_trace`.  For replacements, please see
   [logger.h](https://github.com/lyft/envoy/blob/master/source/common/common/logger.h).
-
-* Version 1.5.0
-  * The connectionId() callback in StreamFilterCallbacks has been deprecated and has been replaced
-  * with more general connection() callback, which, when not returning a nullptr, can be used to get
-  * the connection id from the returned Connection object pointer.
+  * The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
+    replaced with a more general connection() callback, which, when not returning a nullptr, can be
+    used to get the connection id and SSL connection from the returned Connection object pointer.

@@ -63,6 +63,7 @@ public:
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
@@ -95,6 +96,7 @@ public:
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
