@@ -33,12 +33,15 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
 TEST_F(SslContextImplTest, TestURIMatch) {
   EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/foo", "spiffe://lyft.com/foo"));
   EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.com/foo"));
+  EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.com/"));
   EXPECT_TRUE(ContextImpl::uriMatch("spiffe://lyft.com/foo/*", "spiffe://lyft.com/foo/bar"));
   EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/foo", "spiffe://lyft.com/foo/bar"));
   EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", ""));
   EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.net/foo"));
   EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com*", "spiffe://lyft.com/foo"));
   EXPECT_FALSE(ContextImpl::uriMatch("spiffe://lyft.com/*", "spiffe://lyft.comfoo"));
+  EXPECT_FALSE(ContextImpl::uriMatch("*", "foo"));
+  EXPECT_FALSE(ContextImpl::uriMatch("f", "foo"));
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
