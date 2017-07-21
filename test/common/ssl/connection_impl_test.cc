@@ -28,6 +28,7 @@
 
 namespace Envoy {
 using testing::Invoke;
+using testing::StrictMock;
 using testing::_;
 
 namespace Ssl {
@@ -510,17 +511,17 @@ public:
 
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
     MockBuffer* client_write_buffer = nullptr;
-    MockBufferFactory* factory = new MockBufferFactory;
+    MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_())
         .Times(4)
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          return new MockBuffer; // client read buffer.
+          return new StrictMock<MockBuffer>; // client read buffer.
         }))
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          client_write_buffer = new MockBuffer;
+          client_write_buffer = new StrictMock<MockBuffer>;
           return client_write_buffer;
         }))
         .WillRepeatedly(Invoke([]() -> Buffer::Instance* {
@@ -587,7 +588,7 @@ public:
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
-  Network::MockConnectionCallbacks client_callbacks_;
+  StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,

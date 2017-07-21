@@ -109,7 +109,7 @@ public:
     // This needs to be called before the dispatcher is created.
     ASSERT(dispatcher_.get() == nullptr);
 
-    MockBufferFactory* factory = new MockBufferFactory;
+    MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
@@ -119,7 +119,7 @@ public:
           return new MockBuffer; // client read buffer.
         }))
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          client_write_buffer_ = new MockBuffer;
+          client_write_buffer_ = new StrictMock<MockBuffer>;
           return client_write_buffer_;
         }))
         .WillRepeatedly(Invoke([]() -> Buffer::Instance* { return new Buffer::OwnedImpl; }));
@@ -133,9 +133,9 @@ protected:
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
-  MockConnectionCallbacks client_callbacks_;
+  StrictMock<MockConnectionCallbacks> client_callbacks_;
   Network::ConnectionPtr server_connection_;
-  Network::MockConnectionCallbacks server_callbacks_;
+  StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockBuffer* client_write_buffer_ = nullptr;
 };
@@ -269,6 +269,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
   int buffer_len = buffer->length();
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockBuffer::failWrite));
+  EXPECT_CALL(*client_write_buffer_, move(_));
   client_write_buffer_->move(*buffer);
 
   {
@@ -325,6 +326,7 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
 
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   disconnect();
 }
 
@@ -378,6 +380,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -452,6 +455,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_CALL(server_callbacks_, onEvent(_));
   disconnect();
 }
 
