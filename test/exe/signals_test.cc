@@ -74,7 +74,7 @@ TEST(Signals, IllegalInstructionDeathTest) {
 
 TEST(Signals, AbortDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Aborted");
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
 TEST(Signals, RestoredPreviousHandlerDeathTest) {
@@ -86,7 +86,7 @@ TEST(Signals, RestoredPreviousHandlerDeathTest) {
     // goes out of scope, NOT the default.
   }
   // Outer SignalAction should be active again:
-  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Aborted");
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 #endif
 
