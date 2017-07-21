@@ -513,9 +513,6 @@ public:
     MockBufferFactory* factory = new MockBufferFactory;
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
 
-    ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
-      return new Buffer::OwnedImpl;
-    }));
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_())
         .Times(4)
@@ -525,6 +522,9 @@ public:
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
           client_write_buffer = new MockBuffer;
           return client_write_buffer;
+        }))
+        .WillRepeatedly(Invoke([]() -> Buffer::Instance* {
+          return new Buffer::OwnedImpl; // server buffers.
         }));
 
     initialize(read_buffer_limit);

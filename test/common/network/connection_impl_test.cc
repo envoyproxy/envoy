@@ -113,10 +113,6 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
-    ON_CALL(*factory, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
-      return new Buffer::OwnedImpl;
-    }));
-    // Create a mock client write buffer for the first client connection created.
     EXPECT_CALL(*factory, create_())
         .Times(AnyNumber())
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
@@ -125,7 +121,8 @@ public:
         .WillOnce(Invoke([&]() -> Buffer::Instance* {
           client_write_buffer_ = new MockBuffer;
           return client_write_buffer_;
-        }));
+        }))
+        .WillRepeatedly(Invoke([]() -> Buffer::Instance* { return new Buffer::OwnedImpl; }));
   }
 
 protected:
