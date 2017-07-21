@@ -88,7 +88,8 @@ public:
 
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
-    ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_.get()));
+    ON_CALL(Const(filter_callbacks_.connection_), ssl())
+        .WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
     conn_manager_.reset(
