@@ -9,7 +9,6 @@ echo "building using ${NUM_CPUS} CPUs"
 
 function bazel_release_binary_build() {
   echo "Building..."
-  BUILD_TYPE=opt protobuf_3322_workaround
   cd "${ENVOY_CI_DIR}"
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -21,7 +20,6 @@ function bazel_release_binary_build() {
 
 function bazel_debug_binary_build() {
   echo "Building..."
-  BUILD_TYPE=dbg protobuf_3322_workaround
   cd "${ENVOY_CI_DIR}"
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -29,11 +27,6 @@ function bazel_debug_binary_build() {
   cp -f \
     "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy-debug
-}
-
-# See https://github.com/google/protobuf/issues/3322
-function protobuf_3322_workaround() {
-  ln -sf /thirdparty_build_"${BUILD_TYPE}" "${ENVOY_SRCDIR}"/ci/prebuilt/thirdparty_build
 }
 
 if [[ "$1" == "bazel.release" ]]; then
@@ -62,7 +55,6 @@ elif [[ "$1" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BUILD_TYPE=dbg protobuf_3322_workaround
   echo "bazel ASAN/UBSAN debug build with tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
@@ -71,7 +63,6 @@ elif [[ "$1" == "bazel.asan" ]]; then
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
-  BUILD_TYPE=dbg protobuf_3322_workaround
   echo "bazel TSAN debug build with tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
@@ -80,7 +71,6 @@ elif [[ "$1" == "bazel.tsan" ]]; then
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
   setup_clang_toolchain
-  BUILD_TYPE=dbg protobuf_3322_workaround
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   cd "${ENVOY_CI_DIR}"
@@ -96,10 +86,6 @@ elif [[ "$1" == "bazel.dev" ]]; then
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
-  # Technically test/run_envoy_bazel_coverage.sh is doing a -c dbg build, but it
-  # also sets -DNDEBUG, so for protobuf #3322 purposes, we need to setup for
-  # opt.
-  BUILD_TYPE=opt protobuf_3322_workaround
   echo "bazel coverage build with tests..."
   export GCOVR="/thirdparty/gcovr/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"

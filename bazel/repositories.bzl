@@ -19,20 +19,19 @@ def _repository_impl(ctxt):
     result = ctxt.execute(
         ["./repositories.sh"] + ctxt.attr.recipes,
         environment = environment,
-        # Ideally we would print progress, but instead this hangs on "INFO: Loading
-        # complete.  Analyzing.." today, see
-        # https://github.com/bazelbuild/bazel/issues/1289. We could set quiet=False
-        # as well to indicate progress, but that isn't supported in versions folks
-        # are using right now (0.4.5).
-        # TODO(htuch): Revisit this when everyone is on newer Bazel versions.
-        #
-        # quiet = False,
+        quiet = False,
     )
     print("External dep build exited with return code: %d" % result.return_code)
     print(result.stdout)
     print(result.stderr)
     if result.return_code != 0:
         fail("External dep build failed")
+
+def _protobuf_repository_impl(ctxt):
+    ctxt.symlink(Label(ctxt.attr.envoy_deps_path + "thirdparty/protobuf:protobuf.bzl"), "protobuf.bzl")
+    ctxt.symlink(Label(ctxt.attr.envoy_deps_path + "thirdparty/protobuf:BUILD"), "BUILD")
+    ctxt.symlink(ctxt.path(Label(ctxt.attr.envoy_deps_path + "thirdparty/protobuf:BUILD")).dirname.get_child("src"),
+                 "src")
 
 def py_jinja2_dep():
     BUILD = """
@@ -126,17 +125,6 @@ def envoy_api_deps(skip_targets):
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
-    if not skip_protobuf_bzl:
-        native.git_repository(
-            name = "protobuf_bzl",
-            # Using a non-canonical repository/branch here. This is a workaround to the lack of
-            # merge on https://github.com/google/protobuf/pull/2508, which is needed for supporting
-            # arbitrary CC compiler locations from the environment. The branch is
-            # https://github.com/htuch/protobuf/tree/v3.2.0-default-shell-env, which is the 3.2.0
-            # release with the above mentioned PR cherry picked.
-            commit = "d490587268931da78c942a6372ef57bb53db80da",
-            remote = REPO_LOCATIONS["protobuf"],
-        )
     native.bind(
         name = "cc_wkt_protos",
         actual = "@protobuf_bzl//:cc_wkt_protos",
@@ -172,6 +160,22 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
         name = "envoy_deps",
         recipes = recipes.to_list(),
     )
+
+    protobuf_repository = repository_rule(
+        implementation = _protobuf_repository_impl,
+        attrs = {
+            "envoy_deps_path": attr.string(),
+        },
+    )
+
+    # If the WORKSPACE hasn't already supplied @protobuf_bzl and told us to skip it, we need to map in the
+    # full repo into @protobuf_bzl so that we can depend on this in envoy_build_system.bzl and for things
+    # like @protobuf_bzl//:cc_wkt_protos in envoy-api. We do this by some evil symlink stuff.
+    if not skip_protobuf_bzl:
+        protobuf_repository(
+            name = "protobuf_bzl",
+            envoy_deps_path = path,
+        )
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
