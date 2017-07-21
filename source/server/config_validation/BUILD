@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:message_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

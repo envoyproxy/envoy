@@ -481,10 +481,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
     HostListsConstSharedPtr hosts_per_zone, HostListsConstSharedPtr healthy_hosts_per_zone,
     const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
-    ThreadLocal::Instance& tls, uint32_t thead_local_slot) {
+    ThreadLocal::Instance& tls, uint32_t thread_local_slot) {
 
   ThreadLocalClusterManagerImpl& config =
-      tls.getTyped<ThreadLocalClusterManagerImpl>(thead_local_slot);
+      tls.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot);
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   config.thread_local_clusters_[name]->host_set_.updateHosts(

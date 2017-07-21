@@ -6,7 +6,6 @@
 #include "common/http/headers.h"
 #include "common/ratelimit/ratelimit_impl.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -129,10 +128,9 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   Upstream::MockClusterManager cm;
-  Event::MockDispatcher dispatcher;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
-  EXPECT_THROW(GrpcFactoryImpl(*config, cm, dispatcher), EnvoyException);
+  EXPECT_THROW(GrpcFactoryImpl(*config, cm), EnvoyException);
 }
 
 TEST(RateLimitGrpcFactoryTest, Create) {
@@ -144,10 +142,9 @@ TEST(RateLimitGrpcFactoryTest, Create) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   Upstream::MockClusterManager cm;
-  Event::MockDispatcher dispatcher;
 
   EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
-  GrpcFactoryImpl factory(*config, cm, dispatcher);
+  GrpcFactoryImpl factory(*config, cm);
   factory.create(Optional<std::chrono::milliseconds>());
 }
 

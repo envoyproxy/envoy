@@ -26,7 +26,7 @@ public:
             std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
                                                   envoy::api::v2::DiscoveryResponse>>(
                 new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                          envoy::api::v2::DiscoveryResponse>(cm, dispatcher,
+                                          envoy::api::v2::DiscoveryResponse>(cm,
                                                                              remote_cluster_name)),
             dispatcher, service_method, stats) {}
 

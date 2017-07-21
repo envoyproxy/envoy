@@ -11,6 +11,7 @@
 #include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -60,6 +61,14 @@ public:
 
 private:
   void runPostCallbacks();
+#ifndef NDEBUG
+  // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
+  // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
+  // run().
+  bool isThreadSafe() const {
+    return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
+  }
+#endif
 
   Buffer::FactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
@@ -71,6 +80,7 @@ private:
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
   bool deferred_deleting_{};
+  Thread::ThreadId run_tid_{};
 };
 
 } // namespace Event
