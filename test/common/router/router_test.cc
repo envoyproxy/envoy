@@ -114,7 +114,7 @@ TEST_F(RouterTest, ClusterNotFound) {
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
   callbacks_.route_->route_entry_.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, &router_));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
@@ -169,7 +169,13 @@ TEST_F(RouterTest, HashPolicyNoHash) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
       .WillOnce(Return(Optional<uint64_t>()));
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, &router_))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(false, context->hashKey().valid());
+            return &cm_.conn_pool_;
+          }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 

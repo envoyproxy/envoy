@@ -158,7 +158,7 @@ private:
     LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
 
     // Upstream::LoadBalancerContext
-    const Optional<uint64_t>& hashKey() const override { return hash_key_; }
+    Optional<uint64_t> hashKey() const override { return hash_key_; }
 
     const Optional<uint64_t> hash_key_;
   };
