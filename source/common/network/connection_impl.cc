@@ -121,7 +121,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   }
 }
 
-Connection::State ConnectionImpl::state() {
+Connection::State ConnectionImpl::state() const {
   if (fd_ == -1) {
     return State::Closed;
   } else if (state_ & InternalState::CloseWithFlush) {
@@ -181,7 +181,7 @@ void ConnectionImpl::noDelay(bool enable) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-uint64_t ConnectionImpl::id() { return id_; }
+uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (!(state_ & InternalState::ReadEnabled)) {
@@ -245,7 +245,7 @@ void ConnectionImpl::raiseEvents(uint32_t events) {
   }
 }
 
-bool ConnectionImpl::readEnabled() { return state_ & InternalState::ReadEnabled; }
+bool ConnectionImpl::readEnabled() const { return state_ & InternalState::ReadEnabled; }
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 

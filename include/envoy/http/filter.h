@@ -71,9 +71,15 @@ public:
   virtual ~StreamFilterCallbacks() {}
 
   /**
-   * @return uint64_t the ID of the originating connection for logging purposes.
+   * DEPRECATED: Do not call this function. It will be removed in the 1.5.0 release cycle. Use the
+   * connection() callback instead.
    */
   virtual uint64_t connectionId() PURE;
+
+  /**
+   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   */
+  virtual const Network::Connection* connection() PURE;
 
   /**
    * @return Ssl::Connection* the ssl connection.

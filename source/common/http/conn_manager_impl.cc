@@ -388,6 +388,10 @@ uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
   return connection_manager_.read_callbacks_->connection().id();
 }
 
+const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
+  return &connection_manager_.read_callbacks_->connection();
+}
+
 Ssl::Connection* ConnectionManagerImpl::ActiveStream::ssl() {
   return connection_manager_.read_callbacks_->connection().ssl();
 }
@@ -932,6 +936,10 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 
 uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::connectionId() {
   return parent_.connectionId();
+}
+
+const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connection() {
+  return parent_.connection();
 }
 
 Ssl::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::ssl() { return parent_.ssl(); }
