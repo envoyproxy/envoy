@@ -311,6 +311,7 @@ private:
 
     // Http::StreamFilterCallbacks
     uint64_t connectionId() override;
+    const Network::Connection* connection() override;
     Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
@@ -416,6 +417,7 @@ private:
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
+    const Network::Connection* connection();
     Ssl::Connection* ssl();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
