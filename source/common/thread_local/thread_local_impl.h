@@ -20,27 +20,41 @@ public:
   InstanceImpl() : main_thread_id_(std::this_thread::get_id()) {}
   ~InstanceImpl();
 
-  // Server::ThreadLocal
-  uint32_t allocateSlot() override { return next_slot_id_++; }
-  ThreadLocalObjectSharedPtr get(uint32_t index) override;
+  // ThreadLocal::Instance
+  SlotPtr allocateSlot() override;
   void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override;
-  void runOnAllThreads(Event::PostCb cb) override;
-  void set(uint32_t index, InitializeCb cb) override;
+  void shutdownGlobalThreading() override;
   void shutdownThread() override;
 
 private:
+  struct SlotImpl : public Slot {
+    SlotImpl(InstanceImpl& parent, uint32_t index) : parent_(parent), index_(index) {}
+    ~SlotImpl() { parent_.removeSlot(*this); }
+
+    // ThreadLocal::Slot
+    ThreadLocalObjectSharedPtr get() override;
+    void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
+    void set(InitializeCb cb) override;
+
+    InstanceImpl& parent_;
+    const uint32_t index_;
+  };
+
   struct ThreadLocalData {
     std::vector<ThreadLocalObjectSharedPtr> data_;
   };
 
+  void removeSlot(SlotImpl& slot);
   void reset();
+  void runOnAllThreads(Event::PostCb cb);
   static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
 
-  static std::atomic<uint32_t> next_slot_id_;
   static thread_local ThreadLocalData thread_local_data_;
-  static std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
+  std::vector<SlotImpl*> slots_;
+  std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
+  bool shutdown_{};
 };
 
 } // namespace ThreadLocal

@@ -19,8 +19,6 @@
 
 #include "test/test_common/utility.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -191,7 +189,11 @@ public:
   }
   void start(const Network::Address::IpVersion version);
   void start();
-  Stats::Store& store() { return stats_store_; }
+  Stats::CounterSharedPtr counter(const std::string& name) {
+    // When using the thread local store, only counters() is thread safe. This also allows us
+    // to test if a counter exists at all versus just defaulting to zero.
+    return TestUtility::findCounter(*stat_store_, name);
+  }
 
   // TestHooks
   void onWorkerListenerAdded() override;
@@ -224,7 +226,7 @@ private:
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
-  Stats::TestIsolatedStoreImpl stats_store_;
+  Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
 };

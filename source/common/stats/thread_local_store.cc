@@ -63,9 +63,8 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
   main_thread_dispatcher_ = &main_thread_dispatcher;
-  tls_ = &tls;
-  tls_slot_ = tls_->allocateSlot();
-  tls_->set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_ = tls.allocateSlot();
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsCache>();
   });
 }
@@ -93,7 +92,7 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope]() -> void { tls_->getTyped<TlsCache>(tls_slot_).scope_cache_.erase(scope); });
+        [this, scope]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope); });
   }
 }
 
@@ -121,9 +120,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // is no cache entry.
   CounterSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_)
-                   .scope_cache_[this]
-                   .counters_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].counters_[final_name];
   }
 
   // If we have a valid cache entry, return it.
@@ -151,17 +148,21 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string& name,
                                                               uint64_t value) {
-  std::string final_name = prefix_ + name;
-  for (Sink& sink : parent_.timer_sinks_) {
-    sink.onHistogramComplete(final_name, value);
+  if (!parent_.shutting_down_) {
+    std::string final_name = prefix_ + name;
+    for (Sink& sink : parent_.timer_sinks_) {
+      sink.onHistogramComplete(final_name, value);
+    }
   }
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverTimingToSinks(const std::string& name,
                                                            std::chrono::milliseconds ms) {
-  std::string final_name = prefix_ + name;
-  for (Sink& sink : parent_.timer_sinks_) {
-    sink.onTimespanComplete(final_name, ms);
+  if (!parent_.shutting_down_) {
+    std::string final_name = prefix_ + name;
+    for (Sink& sink : parent_.timer_sinks_) {
+      sink.onTimespanComplete(final_name, ms);
+    }
   }
 }
 
@@ -171,8 +172,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   std::string final_name = prefix_ + name;
   GaugeSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref =
-        &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].gauges_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].gauges_[final_name];
   }
 
   if (tls_ref && *tls_ref) {
@@ -199,8 +199,7 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   std::string final_name = prefix_ + name;
   TimerSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref =
-        &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].timers_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].timers_[final_name];
   }
 
   if (tls_ref && *tls_ref) {

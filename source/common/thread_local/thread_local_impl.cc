@@ -12,15 +12,27 @@
 namespace Envoy {
 namespace ThreadLocal {
 
-std::atomic<uint32_t> InstanceImpl::next_slot_id_;
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
-std::list<std::reference_wrapper<Event::Dispatcher>> InstanceImpl::registered_threads_;
 
 InstanceImpl::~InstanceImpl() { reset(); }
 
-ThreadLocalObjectSharedPtr InstanceImpl::get(uint32_t index) {
-  ASSERT(thread_local_data_.data_.size() > index);
-  return thread_local_data_.data_[index];
+SlotPtr InstanceImpl::allocateSlot() {
+  ASSERT(std::this_thread::get_id() == main_thread_id_);
+
+  for (auto& slot : slots_) {
+    if (slot == nullptr) {
+      ASSERT(false); // fixfix
+    }
+  }
+
+  std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
+  slots_.push_back(slot.get());
+  return slot;
+}
+
+ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
+  ASSERT(thread_local_data_.data_.size() > index_);
+  return thread_local_data_.data_[index_];
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
@@ -34,6 +46,16 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
   }
 }
 
+void InstanceImpl::removeSlot(SlotImpl& slot) {
+  if (shutdown_) {
+    return;
+  }
+
+  const int32_t index = slot.index_;
+  slots_[index] = nullptr;
+  runOnAllThreads([index]() -> void { thread_local_data_.data_[index] = nullptr; });
+}
+
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   for (Event::Dispatcher& dispatcher : registered_threads_) {
@@ -44,14 +66,15 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   cb();
 }
 
-void InstanceImpl::set(uint32_t index, InitializeCb cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
-  for (Event::Dispatcher& dispatcher : registered_threads_) {
+void InstanceImpl::SlotImpl::set(InitializeCb cb) {
+  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
+  for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
+    const uint32_t index = index_;
     dispatcher.post([index, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); });
   }
 
   // Handle main thread.
-  setThreadLocal(index, cb(*main_thread_dispatcher_));
+  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
 }
 
 void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object) {
@@ -62,17 +85,16 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
   thread_local_data_.data_[index] = object;
 }
 
-void InstanceImpl::shutdownThread() {
-  for (auto& entry : thread_local_data_.data_) {
-    entry->shutdown();
-  }
+void InstanceImpl::shutdownGlobalThreading() {
+  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  shutdown_ = true;
 }
+
+void InstanceImpl::shutdownThread() { thread_local_data_.data_.clear(); }
 
 void InstanceImpl::reset() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  next_slot_id_ = 0;
   thread_local_data_.data_.clear();
-  registered_threads_.clear();
 }
 
 } // namespace ThreadLocal

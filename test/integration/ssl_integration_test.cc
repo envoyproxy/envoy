@@ -82,14 +82,14 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
 
 void SslIntegrationTest::checkStats() {
   if (version_ == Network::Address::IpVersion::v4) {
-    Stats::Counter& counter = test_server_->store().counter("listener.127.0.0.1_0.ssl.handshake");
-    EXPECT_EQ(1U, counter.value());
-    counter.reset();
+    Stats::CounterSharedPtr counter = test_server_->counter("listener.127.0.0.1_0.ssl.handshake");
+    EXPECT_EQ(1U, counter->value());
+    counter->reset();
   } else {
     // ':' is a reserved char in statsd.
-    Stats::Counter& counter = test_server_->store().counter("listener.[__1]_0.ssl.handshake");
-    EXPECT_EQ(1U, counter.value());
-    counter.reset();
+    Stats::CounterSharedPtr counter = test_server_->counter("listener.[__1]_0.ssl.handshake");
+    EXPECT_EQ(1U, counter->value());
+    counter->reset();
   }
 }
 
@@ -129,7 +129,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySA
 
 TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   testRouterHeaderOnlyRequestAndResponse(makeSslClientConnection(false, false),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
   checkStats();
 }
 

@@ -19,7 +19,6 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -86,7 +85,7 @@ class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               const LocalInfo::LocalInfo& local_info);
+               const LocalInfo::LocalInfo& local_info, ThreadLocal::Instance& tls);
 
   ~InstanceImpl() override;
 
@@ -139,7 +138,7 @@ private:
   Stats::StoreRoot& stats_store_;
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
-  ThreadLocal::InstanceImpl thread_local_;
+  ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
