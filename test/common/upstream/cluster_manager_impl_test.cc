@@ -326,6 +326,44 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
                             "key: #/name");
 }
 
+TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "original_dst",
+      "lb_type": "round_robin"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(
+      create(*loader), EnvoyException,
+      "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
+}
+
+TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "original_dst_lb"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(
+      create(*loader), EnvoyException,
+      "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string json = R"EOF(
   {
@@ -827,6 +865,39 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  factory_.tls_.shutdownThread();
+}
+
+TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "original_dst",
+      "lb_type": "original_dst_lb"
+    }]
+  }
+  )EOF"; // "
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  create(*loader);
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Test for no hosts returning the correct values before we have hosts.
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",
+                                                              ResourcePriority::Default, nullptr));
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
+  EXPECT_EQ(2UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   factory_.tls_.shutdownThread();
 }

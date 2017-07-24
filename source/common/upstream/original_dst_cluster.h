@@ -25,7 +25,6 @@ public:
   OriginalDstCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& dispatcher,
                      bool added_via_api);
-  ~OriginalDstCluster() {}
 
   // Upstream::Cluster
   void initialize() override {}
@@ -45,21 +44,66 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(HostSet& host_set, OriginalDstCluster& parent);
+    LoadBalancer(HostSet& host_set, ClusterSharedPtr& parent);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 
   private:
-    HostSet& host_set_;
-    OriginalDstCluster& parent_;
-    std::unordered_multimap<std::string, HostSharedPtr> host_map_;
+    /**
+     * Map from an host IP address/port to a HostSharedPtr.  Due to races multiple distinct host
+     * objects with the same address can be created, so we need to use a multimap.
+     */
+    class HostMap {
+    public:
+      bool insert(const HostSharedPtr& host, bool check = true) {
+        if (check) {
+          auto range = map_.equal_range(host->address()->asString());
+          auto it = std::find_if(
+              range.first, range.second,
+              [&host](const decltype(map_)::value_type pair) { return pair.second == host; });
+          if (it != range.second) {
+            return false; // 'host' already in the map, no need to insert.
+          }
+        }
+        map_.emplace(host->address()->asString(), host);
+        return true;
+      }
+
+      bool remove(const HostSharedPtr& host) {
+        auto range = map_.equal_range(host->address()->asString());
+        auto it =
+            std::find_if(range.first, range.second, [&host](const decltype(map_)::value_type pair) {
+              return pair.second == host;
+            });
+        if (it != range.second) {
+          map_.erase(it); // found 'host'
+          return true;
+        }
+        return false;
+      }
+
+      HostSharedPtr find(const Network::Address::Instance& address) {
+        auto it = map_.find(address.asString());
+
+        if (it != map_.end()) {
+          return it->second;
+        }
+        return nullptr;
+      }
+
+    private:
+      std::unordered_multimap<std::string, HostSharedPtr> map_;
+    };
+
+    HostSet& host_set_;     // Thread local host set.
+    ClusterWeakPtr parent_; // Primary cluster managed by the main thread.
+    ClusterInfoConstSharedPtr info_;
+    HostMap host_map_;
   };
 
 private:
-  HostSharedPtr createHost(Network::Address::InstanceConstSharedPtr);
-  void addHost(HostSharedPtr);
-
+  void addHost(HostSharedPtr&);
   void cleanup();
 
   Event::Dispatcher& dispatcher_;

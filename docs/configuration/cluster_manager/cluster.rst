@@ -37,8 +37,8 @@ name
 
 type
   *(required, string)* The :ref:`service discovery type <arch_overview_service_discovery_types>` to
-  use for resolving the cluster. Possible options are *static*, *strict_dns*, *logical_dns*, and
-  *sds*.
+  use for resolving the cluster. Possible options are *static*, *strict_dns*, *logical_dns*,
+  *original_dst*, and *sds*.
 
 connect_timeout_ms
   *(required, integer)* The timeout for new network connections to hosts in the cluster specified
@@ -53,12 +53,13 @@ per_connection_buffer_limit_bytes
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   when picking a host in the cluster. Possible options are *round_robin*, *least_request*,
-  *ring_hash*, and *random*.
+  *ring_hash*, *random*, and *original_dst_lb*.  Note that *original_dst_lb* must be used with
+  clusters of type *original_dst*, and may not be used with any other cluster type.
 
 hosts
   *(sometimes required, array)* If the service discovery type is *static*, *strict_dns*, or
-  *logical_dns* the hosts array is required. How it is specified depends on the type of service
-  discovery:
+  *logical_dns* the hosts array is required. Hosts array is not allowed with cluster type
+  *original_dst*. How it is specified depends on the type of service discovery:
 
   static
     Static clusters must use fully resolved hosts that require no DNS lookups. Both TCP and unix
@@ -145,6 +146,13 @@ http2_settings
   *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec when
   initiating HTTP connection pool connections. These are the same options supported in the HTTP connection
   manager :ref:`http2_settings <config_http_conn_man_http2_settings>` option.
+
+.. _config_cluster_manager_cluster_cleanup_interval_ms:
+
+cleanup_interval_ms
+  *(optional, integer)* The interval for removing stale hosts from the cluster. If this setting is
+  not specified, the value defaults to 5000. For cluster types other than *original_dst* this
+  setting is ignored.
 
 .. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 

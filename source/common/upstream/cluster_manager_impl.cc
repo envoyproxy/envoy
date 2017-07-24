@@ -539,8 +539,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
   case LoadBalancerType::OriginalDst: {
     lb_.reset(new OriginalDstCluster::LoadBalancer(
-        host_set_, dynamic_cast<OriginalDstCluster&>(
-                       *parent.parent_.primary_clusters_.at(cluster->name()).cluster_)));
+        host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
     break;
   }
   }

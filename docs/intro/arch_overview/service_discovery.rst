@@ -45,6 +45,17 @@ When interacting with large scale web services, this is the best of all possible
 asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
 forwarding path.
 
+Original destination
+^^^^^^^^^^^^^^^^^^^^
+
+Original destination cluster can be used when incoming connections are redirected to Envoy either
+via an iptables REDIRECT rule or with Proxy Protocol.  In these cases requests routed to an original
+destination cluster are forwarded to upstream hosts as addressed by the redirection metadata,
+without any explicit host configuration or upstream host discovery.  Connections to upstream hosts
+are pooled and unused hosts are flushed out when they have been idle longer than
+*cleanup_interval_ms*, which defaults to 5000ms.  If the original destination address is is not
+available, no upstream connection is opened.
+
 .. _arch_overview_service_discovery_sds:
 
 Service discovery service (SDS)
