@@ -17,13 +17,13 @@ public:
   virtual ~ContextManager() {}
 
   /**
-   * Builds an ClientContext from a Client ContextConfig.
+   * Builds a ClientContext from a ClientContextConfig.
    */
   virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
                                                   ClientContextConfig& config) PURE;
 
   /**
-   * Builds an ServerContext from a ServerContextConfig.
+   * Builds a ServerContext from a ServerContextConfig.
    */
   virtual ServerContextPtr createSslServerContext(Stats::Scope& scope,
                                                   ServerContextConfig& config) PURE;
