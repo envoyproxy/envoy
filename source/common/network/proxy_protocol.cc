@@ -110,7 +110,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   removeFromList(parent_.connections_);
 
-  listener.newConnection(fd, remote_address, local_address);
+  listener.newConnection(fd, remote_address, local_address, true);
 }
 
 void ProxyProtocol::ActiveConnection::close() {
