@@ -8,7 +8,7 @@ load(
 
 envoy_package()
 
-cc_library(
+basic_envoy_cc_library(
     name = "base_includes",
     hdrs = [
         "exception.h",

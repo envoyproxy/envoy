@@ -9,7 +9,7 @@ load(
 
 envoy_package()
 
-cc_library(
+basic_envoy_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
 )
