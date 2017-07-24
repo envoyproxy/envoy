@@ -74,7 +74,6 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath) {
   InSequence sequence;
 
-  //There's probably a better way to do this....
   //Make a new 'codec' with the right settings
   codec_settings_.allow_absolute_url_ = true;
   codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
@@ -90,6 +89,27 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath) {
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
+
+
+TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
+  InSequence sequence;
+
+  std::string output;
+  ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
+
+  //Make a new 'codec' with the right settings
+  codec_settings_.allow_absolute_url_ = true;
+  codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("GET www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
+}
+
 
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
   InSequence sequence;

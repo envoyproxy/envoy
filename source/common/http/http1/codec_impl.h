@@ -259,7 +259,7 @@ private:
     bool remote_complete_{};
   };
 
-  bool handlePath(HeaderMapImplPtr& headers, bool is_connect);
+  void handlePath(HeaderMapImplPtr& headers, bool is_connect);
 
   // ConnectionImpl
   void onEncodeComplete() override;
