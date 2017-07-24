@@ -15,6 +15,7 @@
 #include "google/protobuf/util/time_util.h"
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
+#include "google/protobuf/wrappers.pb.h"
 
 namespace Envoy {
 
