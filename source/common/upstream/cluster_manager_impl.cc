@@ -21,6 +21,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 
 #include "spdlog/spdlog.h"
@@ -534,6 +535,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   case LoadBalancerType::RingHash: {
     lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
                                        parent.parent_.random_));
+    break;
+  }
+  case LoadBalancerType::OriginalDst: {
+    lb_.reset(new OriginalDstCluster::LoadBalancer(
+        host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
     break;
   }
   }

@@ -1305,7 +1305,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "type" : {
         "type" : "string",
-        "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+        "enum" : ["static", "strict_dns", "logical_dns", "sds", "original_dst"]
       },
       "connect_timeout_ms" : {
         "type" : "integer",
@@ -1319,7 +1319,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "lb_type" : {
         "type" : "string",
-        "enum" : ["round_robin", "least_request", "random", "ring_hash"]
+        "enum" : ["round_robin", "least_request", "random", "ring_hash", "original_dst_lb"]
       },
       "hosts" : {
         "type" : "array",
