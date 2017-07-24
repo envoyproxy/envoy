@@ -403,7 +403,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   route_config_.response_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
 
   TestHeaderMapImpl response_headers{
-    {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
+      {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, route_config_);
