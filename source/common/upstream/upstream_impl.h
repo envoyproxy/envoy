@@ -83,7 +83,7 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, bool canary, uint32_t initial_weight,
            const std::string& zone)
-      : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
+      : HostDescriptionImpl(cluster, hostname, address, canary, zone), used_(true) {
     weight(initial_weight);
   }
 
@@ -100,6 +100,11 @@ public:
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
+  bool used(bool new_used) override {
+    bool ret = used_;
+    used_ = new_used;
+    return ret;
+  }
 
 protected:
   static Network::ClientConnectionPtr
@@ -109,6 +114,7 @@ protected:
 private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  std::atomic<bool> used_;
 };
 
 typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;

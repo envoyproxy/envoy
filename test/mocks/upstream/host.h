@@ -117,6 +117,7 @@ public:
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
+  MOCK_METHOD1(used, bool(bool new_used));
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   testing::NiceMock<MockClusterInfo> cluster_;

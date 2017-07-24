@@ -21,6 +21,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 
 #include "spdlog/spdlog.h"
@@ -377,7 +378,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
   });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
+                                                                 LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
@@ -386,7 +388,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
     throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 
-  HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(nullptr);
+  HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
     return logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
   } else {
@@ -534,6 +536,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   case LoadBalancerType::RingHash: {
     lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
                                        parent.parent_.random_));
+    break;
+  }
+  case LoadBalancerType::OriginalDst: {
+    lb_.reset(new OriginalDstCluster::LoadBalancer(
+        host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
     break;
   }
   }

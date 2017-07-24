@@ -90,8 +90,9 @@ public:
   MockClusterManager();
   ~MockClusterManager();
 
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override {
-    MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster);
+  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                               LoadBalancerContext* context) override {
+    MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_};
   }
 
@@ -104,7 +105,9 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority,
                                                LoadBalancerContext* context));
-  MOCK_METHOD1(tcpConnForCluster_, MockHost::MockCreateConnectionData(const std::string& cluster));
+  MOCK_METHOD2(tcpConnForCluster_,
+               MockHost::MockCreateConnectionData(const std::string& cluster,
+                                                  LoadBalancerContext* context));
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
   MOCK_METHOD1(removePrimaryCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
