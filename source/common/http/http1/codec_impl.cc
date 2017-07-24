@@ -392,7 +392,10 @@ void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect
     return;
   }
 
+  // If absolute_urls and/or connect are not going be handled, copy the url and return.
+  // This forces the behavior to be backwards compatible with the old codec behavior.
   if (!codec_settings_.allow_connect_ && !codec_settings_.allow_absolute_url_) {
+    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
 
@@ -404,7 +407,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect
   if (result != 0) {
     sendProtocolError();
     throw CodecProtocolException(
-        "http/1.1 protocol error: invalid url in request line (bad parse)");
+        "http/1.1 protocol error: invalid url in request line, parsed invalid");
   } else {
     if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
       // RFC7230#5.7
@@ -437,8 +440,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect
       return;
     }
     sendProtocolError();
-    throw CodecProtocolException(
-        "http/1.1 protocol error: invalid url in request line (fallthrough)");
+    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
 }
 

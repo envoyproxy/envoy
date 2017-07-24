@@ -260,6 +260,14 @@ private:
     bool remote_complete_{};
   };
 
+  /**
+   * Manipulate the request's request line, parsing the url an converting to a relative path if
+   * neccessary
+   *
+   * @param is_connect true if the request has the CONNECT method
+   * @param headers the request's headers
+   * @throws CodecProtocolException on an invalid url in the request line
+   */
   void handlePath(HeaderMapImplPtr& headers, bool is_connect);
 
   // ConnectionImpl
