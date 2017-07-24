@@ -58,8 +58,8 @@ def envoy_include_prefix(path):
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
 # all envoy targets pass through an envoy-declared skylark function where they can be modified
 # before being passed to a native bazel function.
-def basic_envoy_cc_library(name, **kargs):
-    native.cc_library(name = name, **kwargs)
+def envoy_basic_cc_library(name, **kargs):
+    native.cc_library(name = name, **kargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
