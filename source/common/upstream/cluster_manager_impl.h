@@ -209,11 +209,11 @@ private:
 
   struct PrimaryClusterData {
     PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterPtr&& cluster)
-        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
+        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(cluster.release()) {}
 
     const uint64_t config_hash_;
     const bool added_via_api_;
-    ClusterPtr cluster_;
+    ClusterSharedPtr cluster_;
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
