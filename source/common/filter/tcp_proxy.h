@@ -99,8 +99,10 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const { return 0; }
-  const Network::Connection* downstreamConnection() const { return &read_callbacks_->connection(); }
+  Optional<uint64_t> hashKey() const override { return {}; }
+  const Network::Connection* downstreamConnection() const override {
+    return &read_callbacks_->connection();
+  }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
