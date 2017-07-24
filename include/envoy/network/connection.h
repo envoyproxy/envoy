@@ -181,7 +181,7 @@ public:
   virtual uint32_t bufferLimit() const PURE;
 
   /**
-   * boolean telling if the connection's local address is an original destination address,
+   * @return boolean telling if the connection's local address is an original destination address,
    * rather than the listener's address.
    */
   virtual bool usingOriginalDst() const PURE;
