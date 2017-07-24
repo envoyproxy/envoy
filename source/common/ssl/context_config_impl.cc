@@ -27,22 +27,21 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
-ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
-  alpn_protocols_ = config.getString("alpn_protocols", "");
-  alt_alpn_protocols_ = config.getString("alt_alpn_protocols", "");
-  cipher_suites_ = config.getString("cipher_suites", DEFAULT_CIPHER_SUITES);
-  ecdh_curves_ = config.getString("ecdh_curves", DEFAULT_ECDH_CURVES);
-  ca_cert_file_ = config.getString("ca_cert_file", "");
-  if (config.hasObject("cert_chain_file")) {
-    cert_chain_file_ = config.getString("cert_chain_file");
-    private_key_file_ = config.getString("private_key_file");
-  }
-  if (config.hasObject("verify_subject_alt_name")) {
-    verify_subject_alt_name_list_ = config.getStringArray("verify_subject_alt_name");
-  }
-  verify_certificate_hash_ = config.getString("verify_certificate_hash", "");
-  server_name_indication_ = config.getString("sni", "");
-}
+ContextConfigImpl::ContextConfigImpl(const Json::Object& config)
+    : alpn_protocols_(config.getString("alpn_protocols", "")),
+      alt_alpn_protocols_(config.getString("alt_alpn_protocols", "")),
+      cipher_suites_(config.getString("cipher_suites", DEFAULT_CIPHER_SUITES)),
+      ecdh_curves_(config.getString("ecdh_curves", DEFAULT_ECDH_CURVES)),
+      ca_cert_file_(config.getString("ca_cert_file", "")),
+      cert_chain_file_(config.getString("cert_chain_file", "")),
+      private_key_file_(config.getString("private_key_file", "")),
+      verify_subject_alt_name_list_(config.hasObject("verify_subject_alt_name")
+                                        ? config.getStringArray("verify_subject_alt_name")
+                                        : std::vector<std::string>()),
+      verify_certificate_hash_(config.getString("verify_certificate_hash", "")) {}
+
+ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config)
+    : ContextConfigImpl(config), server_name_indication_(config.getString("sni", "")) {}
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
     : ContextConfigImpl(config),

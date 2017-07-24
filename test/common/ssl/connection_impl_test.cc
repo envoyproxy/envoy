@@ -56,7 +56,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
@@ -338,7 +338,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
@@ -446,7 +446,7 @@ public:
          .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
-    client_ctx_config_.reset(new ContextConfigImpl(*client_ctx_loader_));
+    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
     client_ctx_ = manager_->createSslClientContext(stats_store_, *client_ctx_config_);
 
     client_connection_ =
@@ -583,7 +583,7 @@ public:
   ServerContextPtr server_ctx_;
   Network::ListenerPtr listener_;
   Json::ObjectSharedPtr client_ctx_loader_;
-  std::unique_ptr<ContextConfigImpl> client_ctx_config_;
+  std::unique_ptr<ClientContextConfigImpl> client_ctx_config_;
   ClientContextPtr client_ctx_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;

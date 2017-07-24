@@ -18,7 +18,7 @@ void ContextManagerImpl::releaseContext(Context* context) {
 }
 
 ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
-                                                            ContextConfig& config) {
+                                                            ClientContextConfig& config) {
 
   ClientContextPtr context(new ClientContextImpl(*this, scope, config));
   std::unique_lock<std::mutex> lock(contexts_lock_);
