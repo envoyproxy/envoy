@@ -19,7 +19,7 @@ then
    docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
    # verify the Alpine build even when we're not pushing it
    make -C ci/build_alpine_container
-   
+
    docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
    docker push lyft/envoy:latest
    docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
@@ -30,6 +30,9 @@ then
    docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:$TRAVIS_COMMIT
    docker push lyft/envoy-alpine-debug:$TRAVIS_COMMIT
    docker push lyft/envoy-alpine-debug:latest
+
+   # This script tests the docker examples.
+   ./ci/verify_examples.sh
 else
    echo 'Ignoring PR branch for docker push.'
 fi
