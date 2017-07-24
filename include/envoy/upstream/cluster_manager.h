@@ -82,7 +82,8 @@ public:
    * Returns both a connection and the host that backs the connection. Both can be nullptr if there
    * is no host available in the cluster.
    */
-  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) PURE;
+  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                                       LoadBalancerContext* context) PURE;
 
   /**
    * Returns a client that can be used to make async HTTP calls against the given cluster. The
