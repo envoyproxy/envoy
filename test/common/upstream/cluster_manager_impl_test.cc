@@ -419,7 +419,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr,
             cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default, nullptr));
-  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
+  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
   factory_.tls_.shutdownThread();
 }
@@ -447,7 +447,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_)).WillOnce(Return(connection));
-  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1");
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
   factory_.tls_.shutdownThread();
 }
@@ -804,7 +804,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",
                                                               ResourcePriority::Default, nullptr));
-  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1", nullptr).connection_);
   EXPECT_EQ(2UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   // Set up for an initialize callback.
@@ -896,7 +896,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",
                                                               ResourcePriority::Default, nullptr));
-  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1", nullptr).connection_);
   EXPECT_EQ(2UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   factory_.tls_.shutdownThread();

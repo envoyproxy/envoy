@@ -141,7 +141,8 @@ public:
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
                                                          LoadBalancerContext* context) override;
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
+  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                               LoadBalancerContext* context) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removePrimaryCluster(const std::string& cluster) override;
   void shutdown() override {

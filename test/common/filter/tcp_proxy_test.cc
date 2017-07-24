@@ -379,12 +379,14 @@ public:
       conn_info.host_.reset(
           new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "",
                                  Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
-      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+          .WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))
           .WillOnce(SaveArg<0>(&upstream_read_filter_));
     } else {
       Upstream::MockHost::MockCreateConnectionData conn_info;
-      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+          .WillOnce(Return(conn_info));
     }
 
     filter_.reset(new TcpProxy(config_, cluster_manager_));
@@ -582,7 +584,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(local_address));
 
   // Expect filter to try to open a connection to specified cluster
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster"));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _));
 
   filter_->onNewConnection();
 

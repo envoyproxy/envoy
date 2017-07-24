@@ -86,7 +86,9 @@ typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
  * connection using the defined load balancing proxy for the configured cluster. All data will
  * be proxied back and forth between the two connections.
  */
-class TcpProxy : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class TcpProxy : public Network::ReadFilter,
+                 Upstream::LoadBalancerContext,
+                 Logger::Loggable<Logger::Id::filter> {
 public:
   TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~TcpProxy();
@@ -95,6 +97,10 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+
+  // Upstream::LoadBalancerContext
+  Optional<uint64_t> hashKey() const { return 0; }
+  const Network::Connection* downstreamConnection() const { return &read_callbacks_->connection(); }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.

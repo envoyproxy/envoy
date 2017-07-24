@@ -153,7 +153,7 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
 
   if (!connection_) {
     Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name());
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
     if (!info.connection_) {
       return;
     }

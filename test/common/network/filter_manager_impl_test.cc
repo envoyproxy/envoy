@@ -161,7 +161,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   conn_info.host_.reset(new Upstream::HostImpl(cm.thread_local_cluster_.cluster_.info_, "",
                                                Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1,
                                                ""));
-  EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+  EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);
 
