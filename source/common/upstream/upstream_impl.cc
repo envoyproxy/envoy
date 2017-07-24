@@ -71,7 +71,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
 
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
-    Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
+    Ssl::ClientContextConfigImpl context_config(*config.getObject("ssl_context"));
     ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
   }
 
