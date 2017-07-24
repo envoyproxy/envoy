@@ -21,6 +21,12 @@ public:
    * @return Optional<uint64_t> the optional hash key to use during load balancing.
    */
   virtual Optional<uint64_t> hashKey() const PURE;
+
+  /**
+   * @return const Network::Connection* the incoming connection or nullptr to use during load
+   * balancing.
+   */
+  virtual const Network::Connection* downstreamConnection() const PURE;
 };
 
 /**
