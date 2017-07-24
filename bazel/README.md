@@ -100,6 +100,18 @@ bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
 ```
 
+By default, tests are run with the [gperftools](https://github.com/gperftools/gperftools) heap
+checker enabled in "normal" mode to detect leaks. For other mode options, see the gperftools
+heap checker [documentation](https://gperftools.github.io/gperftools/heap_checker.html). To
+disable the heap checker or change the mode, set the HEAPCHECK environment variable:
+
+```
+# Disables the heap checker
+bazel test //test/... --test_env=HEAPCHECK=
+# Changes the heap checker to "minimal" mode
+bazel test //test/... --test_env=HEAPCHECK=minimal
+```
+
 Bazel will by default cache successful test results. To force it to rerun tests:
 
 ```
