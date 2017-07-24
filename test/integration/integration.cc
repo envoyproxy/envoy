@@ -922,18 +922,16 @@ void BaseIntegrationTest::testAbsolutePath() {
   Buffer::OwnedImpl buffer("GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
-                                  lookupPort("http_forward"), buffer,
-                                  [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-                                    response.append(TestUtility::bufferToString(data));
-                                    client.close(Network::ConnectionCloseType::NoFlush);
-                                  },
-                                  version_);
+      lookupPort("http_forward"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
 
   connection.run();
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
-
-
 
 void BaseIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");

@@ -244,7 +244,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks, Http1Settings settings);
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Http1Settings settings);
 
 private:
   /**

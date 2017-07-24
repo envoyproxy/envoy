@@ -377,22 +377,20 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
-
 // handlePath computes the correct :authority and :path headers based on 7230#5.7 and 7230#6
 // Throws CodecProtocolException on bad request
-void
-ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
+void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
   // TODO(mattwoodyard) - check configuration option if forward proxy is enabled
   // In practice there will only ever be one scheme delivered for forward proxy
   // support
   HeaderString path(Headers::get().Path);
 
   // The url is relative. Nothing to do here.
-  if (active_request_->request_url_.c_str()[0] == '/' || active_request_->request_url_.c_str()[0] == '*') {
+  if (active_request_->request_url_.c_str()[0] == '/' ||
+      active_request_->request_url_.c_str()[0] == '*') {
     headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
-
 
   if (!codec_settings_.allow_connect_ && !codec_settings_.allow_absolute_url_) {
     return;
@@ -400,11 +398,13 @@ ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
 
   struct http_parser_url u;
   http_parser_url_init(&u);
-  int result = http_parser_parse_url(active_request_->request_url_.buffer(), active_request_->request_url_.size(), is_connect, &u);
+  int result = http_parser_parse_url(active_request_->request_url_.buffer(),
+                                     active_request_->request_url_.size(), is_connect, &u);
 
   if (result != 0) {
     sendProtocolError();
-    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line (bad parse)");
+    throw CodecProtocolException(
+        "http/1.1 protocol error: invalid url in request line (bad parse)");
   } else {
     if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
       // RFC7230#5.7
@@ -416,7 +416,8 @@ ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
       // forward the received Host field-value.
 
       // Insert the host header, this will later be converted to :authority
-      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off, u.field_data[UF_HOST].len);
+      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
+                           u.field_data[UF_HOST].len);
       headers->insertHost().value(new_host);
 
       // RFC allows the absolute-uri to not end in /, but the absolute path form
@@ -424,7 +425,7 @@ ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
       if ((u.field_set & UF_HOST) == UF_PATH) {
         HeaderString new_path;
         new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
-                          active_request_->request_url_.size() - u.field_data[UF_PATH].off);
+                         active_request_->request_url_.size() - u.field_data[UF_PATH].off);
         headers->addViaMove(std::move(path), std::move(new_path));
       } else {
         HeaderString new_path;
@@ -436,7 +437,8 @@ ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
       return;
     }
     sendProtocolError();
-    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line (fallthrough)");
+    throw CodecProtocolException(
+        "http/1.1 protocol error: invalid url in request line (fallthrough)");
   }
 }
 
@@ -450,7 +452,8 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     // Currently, CONNECT is not supported. http_parser_parse_url needs to know about CONNECT
     handlePath(headers, strncmp(method_string, "CONNECT", 7) == 0);
 
-    // This can't be reordered without modifying the test code to be more independent of key insertion order
+    // This can't be reordered without modifying the test code to be more independent of key
+    // insertion order
     headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since higher layers are never going to do anything other

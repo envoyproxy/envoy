@@ -377,7 +377,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance&,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
+  return Http::ServerConnectionPtr{
+      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
 }
 
 bool AdminImpl::createFilterChain(Network::Connection& connection) {

@@ -28,13 +28,13 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public ::testing::Test {
 public:
-  Http1ServerConnectionImplTest() : codec_(new ServerConnectionImpl(connection_, callbacks_, codec_settings_)) {}
+  Http1ServerConnectionImplTest()
+      : codec_(new ServerConnectionImpl(connection_, callbacks_, codec_settings_)) {}
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
   NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
-
 };
 
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
@@ -74,14 +74,15 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath) {
   InSequence sequence;
 
-  //Make a new 'codec' with the right settings
+  // Make a new 'codec' with the right settings
   codec_settings_.allow_absolute_url_ = true;
   codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
 
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
@@ -90,14 +91,13 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath) {
   EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
 
-
 TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
   InSequence sequence;
 
   std::string output;
   ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
 
-  //Make a new 'codec' with the right settings
+  // Make a new 'codec' with the right settings
   codec_settings_.allow_absolute_url_ = true;
   codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
 
@@ -110,18 +110,18 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
-
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
   InSequence sequence;
 
-  //Make a new 'codec' with the right settings
+  // Make a new 'codec' with the right settings
   codec_settings_.allow_absolute_url_ = true;
   codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
 
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
@@ -129,7 +129,6 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
-
 
 TEST_F(Http1ServerConnectionImplTest, Http11Options) {
   InSequence sequence;
@@ -140,7 +139,8 @@ TEST_F(Http1ServerConnectionImplTest, Http11Options) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"}, {":path", "*"}, {":method", "OPTIONS"}};
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "*"}, {":method", "OPTIONS"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("OPTIONS * HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
@@ -148,7 +148,6 @@ TEST_F(Http1ServerConnectionImplTest, Http11Options) {
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
-
 
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   InSequence sequence;

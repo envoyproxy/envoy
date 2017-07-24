@@ -151,9 +151,12 @@ public:
  */
 
 struct Http1Settings {
-  // Enable codec to handle CONNECT requests. This will enable forward/explicit proxy support on TLS connections
-  bool allow_connect_{false} ;
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS traffic
+  // Enable codec to handle CONNECT requests. This will enable forward/explicit proxy support on TLS
+  // connections
+  // TODO(mattwoodyard) - Implement CONNECT support.
+  bool allow_connect_{false};
+  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // traffic
   bool allow_absolute_url_{false};
 };
 

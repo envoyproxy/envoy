@@ -173,7 +173,7 @@ Http1Settings Utility::parseHttp1Settings(const Json::Object& config) {
 }
 
 void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                              Code response_code, const std::string& body_text) {
+                             Code response_code, const std::string& body_text) {
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
