@@ -37,8 +37,11 @@ else
     cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy ./build_release
     # This script builds a lyft/envoy image and pushes that image on merge to master.
     ./ci/docker_push.sh
-    # This script runs on every PRs release run to test the docker examples.
-    ./ci/verify_examples.sh
+    if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
+    then
+      # This script runs on every commit to master's release run to test the docker examples.
+      ./ci/verify_examples.sh
+    fi  
   fi
 
 fi
