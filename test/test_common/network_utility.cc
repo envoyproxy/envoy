@@ -105,9 +105,7 @@ const std::string addressVersionAsString(const Address::IpVersion version) {
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     // Pick a random address in 127.0.0.0/8.
-    // TODO(jamessynge): Consider how to use $GTEST_RANDOM_SEED for seeding the rng.
-    // Perhaps we need a TestRuntime::getRandomGenerator() or similar.
-    Runtime::RandomGeneratorImpl rng;
+    TestRandomGenerator rng;
     sockaddr_in sin;
     sin.sin_family = AF_INET;
     sin.sin_port = 0;

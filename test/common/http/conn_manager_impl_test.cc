@@ -88,6 +88,8 @@ public:
 
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
+    ON_CALL(Const(filter_callbacks_.connection_), ssl())
+        .WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
     conn_manager_.reset(
@@ -533,7 +535,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->encodeHeaders(std::move(response_headers), true);
-  EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->ssl());
+  EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->connection()->ssl());
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -1041,7 +1043,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route_config_provider_.route_config_->route_,
                   decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[0]->callbacks_->ssl());
+        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[0]->callbacks_->connection()->ssl());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -1063,7 +1065,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route_config_provider_.route_config_->route_,
                   decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[1]->callbacks_->ssl());
+        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[1]->callbacks_->connection()->ssl());
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
@@ -1081,14 +1083,14 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::StopIteration));
-  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[0]->callbacks_->ssl());
+  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[0]->callbacks_->connection()->ssl());
   decoder_filters_[2]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[2]->callbacks_->encodeData(response_body, false);
   decoder_filters_[2]->callbacks_->encodeTrailers(
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
-  EXPECT_EQ(ssl_connection_.get(), decoder_filters_[2]->callbacks_->ssl());
+  EXPECT_EQ(ssl_connection_.get(), decoder_filters_[2]->callbacks_->connection()->ssl());
 
   // Now finish the encode.
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
@@ -1103,7 +1105,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   expectOnDestroy();
   encoder_filters_[0]->callbacks_->continueEncoding();
 
-  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->ssl());
+  EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl());
 }
 
 TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {

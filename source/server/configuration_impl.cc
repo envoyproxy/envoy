@@ -90,7 +90,7 @@ void MainImpl::initialize(const Json::Object& json, Instance& server,
     ASSERT(type == "grpc_service");
     UNREFERENCED_PARAMETER(type);
     ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
-        *rate_limit_service_config->getObject("config"), *cluster_manager_, server.dispatcher()));
+        *rate_limit_service_config->getObject("config"), *cluster_manager_));
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }

@@ -41,7 +41,7 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerCont
   if (context) {
     hash = context->hashKey();
   }
-  uint64_t h = hash.valid() ? hash.value() : random.random();
+  const uint64_t h = hash.valid() ? hash.value() : random.random();
 
   // Ported from https://github.com/RJ/ketama/blob/master/libketama/ketama.c (ketama_get_server)
   // I've generally kept the variable names to make the code easier to compare.

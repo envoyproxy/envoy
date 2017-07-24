@@ -24,6 +24,7 @@ public:
   // Network::Connection
   std::string nextProtocol() const override;
   Ssl::Connection* ssl() override { return this; }
+  const Ssl::Connection* ssl() const override { return this; }
 
   // Ssl::Connection
   bool peerCertificatePresented() override;

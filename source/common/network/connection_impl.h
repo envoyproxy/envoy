@@ -68,6 +68,7 @@ public:
   const Address::Instance& localAddress() const override { return *local_address_; }
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
+  const Ssl::Connection* ssl() const override { return nullptr; }
   State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;

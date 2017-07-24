@@ -20,9 +20,8 @@ template <class RequestType, class ResponseType> class AsyncRequestImpl;
 template <class RequestType, class ResponseType>
 class AsyncClientImpl final : public AsyncClient<RequestType, ResponseType> {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  const std::string& remote_cluster_name)
-      : cm_(cm), dispatcher_(dispatcher), remote_cluster_name_(remote_cluster_name) {}
+  AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name)
+      : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
 
   ~AsyncClientImpl() override {
     while (!active_streams_.empty()) {
@@ -65,7 +64,6 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
-  Event::Dispatcher& dispatcher_;
   const std::string remote_cluster_name_;
   std::list<std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>>> active_streams_;
 
@@ -86,8 +84,9 @@ public:
   }
 
   virtual void initialize() {
-    stream_ = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_)
-                  .start(*this, Optional<std::chrono::milliseconds>(timeout_));
+    auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
+    dispatcher_ = &http_async_client.dispatcher();
+    stream_ = http_async_client.start(*this, Optional<std::chrono::milliseconds>(timeout_));
 
     if (stream_ == nullptr) {
       callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable);
@@ -216,7 +215,7 @@ private:
     // This will destroy us, but only do so if we are actually in a list. This does not happen in
     // the immediate failure case.
     if (LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::inserted()) {
-      parent_.dispatcher_.deferredDelete(
+      dispatcher_->deferredDelete(
           LinkedObject<AsyncStreamImpl<RequestType, ResponseType>>::removeFromList(
               parent_.active_streams_));
     }
@@ -238,6 +237,7 @@ private:
 
   bool complete() const { return local_closed_ && remote_closed_; }
 
+  Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
   AsyncClientImpl<RequestType, ResponseType>& parent_;
   const Protobuf::MethodDescriptor& service_method_;

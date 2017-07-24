@@ -281,6 +281,7 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
   ASSERT(!new_connections_.empty());
   FakeHttpConnectionPtr connection(
       new FakeHttpConnection(std::move(new_connections_.front()), stats_store_, http_type_));
+  connection->initialize();
   new_connections_.pop_front();
   connection->readDisable(false);
   return connection;
@@ -295,6 +296,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
 
   ASSERT(!new_connections_.empty());
   FakeRawConnectionPtr connection(new FakeRawConnection(std::move(new_connections_.front())));
+  connection->initialize();
   new_connections_.pop_front();
   connection->readDisable(false);
   return connection;

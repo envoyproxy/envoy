@@ -153,6 +153,11 @@ public:
   virtual Ssl::Connection* ssl() PURE;
 
   /**
+   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   */
+  virtual const Ssl::Connection* ssl() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;

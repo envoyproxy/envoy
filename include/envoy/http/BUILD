@@ -26,6 +26,7 @@ envoy_cc_library(
     deps = [
         ":message_interface",
         "//include/envoy/common:optional",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
 

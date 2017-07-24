@@ -5,6 +5,8 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -19,6 +21,7 @@ public:
   AsyncClient::Request* send(MessagePtr&&, Callbacks&,
                              const Optional<std::chrono::milliseconds>&) override;
   AsyncClient::Stream* start(StreamCallbacks&, const Optional<std::chrono::milliseconds>&) override;
+  Event::Dispatcher& dispatcher() override { NOT_IMPLEMENTED; }
 };
 
 } // namespace Http
