@@ -40,4 +40,4 @@ build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Test options
-test --test_env=HEAPCHECK --test_env=PPROF_PATH
+test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
