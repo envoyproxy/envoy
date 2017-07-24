@@ -20,6 +20,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "host_rewrite": "...",
     "auto_host_rewrite": "...",
     "case_sensitive": "...",
+    "allow_websocket_upgrade": "...",
     "timeout_ms": "...",
     "runtime": "{...}",
     "retry_policy": "{...}",
@@ -116,6 +117,24 @@ auto_host_rewrite
 case_sensitive
   *(optional, boolean)* Indicates that prefix/path matching should be case sensitive. The default
   is true.
+
+.. _config_http_conn_man_route_table_route_allow_websocket_upgrade:
+
+allow_websocket_upgrade
+  *(optional, boolean)* Indicates that a HTTP/1.1 client connection to this particular route
+  should be allowed to upgrade to a WebSocket connection. The default is false.
+
+  .. attention::
+
+    If set to true, Envoy will expect the first request matching this route to contain WebSocket
+    upgrade headers. If the headers are not present, the connection will be rejected. If set to
+    true, Envoy will setup plain TCP proxying between the client and the upstream server. Hence,
+    an upstream server that rejects the WebSocket upgrade request is also responsible for closing
+    the associated connection. Until then, Envoy will continue to proxy data from the client to
+    the upstream server.
+
+    Redirects, timeouts and retries are not supported on routes where websocket upgrades are
+    allowed.
 
 .. _config_http_conn_man_route_table_route_timeout:
 
