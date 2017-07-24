@@ -261,7 +261,7 @@ private:
   };
 
   /**
-   * Manipulate the request's request line, parsing the url an converting to a relative path if
+   * Manipulate the request's request line, parsing the url and converting to a relative path if
    * neccessary
    *
    * @param is_connect true if the request has the CONNECT method
