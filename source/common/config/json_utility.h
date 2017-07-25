@@ -4,6 +4,8 @@
 
 // NOLINT(namespace-envoy)
 
+// Set an integer compatible field in a protobuf message with the corresponding field's integer
+// value from a JSON object if the field if set in the JSON object.
 #define JSON_UTIL_SET_INTEGER(json, message, field_name)                                           \
   do {                                                                                             \
     if ((json).hasObject(#field_name)) {                                                           \
