@@ -28,6 +28,7 @@ using testing::_;
 using Envoy::Protobuf::MethodDescriptor;
 
 using Envoy::Protobuf::FileDescriptorSet;
+using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
@@ -75,6 +76,17 @@ public:
       }
     }
   }
+
+  void stripImports(FileDescriptorSet& descriptor_set, std::string file_name) {
+    FileDescriptorProto file_descriptor;
+    for (auto& file : *descriptor_set.mutable_file()) {
+      if (file.name() == file_name) {
+        file_descriptor = file;
+      }
+    }
+    descriptor_set.clear_file();
+    descriptor_set.add_file()->Swap(&file_descriptor);
+  }
 };
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
@@ -93,9 +105,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
 
 TEST_F(GrpcJsonTranscoderConfigTest, IncompleteProto) {
   EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(
-          *configJson(TestEnvironment::runfilesPath("test/proto/bookstore_bad.descriptor"),
-                      "grpc.service.UnknownService")),
+      JsonTranscoderConfig config(*configJson(
+          makeProtoDescriptor([&](FileDescriptorSet& pb) { stripImports(pb, "test/proto/bookstore.proto"); }),
+          "bookstore.Bookstore")),
       EnvoyException, "transcoding_filter: Unable to build proto descriptor pool");
 }
 
