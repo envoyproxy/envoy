@@ -79,10 +79,13 @@ public:
 
   void stripImports(FileDescriptorSet& descriptor_set, std::string file_name) {
     FileDescriptorProto file_descriptor;
-    for (auto& file : *descriptor_set.mutable_file()) {
-      if (file.name() == file_name) {
-        file_descriptor = file;
-      }
+    // filter down descriptor_set to only contain one proto specified as file_name but none of its dependencies
+    auto file_itr = std::find_if(descriptor_set.file().begin(), descriptor_set.file().end(),
+                 [&file_name](const FileDescriptorProto& file) {
+                   return file.name() == file_name;
+                 });
+    if (file_itr != descriptor_set.file().end()) {
+      file_descriptor = *file_itr;
     }
     descriptor_set.clear_file();
     descriptor_set.add_file()->Swap(&file_descriptor);
