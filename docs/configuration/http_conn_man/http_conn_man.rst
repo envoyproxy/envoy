@@ -113,7 +113,9 @@ http1_settings
   *(optional, object)* Additional HTTP/1 settings that are passed to the HTTP/1 codec.
 
   allow_absolute_url
-  *(optional, boolean)* Handle http requests with absolute urls in the requests. These requests are generally sent by clients to forward/explicit proxies. 
+  *(optional, boolean)* Handle http requests with absolute urls in the requests. These requests are generally
+  sent by clients to forward/explicit proxies. This allows clients to configure envoy as their http proxy.
+  In Unix, for example, this is typically done by setting the http_proxy environment variable.
 
 .. _config_http_conn_man_http2_settings:
 

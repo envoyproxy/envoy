@@ -168,7 +168,6 @@ Http1Settings Utility::parseHttp1Settings(const Json::Object& config) {
 
   Json::ObjectSharedPtr http1_settings = config.getObject("http1_settings", true);
   ret.allow_absolute_url_ = http1_settings->getBoolean("allow_absolute_url", false);
-  ret.allow_connect_ = http1_settings->getBoolean("allow_connect", false);
   return ret;
 }
 

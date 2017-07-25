@@ -377,25 +377,30 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
-// handlePath computes the correct :authority and :path headers based on 7230#5.7 and 7230#6
+// handlePath computes the correct
 // Throws CodecProtocolException on bad request
-void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect) {
+void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
   // TODO(mattwoodyard) - check configuration option if forward proxy is enabled
-  // In practice there will only ever be one scheme delivered for forward proxy
-  // support
   HeaderString path(Headers::get().Path);
 
-  // The url is relative. Nothing to do here.
+  bool is_connect = (method == HTTP_CONNECT);
+
+  // The url is relative or OPTIONS. Nothing to do here.
   if (active_request_->request_url_.c_str()[0] == '/' ||
-      active_request_->request_url_.c_str()[0] == '*') {
-    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
+      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
 
   // If absolute_urls and/or connect are not going be handled, copy the url and return.
   // This forces the behavior to be backwards compatible with the old codec behavior.
-  if (!codec_settings_.allow_connect_ && !codec_settings_.allow_absolute_url_) {
-    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
+  if (!codec_settings_.allow_absolute_url_) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  if (method == HTTP_CONNECT) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
 
@@ -421,19 +426,20 @@ void ServerConnectionImpl::handlePath(HeaderMapImplPtr& headers, bool is_connect
       // Insert the host header, this will later be converted to :authority
       std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
                            u.field_data[UF_HOST].len);
-      headers->insertHost().value(new_host);
+
+      headers.insertHost().value(new_host);
 
       // RFC allows the absolute-uri to not end in /, but the absolute path form
       // must start with /
-      if ((u.field_set & UF_HOST) == UF_PATH) {
+      if ((u.field_set & UF_PATH) == UF_PATH && u.field_data[UF_PATH].len > 0) {
         HeaderString new_path;
         new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
                          active_request_->request_url_.size() - u.field_data[UF_PATH].off);
-        headers->addViaMove(std::move(path), std::move(new_path));
+        headers.addViaMove(std::move(path), std::move(new_path));
       } else {
         HeaderString new_path;
         new_path.setCopy("/", 1);
-        headers->addViaMove(std::move(path), std::move(new_path));
+        headers.addViaMove(std::move(path), std::move(new_path));
       }
 
       active_request_->request_url_.clear();
@@ -451,11 +457,10 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   if (active_request_) {
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
 
-    // Currently, CONNECT is not supported. http_parser_parse_url needs to know about CONNECT
-    handlePath(headers, strncmp(method_string, "CONNECT", 7) == 0);
+    // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
+    // CONNECT
+    handlePath(*headers, parser_.method);
 
-    // This can't be reordered without modifying the test code to be more independent of key
-    // insertion order
     headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since higher layers are never going to do anything other

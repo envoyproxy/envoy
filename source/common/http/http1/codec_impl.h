@@ -262,13 +262,13 @@ private:
 
   /**
    * Manipulate the request's request line, parsing the url and converting to a relative path if
-   * neccessary
+   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
    *
    * @param is_connect true if the request has the CONNECT method
    * @param headers the request's headers
    * @throws CodecProtocolException on an invalid url in the request line
    */
-  void handlePath(HeaderMapImplPtr& headers, bool is_connect);
+  void handlePath(HeaderMapImpl& headers, unsigned int method);
 
   // ConnectionImpl
   void onEncodeComplete() override;

@@ -933,6 +933,44 @@ void BaseIntegrationTest::testAbsolutePath() {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
+void BaseIntegrationTest::testAllowAbsoluteSameRelative() {
+  // Ensure that relative urls behave the same with allow_absolute_url enabled and without
+  testEquivalent("GET /foo/bar HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testConnect() {
+  // Ensure that connect behaves the same with allow_absolute_url enabled and without
+  testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testEquivalent(std::string request) {
+  Buffer::OwnedImpl buffer1(request);
+  std::string response1;
+  RawConnectionDriver connection1(
+      lookupPort("http"), buffer1,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response1.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection1.run();
+
+  Buffer::OwnedImpl buffer2(request);
+  std::string response2;
+  RawConnectionDriver connection2(
+      lookupPort("http_forward"), buffer2,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response2.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection2.run();
+
+  EXPECT_TRUE(response1 == response2);
+}
+
 void BaseIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
