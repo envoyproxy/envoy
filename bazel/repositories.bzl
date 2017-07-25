@@ -108,16 +108,14 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "422332bf5fb251904dd53ed8cbb5f28e892ed69d",
+        commit = "0b35f3efc31621953bc2eb7458d01d8eab984394",
     )
-    native.bind(
-        name = "envoy_base",
-        actual = "@envoy_api//api:base_cc",
-    )
-    native.bind(
-        name = "envoy_eds",
-        actual = "@envoy_api//api:eds_cc",
-    )
+    bind_targets = ["base", "cds", "eds", "health_check", "protocol", "tls_context"]
+    for t in bind_targets:
+        native.bind(
+            name = "envoy_" + t,
+            actual = "@envoy_api//api:" + t + "_cc",
+        )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
