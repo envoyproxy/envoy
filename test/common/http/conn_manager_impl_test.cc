@@ -1006,11 +1006,13 @@ TEST_F(HttpConnectionManagerImplTest, WatermarkCallbacks) {
   EXPECT_CALL(stream, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
 
   EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream));
   EXPECT_CALL(stream, readDisable(false));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
