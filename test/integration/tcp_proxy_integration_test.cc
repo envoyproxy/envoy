@@ -9,7 +9,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
