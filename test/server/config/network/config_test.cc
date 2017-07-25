@@ -162,7 +162,8 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   {
     "stat_prefix": "my_stat_prefix",
     "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]]
+    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
+    "timeout_ms": 1337
   }
   )EOF";
 
