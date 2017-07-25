@@ -11,12 +11,16 @@ envoy_package()
 
 exports_files(["bookstore.proto"])
 
-# The binary proto descriptors are generated and stored prior to runtime. The command to generate
-# proto descriptors from the command line can be found here: https://lyft.github.io/envoy/docs/conf
-# iguration/http_filters/grpc_json_transcoder_filter.html#config-http-filters-grpc-json-transcoder.
-# Alternatively, the proto descriptors can be generated with bazel rule envoy_proto_descriptor. The
-# generated proto descriptors can then be copied from bazel-genfiles/test/proto/... to
-# test/proto/...
+# The binary proto descriptors bookstore_descriptor and bookstore_bad.descriptor are generated and
+# stored prior to runtime. Should bookstore.proto change, the proto descriptors will need to be
+# updated. The proto descriptors can be generated with bazel rule envoy_proto_descriptor. The
+# generated proto descriptors can then be copied from bazel-genfiles/test/proto/ to test/proto/. For
+# reference see: https://lyft.github.io/envoy/docs/configuration/http_filters/grpc_json_transcoder_
+# filter.html#config-http-filters-grpc-json-transcoder.
+#
+# For example, to update bookstore.descriptor execute the following commands:
+#   1. bazel build //test/proto:bookstore_proto_descriptor
+#   2. cp bazel-genfiles/test/proto/bookstore.descriptor test/proto/
 filegroup(
     name = "bookstore_descriptors",
     srcs = [
