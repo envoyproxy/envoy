@@ -185,7 +185,7 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
   initiateClientConnection();
   fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
   fake_ratelimit_connection_->close();
-  fake_ratelimit_connection_->waitForDisconnect();
+  fake_ratelimit_connection_->waitForDisconnect(true);
   fake_ratelimit_connection_ = nullptr;
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
