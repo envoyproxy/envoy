@@ -69,7 +69,7 @@ envoy_cc_test(
     ],
     data = [
         "//test/config/integration:server_grpc_json_transcoder.json",
-        "//test/proto:bookstore_proto_descriptor",
+        "//test/proto:bookstore_descriptors",
     ],
     deps = [
         ":integration_lib",
