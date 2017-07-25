@@ -511,10 +511,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // a handle over the stream decoder filter callback instead of ** ?
       std::list<ActiveStreamDecoderFilterPtr>::iterator entry = decoder_filters_.begin();
       if (entry != decoder_filters_.end()) {
-        connection_manager_.ws_connection_ = std::unique_ptr<WebSocket::WsHandlerImpl>(
-            new WebSocket::WsHandlerImpl(route_entry->clusterName(), *request_headers_, route_entry,
-                                         **entry, connection_manager_.cluster_manager_));
-        connection_manager_.ws_connection_->initializeReadFilterCallbacks(
+        connection_manager_.ws_connection_ =
+            std::unique_ptr<WebSocket::WsHandlerImpl>(new WebSocket::WsHandlerImpl(
+                *request_headers_, route_entry, **entry, connection_manager_.cluster_manager_));
+        connection_manager_.ws_connection_->initializeUpstreamConnection(
             *connection_manager_.read_callbacks_);
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
         connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
@@ -527,14 +527,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       }
       return;
     } else if (websocket_upgrade_requested || websocket_upgrade_allowed) {
+      HeaderMapImpl headers;
       if (websocket_upgrade_requested) {
         // Do not allow WebSocket upgrades if the route does not support it.
         connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+        headers.addStatic(Headers::get().Status, std::to_string(enumToInt(Code::Forbidden)));
       } else {
         // Do not allow normal connections on WebSocket routes.
         connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
+        headers.addStatic(Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired)));
       }
-      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
       encodeHeaders(nullptr, headers, true);
       return;
     }

@@ -22,23 +22,24 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
-WsHandlerImpl::WsHandlerImpl(const std::string& cluster_name, Http::HeaderMap& request_headers,
+WsHandlerImpl::WsHandlerImpl(Http::HeaderMap& request_headers,
                              const Router::RouteEntry* route_entry,
                              StreamDecoderFilterCallbacks& stream,
                              Upstream::ClusterManager& cluster_manager)
-    : Filter::TcpProxy(nullptr, cluster_manager), cluster_name_(cluster_name),
-      request_headers_(request_headers), route_entry_(route_entry), stream_(stream) {}
+    : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
+      route_entry_(route_entry), stream_(stream) {}
 
 WsHandlerImpl::~WsHandlerImpl() {}
 
-void WsHandlerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name_);
+  const std::string& cluster_name = route_entry_->clusterName();
+  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
   if (thread_local_cluster) {
     ENVOY_CONN_LOG(debug, "creating connection to upstream cluster {}",
-                   read_callbacks_->connection(), cluster_name_);
+                   read_callbacks_->connection(), cluster_name);
   } else {
     Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
     headers->addStatic(Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound)));
@@ -57,8 +58,7 @@ void WsHandlerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& 
     return;
   }
 
-  Upstream::Host::CreateConnectionData conn_info =
-      cluster_manager_.tcpConnForCluster(cluster_name_);
+  Upstream::Host::CreateConnectionData conn_info = cluster_manager_.tcpConnForCluster(cluster_name);
 
   // path and host rewrites
   route_entry_->finalizeRequestHeaders(request_headers_);
@@ -90,10 +90,27 @@ void WsHandlerImpl::onConnectTimeout() {
 }
 
 void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
-  Filter::TcpProxy::onUpstreamEvent(event);
+  if (event & Network::ConnectionEvent::RemoteClose) {
+    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
+  }
 
-  if (!(event & Network::ConnectionEvent::RemoteClose) &&
-      (event & Network::ConnectionEvent::Connected)) {
+  if (event & Network::ConnectionEvent::LocalClose) {
+    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
+  }
+
+  if (event & Network::ConnectionEvent::RemoteClose) {
+    if (connect_timeout_timer_) {
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
+      read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
+      Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
+      headers->addStatic(Headers::get().Status, std::to_string(enumToInt(Http::Code::BadGateway)));
+      stream_.encodeHeaders(std::move(headers), true);
+    }
+
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (event & Network::ConnectionEvent::Connected) {
+    connect_timespan_->complete();
+
     // Wrap upstream connection in HTTP Connection, so that we can
     // re-use the HTTP1 codec to send upgrade headers to upstream
     // host.
@@ -115,6 +132,11 @@ void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     Http::Http1::RequestStreamEncoderImpl upstream_request =
         Http1::RequestStreamEncoderImpl(upstream_http);
     upstream_request.encodeHeaders(request_headers_, false);
+  }
+
+  if (connect_timeout_timer_) {
+    connect_timeout_timer_->disableTimer();
+    connect_timeout_timer_.reset();
   }
 }
 

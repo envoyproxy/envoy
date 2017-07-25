@@ -94,7 +94,7 @@ public:
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
-                                                  local_info_, cm_));
+                                                  local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -193,7 +193,7 @@ public:
   RouteConfigProvider route_config_provider_;
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_;
-  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;
@@ -522,7 +522,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("400", headers.Status()->value().c_str());
+        EXPECT_STREQ("403", headers.Status()->value().c_str());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -548,7 +548,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectNonWebSocketOnWebSocketRoute) {
 
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ("400", headers.Status()->value().c_str());
+        EXPECT_STREQ("426", headers.Status()->value().c_str());
       }));
 
   Buffer::OwnedImpl fake_input("1234");

@@ -26,14 +26,11 @@ namespace WebSocket {
  */
 class WsHandlerImpl : public Filter::TcpProxy {
 public:
-  WsHandlerImpl(const std::string& cluster_name, Http::HeaderMap& request_headers,
-                const Router::RouteEntry* route_entry, StreamDecoderFilterCallbacks& stream,
-                Upstream::ClusterManager& cluster_manager);
+  WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry* route_entry,
+                StreamDecoderFilterCallbacks& stream, Upstream::ClusterManager& cluster_manager);
   ~WsHandlerImpl();
 
-  // Filter::TcpProxy
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks);
 
 protected:
   // Filter::TcpProxy
@@ -46,7 +43,6 @@ private:
     void onGoAway() override{};
   };
 
-  const std::string& cluster_name_;
   Http::HeaderMap& request_headers_;
   const Router::RouteEntry* route_entry_;
   Http::StreamDecoderFilterCallbacks& stream_;

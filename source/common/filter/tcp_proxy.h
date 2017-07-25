@@ -93,11 +93,9 @@ public:
   ~TcpProxy();
 
   // Network::ReadFilter
-  virtual Network::FilterStatus onData(Buffer::Instance& data) override;
-  virtual Network::FilterStatus onNewConnection() override {
-    return initializeUpstreamConnection();
-  }
-  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
