@@ -27,6 +27,7 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Upstream {
+namespace OriginalDstClusterTest {
 
 class TestLoadBalancerContext : public LoadBalancerContext {
 public:
@@ -421,5 +422,6 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   EXPECT_EQ(host, second.hosts()[0]);
 }
 
+} // namespace OriginalDstClusterTest
 } // namespace Upstream
 } // namespace Envoy
