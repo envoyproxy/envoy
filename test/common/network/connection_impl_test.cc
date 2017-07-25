@@ -99,10 +99,17 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  void disconnect() {
+  void disconnect(bool async) {
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    if (async) {
+      // Make sure the local client is closed.
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    } else {
+      // Loop until the server is notified.
+      EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+      dispatcher_->run(Event::Dispatcher::RunType::Block);
+    }
   }
 
   void useMockBuffer() {
@@ -255,7 +262,7 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   client_connection_->readDisable(false);
   client_connection_->readDisable(false);
 
-  disconnect();
+  disconnect(true);
 }
 
 // Test that as watermark levels are changed, the appropriate callbacks are triggered.
@@ -300,10 +307,10 @@ TEST_P(ConnectionImplTest, Watermarks) {
     client_connection_->setBufferLimits(buffer_len * 2);
   }
 
-  disconnect();
+  disconnect(true);
 }
 
-// Write some data to the connection.  It will automatically attempt to flush
+// Write some data to the trueconnection.  It will automatically attempt to flush
 // it to the upstream file descriptor via a write() call to buffer_, which is
 // configured to succeed and accept all bytes read.
 TEST_P(ConnectionImplTest, BasicWrite) {
@@ -326,8 +333,7 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
 
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
-  disconnect();
+  disconnect(false);
 }
 
 // Similar to BasicWrite, only with watermarks set.
@@ -455,8 +461,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  EXPECT_CALL(server_callbacks_, onEvent(_));
-  disconnect();
+  disconnect(false);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {
