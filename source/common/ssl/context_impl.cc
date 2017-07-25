@@ -225,8 +225,8 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
 
 bool ContextImpl::uriMatch(const std::string& uriPattern, const char* uri) {
   size_t pattern_len = uriPattern.length();
-  if (pattern_len > 1 && uriPattern[pattern_len - 1] == '*' && uriPattern[pattern_len - 2] == '/') {
-    return uriPattern.compare(0, pattern_len - 1, uri, pattern_len - 1) == 0;
+  if (pattern_len > 1 && uriPattern.substr(pattern_len - 2) == "/*") {
+    return strncmp(uriPattern.c_str(), uri, pattern_len - 1) == 0 && uri[pattern_len - 1];
   }
 
   return uriPattern == uri;

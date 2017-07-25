@@ -44,7 +44,7 @@ verify_certificate_hash
 verify_subject_alt_name
   *(optional, array)* An optional list of subject alt names. If specified, Envoy will verify
   that the server certificate's subject alt name matches one of the specified values. The names
-  support wildcard in the end. For example, ``foo.com/*`` will match certificate with subject alt
+  support wildcard at the end. For example, ``foo.com/*`` will match certificate with subject alt
   name ``foo.com/bar``.
 
 cipher_suites

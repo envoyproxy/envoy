@@ -70,7 +70,7 @@ public:
 
   /**
    * Determines whether the given URI matches 'pattern' which may end with a wildcard.
-   * @param uriPattern the pattern to match against (foo.bar/baz/ *)
+   * @param uriPattern the pattern to match against
    * @param uri the URI to match
    * @return true if uri matches pattern
    */
