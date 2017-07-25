@@ -974,6 +974,11 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
       "request_type" : {
         "type" : "string",
         "enum" : ["internal", "external", "both"]
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required" : ["domain"],
