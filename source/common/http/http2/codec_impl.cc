@@ -51,10 +51,14 @@ template <typename T> static T* remove_const(const void* object) {
   return const_cast<T*>(reinterpret_cast<const T*>(object));
 }
 
-ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
+ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
       local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
-      waiting_for_non_informational_headers_(false) {}
+      waiting_for_non_informational_headers_(false) {
+  if (buffer_limit > 0) {
+    setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
+  }
+}
 
 ConnectionImpl::StreamImpl::~StreamImpl() {}
 
@@ -117,6 +121,40 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
   }
+}
+void ConnectionImpl::StreamImpl::readDisable(bool disable) {
+  ENVOY_CONN_LOG(debug, "Stream {} disabled: disable {}, unconsumed_bytes {}", parent_.connection_,
+                 stream_id_, disable, unconsumed_bytes_);
+  if (disable) {
+    ++buffers_overrun_;
+  } else {
+    --buffers_overrun_;
+    if (!buffers_overrun()) {
+      nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
+      unconsumed_bytes_ = 0;
+      parent_.sendPendingFrames();
+    }
+  }
+}
+
+void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
+  ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
+  readDisable(true);
+}
+
+void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
+  ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
+  readDisable(false);
+}
+
+void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
+  ENVOY_CONN_LOG(debug, "send buffer over limit ", parent_.connection_);
+  runHighWatermarkCallbacks();
+}
+
+void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
+  ENVOY_CONN_LOG(debug, "send buffer under limit ", parent_.connection_);
+  runLowWatermarkCallbacks();
 }
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
@@ -260,7 +298,13 @@ ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
-  getStream(stream_id)->pending_recv_data_.add(data, len);
+  StreamImpl* stream = getStream(stream_id);
+  stream->pending_recv_data_.add(data, len);
+  if (!stream->buffers_overrun()) {
+    nghttp2_session_consume(session_, stream_id, len);
+  } else {
+    stream->unconsumed_bytes_ += len;
+  }
   return 0;
 }
 
@@ -658,13 +702,14 @@ ConnectionImpl::Http2Options::Http2Options() {
   // calculations. This saves a tremendous amount of memory in cases where there are a large number
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
+  nghttp2_option_set_no_auto_window_update(options_, 1);
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
-                                           ConnectionCallbacks& callbacks, Stats::Scope& stats,
-                                           const Http2Settings& http2_settings)
+                                           Http::ConnectionCallbacks& callbacks,
+                                           Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
@@ -672,7 +717,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
-  StreamImplPtr stream(new ClientStreamImpl(*this));
+  StreamImplPtr stream(new ClientStreamImpl(*this, connection_.bufferLimit()));
   stream->decoder_ = &decoder;
   stream->moveIntoList(std::move(stream), active_streams_);
   return *active_streams_.front();
@@ -722,7 +767,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     return 0;
   }
 
-  StreamImplPtr stream(new ServerStreamImpl(*this));
+  StreamImplPtr stream(new ServerStreamImpl(*this, connection_.bufferLimit()));
   stream->decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);

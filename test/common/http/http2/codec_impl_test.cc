@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/http/codec.h"
+
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -15,11 +17,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Return;
 using testing::_;
 
 namespace Envoy {
@@ -39,6 +43,24 @@ Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
   return ret;
 }
 } // namespace
+
+class TestServerConnectionImpl : public ServerConnectionImpl {
+public:
+  TestServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                           Stats::Scope& scope, const Http2Settings& http2_settings)
+      : ServerConnectionImpl(connection, callbacks, scope, http2_settings) {}
+  nghttp2_session* session() { return session_; }
+  using ServerConnectionImpl::getStream;
+};
+
+class TestClientConnectionImpl : public ClientConnectionImpl {
+public:
+  TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+                           Stats::Scope& scope, const Http2Settings& http2_settings)
+      : ClientConnectionImpl(connection, callbacks, scope, http2_settings) {}
+  nghttp2_session* session() { return session_; }
+  using ClientConnectionImpl::getStream;
+};
 
 class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
@@ -62,8 +84,10 @@ public:
       : client_http2settings_(Http2SettingsFromTuple(::testing::get<0>(GetParam()))),
         client_(client_connection_, client_callbacks_, stats_store_, client_http2settings_),
         server_http2settings_(Http2SettingsFromTuple(::testing::get<1>(GetParam()))),
-        server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_),
-        request_encoder_(client_.newStream(response_decoder_)) {
+        server_(server_connection_, server_callbacks_, stats_store_, server_http2settings_) {}
+
+  void initialize() {
+    request_encoder_ = &client_.newStream(response_decoder_);
     setupDefaultConnectionMocks();
 
     EXPECT_CALL(server_callbacks_, newStream(_))
@@ -87,21 +111,23 @@ public:
   const Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
-  ClientConnectionImpl client_;
+  TestClientConnectionImpl client_;
   ConnectionWrapper client_wrapper_;
   const Http2Settings server_http2settings_;
   NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
-  ServerConnectionImpl server_;
+  TestServerConnectionImpl server_;
   ConnectionWrapper server_wrapper_;
   MockStreamDecoder response_decoder_;
-  StreamEncoder& request_encoder_;
+  StreamEncoder* request_encoder_;
   MockStreamDecoder request_decoder_;
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
 };
 
 TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
+  initialize();
+
   TestHeaderMapImpl request_headers;
   request_headers.addViaCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -111,11 +137,11 @@ TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
 
   TestHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
 
   EXPECT_CALL(request_decoder_, decodeData(_, true));
   Buffer::OwnedImpl hello("hello");
-  request_encoder_.encodeData(hello, true);
+  request_encoder_->encodeData(hello, true);
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), true));
@@ -123,6 +149,8 @@ TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
 }
 
 TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
+  initialize();
+
   TestHeaderMapImpl request_headers;
   request_headers.addViaCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -130,11 +158,11 @@ TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
 
   TestHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
 
   EXPECT_CALL(request_decoder_, decodeData(_, true));
   Buffer::OwnedImpl hello("hello");
-  request_encoder_.encodeData(hello, true);
+  request_encoder_->encodeData(hello, true);
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), false));
@@ -146,10 +174,12 @@ TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
 }
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
+  initialize();
+
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_.encodeHeaders(request_headers, true);
+  request_encoder_->encodeHeaders(request_headers, true);
 
   EXPECT_CALL(client_callbacks_, onGoAway());
   server_.shutdownNotice();
@@ -161,36 +191,42 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
 }
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
+  initialize();
+
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
 
   MockStreamCallbacks callbacks;
-  request_encoder_.getStream().addCallbacks(callbacks);
+  request_encoder_->getStream().addCallbacks(callbacks);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 }
 
 TEST_P(Http2CodecImplTest, InvalidFrame) {
+  initialize();
+
   ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
     server_wrapper_.buffer_.add(data);
   }));
-  request_encoder_.encodeHeaders(TestHeaderMapImpl{}, true);
+  request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
   EXPECT_THROW(server_wrapper_.dispatch(Buffer::OwnedImpl(), server_), CodecProtocolException);
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
+  initialize();
+
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   Buffer::OwnedImpl hello("hello");
-  request_encoder_.encodeData(hello, false);
+  request_encoder_->encodeData(hello, false);
   EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  request_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
@@ -203,6 +239,8 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
+  initialize();
+
   // Buffer server data so we can make sure we don't get any window updates.
   ON_CALL(client_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
     server_wrapper_.buffer_.add(data);
@@ -211,12 +249,12 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
-  request_encoder_.encodeData(body, false);
+  request_encoder_->encodeData(body, false);
   EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  request_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 
   // Flush pending data.
   setupDefaultConnectionMocks();
@@ -235,10 +273,12 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
+  initialize();
+
   InSequence s;
 
   MockStreamCallbacks client_stream_callbacks;
-  request_encoder_.getStream().addCallbacks(client_stream_callbacks);
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
 
   // Do a request, but pause server dispatch so we don't send window updates. This will result in a
   // deferred reset, followed by a pending frames flush which will cause the stream to actually
@@ -248,11 +288,11 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   }));
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
-  request_encoder_.encodeData(body, true);
+  request_encoder_->encodeData(body, true);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
-  request_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   // Dispatch server. We expect to see some data.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
@@ -271,12 +311,14 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
 }
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
+  initialize();
+
   InSequence s;
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  request_encoder_.encodeHeaders(request_headers, false);
+  request_encoder_->encodeHeaders(request_headers, false);
 
   // In this case we do the same thing as DeferredResetClient but on the server side.
   ON_CALL(server_connection_, write(_)).WillByDefault(Invoke([&](Buffer::Instance& data) -> void {
@@ -290,7 +332,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   MockStreamCallbacks client_stream_callbacks;
-  request_encoder_.getStream().addCallbacks(client_stream_callbacks);
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset));
@@ -298,16 +340,85 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), client_);
 }
 
-// Deferred reset tests use only small windows so that we can test certain conditions.
-#define HTTP2SETTINGS_DEFERRED_RESET_COMBINE                                                       \
+class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
+
+// Back up the pending_sent_data_ buffer in the client connection and make sure the watermarks fire
+// as expected.
+//
+// This also tests the readDisable logic in StreamImpl, verifying that h2 bytes are consumed
+// when the stream has readDisable(true) called.
+TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
+  EXPECT_CALL(client_connection_, bufferLimit()).WillOnce(Return(10));
+
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Force the server stream to be read disabled.  This will cause it to stop sending window
+  // updates to the client.
+  server_.getStream(1)->readDisable(true);
+
+  uint32_t initial_window =
+      nghttp2_session_get_stream_effective_local_window_size(client_.session(), 1);
+  // If this limit is changed, this test will fail due to the initial large writes being divided
+  // into more than 4 frames.  Fast fail here with this explanatory comment.
+  ASSERT_EQ(65535, initial_window);
+  // One large write gets broken into smaller frames.
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
+  Buffer::OwnedImpl long_data(std::string(initial_window, 'a'));
+  // The one giant write will cause the buffer to go over the limit, then drain and go back under
+  // the limit.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  request_encoder_->encodeData(long_data, false);
+
+  // Verify that the window is full.  The client will not send more data to the server for this
+  // stream.
+  EXPECT_EQ(0, nghttp2_session_get_stream_local_window_size(server_.session(), 1));
+  EXPECT_EQ(0, nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
+  EXPECT_EQ(initial_window, server_.getStream(1)->unconsumed_bytes_);
+
+  // Now that the flow control window is full, further data causes the send buffer to back up.
+  Buffer::OwnedImpl ten_bytes("0123456789");
+  request_encoder_->encodeData(ten_bytes, false);
+  EXPECT_EQ(10, client_.getStream(1)->pending_send_data_.length());
+
+  // If we go over the limit, the stream callbacks should fire.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  Buffer::OwnedImpl last_byte("!");
+  request_encoder_->encodeData(last_byte, false);
+  EXPECT_EQ(11, client_.getStream(1)->pending_send_data_.length());
+
+  // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
+  // updates to be sent, and the client to flush all queued data.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  server_.getStream(1)->readDisable(false);
+  EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
+  // The 11 bytes sent won't trigger another window update, so the final window should be the
+  // initial window minus the last 11 byte flush from the client to server.
+  EXPECT_EQ(initial_window - 11,
+            nghttp2_session_get_stream_local_window_size(server_.session(), 1));
+  EXPECT_EQ(initial_window - 11,
+            nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
+}
+
+#define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
                      ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
 
+// Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_CASE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFERRED_RESET_COMBINE,
-                                           HTTP2SETTINGS_DEFERRED_RESET_COMBINE));
+                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // we seperate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
@@ -332,6 +443,11 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
+
+// Flow control tests only use only small windows so that we can test certain conditions.
+INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
+                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

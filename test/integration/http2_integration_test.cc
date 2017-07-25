@@ -59,6 +59,12 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
                                        false);
 }
 
+TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer_limits")),
+                                       Http::CodecClient::Type::HTTP2, 1024 * 1024, 1024 * 1024,
+                                       false);
+}
+
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
                                          Http::CodecClient::Type::HTTP2);
@@ -181,7 +187,8 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
-TEST_P(Http2IntegrationTest, SimultaneousRequest) {
+void Http2IntegrationTest::simultaneousRequest(uint32_t port, int32_t request1_bytes,
+                                               int32_t request2_bytes) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
@@ -192,9 +199,7 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   executeActions(
-      {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-       },
+      {[&]() -> void { codec_client = makeHttpConnection(port, Http::CodecClient::Type::HTTP2); },
        // Start request 1
        [&]() -> void {
          encoder1 = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -224,14 +229,14 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
 
        // Finish request 1
        [&]() -> void {
-         codec_client->sendData(*encoder1, 1024, true);
+         codec_client->sendData(*encoder1, request1_bytes, true);
 
        },
        [&]() -> void { upstream_request1->waitForEndStream(*dispatcher_); },
 
        // Finish request 2
        [&]() -> void {
-         codec_client->sendData(*encoder2, 512, true);
+         codec_client->sendData(*encoder2, request2_bytes, true);
 
        },
        [&]() -> void { upstream_request2->waitForEndStream(*dispatcher_); },
@@ -239,31 +244,31 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
        // Respond request 2
        [&]() -> void {
          upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request2->encodeData(1024, true);
+         upstream_request2->encodeData(request2_bytes, true);
        },
        [&]() -> void {
          response2->waitForEndStream();
          EXPECT_TRUE(upstream_request2->complete());
-         EXPECT_EQ(512U, upstream_request2->bodyLength());
+         EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
 
          EXPECT_TRUE(response2->complete());
          EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
-         EXPECT_EQ(1024U, response2->body().size());
+         EXPECT_EQ(request2_bytes, response2->body().size());
        },
 
        // Respond request 1
        [&]() -> void {
          upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request1->encodeData(512, true);
+         upstream_request1->encodeData(request2_bytes, true);
        },
        [&]() -> void {
          response1->waitForEndStream();
          EXPECT_TRUE(upstream_request1->complete());
-         EXPECT_EQ(1024U, upstream_request1->bodyLength());
+         EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
 
          EXPECT_TRUE(response1->complete());
          EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
-         EXPECT_EQ(512U, response1->body().size());
+         EXPECT_EQ(request2_bytes, response1->body().size());
        },
 
        // Cleanup both downstream and upstream
@@ -273,4 +278,13 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection2->close(); },
        [&]() -> void { fake_upstream_connection2->waitForDisconnect(); }});
 }
+
+TEST_P(Http2IntegrationTest, SimultaneousRequest) {
+  simultaneousRequest(lookupPort("http"), 1024, 512);
+}
+
+TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
+  simultaneousRequest(lookupPort("http_buffer_limits"), 1024 * 32, 1024 * 16);
+}
+
 } // namespace Envoy

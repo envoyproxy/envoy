@@ -987,6 +987,18 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
   parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::
+    onDecoderFilterAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", parent_);
+  parent_.response_encoder_->getStream().readDisable(true);
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::
+    onDecoderFilterBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
+  parent_.response_encoder_->getStream().readDisable(false);
+}
+
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
   return parent_.addEncodedData(*this, data);
 }

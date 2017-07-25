@@ -279,6 +279,7 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
+  // TODO(alyssawilk) disable upstream reads.
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -354,8 +355,8 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+    void onDecoderFilterAboveWriteBufferHighWatermark() override;
+    void onDecoderFilterBelowWriteBufferLowWatermark() override;
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -386,6 +387,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data) override;
+    // TODO(alysawilk) disable reads from upstream.
     void onEncoderFilterAboveWriteBufferHighWatermark() override {}
     void onEncoderFilterBelowWriteBufferLowWatermark() override {}
     void continueEncoding() override;
@@ -432,6 +434,7 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
+    // TODO(alyssawilk) disable upstream reads.
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

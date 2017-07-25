@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
@@ -120,7 +121,7 @@ protected:
                       public Event::DeferredDeletable,
                       public StreamCallbackHelper {
 
-    StreamImpl(ConnectionImpl& parent);
+    StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
     ~StreamImpl();
 
     StreamImpl* base() { return this; }
@@ -143,19 +144,43 @@ protected:
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
-    virtual void readDisable(bool /*disable*/) override{};
+    virtual void readDisable(bool disable) override;
+
+    void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
+      pending_recv_data_.setWatermarks(low_watermark, high_watermark);
+      pending_send_data_.setWatermarks(low_watermark, high_watermark);
+    }
+
+    // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
+    void pendingRecvBufferHighWatermark();
+    void pendingRecvBufferLowWatermark();
+
+    // If the send buffer encounters watermark callbacks, propogate this information to the streams.
+    // The router and connection manager will propogate them on as appropriate.
+    void pendingSendBufferHighWatermark();
+    void pendingSendBufferLowWatermark();
 
     // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
     // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
     // I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
+    bool buffers_overrun() { return buffers_overrun_ > 0; }
+
     ConnectionImpl& parent_;
     HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
-    Buffer::OwnedImpl pending_recv_data_;
-    Buffer::OwnedImpl pending_send_data_;
+    uint32_t unconsumed_bytes_{0};
+    uint32_t buffers_overrun_{0};
+    Buffer::WatermarkBuffer pending_recv_data_{
+        Buffer::InstancePtr{new Buffer::OwnedImpl},
+        [this]() -> void { this->pendingRecvBufferLowWatermark(); },
+        [this]() -> void { this->pendingRecvBufferHighWatermark(); }};
+    Buffer::WatermarkBuffer pending_send_data_{
+        Buffer::InstancePtr{new Buffer::OwnedImpl},
+        [this]() -> void { this->pendingSendBufferLowWatermark(); },
+        [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
     Optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
@@ -202,9 +227,10 @@ protected:
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};
   CodecStats stats_;
+  Network::Connection& connection_;
 
 private:
-  virtual ConnectionCallbacks& callbacks() PURE;
+  virtual Http::ConnectionCallbacks& callbacks() PURE;
   virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   int onFrameReceived(const nghttp2_frame* frame);
@@ -216,7 +242,6 @@ private:
 
   static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
 
-  Network::Connection& connection_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
@@ -227,21 +252,31 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
+  ClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                        Stats::Scope& stats, const Http2Settings& http2_settings);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  void onBelowWriteBufferLowWatermark() override {}
-  void onAboveWriteBufferHighWatermark() override {}
+  // Propogate connection watermark events to each stream on the connection.
+  // The router will propogate it downstream.
+  void onAboveWriteBufferHighWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runHighWatermarkCallbacks();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runLowWatermarkCallbacks();
+    }
+  }
 
 private:
   // ConnectionImpl
-  ConnectionCallbacks& callbacks() override { return callbacks_; }
+  Http::ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
-  ConnectionCallbacks& callbacks_;
+  Http::ConnectionCallbacks& callbacks_;
 };
 
 /**
@@ -254,7 +289,7 @@ public:
 
 private:
   // ConnectionImpl
-  ConnectionCallbacks& callbacks() override { return callbacks_; }
+  Http::ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 

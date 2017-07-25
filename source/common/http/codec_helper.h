@@ -7,6 +7,18 @@ namespace Http {
 
 class StreamCallbackHelper {
 public:
+  void runLowWatermarkCallbacks() {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      callbacks->onBelowWriteBufferLowWatermark();
+    }
+  }
+
+  void runHighWatermarkCallbacks() {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      callbacks->onAboveWriteBufferHighWatermark();
+    }
+  }
+
   void runResetCallbacks(StreamResetReason reason) {
     if (reset_callbacks_run_) {
       return;

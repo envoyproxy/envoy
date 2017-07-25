@@ -165,8 +165,14 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    void onAboveWriteBufferHighWatermark() override {
+      // Have the connection manager disable reads on the downstream stream.
+      parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      // Have the connection manager enable reads on the downstream stream.
+      parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,

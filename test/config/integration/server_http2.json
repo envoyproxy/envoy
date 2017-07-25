@@ -174,23 +174,87 @@
       }
     }]
   },
-  {
+    {
     "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
     "filters": [
-      { "type": "read", "name":
-        "tcp_proxy",
-        "config": {
-          "stat_prefix": "test_tcp",
-          "route_config": {
-            "routes": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http2",
+        "drain_timeout_ms": 5000,
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
               {
-                "cluster": "cluster_1"
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
               }
             ]
           }
-        }
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_3"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_3",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_3"
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": false, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {}}
+        ]
       }
-    ]
+    }]
   }],
 
   "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
@@ -219,6 +283,14 @@
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
       "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
+    },
+    {
+      "name": "cluster_3",
+      "per_connection_buffer_limit_bytes": 1024,
+      "connect_timeout_ms": 5000,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}]
     },
     {
       "name": "statsd",
