@@ -29,8 +29,8 @@ using Envoy::Protobuf::MethodDescriptor;
 
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::Protobuf::util::Status;
-using Envoy::Protobuf::util::error::Code;
+using Envoy::ProtobufUtil::Status;
+using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 
@@ -149,7 +149,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
-  EXPECT_EQ(Protobuf::util::error::Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
             status.error_message());
   EXPECT_FALSE(transcoder);

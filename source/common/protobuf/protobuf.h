@@ -24,6 +24,9 @@ namespace Envoy {
 // Google we have more than one protobuf implementation.
 namespace Protobuf = google::protobuf;
 
+// Allows mapping from google::protobuf::util to other util libraries.
+namespace ProtobufUtil = google::protobuf::util;
+
 // Protobuf well-known types (WKT) should be referenced via the ProtobufWkt
 // namespace.
 namespace ProtobufWkt = google::protobuf;

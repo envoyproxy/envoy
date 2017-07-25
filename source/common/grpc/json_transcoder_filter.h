@@ -29,9 +29,9 @@ struct VariableBinding {
   // The location of the field in the protobuf message, where the value
   // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
   // of the nested "shelf" message of the request protobuf message.
-  std::vector<std::string> field_path;
+  std::vector<ProtobufTypes::String> field_path;
   // The value to be inserted.
-  std::string value;
+  ProtobufTypes::String value;
 };
 
 /**
@@ -54,7 +54,7 @@ public:
    * @param method_descriptor output parameter for the method looked up from config
    * @return status whether the Transcoder instance are successfully created or not
    */
-  Protobuf::util::Status
+  ProtobufUtil::Status
   createTranscoder(const Http::HeaderMap& headers, Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
@@ -64,8 +64,8 @@ private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
-  Protobuf::util::Status methodToRequestInfo(const Protobuf::MethodDescriptor* method,
-                                             google::grpc::transcoding::RequestInfo* info);
+  ProtobufUtil::Status methodToRequestInfo(const Protobuf::MethodDescriptor* method,
+                                           google::grpc::transcoding::RequestInfo* info);
 
 private:
   Protobuf::DescriptorPool descriptor_pool_;
