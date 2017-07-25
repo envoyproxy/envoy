@@ -377,6 +377,11 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
             "additionalProperties": false
           }
         }
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["stat_prefix", "descriptors", "domain"],

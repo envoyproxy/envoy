@@ -16,9 +16,10 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
                                                                    FactoryContext& context) {
   RateLimit::TcpFilter::ConfigSharedPtr config(
       new RateLimit::TcpFilter::Config(json_config, context.scope(), context.runtime()));
-  return [config, &context](Network::FilterManager& filter_manager) -> void {
+  const uint32_t timeout_ms = config.getInteger("timeout_ms", 20);
+  return [config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new RateLimit::TcpFilter::Instance(
-        config, context.rateLimitClient(Optional<std::chrono::milliseconds>()))});
+        config, context.rateLimitClient(timeout_ms))});
   };
 }
 
