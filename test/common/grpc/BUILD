@@ -73,8 +73,7 @@ envoy_cc_test(
     srcs = ["json_transcoder_filter_test.cc"],
     data = [
         "//test/proto:bookstore.proto",
-        "//test/proto:bookstore_proto_descriptor",
-        "//test/proto:bookstore_proto_descriptor_bad",
+        "//test/proto:bookstore_descriptors",
     ],
     deps = [
         "//source/common/grpc:json_transcoder_filter_lib",

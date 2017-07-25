@@ -11,6 +11,14 @@ envoy_package()
 
 exports_files(["bookstore.proto"])
 
+filegroup(
+    name = "bookstore_descriptors",
+    srcs = [
+        "bookstore.descriptor",
+        "bookstore_bad.descriptor",
+    ],
+)
+
 envoy_proto_library(
     name = "helloworld_proto",
     srcs = [":helloworld.proto"],
