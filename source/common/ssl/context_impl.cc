@@ -224,20 +224,12 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
 }
 
 bool ContextImpl::uriMatch(const std::string& uriPattern, const char* uri) {
-  auto p = uriPattern.c_str();
-  while (*p && *uri && *p == *uri) {
-    p++;
-    uri++;
-  }
-  if (!(*p) && !(*uri)) { // strings are identical
-    return true;
+  size_t pattern_len = uriPattern.length();
+  if (pattern_len > 1 && uriPattern[pattern_len - 1] == '*' && uriPattern[pattern_len - 2] == '/') {
+    return uriPattern.compare(0, pattern_len - 1, uri, pattern_len - 1) == 0;
   }
 
-  if (*p == '*' && p != uriPattern.c_str() && *(p - 1) == '/' && !(*(p + 1))) { // prefix matches
-    return true;
-  }
-
-  return false;
+  return uriPattern == uri;
 }
 
 bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
