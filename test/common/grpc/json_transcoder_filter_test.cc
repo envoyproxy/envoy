@@ -84,9 +84,9 @@ public:
     auto file_itr = std::find_if(
         descriptor_set.file().begin(), descriptor_set.file().end(),
         [&file_name](const FileDescriptorProto& file) { return file.name() == file_name; });
-    if (file_itr != descriptor_set.file().end()) {
-      file_descriptor = *file_itr;
-    }
+    RELEASE_ASSERT(file_itr != descriptor_set.file().end());
+    file_descriptor = *file_itr;
+
     descriptor_set.clear_file();
     descriptor_set.add_file()->Swap(&file_descriptor);
   }
