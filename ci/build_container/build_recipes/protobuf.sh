@@ -2,12 +2,16 @@
 
 set -e
 
-VERSION=3.3.0
+# Unless overriden with an explicit release tag, e.g. v3.2.0rc2, we use a pinned
+# HEAD commit. This is only until we get a release with
+# https://github.com/google/protobuf/pull/3327, i.e. v3.4.0.
+[ -z "$ENVOY_PROTOBUF_COMMIT" ] && ENVOY_PROTOBUF_COMMIT=062df3d0724d9ae5e3c65d481dc1d3aca811152e  # 2017-07-20
 
-wget -O protobuf-$VERSION.tar.gz https://github.com/google/protobuf/releases/download/v$VERSION/protobuf-cpp-$VERSION.tar.gz
-tar xf protobuf-$VERSION.tar.gz
-rsync -av protobuf-$VERSION/* $THIRDPARTY_SRC/protobuf
-cd protobuf-$VERSION
+git clone https://github.com/google/protobuf.git
+rsync -av protobuf/* $THIRDPARTY_SRC/protobuf
+cd protobuf
+git reset --hard "$ENVOY_PROTOBUF_COMMIT"
+./autogen.sh
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make V=1 install
 

@@ -312,7 +312,7 @@ void ConnectionImpl::closeSocket(uint32_t close_type) {
   Network::ConnectionImpl::closeSocket(close_type);
 }
 
-std::string ConnectionImpl::nextProtocol() {
+std::string ConnectionImpl::nextProtocol() const {
   const unsigned char* proto;
   unsigned int proto_len;
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);

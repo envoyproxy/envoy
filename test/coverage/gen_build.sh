@@ -23,9 +23,11 @@ set -e
 # E.g., "//envoy-lyft/test/..."
 [ -z "${EXTRA_QUERY_PATHS}" ] && EXTRA_QUERY_PATHS=""
 
-TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)")
+rm -f "${BUILD_PATH}"
+
+TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)" | grep "^//")
 if [ -n "${EXTRA_QUERY_PATHS}" ]; then
-  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})")"
+  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})" | grep "^//")"
 fi
 
 (

@@ -225,6 +225,7 @@ public:
 
   // Http::StreamFilterCallbacks
   MOCK_METHOD0(connectionId, uint64_t());
+  MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
@@ -258,6 +259,7 @@ public:
 
   // Http::StreamFilterCallbacks
   MOCK_METHOD0(connectionId, uint64_t());
+  MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
