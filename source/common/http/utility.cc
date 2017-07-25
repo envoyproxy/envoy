@@ -151,16 +151,15 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
 
 Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config) {
   Http2Settings ret;
-  ret.hpack_table_size_ = MessageUtil::getUInt32(config, "hpack_table_size",
-                                                 Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
-  ret.max_concurrent_streams_ = MessageUtil::getUInt32(
-      config, "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
-  ret.initial_stream_window_size_ =
-      MessageUtil::getUInt32(config, "initial_stream_window_size",
-                             Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  ret.hpack_table_size_ =
+      PROTOBUF_GET_WRAPPED(config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
+  ret.max_concurrent_streams_ = PROTOBUF_GET_WRAPPED(
+      config, max_concurrent_streams, Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+  ret.initial_stream_window_size_ = PROTOBUF_GET_WRAPPED(
+      config, initial_stream_window_size, Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   ret.initial_connection_window_size_ =
-      MessageUtil::getUInt32(config, "initial_connection_window_size",
-                             Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+      PROTOBUF_GET_WRAPPED(config, initial_connection_window_size,
+                           Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
   return ret;
 }
 

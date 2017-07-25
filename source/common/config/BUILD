@@ -80,7 +80,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "json_utility_lib",
-    srcs = ["json_utility.cc"],
     hdrs = ["json_utility.h"],
     deps = [
         "//include/envoy/json:json_object_interface",
