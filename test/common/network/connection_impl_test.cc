@@ -107,6 +107,8 @@ public:
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     } else {
       // Loop until the server is notified.
+      EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
       dispatcher_->run(Event::Dispatcher::RunType::Block);
     }
