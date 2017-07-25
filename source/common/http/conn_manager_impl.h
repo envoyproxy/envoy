@@ -354,6 +354,8 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
+    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -384,6 +386,8 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data) override;
+    void onEncoderFilterAboveWriteBufferHighWatermark() override {}
+    void onEncoderFilterBelowWriteBufferLowWatermark() override {}
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
@@ -428,6 +432,8 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // Http::StreamDecoder
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;

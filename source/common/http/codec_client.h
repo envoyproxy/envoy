@@ -157,6 +157,8 @@ private:
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // StreamDecoderWrapper
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }

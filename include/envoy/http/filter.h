@@ -198,6 +198,16 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called when a decoder filter goes over its high watermark.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -297,6 +307,16 @@ public:
    * It is an error to call this method in any other case.
    */
   virtual void addEncodedData(Buffer::Instance& data) PURE;
+
+  /**
+   * Called when an encoder filter goes over its high watermark.
+   */
+  virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**

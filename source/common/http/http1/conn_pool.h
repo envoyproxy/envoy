@@ -57,6 +57,8 @@ protected:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ActiveClient& parent_;
     bool encode_complete_{};

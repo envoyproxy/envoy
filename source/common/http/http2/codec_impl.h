@@ -143,6 +143,7 @@ protected:
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
+    virtual void readDisable(bool /*disable*/) override{};
 
     // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
     // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
@@ -231,6 +232,8 @@ public:
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  void onBelowWriteBufferLowWatermark() override {}
+  void onAboveWriteBufferHighWatermark() override {}
 
 private:
   // ConnectionImpl

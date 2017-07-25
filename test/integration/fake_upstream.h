@@ -55,6 +55,8 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   FakeHttpConnection& parent_;

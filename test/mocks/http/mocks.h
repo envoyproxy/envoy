@@ -140,6 +140,8 @@ public:
 
   // Http::StreamCallbacks
   MOCK_METHOD1(onResetStream, void(StreamResetReason reason));
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockStream : public Stream {
@@ -151,6 +153,8 @@ public:
   MOCK_METHOD1(addCallbacks, void(StreamCallbacks& callbacks));
   MOCK_METHOD1(removeCallbacks, void(StreamCallbacks& callbacks));
   MOCK_METHOD1(resetStream, void(StreamResetReason reason));
+  MOCK_METHOD1(readDisable, void(bool disable));
+  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
 
   std::list<StreamCallbacks*> callbacks_{};
 };
@@ -198,6 +202,8 @@ public:
 
   // Http::ClientConnection
   MOCK_METHOD1(newStream, StreamEncoder&(StreamDecoder& response_decoder));
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockFilterChainFactory : public FilterChainFactory {
@@ -234,6 +240,8 @@ public:
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
+  MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -268,6 +276,8 @@ public:
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
+  MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));

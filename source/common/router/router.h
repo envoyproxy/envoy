@@ -165,6 +165,8 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
