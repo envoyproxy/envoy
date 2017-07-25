@@ -527,17 +527,19 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       }
       return;
     } else if (websocket_upgrade_requested || websocket_upgrade_allowed) {
-      HeaderMapImpl headers;
       if (websocket_upgrade_requested) {
         // Do not allow WebSocket upgrades if the route does not support it.
         connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-        headers.addStatic(Headers::get().Status, std::to_string(enumToInt(Code::Forbidden)));
+        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
+        encodeHeaders(nullptr, headers, true);
       } else {
         // Do not allow normal connections on WebSocket routes.
         connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
-        headers.addStatic(Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired)));
+        HeaderMapImpl headers{
+            {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
+        encodeHeaders(nullptr, headers, true);
       }
-      encodeHeaders(nullptr, headers, true);
+
       return;
     }
   }
