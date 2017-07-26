@@ -200,7 +200,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
         ASN1_STRING* str = altname->d.dNSName;
         char* dns_name = reinterpret_cast<char*>(ASN1_STRING_data(str));
         for (auto& config_san : subject_alt_names) {
-          if (dNSNameMatch(config_san, dns_name)) {
+          if (dNSNameMatch(config_san, dns_name, static_cast<size_t>(ASN1_STRING_length(str)))) {
             verified = true;
             break;
           }
@@ -209,7 +209,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
         ASN1_STRING* str = altname->d.uniformResourceIdentifier;
         char* crt_san = reinterpret_cast<char*>(ASN1_STRING_data(str));
         for (auto& config_san : subject_alt_names) {
-          if (uriMatch(config_san, crt_san)) {
+          if (uriMatch(config_san, crt_san, static_cast<size_t>(ASN1_STRING_length(str)))) {
             verified = true;
             break;
           }
@@ -223,29 +223,29 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return verified;
 }
 
-bool ContextImpl::uriMatch(const std::string& uriPattern, const char* uri) {
-  size_t pattern_len = uriPattern.length();
-  if (pattern_len > 1 && uriPattern.substr(pattern_len - 2) == "/*") {
-    return strncmp(uriPattern.c_str(), uri, pattern_len - 1) == 0 && uri[pattern_len - 1];
+bool ContextImpl::dNSNameMatch(const std::string& dns_pattern, const char* dns, size_t dns_len) {
+  size_t pattern_len = dns_pattern.length();
+  if (pattern_len > 1 && dns_pattern.substr(0, 2) == "*.") {
+    if (dns_len >= pattern_len) {
+      size_t off = dns_len - pattern_len + 1;
+      return dns_pattern.compare(1, pattern_len - 1, dns + off, pattern_len - 1) == 0;
+    }
+    return false;
   }
 
-  return uriPattern == uri;
+  return dns_pattern == dns;
 }
 
-bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
-  if (dNSName == pattern) {
-    return true;
-  }
-
-  size_t pattern_len = strlen(pattern);
-  if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dNSName.length() > pattern_len - 1) {
-      size_t off = dNSName.length() - pattern_len + 1;
-      return dNSName.compare(off, pattern_len - 1, pattern + 1) == 0;
+bool ContextImpl::uriMatch(const std::string& uri_pattern, const char* uri, size_t uri_len) {
+  size_t pattern_len = uri_pattern.length();
+  if (pattern_len > 1 && uri_pattern.substr(pattern_len - 2) == "/*") {
+    if (uri_len >= pattern_len) {
+      return uri_pattern.compare(0, pattern_len - 1, uri, pattern_len - 1) == 0;
     }
+    return false;
   }
 
-  return false;
+  return uri_pattern == uri;
 }
 
 bool ContextImpl::verifyCertificateHash(X509* cert, const std::vector<uint8_t>& expected_hash) {

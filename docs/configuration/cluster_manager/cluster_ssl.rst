@@ -43,9 +43,11 @@ verify_certificate_hash
 
 verify_subject_alt_name
   *(optional, array)* An optional list of subject alt names. If specified, Envoy will verify
-  that the server certificate's subject alt name matches one of the specified values. The names
-  support wildcard at the end. For example, ``foo.com/*`` will match certificate with subject alt
-  name ``foo.com/bar``.
+  that the client certificate's subject alt name matches one of the specified values. You can specify
+  two types of subject alt names: DNS (``www.foo.com``) and URI (``foo.com/bar``). Both types also
+  support optional wildcard matching. For DNS, ``*.foo.com`` will match subject alt names like
+  ```bar.foo.com`` and ``baz.foo.com``. For URI, ``foo.com/*`` will match names like ``foo.com/bar``
+  and ``foo.com/baz``.
 
 cipher_suites
   *(optional, string)* If specified, the TLS connection will only support the specified `cipher list

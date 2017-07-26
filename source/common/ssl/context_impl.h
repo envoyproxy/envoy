@@ -60,21 +60,23 @@ public:
   static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
 
   /**
-   * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
+   * Determines whether the given DNS matches 'pattern' which may begin with a wildcard.
    * NOTE:  public for testing
-   * @param san the subjectAltName to match
-   * @param pattern the pattern to match against (*.example.com)
-   * @return true if the san matches pattern
+   * @param dns_pattern the pattern to match against (*.example.com)
+   * @param dns the DNS to match
+   * @param dns_len length of DNS string
+   * @return true if the dns matches pattern
    */
-  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
+  static bool dNSNameMatch(const std::string& dns_pattern, const char* dns, size_t dns_len);
 
   /**
    * Determines whether the given URI matches 'pattern' which may end with a wildcard.
-   * @param uriPattern the pattern to match against
+   * @param uri_pattern the pattern to match against
    * @param uri the URI to match
+   * @param uri_len length of URI string
    * @return true if uri matches pattern
    */
-  static bool uriMatch(const std::string& uriPattern, const char* uri);
+  static bool uriMatch(const std::string& uri_pattern, const char* uri, size_t uri_len);
 
   SslStats& stats() { return stats_; }
 
