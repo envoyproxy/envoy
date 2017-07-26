@@ -76,6 +76,13 @@ public:
    * integration tests where a mock runtime is not needed.
    */
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
+
+  /**
+   * Helper for flushing counters and gauges to sinks.
+   * @param sinks supplies the list of sinks.
+   * @param store supplies the store to flush.
+   */
+  static void flushHelper(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 };
 
 /**

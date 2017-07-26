@@ -9,8 +9,28 @@
 
 #include "gtest/gtest.h"
 
+using testing::InSequence;
+using testing::StrictMock;
+
 namespace Envoy {
 namespace Server {
+
+TEST(ServerInstanceUtil, flushHelper) {
+  InSequence s;
+
+  Stats::IsolatedStoreImpl store;
+  store.counter("hello").inc();
+  store.gauge("world").set(5);
+  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
+  EXPECT_CALL(*sink, beginFlush());
+  EXPECT_CALL(*sink, flushCounter("hello", 1));
+  EXPECT_CALL(*sink, flushGauge("world", 5));
+  EXPECT_CALL(*sink, endFlush());
+
+  std::list<Stats::SinkPtr> sinks;
+  sinks.emplace_back(std::move(sink));
+  InstanceUtil::flushHelper(sinks, store);
+}
 
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
