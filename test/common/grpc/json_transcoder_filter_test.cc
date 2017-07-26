@@ -27,6 +27,7 @@ using testing::_;
 
 using Envoy::Protobuf::MethodDescriptor;
 
+using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::Status;
@@ -75,6 +76,25 @@ public:
       }
     }
   }
+
+  void stripImports(FileDescriptorSet& descriptor_set, const ProtobufTypes::String& file_name) {
+    FileDescriptorProto file_descriptor;
+    // filter down descriptor_set to only contain one proto specified as file_name but none of its
+    // dependencies
+    auto file_itr =
+        std::find_if(descriptor_set.file().begin(), descriptor_set.file().end(),
+                     [&file_name](const FileDescriptorProto& file) {
+                       // return whether file.name() ends with file_name
+                       return file.name().length() >= file_name.length() &&
+                              0 == file.name().compare(file.name().length() - file_name.length(),
+                                                       ProtobufTypes::String::npos, file_name);
+                     });
+    RELEASE_ASSERT(file_itr != descriptor_set.file().end());
+    file_descriptor = *file_itr;
+
+    descriptor_set.clear_file();
+    descriptor_set.add_file()->Swap(&file_descriptor);
+  }
 };
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
@@ -93,9 +113,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
 
 TEST_F(GrpcJsonTranscoderConfigTest, IncompleteProto) {
   EXPECT_THROW_WITH_MESSAGE(
-      JsonTranscoderConfig config(
-          *configJson(TestEnvironment::runfilesPath("test/proto/bookstore_bad.descriptor"),
-                      "grpc.service.UnknownService")),
+      JsonTranscoderConfig config(*configJson(makeProtoDescriptor([&](FileDescriptorSet& pb) {
+                                                stripImports(pb, "test/proto/bookstore.proto");
+                                              }),
+                                              "bookstore.Bookstore")),
       EnvoyException, "transcoding_filter: Unable to build proto descriptor pool");
 }
 
