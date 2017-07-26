@@ -183,6 +183,9 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http2",
+        "http2_settings": {
+           "per_stream_buffer_limit": 1024
+        },
         "drain_timeout_ms": 5000,
         "access_log": [
         {

@@ -160,6 +160,7 @@ const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
 const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
 const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT;
 
 TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
 

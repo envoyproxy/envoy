@@ -286,6 +286,11 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type": "integer",
             "minimum": 65535,
             "maximum" : 2147483647
+          },
+          "per_stream_buffer_limit" : {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum" : true
           }
         }
       },
@@ -1380,6 +1385,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "type": "integer",
             "minimum": 65535,
             "maximum" : 2147483647
+          },
+          "per_stream_buffer_limit" : {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum" : true
           }
         }
       },

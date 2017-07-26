@@ -200,12 +200,18 @@ public:
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
 
   /**
-   * Called when a decoder filter goes over its high watermark.
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times.  Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
 
   /**
-   * Called when a decoder filter goes from over its high watermark to under its low watermark.
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
 };

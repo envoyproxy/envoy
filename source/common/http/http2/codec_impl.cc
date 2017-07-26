@@ -710,14 +710,15 @@ ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
-    : ConnectionImpl(connection, stats), callbacks_(callbacks) {
+    : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
   sendSettings(http2_settings);
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
-  StreamImplPtr stream(new ClientStreamImpl(*this, connection_.bufferLimit()));
+
+  StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &decoder;
   stream->moveIntoList(std::move(stream), active_streams_);
   return *active_streams_.front();
@@ -748,7 +749,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
                                            Stats::Scope& scope, const Http2Settings& http2_settings)
-    : ConnectionImpl(connection, scope), callbacks_(callbacks) {
+    : ConnectionImpl(connection, scope, http2_settings), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
   sendSettings(http2_settings);
@@ -767,7 +768,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     return 0;
   }
 
-  StreamImplPtr stream(new ServerStreamImpl(*this, connection_.bufferLimit()));
+  StreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);

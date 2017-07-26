@@ -30,16 +30,21 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
 typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
 
+const char SMALL_WINDOW = 10;
+
 namespace {
+
 Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
   Http2Settings ret;
   ret.hpack_table_size_ = ::testing::get<0>(tp);
   ret.max_concurrent_streams_ = ::testing::get<1>(tp);
   ret.initial_stream_window_size_ = ::testing::get<2>(tp);
   ret.initial_connection_window_size_ = ::testing::get<3>(tp);
+  ret.per_stream_buffer_limit_ = ::testing::get<4>(tp);
+
   return ret;
 }
 } // namespace
@@ -348,8 +353,6 @@ class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
 // This also tests the readDisable logic in StreamImpl, verifying that h2 bytes are consumed
 // when the stream has readDisable(true) called.
 TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
-  EXPECT_CALL(client_connection_, bufferLimit()).WillOnce(Return(10));
-
   initialize();
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
@@ -388,13 +391,13 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // Now that the flow control window is full, further data causes the send buffer to back up.
   Buffer::OwnedImpl ten_bytes("0123456789");
   request_encoder_->encodeData(ten_bytes, false);
-  EXPECT_EQ(10, client_.getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(SMALL_WINDOW, client_.getStream(1)->pending_send_data_.length());
 
   // If we go over the limit, the stream callbacks should fire.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl last_byte("!");
   request_encoder_->encodeData(last_byte, false);
-  EXPECT_EQ(11, client_.getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(SMALL_WINDOW + 1, client_.getStream(1)->pending_send_data_.length());
 
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
@@ -403,29 +406,38 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The 11 bytes sent won't trigger another window update, so the final window should be the
   // initial window minus the last 11 byte flush from the client to server.
-  EXPECT_EQ(initial_window - 11,
+  EXPECT_EQ(initial_window - (SMALL_WINDOW + 1),
             nghttp2_session_get_stream_local_window_size(server_.session(), 1));
-  EXPECT_EQ(initial_window - 11,
+  EXPECT_EQ(initial_window - (SMALL_WINDOW + 1),
             nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
 }
+
+#define HTTP2SETTINGS_DEFERRED_RESET_COMBINE                                                       \
+  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
+                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
+                     ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
+                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE),         \
+                     ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
 
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
+                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE),         \
+                     ::testing::Values(SMALL_WINDOW))
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_CASE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+                        ::testing::Combine(HTTP2SETTINGS_DEFERRED_RESET_COMBINE,
+                                           HTTP2SETTINGS_DEFERRED_RESET_COMBINE));
 
 // we seperate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
-                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
+                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE),     \
+                     ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
@@ -439,7 +451,8 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
                         Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
-                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
+                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE),                        \
+      ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));

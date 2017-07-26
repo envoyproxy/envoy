@@ -161,6 +161,8 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   ret.initial_connection_window_size_ =
       http2_settings->getInteger("initial_connection_window_size",
                                  Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.per_stream_buffer_limit_ = http2_settings->getInteger(
+      "per_stream_buffer_limit", Http::Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT);
 
   // http_codec_options config is DEPRECATED
   std::string options = config.getString("http_codec_options", "");

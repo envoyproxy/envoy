@@ -69,10 +69,11 @@ public:
  */
 class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::http2> {
 public:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats)
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                 const Http2Settings& http2_settings)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection), dispatching_(false), raised_goaway_(false),
-        pending_deferred_reset_(false) {}
+        connection_(connection), per_stream_buffer_limit_(http2_settings.per_stream_buffer_limit_),
+        dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
   ~ConnectionImpl();
 
@@ -228,6 +229,7 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
+  uint32_t per_stream_buffer_limit_;
 
 private:
   virtual Http::ConnectionCallbacks& callbacks() PURE;

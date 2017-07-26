@@ -174,6 +174,8 @@ struct Http2Settings {
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
+  // This setting applies to the HTTP/2 codec but is not an HTTP/2 setting per the spec.
+  uint32_t per_stream_buffer_limit_{DEFAULT_PER_STREAM_BUFFER_LIMIT};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -207,6 +209,9 @@ struct Http2Settings {
   // our default connection-level window also equals to our stream-level
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
+
+  // By default, do not enforce stream buffer limits beyond the connection level limits.
+  static const uint32_t DEFAULT_PER_STREAM_BUFFER_LIMIT = 0;
 };
 
 /**
