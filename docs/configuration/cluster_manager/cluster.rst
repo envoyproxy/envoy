@@ -150,9 +150,14 @@ http2_settings
 .. _config_cluster_manager_cluster_cleanup_interval_ms:
 
 cleanup_interval_ms
-  *(optional, integer)* The interval for removing stale hosts from the cluster. If this setting is
-  not specified, the value defaults to 5000. For cluster types other than *original_dst* this
-  setting is ignored.
+  *(optional, integer)* The interval for removing stale hosts from an *original_dst* cluster. Hosts
+  are considered stale if they have not been used as upstream destinations during this interval.
+  New hosts are added to original destination clusters on demand as new connections are redirected
+  to Envoy, causing the number of hosts in the cluster to grow over time. Hosts that are not stale
+  (they are actively used as destinations) are kept in the cluster, which allows connections to
+  them remain open, saving the latency that would otherwise be spent on opening new connections.
+  If this setting is not specified, the value defaults to 5000. For cluster types other than
+  *original_dst* this setting is ignored.
 
 .. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 
