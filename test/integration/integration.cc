@@ -369,38 +369,35 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
-  std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
-      [&]() -> void {
-        codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"},
-                                                                    {"x-lyft-user-id", "123"}},
-                                            *response);
-      },
-      [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-      },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForEndStream(*dispatcher_); },
-      [&]() -> void {
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
-      },
-      [&]() -> void { response->waitForEndStream(); },
-      // Cleanup both downstream and upstream
-      [&]() -> void { codec_client->close(); }};
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+       [&]() -> void {
+         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                     {":path", "/test/long/url"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"},
+                                                                     {"x-lyft-user-id", "123"}},
+                                             *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void {
+         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+       },
+       [&]() -> void { response->waitForEndStream(); },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); }});
 
-  if (close_upstream) {
-    actions.push_back([&]() -> void { fake_upstream_connection->close(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
-  }
-
-  executeActions(actions);
-
+  // fixfix comment
   if (!close_upstream) {
     test_server_.reset();
   }
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
 
   EXPECT_TRUE(request->complete());
   EXPECT_EQ(0U, request->bodyLength());
