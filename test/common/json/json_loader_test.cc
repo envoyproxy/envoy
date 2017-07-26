@@ -167,6 +167,18 @@ TEST(JsonLoaderTest, Basic) {
   }
 
   {
+    std::string json = R"EOF({})EOF";
+    ObjectSharedPtr config = Factory::loadFromString(json);
+    EXPECT_THROW(config->getStringArray("foo"), EnvoyException);
+  }
+
+  {
+    std::string json = R"EOF({})EOF";
+    ObjectSharedPtr config = Factory::loadFromString(json);
+    EXPECT_TRUE(config->getStringArray("foo", true).empty());
+  }
+
+  {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[2.0]}");
     EXPECT_THROW(json->getObjectArray("hello").at(0)->getDouble("foo"), Exception);
   }
