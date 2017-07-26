@@ -119,9 +119,9 @@ DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
-  // TODO(htuch): Figure out why we can't set this assertion, see
-  // https://github.com/lyft/envoy/issues/1294.
-  // ASSERT(isThreadSafe());
+  // We don't ASSERT that createTimer() is called on the run thread because timers are used for
+  // synchronization in various places across threads. Also, this call is actually thread safe as
+  // the event base has locking.
   return TimerPtr{new TimerImpl(*this, cb)};
 }
 
