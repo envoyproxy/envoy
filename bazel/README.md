@@ -61,6 +61,12 @@ Though Envoy has been run in production compiled with GCC 4.9 extensively, we no
 recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
 to work.
 
+## Clang STL debug symbols
+
+By default Clang drops some debug symbols that are required for pretty printing to work correctly.
+More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
+is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
