@@ -72,6 +72,7 @@ TEST_F(RedisEncoderDecoderImplTest, Integer) {
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
+  EXPECT_EQ(value.asInteger(), 9223372036854775807);
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerSmall) {
