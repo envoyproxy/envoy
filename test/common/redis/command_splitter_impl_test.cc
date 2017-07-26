@@ -484,7 +484,6 @@ TEST_F(RedisMSETCommandHandlerTest, Cancel) {
   handle_->cancel();
 };
 
-
 } // namespace CommandSplitter
 } // namespace Redis
 } // namespace Envoy
