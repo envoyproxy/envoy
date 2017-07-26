@@ -100,6 +100,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tls_context_json_lib",
+    srcs = ["tls_context_json.cc"],
+    hdrs = ["tls_context_json.h"],
+    external_deps = ["envoy_tls_context"],
+    deps = [
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

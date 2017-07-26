@@ -39,8 +39,15 @@ namespace ProtobufTypes {
 
 typedef std::string String;
 
-inline const String ToString(const std::string& s) { return s; }
-inline const std::string FromString(const String& s) { return s; }
+inline String ToString(const std::string& s) { return s; }
+inline std::string FromString(const String& s) { return s; }
+
+inline std::vector<std::string>
+stringVector(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source) {
+  std::vector<std::string> result;
+  std::transform(source.begin(), source.end(), std::back_inserter(result), FromString);
+  return result;
+}
 
 typedef int64_t Int64;
 
