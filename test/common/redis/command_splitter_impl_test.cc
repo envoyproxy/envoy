@@ -484,6 +484,18 @@ TEST_F(RedisMSETCommandHandlerTest, Cancel) {
   handle_->cancel();
 };
 
+TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
+  InSequence s;
+
+  RespValue response;
+  response.type(RespType::Error);
+  response.asString() = "wrong number of arguments for command";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  RespValue request;
+  makeBulkStringArray(request, {"mset", "foo", "bar", "fizz"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+};
+
 class RedisSplitKeysSumResultHandlerTest : public RedisCommandSplitterImplTest,
                                            public testing::WithParamInterface<std::string> {
 public:
