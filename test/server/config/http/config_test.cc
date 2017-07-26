@@ -60,6 +60,38 @@ TEST(HttpFilterConfigTest, BadBufferFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
+TEST(HttpFilterConfigTest, RateLimitFilter) {
+  std::string json_string = R"EOF(
+  {
+    "domain" : "test",
+    "timeout_ms" : 1337
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  RateLimitFilterConfig factory;
+  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
+  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, BadRateLimitFilterConfig) {
+  std::string json_string = R"EOF(
+  {
+    "domain" : "test",
+    "timeout_ms" : 0
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  RateLimitFilterConfig factory;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+}
+
 TEST(HttpFilterConfigTest, DynamoFilter) {
   std::string json_string = R"EOF(
   {

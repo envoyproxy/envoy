@@ -8,6 +8,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "api/protocol.pb.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -75,7 +77,7 @@ public:
    * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
    *         "http2_settings" JSON fields.
    */
-  static Http2Settings parseHttp2Settings(const Json::Object& config);
+  static Http2Settings parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config);
 
   /**
    * Create a locally generated response using filter callbacks.
