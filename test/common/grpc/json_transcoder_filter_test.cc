@@ -77,7 +77,7 @@ public:
     }
   }
 
-  void stripImports(FileDescriptorSet& descriptor_set, std::string file_name) {
+  void stripImports(FileDescriptorSet& descriptor_set, const ProtobufTypes::String& file_name) {
     FileDescriptorProto file_descriptor;
     // filter down descriptor_set to only contain one proto specified as file_name but none of its
     // dependencies
@@ -87,7 +87,7 @@ public:
                        // return whether file.name() ends with file_name
                        return file.name().length() >= file_name.length() &&
                               0 == file.name().compare(file.name().length() - file_name.length(),
-                                                       std::string::npos, file_name);
+                                                       ProtobufTypes::String::npos, file_name);
                      });
     RELEASE_ASSERT(file_itr != descriptor_set.file().end());
     file_descriptor = *file_itr;
