@@ -6,7 +6,7 @@ namespace Envoy {
 
 MissingFieldException::MissingFieldException(const std::string& field_name,
                                              const Protobuf::Message& message)
-    : EnvoyException(
-          fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
+    : EnvoyException(fmt::format("Field '{}' is missing in: {}", field_name,
+                                 ProtobufTypes::FromString(message.DebugString()))) {}
 
 } // namespace Envoy
