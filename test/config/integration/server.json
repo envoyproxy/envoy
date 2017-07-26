@@ -228,6 +228,21 @@
         ]
       }
     }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "redis_proxy",
+      "config": {
+        "cluster_name": "redis",
+        "stat_prefix": "redis",
+        "conn_pool": {
+          "op_timeout_ms": 400
+        }
+      }
+    }]
   }],
 
   "admin": { "access_log_path": "/dev/null",
@@ -292,6 +307,14 @@
       "connect_timeout_ms": 5000,
       "type": "strict_dns",
       "lb_type": "round_robin",
+      "dns_lookup_family": "{{ dns_lookup_family }}",
+      "hosts": [{"url": "tcp://localhost:4"}]
+    },
+    {
+      "name": "redis",
+      "connect_timeout_ms": 5000,
+      "type": "strict_dns",
+      "lb_type": "ring_hash",
       "dns_lookup_family": "{{ dns_lookup_family }}",
       "hosts": [{"url": "tcp://localhost:4"}]
     }]
