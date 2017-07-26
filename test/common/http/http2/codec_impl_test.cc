@@ -368,14 +368,14 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // updates to the client.
   server_.getStream(1)->readDisable(true);
 
-  uint32_t initial_window =
+  uint32_t initial_stream_window =
       nghttp2_session_get_stream_effective_local_window_size(client_.session(), 1);
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames.  Fast fail here with this explanatory comment.
-  ASSERT_EQ(65535, initial_window);
+  ASSERT_EQ(65535, initial_stream_window);
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
-  Buffer::OwnedImpl long_data(std::string(initial_window, 'a'));
+  Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
   // The one giant write will cause the buffer to go over the limit, then drain and go back under
   // the limit.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
@@ -386,7 +386,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // stream.
   EXPECT_EQ(0, nghttp2_session_get_stream_local_window_size(server_.session(), 1));
   EXPECT_EQ(0, nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
-  EXPECT_EQ(initial_window, server_.getStream(1)->unconsumed_bytes_);
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->unconsumed_bytes_);
 
   // Now that the flow control window is full, further data causes the send buffer to back up.
   Buffer::OwnedImpl ten_bytes("0123456789");
@@ -406,10 +406,58 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The 11 bytes sent won't trigger another window update, so the final window should be the
   // initial window minus the last 11 byte flush from the client to server.
-  EXPECT_EQ(initial_window - (SMALL_WINDOW + 1),
+  EXPECT_EQ(initial_stream_window - (SMALL_WINDOW + 1),
             nghttp2_session_get_stream_local_window_size(server_.session(), 1));
-  EXPECT_EQ(initial_window - (SMALL_WINDOW + 1),
+  EXPECT_EQ(initial_stream_window - (SMALL_WINDOW + 1),
             nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
+}
+
+// Set up the same asTestFlowControlInPendingSendData, but tears the stream down with an early reset
+// once the flow control window is full up.
+TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Force the server stream to be read disabled.  This will cause it to stop sending window
+  // updates to the client.
+  server_.getStream(1)->readDisable(true);
+
+  uint32_t initial_stream_window =
+      nghttp2_session_get_stream_effective_local_window_size(client_.session(), 1);
+  uint32_t initial_connection_window = nghttp2_session_get_remote_window_size(client_.session());
+  // If this limit is changed, this test will fail due to the initial large writes being divided
+  // into more than 4 frames.  Fast fail here with this explanatory comment.
+  ASSERT_EQ(65535, initial_stream_window);
+  // One large write gets broken into smaller frames.
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
+  Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
+  // The one giant write will cause the buffer to go over the limit, then drain and go back under
+  // the limit.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  request_encoder_->encodeData(long_data, false);
+
+  // Verify that the window is full.  The client will not send more data to the server for this
+  // stream.
+  EXPECT_EQ(0, nghttp2_session_get_stream_local_window_size(server_.session(), 1));
+  EXPECT_EQ(0, nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->unconsumed_bytes_);
+  EXPECT_GT(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
+  response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
+
+  // Regression test that the window is consumed even if the stream is destroyed early.
+  EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
 }
 
 #define HTTP2SETTINGS_DEFERRED_RESET_COMBINE                                                       \

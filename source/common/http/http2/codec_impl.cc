@@ -60,7 +60,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   }
 }
 
-ConnectionImpl::StreamImpl::~StreamImpl() {}
+ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(unconsumed_bytes_ == 0); }
 
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,
                                               const HeaderMap& headers) {
@@ -500,6 +500,8 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
+    nghttp2_session_consume(session_, stream_id, stream->unconsumed_bytes_);
+    stream->unconsumed_bytes_ = 0;
     nghttp2_session_set_stream_user_data(session_, stream->stream_id_, nullptr);
   }
 
