@@ -81,9 +81,14 @@ public:
     FileDescriptorProto file_descriptor;
     // filter down descriptor_set to only contain one proto specified as file_name but none of its
     // dependencies
-    auto file_itr = std::find_if(
-        descriptor_set.file().begin(), descriptor_set.file().end(),
-        [&file_name](const FileDescriptorProto& file) { return file.name() == file_name; });
+    auto file_itr =
+        std::find_if(descriptor_set.file().begin(), descriptor_set.file().end(),
+                     [&file_name](const FileDescriptorProto& file) {
+                       // return whether file.name() ends with file_name
+                       return file.name().length() >= file_name.length() &&
+                              0 == file.name().compare(file.name().length() - file_name.length(),
+                                                       std::string::npos, file_name);
+                     });
     RELEASE_ASSERT(file_itr != descriptor_set.file().end());
     file_descriptor = *file_itr;
 

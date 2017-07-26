@@ -6,7 +6,7 @@ set -e
 . ./ci/envoy_build_sha.sh
 
 # Lint travis file.
-travis lint .travis.yml --skip-completion-check
+#travis lint .travis.yml --skip-completion-check
 
 # Where the Envoy build takes place.
 export ENVOY_BUILD_DIR=/tmp/envoy-docker-build
