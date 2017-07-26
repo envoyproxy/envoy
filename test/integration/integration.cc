@@ -391,7 +391,8 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
        // Cleanup both downstream and upstream
        [&]() -> void { codec_client->close(); }});
 
-  // fixfix comment
+  // The following allows us to test shutting down the server with active connection pool
+  // connections. Either way we need to clean up the upstream connections to avoid race conditions.
   if (!close_upstream) {
     test_server_.reset();
   }

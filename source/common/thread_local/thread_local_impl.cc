@@ -19,9 +19,11 @@ InstanceImpl::~InstanceImpl() { reset(); }
 SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
 
-  for (auto& slot : slots_) {
-    if (slot == nullptr) {
-      ASSERT(false); // fixfix
+  for (uint64_t i = 0; i < slots_.size(); i++) {
+    if (slots_[i] == nullptr) {
+      std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, i));
+      slots_[i] = slot.get();
+      return slot;
     }
   }
 
@@ -51,9 +53,13 @@ void InstanceImpl::removeSlot(SlotImpl& slot) {
     return;
   }
 
-  const int32_t index = slot.index_;
+  const uint64_t index = slot.index_;
   slots_[index] = nullptr;
-  runOnAllThreads([index]() -> void { thread_local_data_.data_[index] = nullptr; });
+  runOnAllThreads([index]() -> void {
+    if (index < thread_local_data_.data_.size()) {
+      thread_local_data_.data_[index] = nullptr;
+    }
+  });
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
@@ -90,7 +96,16 @@ void InstanceImpl::shutdownGlobalThreading() {
   shutdown_ = true;
 }
 
-void InstanceImpl::shutdownThread() { thread_local_data_.data_.clear(); }
+void InstanceImpl::shutdownThread() {
+  // Destruction of slots is done in *reverse* order. This is so that filters and higher layer
+  // things that are built on top of the cluster manager, stats, etc. will be destroyed before
+  // more base layer things. It's possible this might need to become more complicated later but
+  // it's OK for now.
+  for (auto it = thread_local_data_.data_.rbegin(); it != thread_local_data_.data_.rend(); ++it) {
+    it->reset();
+  }
+  thread_local_data_.data_.clear();
+}
 
 void InstanceImpl::reset() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);

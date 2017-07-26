@@ -28,7 +28,7 @@ public:
 
 private:
   struct SlotImpl : public Slot {
-    SlotImpl(InstanceImpl& parent, uint32_t index) : parent_(parent), index_(index) {}
+    SlotImpl(InstanceImpl& parent, uint64_t index) : parent_(parent), index_(index) {}
     ~SlotImpl() { parent_.removeSlot(*this); }
 
     // ThreadLocal::Slot
@@ -37,7 +37,7 @@ private:
     void set(InitializeCb cb) override;
 
     InstanceImpl& parent_;
-    const uint32_t index_;
+    const uint64_t index_;
   };
 
   struct ThreadLocalData {
