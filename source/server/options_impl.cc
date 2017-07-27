@@ -11,6 +11,10 @@
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
+#if defined(__APPLE__)
+#define uint64_t unsigned long
+#endif
+
 namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_version,
                          spdlog::level::level_enum default_log_level) {
