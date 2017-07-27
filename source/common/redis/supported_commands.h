@@ -10,9 +10,7 @@ struct SupportedCommands {
   /**
    * @return commands which hash to a single server
    */
-  static const std::vector<std::string>& allToOneCommands() {
-    // TODO(danielhochman): DEL should hash to multiple servers and is only added for testing single
-    // key deletes
+  static const std::vector<std::string>& simpleCommands() {
     static const std::vector<std::string>* commands =
         new std::vector<std::string>{"append",
                                      "bitcount",
@@ -20,7 +18,6 @@ struct SupportedCommands {
                                      "bitpos",
                                      "decr",
                                      "decrby",
-                                     "del",
                                      "dump",
                                      "expire",
                                      "expireat",
@@ -106,7 +103,33 @@ struct SupportedCommands {
                                      "zscore"};
     return *commands;
   }
-  // TODO(danielhochman): static vector of commands that hash to multiple servers: mget, mset, del
+
+  /**
+   * @return commands which are sent to multiple servers and coalesced by summing the responses
+   */
+  static const std::vector<std::string>& hashMultipleSumResultCommands() {
+    static const std::vector<std::string>* commands =
+        new std::vector<std::string>{"del", "exists", "touch", "unlink"};
+    return *commands;
+  }
+
+  /**
+   * @return mget command
+   */
+  static const std::string& mget() {
+    static const std::string* command = new std::string("mget");
+    return *command;
+  }
+
+  /**
+   * @return mset command
+   */
+  static const std::string& mset() {
+    static const std::string* command = new std::string("mset");
+    return *command;
+  }
+
+  // TODO(danielhochman): support for EVAL with argument enforcement
 };
 
 } // namespace Redis
