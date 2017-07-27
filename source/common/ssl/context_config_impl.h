@@ -7,6 +7,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "api/tls_context.pb.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -26,7 +28,8 @@ public:
   const std::string& verifyCertificateHash() const override { return verify_certificate_hash_; };
 
 protected:
-  ContextConfigImpl(const Json::Object& config);
+  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config,
+                    const envoy::api::v2::TlsCertificate& cert);
 
 private:
   static const std::string DEFAULT_CIPHER_SUITES;
@@ -41,11 +44,11 @@ private:
   const std::string private_key_file_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
-  const std::string server_name_indication_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
+  ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
   ClientContextConfigImpl(const Json::Object& config);
 
   // Ssl::ClientContextConfig

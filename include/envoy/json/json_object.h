@@ -105,9 +105,11 @@ public:
   /**
    * Get a string array by name.
    * @param name supplies the key name.
+   * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<std::string> the array of strings.
    */
-  virtual std::vector<std::string> getStringArray(const std::string& name) const PURE;
+  virtual std::vector<std::string> getStringArray(const std::string& name,
+                                                  bool allow_empty = false) const PURE;
 
   /**
    * Get a double value by name.
