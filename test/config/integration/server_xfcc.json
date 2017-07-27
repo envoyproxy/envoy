@@ -179,7 +179,7 @@
       "connect_timeout_ms": 5000,
       "ssl_context": {
         "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
-        "verify_subject_alt_name": [ "foo.lyft.com" ]
+        "verify_subject_alt_name": [ "*.lyft.com" ]
       },
       "type": "static",
       "lb_type": "round_robin",
@@ -190,7 +190,7 @@
       "connect_timeout_ms": 5000,
       "ssl_context": {
         "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
-        "verify_subject_alt_name": [ "foo.lyft.com" ]
+        "verify_subject_alt_name": [ "*.lyft.com" ]
       },
       "type": "strict_dns",
       "lb_type": "round_robin",
