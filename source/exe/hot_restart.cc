@@ -157,10 +157,8 @@ int HotRestartImpl::bindDomainSocket(uint64_t id) {
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
 
-  int size = sizeof(address);
-  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), size);
+  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (rc != 0) {
-    printf("errno = %d (%s)\n", errno, strerror(errno));
     throw EnvoyException(
         fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
   }
@@ -458,7 +456,6 @@ void HotRestartImpl::shutdown() { socket_event_.reset(); }
 std::string HotRestartImpl::version() { return SharedMemory::version(); }
 
 #endif // __linux__
-
 
 } // namespace Server
 } // namespace Envoy

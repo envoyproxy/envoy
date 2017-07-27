@@ -480,18 +480,9 @@ public:
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Network::FilterStatus {
-          printf("onData\n");
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
-
-          if (data.length() == 1) {
-            if (filter_seen < 8 || filter_seen >= (write_size * num_writes) - 8) {
-              printf("filter_seen = %u (of %u)\n", filter_seen, write_size * num_writes);
-            }
-          } else {
-            printf("filter_seen = %u (of %u)\n", filter_seen, write_size * num_writes);
-          }
 
           if (filter_seen == (write_size * num_writes)) {
             server_connection_->close(Network::ConnectionCloseType::FlushWrite);
@@ -501,7 +492,6 @@ public:
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
-          printf("close\n");
           EXPECT_EQ((write_size * num_writes), filter_seen);
           dispatcher_->exit();
         }));

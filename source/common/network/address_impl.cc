@@ -141,11 +141,11 @@ int Ipv4Instance::connect(int fd) const {
 }
 
 int Ipv4Instance::socket(SocketType type) const {
-    int fd = ::socket(AF_INET, flagsFromSocketType(type), 0);
+  int fd = ::socket(AF_INET, flagsFromSocketType(type), 0);
 #ifdef __APPLE__
-    if (fd >= 0) {
-      RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-    }
+  if (fd != -1) {
+    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+  }
 #endif
     return fd;
 }
@@ -207,9 +207,7 @@ int Ipv6Instance::socket(SocketType type) const {
   RELEASE_ASSERT(fd != -1);
 
 #ifdef __APPLE__
-  if (fd >= 0) {
-    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-  }
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
 #endif
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
@@ -244,7 +242,9 @@ int PipeInstance::connect(int fd) const {
 int PipeInstance::socket(SocketType type) const {
     int fd = ::socket(AF_UNIX, flagsFromSocketType(type), 0);
 #ifdef __APPLE__
-    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+    if (fd != -1) {
+      RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+    }
 #endif
     return fd;
 }
