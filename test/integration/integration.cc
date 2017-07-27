@@ -943,7 +943,7 @@ void BaseIntegrationTest::testConnect() {
   testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
 }
 
-void BaseIntegrationTest::testEquivalent(std::string request) {
+void BaseIntegrationTest::testEquivalent(const std::string& request) {
   Buffer::OwnedImpl buffer1(request);
   std::string response1;
   RawConnectionDriver connection1(

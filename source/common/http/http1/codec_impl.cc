@@ -377,10 +377,7 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
-// handlePath computes the correct
-// Throws CodecProtocolException on bad request
 void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
-  // TODO(mattwoodyard) - check configuration option if forward proxy is enabled
   HeaderString path(Headers::get().Path);
 
   bool is_connect = (method == HTTP_CONNECT);
@@ -399,7 +396,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
     return;
   }
 
-  if (method == HTTP_CONNECT) {
+  if (is_connect) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
@@ -460,6 +457,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
     // CONNECT
     handlePath(*headers, parser_.method);
+    ASSERT(active_request_->request_url_.empty());
 
     headers->insertMethod().value(method_string, strlen(method_string));
 
