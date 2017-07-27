@@ -74,7 +74,7 @@ public:
   std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const override;
   std::string getString(const std::string& name) const override;
   std::string getString(const std::string& name, const std::string& default_value) const override;
-  std::vector<std::string> getStringArray(const std::string& name) const override;
+  std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
 
@@ -429,16 +429,19 @@ std::string Field::getString(const std::string& name, const std::string& default
   }
 }
 
-std::vector<std::string> Field::getStringArray(const std::string& name) const {
+std::vector<std::string> Field::getStringArray(const std::string& name, bool allow_empty) const {
   checkType(Type::Object);
+  std::vector<std::string> string_array;
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
+    if (allow_empty && value_itr == value_.object_value_.end()) {
+      return string_array;
+    }
     throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
-  std::vector<std::string> string_array;
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {

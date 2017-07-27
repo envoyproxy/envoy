@@ -70,6 +70,7 @@ private:
   }
 #endif
 
+  Thread::ThreadId run_tid_{};
   Buffer::FactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
@@ -80,7 +81,6 @@ private:
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
   bool deferred_deleting_{};
-  Thread::ThreadId run_tid_{};
 };
 
 } // namespace Event
