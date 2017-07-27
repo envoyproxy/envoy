@@ -104,6 +104,11 @@ const std::string addressVersionAsString(const Address::IpVersion version) {
 
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
+#ifdef __APPLE__
+    // By default, only 127.0.0.1 is configured to loopback.
+    // Aliases can be added one-at-a-time: sudo ifconfig lo0 alias 127.0.0.2
+    return Network::Utility::getCanonicalIpv4LoopbackAddress();
+#else
     // Pick a random address in 127.0.0.0/8.
     TestRandomGenerator rng;
     sockaddr_in sin;
@@ -113,6 +118,7 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
     uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&sin.sin_addr.s_addr);
     address_bytes[0] = 127;
     return std::make_shared<Address::Ipv4Instance>(&sin);
+#endif
   } else {
     // There is only one IPv6 loopback address.
     return Network::Utility::getIpv6LoopbackAddress();
