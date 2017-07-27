@@ -2,7 +2,11 @@
 
 #include <signal.h>
 #include <sys/mman.h>
+
+#if defined(__linux__)
 #include <sys/prctl.h>
+#endif
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -16,6 +20,7 @@
 #include "envoy/server/options.h"
 
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "spdlog/spdlog.h"
@@ -82,12 +87,15 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutexattr_t attribute;
   pthread_mutexattr_init(&attribute);
   pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
+#ifdef PTHREAD_MUTEX_ROBUST
   pthread_mutexattr_setrobust(&attribute, PTHREAD_MUTEX_ROBUST);
+#endif
   pthread_mutex_init(&mutex, &attribute);
 }
 
 std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeof(SharedMemory)); }
 
+#ifdef __linux__
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
       access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
@@ -105,6 +113,14 @@ HotRestartImpl::HotRestartImpl(Options& options)
   RELEASE_ASSERT(rc != -1);
   UNREFERENCED_PARAMETER(rc);
 }
+
+#else // __linux__
+
+HotRestartImpl::HotRestartImpl(Options& options)
+    : shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
+      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_) { }
+
+#endif // __linux__
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
@@ -133,13 +149,18 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   memset(&data, 0, sizeof(Stats::RawStatData));
 }
 
+#ifdef __linux__
+
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
-  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+
+  int size = sizeof(address);
+  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), size);
   if (rc != 0) {
+    printf("errno = %d (%s)\n", errno, strerror(errno));
     throw EnvoyException(
         fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
   }
@@ -161,6 +182,7 @@ sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
                       fmt::format("envoy_domain_socket_{}", options_.baseId() + id).c_str(),
                       sizeof(address.sun_path) - 1);
   address.sun_path[0] = 0;
+
   return address;
 }
 
@@ -434,6 +456,9 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() { return SharedMemory::version(); }
+
+#endif // __linux__
+
 
 } // namespace Server
 } // namespace Envoy

@@ -70,9 +70,11 @@ public:
     // getting into a further messed up state.
     int rc = pthread_mutex_lock(&mutex_);
     ASSERT(rc == 0 || rc == EOWNERDEAD);
+#ifdef PTHREAD_MUTEX_ROBUST
     if (rc == EOWNERDEAD) {
       pthread_mutex_consistent(&mutex_);
     }
+#endif
   }
 
   bool try_lock() override {
@@ -82,10 +84,11 @@ public:
     }
 
     ASSERT(rc == 0 || rc == EOWNERDEAD);
+#ifdef PTHREAD_MUTEX_ROBUST
     if (rc == EOWNERDEAD) {
       pthread_mutex_consistent(&mutex_);
     }
-
+#endif
     return true;
   }
 
@@ -99,6 +102,7 @@ private:
   pthread_mutex_t& mutex_;
 };
 
+#ifdef __linux__
 /**
  * Implementation of HotRestart built for Linux.
  */
@@ -200,6 +204,41 @@ private:
   Server::Instance* server_{};
   bool parent_terminated_{};
 };
+
+#else // __linux__
+
+/**
+ * No-op implementation of HotRestart for everybody else.
+ */
+class HotRestartImpl : public HotRestart,
+                       public Stats::RawStatDataAllocator {
+public:
+    HotRestartImpl(Options& options);
+
+    Thread::BasicLockable& logLock() { return log_lock_; }
+    Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
+
+    // Server::HotRestart
+    void drainParentListeners() override {}
+    int duplicateParentListenSocket(const std::string&) override { return -1; }
+    void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
+    void initialize(Event::Dispatcher&, Server::Instance&) override {}
+    void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
+    void terminateParent() override {}
+    void shutdown() override {}
+    std::string version() override { return "disabled"; }
+
+    // RawStatDataAllocator
+    Stats::RawStatData* alloc(const std::string& name) override;
+    void free(Stats::RawStatData& data) override;
+
+private:
+    SharedMemory& shmem_;
+    ProcessSharedMutex log_lock_;
+    ProcessSharedMutex access_log_lock_;
+    ProcessSharedMutex stat_lock_;
+};
+#endif // __linux__
 
 } // namespace Server
 } // namespace Envoy
