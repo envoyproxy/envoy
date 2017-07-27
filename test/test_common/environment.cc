@@ -73,11 +73,10 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
     if (TestEnvironment::shouldRunTestForIpVersion(version)) {
       parameters.push_back(version);
       if (!Network::Test::supportsIpVersion(version)) {
-        Logger::Registry::getLog(Logger::Id::testing)
-            .warn(
-                fmt::format("Testing with IP{} addresses may not be supported on this machine. If "
+        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), warn,
+                            "Testing with IP{} addresses may not be supported on this machine. If "
                             "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
-                            Network::Test::addressVersionAsString(version)));
+                            Network::Test::addressVersionAsString(version));
       }
     }
   }
