@@ -64,7 +64,11 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   if (rc != 0) {
     throw EnvoyException(fmt::format("getpeername failed for '{}': {}", fd, strerror(errno)));
   }
+#ifdef __APPLE__
+  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX) {
+#else
   if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX) {
+#endif
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
