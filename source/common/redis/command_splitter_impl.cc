@@ -125,6 +125,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   }
   case RespType::Error: {
     error_count_++;
+    // fall through
   }
   case RespType::BulkString: {
     pending_response_->asArray()[index].asString().swap(value->asString());
@@ -189,8 +190,10 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 
   switch (value->type()) {
   case RespType::SimpleString: {
-    if (value->asString() == "OK")
+    if (value->asString() == "OK") {
       break;
+    }
+    // else fall through
   }
   default: {
     error_count_++;
@@ -234,7 +237,8 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
     single_fragment.asArray()[1].asString() = incoming_request.asArray()[i].asString();
-    ENVOY_LOG(debug, "redis: parallel del: '{}'", single_fragment.toString());
+    ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request.asArray()[0].asString(),
+              single_fragment.toString());
     pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
                                                     single_fragment, pending_request);
     if (!pending_request.handle_) {
