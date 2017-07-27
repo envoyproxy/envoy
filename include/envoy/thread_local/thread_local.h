@@ -81,7 +81,9 @@ public:
    * A thread (via its dispatcher) must be registered before set() is called on any allocated slots
    * to receive thread local data updates.
    * @param dispatcher supplies the thread's dispatcher.
-   * @param main_thread supplies whether this is the main program thread or a worker thread.
+   * @param main_thread supplies whether this is the main program thread or not. (The only
+   *                    difference is that callbacks fire immediately on the main thread when posted
+   *                    from the main thread).
    */
   virtual void registerThread(Event::Dispatcher& dispatcher, bool main_thread) PURE;
 

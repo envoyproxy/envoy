@@ -45,7 +45,6 @@ private:
   };
 
   void removeSlot(SlotImpl& slot);
-  void reset();
   void runOnAllThreads(Event::PostCb cb);
   static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
 
@@ -54,7 +53,7 @@ private:
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  bool shutdown_{};
+  std::atomic<bool> shutdown_{};
 };
 
 } // namespace ThreadLocal

@@ -148,21 +148,31 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string& name,
                                                               uint64_t value) {
-  if (!parent_.shutting_down_) {
-    std::string final_name = prefix_ + name;
-    for (Sink& sink : parent_.timer_sinks_) {
-      sink.onHistogramComplete(final_name, value);
-    }
+  // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
+  // This is because the sinks may end up trying to create new connections via the thread local
+  // cluster manager which may already be destroyed (there is no way to sequence this because the
+  // cluster manager destroying can create deliveries). We special case this explicitly to avoid
+  // having to implement a shutdown() method (or similar) on every TLS object.
+  if (parent_.shutting_down_) {
+    return;
+  }
+
+  const std::string final_name = prefix_ + name;
+  for (Sink& sink : parent_.timer_sinks_) {
+    sink.onHistogramComplete(final_name, value);
   }
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverTimingToSinks(const std::string& name,
                                                            std::chrono::milliseconds ms) {
-  if (!parent_.shutting_down_) {
-    std::string final_name = prefix_ + name;
-    for (Sink& sink : parent_.timer_sinks_) {
-      sink.onTimespanComplete(final_name, ms);
-    }
+  // See comment in deliverHistogramToSinks() for why we guard this.
+  if (parent_.shutting_down_) {
+    return;
+  }
+
+  const std::string final_name = prefix_ + name;
+  for (Sink& sink : parent_.timer_sinks_) {
+    sink.onTimespanComplete(final_name, ms);
   }
 }
 
