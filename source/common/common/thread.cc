@@ -1,6 +1,6 @@
 #include "common/common/thread.h"
 
-#ifdef linux
+#ifdef __linux__
 #include <sys/syscall.h>
 #elif defined(__FreeBSD__)
 #include <pthread_np.h>
@@ -28,7 +28,7 @@ Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_ro
 }
 
 int32_t Thread::currentThreadId() {
-#ifdef linux
+#ifdef __linux__
   return syscall(SYS_gettid);
 #elif defined(__FreeBSD__)
   return pthread_getthreadid_np();
