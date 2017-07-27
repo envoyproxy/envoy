@@ -78,7 +78,14 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
 }
 
 int InstanceBase::flagsFromSocketType(SocketType type) const {
+#if defined(__FreeBSD__)
+  int flags = O_NONBLOCK;
+#elif defined(__APPLE__)
+  int flags = 0;
+#else
   int flags = SOCK_NONBLOCK;
+#endif
+
   if (type == SocketType::Stream) {
     flags |= SOCK_STREAM;
   } else {
@@ -130,7 +137,13 @@ int Ipv4Instance::connect(int fd) const {
 }
 
 int Ipv4Instance::socket(SocketType type) const {
-  return ::socket(AF_INET, flagsFromSocketType(type), 0);
+    int fd = ::socket(AF_INET, flagsFromSocketType(type), 0);
+#ifdef __APPLE__
+    if (fd >= 0) {
+      RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+    }
+#endif
+    return fd;
 }
 
 std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
@@ -188,6 +201,13 @@ int Ipv6Instance::connect(int fd) const {
 int Ipv6Instance::socket(SocketType type) const {
   const int fd = ::socket(AF_INET6, flagsFromSocketType(type), 0);
   RELEASE_ASSERT(fd != -1);
+
+#ifdef __APPLE__
+  if (fd >= 0) {
+    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+  }
+#endif
+
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = 1;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1);
@@ -218,7 +238,11 @@ int PipeInstance::connect(int fd) const {
 }
 
 int PipeInstance::socket(SocketType type) const {
-  return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
+    int fd = ::socket(AF_UNIX, flagsFromSocketType(type), 0);
+#ifdef __APPLE__
+    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+#endif
+    return fd;
 }
 
 } // namespace Address
