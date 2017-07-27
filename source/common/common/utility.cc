@@ -190,4 +190,10 @@ bool StringUtil::startsWith(const char* source, const std::string& start, bool c
     return strncasecmp(source, start.c_str(), start.size()) == 0;
   }
 }
+
+const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
+                                                       const std::string& default_value) {
+  return s.empty() ? default_value : s;
+}
+
 } // namespace Envoy

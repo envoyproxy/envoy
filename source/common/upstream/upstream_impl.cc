@@ -17,6 +17,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
+#include "common/config/tls_context_json.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -78,7 +79,10 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
 
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
-    Ssl::ClientContextConfigImpl context_config(*config.getObject("ssl_context"));
+    envoy::api::v2::UpstreamTlsContext upstream_tls_context;
+    Config::TlsContextJson::translateUpstreamTlsContext(*config.getObject("ssl_context"),
+                                                        upstream_tls_context);
+    Ssl::ClientContextConfigImpl context_config(upstream_tls_context);
     ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
   }
 

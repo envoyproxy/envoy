@@ -27,9 +27,13 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
+    external_deps = ["envoy_tls_context"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
