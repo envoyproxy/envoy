@@ -113,7 +113,8 @@ void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
 void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
   ASSERT(current_slice_mem_ != nullptr);
   // 40 > 6 (prefix) + 4 (random chars) + 30 for number (bigger than it will ever be)
-  if (current_buffer_slice_.len_ - usedBuffer() < name.size() + 40) {
+  const uint32_t max_size = name.size() + 40;
+  if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
     endFlush(false);
     beginFlush(false);
   }
@@ -132,7 +133,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   *current_slice_mem_++ = stat_type;
   *current_slice_mem_++ = '\n';
 
-  ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < name.size() + 40);
+  ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < max_size);
   UNREFERENCED_PARAMETER(snapped_current);
 }
 
