@@ -121,10 +121,26 @@ void InstanceImpl::shutdownThread() {
 
   // Destruction of slots is done in *reverse* order. This is so that filters and higher layer
   // things that are built on top of the cluster manager, stats, etc. will be destroyed before
-  // more base layer things. It's possible this might need to become more complicated later but
-  // it's OK for now. Note that this is always safe to do because:
+  // more base layer things. The reason reverse ordering is done is to deal with the potentially
+  // likely case that leaf objects depend in some way on "persistent" objects (particularly the
+  // cluster manager) that are created very early on with a known slot number and never destroyed
+  // until shutdown. For example, if we chose to create persistent per-thread gRPC clients we would
+  // potentially run into shutdown issues if that thing got destroyed after the cluster manager.
+  // Examples of things with TLS that are created early on and are never destroyed until server
+  // shutdown are stats, runtime, and the cluster manager (see server.cc).
+  //
+  // It's possible this might need to become more complicated later but it's OK for now. Note that
+  // this is always safe to do because:
   // 1) All slot updates come in via post().
   // 2) No updates or removals will come in during shutdown().
+  //
+  // TODO(mattklein123): Deletion should really be in reverse *allocation* order. This could be
+  //                     implemented relatively easily by keeping a parallel list of slot #s. This
+  //                     would fix the case where something allocates two slots, but is interleaved
+  //                     with a deletion, such that the second allocation is actually a lower slot
+  //                     number than the first. This is an edge case that does not exist anywhere
+  //                     in the code today, but we can keep this in mind if things become more
+  //                     complicated in the future.
   for (auto it = thread_local_data_.data_.rbegin(); it != thread_local_data_.data_.rend(); ++it) {
     it->reset();
   }
