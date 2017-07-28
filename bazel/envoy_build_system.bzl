@@ -20,7 +20,6 @@ def envoy_copts(repository, test = False):
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
-        "//bazel/osx:darwin": [],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
