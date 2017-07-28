@@ -173,6 +173,37 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponse) {
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* request_callbacks1;
+  CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* request_callbacks2;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    RespValuePtr request1(new RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
+    decoder_callbacks_->onRespValue(std::move(request1));
+
+    RespValuePtr request2(new RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2)), Return(request_handle2)));
+    decoder_callbacks_->onRespValue(std::move(request2));
+  }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data));
+
+  EXPECT_EQ(2UL, config_->stats().downstream_rq_total_.value());
+  EXPECT_EQ(2UL, config_->stats().downstream_rq_active_.value());
+
+  RespValuePtr response2(new RespValue());
+  request_callbacks2->onResponse(std::move(response2));
+  EXPECT_CALL(*request_handle1, cancel());
+
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   InSequence s;
 
