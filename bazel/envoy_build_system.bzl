@@ -29,6 +29,9 @@ def envoy_copts(repository, test = False):
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
+        # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
+        # The file could should contain the current git SHA (or enough placeholder data to allow
+        # it to be rewritten by tools/git_sha_rewriter.py).
         "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": [
             "-pthread",
