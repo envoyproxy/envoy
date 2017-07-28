@@ -1,4 +1,4 @@
-#include "common/filesystem/watcher_impl_linux.h"
+#include "common/filesystem/watcher_impl.h"
 
 #include <sys/inotify.h>
 

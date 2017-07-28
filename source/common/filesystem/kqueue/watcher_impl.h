@@ -14,7 +14,9 @@ namespace Envoy {
 namespace Filesystem {
 
 /**
- * Implementation of Watcher that uses kqueue.
+ * Implementation of Watcher that uses kqueue. If the file being watched doesn't exist, we watch
+ * the directory, and then try to add a file watch each time there's a write event to the
+ * directory.
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:

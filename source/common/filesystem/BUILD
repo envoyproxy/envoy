@@ -22,16 +22,20 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "watcher_lib",
-    srcs = [
-        "watcher_impl.cc",
-    ],
-    hdrs = [
-        "watcher_impl.h",
-        "watcher_impl_bsd.cc",
-        "watcher_impl_bsd.h",
-        "watcher_impl_linux.cc",
-        "watcher_impl_linux.h",
-    ],
+    srcs = select({
+        "@bazel_tools//tools/osx:darwin": [
+            "kqueue/watcher_impl.cc",
+        ],
+        "//conditions:default": [
+            "inotify/watcher_impl.cc",
+        ]}),
+    hdrs = select({
+        "@bazel_tools//tools/osx:darwin": [
+            "kqueue/watcher_impl.h",
+        ],
+        "//conditions:default": [
+            "inotify/watcher_impl.h",
+        ]}),
     external_deps = ["event"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
@@ -40,4 +44,8 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
     ],
+    strip_include_prefix = select({
+        "@bazel_tools//tools/osx:darwin": "kqueue",
+        "//conditions:default": "inotify",
+    }),
 )
