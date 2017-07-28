@@ -23,7 +23,7 @@ namespace Http {
 namespace WebSocket {
 
 WsHandlerImpl::WsHandlerImpl(Http::HeaderMap& request_headers,
-                             const Router::RouteEntry* route_entry,
+                             const Router::RouteEntry& route_entry,
                              StreamDecoderFilterCallbacks& stream,
                              Upstream::ClusterManager& cluster_manager)
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
@@ -34,7 +34,7 @@ WsHandlerImpl::~WsHandlerImpl() {}
 void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  const std::string& cluster_name = route_entry_->clusterName();
+  const std::string& cluster_name = route_entry_.clusterName();
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
   if (thread_local_cluster) {
@@ -61,9 +61,9 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
   Upstream::Host::CreateConnectionData conn_info = cluster_manager_.tcpConnForCluster(cluster_name);
 
   // path and host rewrites
-  route_entry_->finalizeRequestHeaders(request_headers_);
+  route_entry_.finalizeRequestHeaders(request_headers_);
   // for auto host rewrite
-  if (route_entry_->autoHostRewrite() && !conn_info.host_description_->hostname().empty()) {
+  if (route_entry_.autoHostRewrite() && !conn_info.host_description_->hostname().empty()) {
     request_headers_.Host()->value(conn_info.host_description_->hostname());
   }
 
@@ -77,7 +77,7 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
     return;
   }
 
-  Filter::TcpProxy::commonInitializeUpstreamConnection(cluster);
+  Filter::TcpProxy::commonInitializeUpstreamConnection(*cluster);
 }
 
 void WsHandlerImpl::onConnectTimeout() {
@@ -90,15 +90,17 @@ void WsHandlerImpl::onConnectTimeout() {
 }
 
 void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
-  if (event & Network::ConnectionEvent::RemoteClose) {
-    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
-  }
-
   if (event & Network::ConnectionEvent::LocalClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
   }
 
   if (event & Network::ConnectionEvent::RemoteClose) {
+    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
+
+    // We send a BadGateway response if upstream close occurs before the connection
+    // is established (i.e. non-null connect_timeout_timer). If upstream close occurs
+    // after the connection is established, then we close and flush the connection as
+    // in TCP proxy.
     if (connect_timeout_timer_) {
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();

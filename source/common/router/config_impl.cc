@@ -75,7 +75,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
       auto_host_rewrite_(route.getBoolean("auto_host_rewrite", false)),
-      allow_websocket_upgrade_(route.getBoolean("allow_websocket_upgrade", false)),
+      use_websocket_(route.getBoolean("use_websocket", false)),
       cluster_name_(route.getString("cluster", "")),
       cluster_header_name_(route.getString("cluster_header", "")),
       timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
@@ -103,7 +103,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   }
 
   // WebSockets are not allowed in redirect route entries.
-  if (isRedirect() && allow_websocket_upgrade_) {
+  if (isRedirect() && use_websocket_) {
     throw EnvoyException("Redirect route entries must not have WebSockets enabled");
   }
 

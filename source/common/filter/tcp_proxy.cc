@@ -140,6 +140,7 @@ void TcpProxy::readDisableUpstream(bool disable) {
 
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
+  // The WsHandlerImpl class uses TCP Proxy code with a null config.
   if (!config_) {
     return;
   }
@@ -179,8 +180,13 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   parent_.readDisableDownstream(false);
 }
 
-void TcpProxy::commonInitializeUpstreamConnection(Upstream::ClusterInfoConstSharedPtr cluster) {
-  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
+// WebSocket handler (WsHandlerImpl) and generic TCP proxy share similar upstream
+// initialization tasks, with the exception of how they handle error cases. On error,
+// Tcp proxy simply closes downstream TCP connection, whereas WsHandlerImpl sends
+// HTTP error codes to downstream. Once they initialize/kick start the upstream connection,
+// they share the same setup tasks such as setting up callbacks, stats connect timers.
+void TcpProxy::commonInitializeUpstreamConnection(const Upstream::ClusterInfo& cluster) {
+  cluster.resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
   upstream_connection_->setBufferStats(
@@ -193,7 +199,7 @@ void TcpProxy::commonInitializeUpstreamConnection(Upstream::ClusterInfoConstShar
 
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
       [this]() -> void { onConnectTimeout(); });
-  connect_timeout_timer_->enableTimer(cluster->connectTimeout());
+  connect_timeout_timer_->enableTimer(cluster.connectTimeout());
 
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_total_.inc();
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();
@@ -234,7 +240,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  commonInitializeUpstreamConnection(cluster);
+  commonInitializeUpstreamConnection(*cluster);
   return Network::FilterStatus::Continue;
 }
 

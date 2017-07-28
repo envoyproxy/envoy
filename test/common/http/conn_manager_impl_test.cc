@@ -536,7 +536,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectNonWebSocketOnWebSocketRoute) {
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, allowWebSocketUpgrade())
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
       .WillByDefault(Return(true));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);

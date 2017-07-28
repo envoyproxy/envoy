@@ -178,7 +178,6 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
-
   // Send the data through WebSocket handlers if this connection is a
   // WebSocket connection.  N.B. The first request from the client to Envoy
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
@@ -492,15 +491,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
   }
 
-  // Check for WebSocket upgrade request if the route is valid, and supports WebSockets.
+  // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
   if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     // Websocket route entries cannot be redirects.
-    bool websocket_upgrade_allowed =
-        (route_entry != nullptr) && route_entry->allowWebSocketUpgrade();
-    bool websocket_upgrade_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
+    bool websocket_required = (route_entry != nullptr) && route_entry->useWebSocket();
+    bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_upgrade_requested && websocket_upgrade_allowed) {
+    if (websocket_requested && websocket_required) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
       // A very kludgey way to get a handle over the stream
@@ -509,11 +507,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // there is an error establishing connection to upstream.
       // TODO (rshriram) - can decoder_filters_ be empty? Is there a better way to get
       // a handle over the stream decoder filter callback instead of ** ?
-      std::list<ActiveStreamDecoderFilterPtr>::iterator entry = decoder_filters_.begin();
+      const auto entry = decoder_filters_.begin();
       if (entry != decoder_filters_.end()) {
         connection_manager_.ws_connection_ =
             std::unique_ptr<WebSocket::WsHandlerImpl>(new WebSocket::WsHandlerImpl(
-                *request_headers_, route_entry, **entry, connection_manager_.cluster_manager_));
+                *request_headers_, *route_entry, **entry, connection_manager_.cluster_manager_));
         connection_manager_.ws_connection_->initializeUpstreamConnection(
             *connection_manager_.read_callbacks_);
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
@@ -526,8 +524,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         encodeHeaders(nullptr, headers, true);
       }
       return;
-    } else if (websocket_upgrade_requested || websocket_upgrade_allowed) {
-      if (websocket_upgrade_requested) {
+    } else if (websocket_requested || websocket_required) {
+      if (websocket_requested) {
         // Do not allow WebSocket upgrades if the route does not support it.
         connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
         HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};

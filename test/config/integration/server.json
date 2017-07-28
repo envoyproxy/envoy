@@ -76,7 +76,7 @@
                 {
                   "prefix": "/websocket/test",
                   "cluster": "cluster_1",
-                  "allow_websocket_upgrade" : true
+                  "use_websocket" : true
                 }
               ]
             }
@@ -174,7 +174,7 @@
                 {
                   "prefix": "/websocket/test",
                   "cluster": "cluster_1",
-                  "allow_websocket_upgrade" : true
+                  "use_websocket" : true
                 }
               ]
             }

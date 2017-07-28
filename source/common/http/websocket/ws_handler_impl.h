@@ -16,17 +16,16 @@ namespace Http {
 namespace WebSocket {
 
 /**
- * An implementation of a WebSocket proxy based on TCP proxy. This filter will instantiate a
- * new outgoing TCP connection using the defined load balancing proxy for the configured cluster.
- * All data will be proxied back and forth between the two connections, without any knowledge of
- * the underlying WebSocket protocol.
- *
- * N.B. This class implements Network::ReadFilter interfaces purely for sake of consistency
- * with TcpProxy filter. WsHandlerImpl it is not used as a network filter in any way.
+ * An implementation of a WebSocket proxy based on TCP proxy. This will be used for
+ * handling client connection only after a WebSocket upgrade request succeeds
+ * (i.e, it is requested by client and allowed by config). This implementation will
+ * instantiate a new outgoing TCP connection for the configured upstream cluster.
+ * All data will be proxied back and forth between the two connections, without any
+ * knowledge of the underlying WebSocket protocol.
  */
 class WsHandlerImpl : public Filter::TcpProxy {
 public:
-  WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry* route_entry,
+  WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry& route_entry,
                 StreamDecoderFilterCallbacks& stream, Upstream::ClusterManager& cluster_manager);
   ~WsHandlerImpl();
 
@@ -44,7 +43,7 @@ private:
   };
 
   Http::HeaderMap& request_headers_;
-  const Router::RouteEntry* route_entry_;
+  const Router::RouteEntry& route_entry_;
   Http::StreamDecoderFilterCallbacks& stream_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
 };

@@ -134,7 +134,7 @@ protected:
     bool on_high_watermark_called_{false};
   };
 
-  void commonInitializeUpstreamConnection(Upstream::ClusterInfoConstSharedPtr cluster);
+  void commonInitializeUpstreamConnection(const Upstream::ClusterInfo& cluster);
   Network::FilterStatus initializeUpstreamConnection();
   virtual void onConnectTimeout();
   void onDownstreamEvent(uint32_t event);

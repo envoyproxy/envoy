@@ -586,7 +586,7 @@ TEST(RouteMatcherTest, NoRedirectAndWebSocket) {
         {
           "prefix": "/foo",
           "host_redirect": "new.lyft.com",
-          "allow_websocket_upgrade": true
+          "use_websocket": true
         }
       ]
     }
@@ -1598,7 +1598,7 @@ TEST(RouteMatcherTest, WeightedClusters) {
     EXPECT_EQ(nullptr, route->hashPolicy());
     EXPECT_TRUE(route->opaqueConfig().empty());
     EXPECT_FALSE(route->autoHostRewrite());
-    EXPECT_FALSE(route->allowWebSocketUpgrade());
+    EXPECT_FALSE(route->useWebSocket());
     EXPECT_TRUE(route->includeVirtualHostRateLimits());
   }
 
