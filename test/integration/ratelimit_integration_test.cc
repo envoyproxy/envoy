@@ -132,9 +132,9 @@ TEST_P(RatelimitIntegrationTest, Ok) {
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
-  EXPECT_EQ(1, test_server_->store().counter("cluster.traffic.ratelimit.ok").value());
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.over_limit").value());
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.error").value());
+  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.ok")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.over_limit"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.error"));
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimit) {
@@ -144,9 +144,9 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   waitForFailedUpstreamResponse(429);
   cleanup();
 
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.ok").value());
-  EXPECT_EQ(1, test_server_->store().counter("cluster.traffic.ratelimit.over_limit").value());
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.error").value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.error"));
 }
 
 TEST_P(RatelimitIntegrationTest, Error) {
@@ -157,9 +157,9 @@ TEST_P(RatelimitIntegrationTest, Error) {
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.ok").value());
-  EXPECT_EQ(0, test_server_->store().counter("cluster.traffic.ratelimit.over_limit").value());
-  EXPECT_EQ(1, test_server_->store().counter("cluster.traffic.ratelimit.error").value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.ok"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.over_limit"));
+  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.error")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {
@@ -168,7 +168,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
   // Keep polling stats until the HTTP ratelimit wait times out.
   const uint32_t sleep_ms = 100;
   for (int32_t timeout_wait_ms = 50000; timeout_wait_ms > 0; timeout_wait_ms -= sleep_ms) {
-    if (test_server_->store().counter("cluster.ratelimit.upstream_rq_timeout").value() > 0) {
+    if (test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value() > 0) {
       break;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
@@ -177,8 +177,8 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
-  EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_timeout").value());
-  EXPECT_EQ(1, test_server_->store().counter("cluster.ratelimit.upstream_rq_504").value());
+  EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_504")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {

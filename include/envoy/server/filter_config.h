@@ -10,6 +10,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -105,10 +106,10 @@ public:
   virtual Stats::Scope& scope() PURE;
 
   /**
-   * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
-   *         allow runtime lockless updates to configuration, etc. across multiple threads.
+   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
-  virtual ThreadLocal::Instance& threadLocal() PURE;
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };

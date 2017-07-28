@@ -261,8 +261,6 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
   }));
 }
 
-BaseIntegrationTest::~BaseIntegrationTest() {}
-
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return dispatcher_->createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)));
@@ -365,7 +363,7 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
 }
 
 void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, bool close_upstream) {
 
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
@@ -391,9 +389,16 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
        },
        [&]() -> void { response->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client->close(); }});
+
+  // The following allows us to test shutting down the server with active connection pool
+  // connections. Either way we need to clean up the upstream connections to avoid race conditions.
+  if (!close_upstream) {
+    test_server_.reset();
+  }
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
 
   EXPECT_TRUE(request->complete());
   EXPECT_EQ(0U, request->bodyLength());

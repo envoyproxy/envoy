@@ -153,13 +153,12 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
 }
 
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                                       Stats::Store& stats, ThreadLocal::Instance& tls,
+                                       Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
                                        Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
-    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
-      thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
-      cm_stats_(generateStats(stats)) {
+    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
+      random_(random), local_info_(local_info), cm_stats_(generateStats(stats)) {
 
   config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
@@ -204,12 +203,11 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     }
   }
 
-  tls.set(thread_local_slot_,
-          [this, local_cluster_name](
-              Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-            return ThreadLocal::ThreadLocalObjectSharedPtr{
-                new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
-          });
+  tls_->set([this, local_cluster_name](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return ThreadLocal::ThreadLocalObjectSharedPtr{
+        new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
+  });
 
   // To avoid threading issues, for those clusters that start with hosts already in them (like the
   // static cluster), we need to post an update onto each thread to notify them of the update. We
@@ -254,9 +252,9 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
   loadCluster(new_config, true);
   ClusterInfoConstSharedPtr new_cluster = primary_clusters_.at(cluster_name).cluster_->info();
   ENVOY_LOG(info, "add/update cluster {}", cluster_name);
-  tls_.runOnAllThreads([this, new_cluster]() -> void {
+  tls_->runOnAllThreads([this, new_cluster]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
-        tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+        tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
     if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
       ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
@@ -283,9 +281,9 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
   cm_stats_.cluster_removed_.inc();
   cm_stats_.total_clusters_.set(primary_clusters_.size());
   ENVOY_LOG(info, "removing cluster {}", cluster_name);
-  tls_.runOnAllThreads([this, cluster_name]() -> void {
+  tls_->runOnAllThreads([this, cluster_name]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
-        tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+        tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
     ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
     ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
@@ -331,8 +329,7 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
 }
 
 ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager =
-      tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
@@ -345,8 +342,7 @@ ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager =
-      tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -369,17 +365,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
   HostListsConstSharedPtr healthy_hosts_per_zone_copy(
       new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerZone()));
 
-  tls_.runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy,
-                        healthy_hosts_per_zone_copy, hosts_added, hosts_removed]() -> void {
+  tls_->runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy,
+                         healthy_hosts_per_zone_copy, hosts_added, hosts_removed]() -> void {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
         name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy, healthy_hosts_per_zone_copy,
-        hosts_added, hosts_removed, tls_, thread_local_slot_);
+        hosts_added, hosts_removed, *tls_);
   });
 }
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager =
-      tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
@@ -396,8 +391,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 }
 
 Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
-  ThreadLocalClusterManagerImpl& cluster_manager =
-      tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
     return entry->second->http_async_client_;
@@ -436,8 +430,20 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImpl() {
-  ASSERT(thread_local_clusters_.empty());
-  ASSERT(host_http_conn_pool_map_.empty());
+  // Clear out connection pools as well as the thread local cluster map so that we release all
+  // primary cluster pointers. Currently we have to free all non-local clusters before we free
+  // the local cluster. This is because non-local clusters have a member update callback registered
+  // with the local cluster.
+  // TODO(mattklein123): The above is sub-optimal and is related to the TODO in
+  //                     redis/conn_pool_impl.cc. Will fix at the same time.
+  ENVOY_LOG(debug, "shutting down thread local cluster manager");
+  host_http_conn_pool_map_.clear();
+  for (auto& cluster : thread_local_clusters_) {
+    if (&cluster.second->host_set_ != local_host_set_) {
+      cluster.second.reset();
+    }
+  }
+  thread_local_clusters_.clear();
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
@@ -481,30 +487,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
     HostListsConstSharedPtr hosts_per_zone, HostListsConstSharedPtr healthy_hosts_per_zone,
     const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
-    ThreadLocal::Instance& tls, uint32_t thread_local_slot) {
+    ThreadLocal::Slot& tls) {
 
-  ThreadLocalClusterManagerImpl& config =
-      tls.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot);
+  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   config.thread_local_clusters_[name]->host_set_.updateHosts(
       hosts, healthy_hosts, hosts_per_zone, healthy_hosts_per_zone, hosts_added, hosts_removed);
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
-  // Clear out connection pools as well as the thread local cluster map so that we release all
-  // primary cluster pointers. Currently we have to free all non-local clusters before we free
-  // the local cluster. This is because non-local clusters have a member update callback registered
-  // with the local cluster.
-  // TODO(mattklein123): The above is sub-optimal and is related to the TODO in
-  //                     redis/conn_pool_impl.cc. Will fix at the same time.
-  host_http_conn_pool_map_.clear();
-  for (auto& cluster : thread_local_clusters_) {
-    if (&cluster.second->host_set_ != local_host_set_) {
-      cluster.second.reset();
-    }
-  }
-  thread_local_clusters_.clear();
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(

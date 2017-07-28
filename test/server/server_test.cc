@@ -1,3 +1,5 @@
+#include "common/thread_local/thread_local_impl.h"
+
 #include "server/server.h"
 
 #include "test/integration/server.h"
@@ -19,8 +21,9 @@ protected:
                                                           {{"upstream_0", 0}, {"upstream_1", 0}},
                                                           version_)),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                local_info_) {}
+                local_info_, thread_local_) {}
   void TearDown() override {
+    server_.threadLocal().shutdownGlobalThreading();
     server_.clusterManager().shutdown();
     server_.threadLocal().shutdownThread();
   }
@@ -29,6 +32,7 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultTestHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
+  ThreadLocal::InstanceImpl thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
