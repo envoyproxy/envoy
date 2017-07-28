@@ -12,7 +12,26 @@ envoy_cc_library(
     name = "cds_api_lib",
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
+    external_deps = ["envoy_cds"],
     deps = [
+        ":cds_subscription_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/json:json_object_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cds_subscription_lib",
+    srcs = ["cds_subscription.cc"],
+    hdrs = ["cds_subscription.h"],
+    external_deps = ["envoy_cds"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
