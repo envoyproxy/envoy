@@ -34,7 +34,6 @@ def envoy_linkopts():
         "//conditions:default": [
             "-pthread",
             "-lrt",
-            "-luuid",
             # Force MD5 hash in build. This is part of the workaround for
             # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
             # does this by itself prior to
@@ -57,7 +56,7 @@ def envoy_test_linkopts():
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-latomic", "-luuid"],
+        "//conditions:default": ["-pthread", "-latomic"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
