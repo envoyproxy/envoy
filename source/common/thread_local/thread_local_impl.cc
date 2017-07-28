@@ -121,13 +121,14 @@ void InstanceImpl::shutdownThread() {
 
   // Destruction of slots is done in *reverse* order. This is so that filters and higher layer
   // things that are built on top of the cluster manager, stats, etc. will be destroyed before
-  // more base layer things. The reason reverse ordering is done is to deal with the potentially
-  // likely case that leaf objects depend in some way on "persistent" objects (particularly the
-  // cluster manager) that are created very early on with a known slot number and never destroyed
-  // until shutdown. For example, if we chose to create persistent per-thread gRPC clients we would
-  // potentially run into shutdown issues if that thing got destroyed after the cluster manager.
-  // Examples of things with TLS that are created early on and are never destroyed until server
-  // shutdown are stats, runtime, and the cluster manager (see server.cc).
+  // more base layer things. The reason reverse ordering is done is to deal with the case that leaf
+  // objects depend in some way on "persistent" objects (particularly the cluster manager) that are
+  // created very early on with a known slot number and never destroyed until shutdown. For example,
+  // if we chose to create persistent per-thread gRPC clients we would potentially run into shutdown
+  // issues if that thing got destroyed after the cluster manager. This happens in practice
+  // currently when a redis connection pool is destroyed and removes its member update callback from
+  // the backing cluster. Examples of things with TLS that are created early on and are never
+  // destroyed until server shutdown are stats, runtime, and the cluster manager (see server.cc).
   //
   // It's possible this might need to become more complicated later but it's OK for now. Note that
   // this is always safe to do because:
