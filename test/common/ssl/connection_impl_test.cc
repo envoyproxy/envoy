@@ -470,9 +470,7 @@ public:
         }));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void {
-            dispatcher_->exit();
-          }));
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     uint32_t filter_seen = 0;
@@ -557,20 +555,17 @@ public:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockBuffer::baseMove)));
-    EXPECT_CALL(*client_write_buffer, drain(_))
-      .WillOnce(Invoke([&](uint64_t n) -> void {
-            client_write_buffer->baseDrain(n);
-            dispatcher_->exit();
-          }));
+    EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
+      client_write_buffer->baseDrain(n);
+      dispatcher_->exit();
+    }));
     client_connection_->write(buffer_to_write);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-            dispatcher_->exit();
-          }));
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
 
     client_connection_->close(Network::ConnectionCloseType::NoFlush);
     dispatcher_->run(Event::Dispatcher::RunType::Block);

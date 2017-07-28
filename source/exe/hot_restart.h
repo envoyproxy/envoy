@@ -205,38 +205,37 @@ private:
   bool parent_terminated_{};
 };
 
-#else // __linux__
+#else  // __linux__
 
 /**
  * No-op implementation of HotRestart for everybody else.
  */
-class HotRestartImpl : public HotRestart,
-                       public Stats::RawStatDataAllocator {
+class HotRestartImpl : public HotRestart, public Stats::RawStatDataAllocator {
 public:
-    HotRestartImpl(Options& options);
+  HotRestartImpl(Options& options);
 
-    Thread::BasicLockable& logLock() { return log_lock_; }
-    Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
+  Thread::BasicLockable& logLock() { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
 
-    // Server::HotRestart
-    void drainParentListeners() override {}
-    int duplicateParentListenSocket(const std::string&) override { return -1; }
-    void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
-    void initialize(Event::Dispatcher&, Server::Instance&) override {}
-    void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
-    void terminateParent() override {}
-    void shutdown() override {}
-    std::string version() override { return "disabled"; }
+  // Server::HotRestart
+  void drainParentListeners() override {}
+  int duplicateParentListenSocket(const std::string&) override { return -1; }
+  void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
+  void initialize(Event::Dispatcher&, Server::Instance&) override {}
+  void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
+  void terminateParent() override {}
+  void shutdown() override {}
+  std::string version() override { return "disabled"; }
 
-    // RawStatDataAllocator
-    Stats::RawStatData* alloc(const std::string& name) override;
-    void free(Stats::RawStatData& data) override;
+  // RawStatDataAllocator
+  Stats::RawStatData* alloc(const std::string& name) override;
+  void free(Stats::RawStatData& data) override;
 
 private:
-    SharedMemory& shmem_;
-    ProcessSharedMutex log_lock_;
-    ProcessSharedMutex access_log_lock_;
-    ProcessSharedMutex stat_lock_;
+  SharedMemory& shmem_;
+  ProcessSharedMutex log_lock_;
+  ProcessSharedMutex access_log_lock_;
+  ProcessSharedMutex stat_lock_;
 };
 #endif // __linux__
 

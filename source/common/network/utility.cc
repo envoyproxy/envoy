@@ -276,18 +276,18 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   // TODO(mattklein123): IPv6 support. See github issue #1094.
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
 #else
-  int status = getsockname(fd, reinterpret_cast<sockaddr *>(&orig_addr), &addr_len);
+  int status = getsockname(fd, reinterpret_cast<sockaddr*>(&orig_addr), &addr_len);
 #endif
 
   if (status == 0) {
-    switch(orig_addr.ss_family) {
+    switch (orig_addr.ss_family) {
     case AF_INET:
       return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
 
     case AF_INET6:
       return Address::InstanceConstSharedPtr{
-        new Address::Ipv6Instance(*reinterpret_cast<sockaddr_in6*>(&orig_addr))};
+          new Address::Ipv6Instance(*reinterpret_cast<sockaddr_in6*>(&orig_addr))};
 
     default:
       throw EnvoyException(fmt::format("invalid domain {}", orig_addr.ss_family));

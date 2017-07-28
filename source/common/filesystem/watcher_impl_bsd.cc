@@ -1,5 +1,9 @@
 #include "common/filesystem/watcher_impl_bsd.h"
 
+#include <sys/event.h>
+#include <sys/fcntl.h>
+#include <sys/types.h>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
@@ -8,10 +12,6 @@
 #include "common/common/utility.h"
 
 #include "event2/event.h"
-
-#include <sys/fcntl.h>
-#include <sys/types.h>
-#include <sys/event.h>
 
 namespace Envoy {
 namespace Filesystem {
@@ -30,8 +30,8 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
 WatcherImpl::~WatcherImpl() {
   close(queue_);
 
-  for (const auto &entry : watches_) {
-      close(entry.first);
+  for (const auto& entry : watches_) {
+    close(entry.first);
   }
   watches_.clear();
 }
@@ -80,7 +80,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
 
   struct kevent event;
   EV_SET(&event, watch_fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, flags, 0,
-         reinterpret_cast<void *>(watch_fd));
+         reinterpret_cast<void*>(watch_fd));
 
   if (kevent(queue_, &event, 1, NULL, 0, NULL) == -1) {
     throw EnvoyException(
@@ -99,7 +99,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
   return watch;
 }
 
-void WatcherImpl::removeWatch_(FileWatchPtr &watch) {
+void WatcherImpl::removeWatch_(FileWatchPtr& watch) {
   int fd = watch->fd_;
   close(fd);
   watches_.erase(fd);

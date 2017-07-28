@@ -118,7 +118,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
 
 HotRestartImpl::HotRestartImpl(Options& options)
     : shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_) { }
+      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_) {}
 
 #endif // __linux__
 

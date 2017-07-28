@@ -26,21 +26,18 @@ namespace Runtime {
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 std::string RandomGeneratorImpl::uuid() {
-    char generated_uuid[UUID_LENGTH + 1];
+  char generated_uuid[UUID_LENGTH + 1];
 
 #if defined(__linux__) || defined(__APPLE__)
-    uuid_t uuid;
-    uuid_generate_random(uuid);
-    uuid_unparse(uuid, generated_uuid);
+  uuid_t uuid;
+  uuid_generate_random(uuid);
+  uuid_unparse(uuid, generated_uuid);
 #else
-    sprintf(generated_uuid, "%08lx-%04x-%04x-%04x-%04x%08lx",
-        static_cast<unsigned long>(arc4random()),
-        static_cast<unsigned>(arc4random() & 0xffff),
-        static_cast<unsigned>((arc4random() & 0xfff) | 0x4000),
-        static_cast<unsigned>((arc4random() & 0x3fff) | 0x8000),
-        static_cast<unsigned>(arc4random() & 0xffff),
-        static_cast<unsigned long>(arc4random())
-    );
+  sprintf(generated_uuid, "%08lx-%04x-%04x-%04x-%04x%08lx",
+          static_cast<unsigned long>(arc4random()), static_cast<unsigned>(arc4random() & 0xffff),
+          static_cast<unsigned>((arc4random() & 0xfff) | 0x4000),
+          static_cast<unsigned>((arc4random() & 0x3fff) | 0x8000),
+          static_cast<unsigned>(arc4random() & 0xffff), static_cast<unsigned long>(arc4random()));
 #endif
 
   return std::string(generated_uuid);

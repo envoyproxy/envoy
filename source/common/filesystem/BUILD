@@ -27,10 +27,10 @@ envoy_cc_library(
     ],
     hdrs = [
         "watcher_impl.h",
-        "watcher_impl_linux.cc",
         "watcher_impl_bsd.cc",
-        "watcher_impl_linux.h",
         "watcher_impl_bsd.h",
+        "watcher_impl_linux.cc",
+        "watcher_impl_linux.h",
     ],
     external_deps = ["event"],
     deps = [

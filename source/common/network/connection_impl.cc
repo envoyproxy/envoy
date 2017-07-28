@@ -181,7 +181,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // connect response is EINPROGRESS but the socket failed and the calling code might not know about
   // it yet.
   if (-1 == rc && errno == ECONNRESET) {
-      return;
+    return;
   }
 #ifdef __APPLE__
   if (-1 == rc && errno == EINVAL) {
@@ -460,14 +460,14 @@ void ConnectionImpl::onWriteReady() {
     socklen_t slen = sizeof(struct sockaddr_in);
     struct sockaddr sain;
     if (error == 0 && getpeername(fd_, &sain, &slen) == -1 && errno == ENOTCONN) {
-        int rc = read_buffer_->read(fd_, 1);
-        ASSERT(-1 == rc);
-        UNREFERENCED_PARAMETER(rc);
+      int rc = read_buffer_->read(fd_, 1);
+      ASSERT(-1 == rc);
+      UNREFERENCED_PARAMETER(rc);
 
-        error = errno;
-        if (errno == EAGAIN) {
-            return;
-        }
+      error = errno;
+      if (errno == EAGAIN) {
+        return;
+      }
     }
 #endif
 

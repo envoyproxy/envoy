@@ -32,9 +32,9 @@ public:
       : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), true),
         listener_(dispatcher_.createListener(connection_handler_, socket_, callbacks_, stats_store_,
                                              {.bind_to_port_ = true,
-                                                 .use_proxy_proto_ = true,
-                                                 .use_original_dst_ = false,
-                                                 .per_connection_buffer_limit_bytes_ = 0})) {
+                                              .use_proxy_proto_ = true,
+                                              .use_original_dst_ = false,
+                                              .per_connection_buffer_limit_bytes_ = 0})) {
     conn_ = dispatcher_.createClientConnection(socket_.localAddress());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
@@ -43,16 +43,14 @@ public:
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-            server_connection_ = std::move(conn);
-            server_connection_->addConnectionCallbacks(server_callbacks_);
-            server_connection_->addReadFilter(read_filter_);
-            printf("argh!\n");
-          }));
+        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+          server_connection_ = std::move(conn);
+          server_connection_->addConnectionCallbacks(server_callbacks_);
+          server_connection_->addReadFilter(read_filter_);
+          printf("argh!\n");
+        }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-            dispatcher_.exit();
-          }));
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
@@ -60,9 +58,7 @@ public:
   void connectNoRead() {
     conn_->connect();
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-            dispatcher_.exit();
-          }));
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
@@ -72,23 +68,22 @@ public:
   }
 
   void disconnect() {
-      EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
-      EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
 
-      conn_->close(ConnectionCloseType::NoFlush);
+    conn_->close(ConnectionCloseType::NoFlush);
 
-      dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
   void expectProxyProtoError() {
-      EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
 
-      dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
 
-
-      EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
+    EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
   Event::DispatcherImpl dispatcher_;
@@ -114,13 +109,13 @@ TEST_P(ProxyProtocolTest, Basic) {
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
-    .WillOnce(Invoke([&](Buffer::Instance &buffer) -> FilterStatus {
-          EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1.2.3.4");
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+        EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1.2.3.4");
 
-          EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-          buffer.drain(9);
-          return Network::FilterStatus::Continue;
-        }));
+        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
+        buffer.drain(9);
+        return Network::FilterStatus::Continue;
+      }));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
@@ -133,13 +128,13 @@ TEST_P(ProxyProtocolTest, BasicV6) {
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
-    .WillOnce(Invoke([&](Buffer::Instance &buffer) -> FilterStatus {
-          EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1:2:3::4");
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+        EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1:2:3::4");
 
-          EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-          buffer.drain(9);
-          return Network::FilterStatus::Continue;
-        }));
+        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
+        buffer.drain(9);
+        return Network::FilterStatus::Continue;
+      }));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
@@ -263,7 +258,7 @@ TEST_P(ProxyProtocolTest, Truncated) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
-    .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
   conn_->close(ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -275,7 +270,7 @@ TEST_P(ProxyProtocolTest, Closed) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
-    .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
   conn_->close(ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -296,9 +291,9 @@ public:
             socket_.localAddress()->ip()->port())),
         listener_(dispatcher_.createListener(connection_handler_, socket_, callbacks_, stats_store_,
                                              {.bind_to_port_ = true,
-                                                 .use_proxy_proto_ = true,
-                                                 .use_original_dst_ = false,
-                                                 .per_connection_buffer_limit_bytes_ = 0})) {
+                                              .use_proxy_proto_ = true,
+                                              .use_original_dst_ = false,
+                                              .per_connection_buffer_limit_bytes_ = 0})) {
     conn_ = dispatcher_.createClientConnection(local_dst_address_);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
@@ -307,15 +302,13 @@ public:
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-            server_connection_ = std::move(conn);
-            server_connection_->addConnectionCallbacks(server_callbacks_);
-            server_connection_->addReadFilter(read_filter_);
-          }));
+        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+          server_connection_ = std::move(conn);
+          server_connection_->addConnectionCallbacks(server_callbacks_);
+          server_connection_->addReadFilter(read_filter_);
+        }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
-            dispatcher_.exit();
-          }));
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
@@ -331,7 +324,7 @@ public:
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     } else {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+          .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
 
       dispatcher_.run(Event::Dispatcher::RunType::Block);
     }
@@ -361,7 +354,7 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
-    .WillOnce(Invoke([&](Buffer::Instance &buffer) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
         EXPECT_EQ(server_connection_->remoteAddress().asString(), "1.2.3.4:65535");
         EXPECT_EQ(server_connection_->localAddress().asString(), "254.254.254.254:1234");
 
@@ -379,7 +372,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
-    .WillOnce(Invoke([&](Buffer::Instance &buffer) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
         EXPECT_EQ(server_connection_->remoteAddress().asString(), "[1:2:3::4]:65535");
         EXPECT_EQ(server_connection_->localAddress().asString(), "[5:6::7:8]:1234");
 

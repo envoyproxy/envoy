@@ -147,7 +147,7 @@ int Ipv4Instance::socket(SocketType type) const {
     RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
   }
 #endif
-    return fd;
+  return fd;
 }
 
 std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
@@ -240,13 +240,13 @@ int PipeInstance::connect(int fd) const {
 }
 
 int PipeInstance::socket(SocketType type) const {
-    int fd = ::socket(AF_UNIX, flagsFromSocketType(type), 0);
+  int fd = ::socket(AF_UNIX, flagsFromSocketType(type), 0);
 #ifdef __APPLE__
-    if (fd != -1) {
-      RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-    }
+  if (fd != -1) {
+    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+  }
 #endif
-    return fd;
+  return fd;
 }
 
 } // namespace Address

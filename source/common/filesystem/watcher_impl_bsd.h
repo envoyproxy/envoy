@@ -38,7 +38,7 @@ private:
   void onKqueueEvent();
   FileWatchPtr addWatch_(const std::string& path, uint32_t events, Watcher::OnChangedCb cb,
                          bool pathMustExist);
-  void removeWatch_(FileWatchPtr &watch);
+  void removeWatch_(FileWatchPtr& watch);
 
   int queue_;
   std::unordered_map<int, FileWatchPtr> watches_;
