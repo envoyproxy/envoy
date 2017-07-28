@@ -27,15 +27,13 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  // TODO PERF: Append and do not copy.
-  HeaderEntry* header = headers.ForwardedFor();
-  std::string forwarded_for = header ? header->value().c_str() : "";
-  if (!forwarded_for.empty()) {
-    forwarded_for += ", ";
+  HeaderString& header = headers.insertForwardedFor().value();
+  if (!header.empty()) {
+    header.append(", ", 2);
   }
 
-  forwarded_for += remote_address.ip()->addressAsString();
-  headers.insertForwardedFor().value(forwarded_for);
+  const std::string& address_as_string = remote_address.ip()->addressAsString();
+  header.append(address_as_string.c_str(), address_as_string.size());
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
