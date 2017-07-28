@@ -57,6 +57,7 @@ TEST_F(TcpStatsdSinkTest, EmptyFlush) {
 
   sink_->beginFlush();
   expectCreateConnection();
+  EXPECT_CALL(*connection_, write(BufferStringEqual("")));
   sink_->endFlush();
 }
 
