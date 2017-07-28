@@ -27,13 +27,20 @@ public:
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void shutdownThread_() { data_.clear(); }
+  void shutdownThread_() {
+    // Reverse order which is same as the production code.
+    for (auto it = data_.rbegin(); it != data_.rend(); ++it) {
+      it->reset();
+    }
+    data_.clear();
+  }
 
   struct SlotImpl : public Slot {
     SlotImpl(MockInstance& parent, uint32_t index) : parent_(parent), index_(index) {
-      // Deletion of slots is not currently supported in the mock.
       parent_.data_.resize(index_ + 1);
     }
+
+    ~SlotImpl() { parent_.data_[index_].reset(); }
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
