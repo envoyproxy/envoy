@@ -8,11 +8,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -74,6 +72,8 @@ void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::mil
   tls_->getTyped<Writer>().writeTimer(name, ms);
 }
 
+char TcpStatsdSink::STAT_PREFIX[] = "envoy.";
+
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
@@ -97,12 +97,62 @@ TcpStatsdSink::TlsSink::~TlsSink() {
   }
 }
 
+void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
+  ASSERT(!expect_empty_buffer || buffer_.length() == 0);
+  ASSERT(current_slice_mem_ == nullptr);
+  UNREFERENCED_PARAMETER(expect_empty_buffer);
+
+  uint64_t num_iovecs = buffer_.reserve(FLUSH_SLICE_SIZE_BYTES, &current_buffer_slice_, 1);
+  ASSERT(num_iovecs == 1);
+  UNREFERENCED_PARAMETER(num_iovecs);
+
+  ASSERT(current_buffer_slice_.len_ >= FLUSH_SLICE_SIZE_BYTES);
+  current_slice_mem_ = reinterpret_cast<char*>(current_buffer_slice_.mem_);
+}
+
+void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
+  ASSERT(current_slice_mem_ != nullptr);
+  // 40 > 6 (prefix) + 4 (random chars) + 30 for number (bigger than it will ever be)
+  const uint32_t max_size = name.size() + 40;
+  if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
+    endFlush(false);
+    beginFlush(false);
+  }
+
+  // Produces something like "envoy.{}:{}|c\n"
+  // This written this way for maximum perf since with a large number of stats and at a high flush
+  // rate this can become expensive.
+  const char* snapped_current = current_slice_mem_;
+  memcpy(current_slice_mem_, STAT_PREFIX, sizeof(STAT_PREFIX) - 1);
+  current_slice_mem_ += sizeof(STAT_PREFIX) - 1;
+  memcpy(current_slice_mem_, name.c_str(), name.size());
+  current_slice_mem_ += name.size();
+  *current_slice_mem_++ = ':';
+  current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);
+  *current_slice_mem_++ = '|';
+  *current_slice_mem_++ = stat_type;
+  *current_slice_mem_++ = '\n';
+
+  ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < max_size);
+  UNREFERENCED_PARAMETER(snapped_current);
+}
+
 void TcpStatsdSink::TlsSink::flushCounter(const std::string& name, uint64_t delta) {
-  write(fmt::format("envoy.{}:{}|c\n", name, delta));
+  commonFlush(name, delta, 'c');
 }
 
 void TcpStatsdSink::TlsSink::flushGauge(const std::string& name, uint64_t value) {
-  write(fmt::format("envoy.{}:{}|g\n", name, value));
+  commonFlush(name, value, 'g');
+}
+
+void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
+  ASSERT(current_slice_mem_ != nullptr);
+  current_buffer_slice_.len_ = usedBuffer();
+  buffer_.commit(&current_buffer_slice_, 1);
+  current_slice_mem_ = nullptr;
+  if (do_write) {
+    write(buffer_);
+  }
 }
 
 void TcpStatsdSink::TlsSink::onEvent(uint32_t events) {
@@ -114,10 +164,14 @@ void TcpStatsdSink::TlsSink::onEvent(uint32_t events) {
 
 void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
                                                 std::chrono::milliseconds ms) {
-  write(fmt::format("envoy.{}:{}|ms\n", name, ms.count()));
+  // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
+  // also currently not possible that this interleaves with any counter/gauge flushing.
+  ASSERT(current_slice_mem_ == nullptr);
+  Buffer::OwnedImpl buffer(fmt::format("envoy.{}:{}|ms\n", name, ms.count()));
+  write(buffer);
 }
 
-void TcpStatsdSink::TlsSink::write(const std::string& stat) {
+void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   // Guard against the stats connection backing up. In this case we probably have no visibility
   // into what is going on externally, but we also increment a stat that should be viewable
   // locally.
@@ -129,11 +183,12 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
   // TODO(mattklein123): The use of the stat is somewhat of a hack, and should be replaced with
   // real flow control callbacks once they are available.
   if (parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_.value() >
-      MaxBufferedStatsBytes) {
+      MAX_BUFFERED_STATS_BYTES) {
     if (connection_) {
       connection_->close(Network::ConnectionCloseType::NoFlush);
     }
     parent_.cx_overflow_stat_.inc();
+    buffer.drain(buffer.length());
     return;
   }
 
@@ -153,8 +208,12 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
     connection_->connect();
   }
 
-  Buffer::OwnedImpl buffer(stat);
   connection_->write(buffer);
+}
+
+uint64_t TcpStatsdSink::TlsSink::usedBuffer() {
+  ASSERT(current_slice_mem_ != nullptr);
+  return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
 }
 
 } // namespace Statsd

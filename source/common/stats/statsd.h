@@ -10,6 +10,8 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/buffer_impl.h"
+
 namespace Envoy {
 namespace Stats {
 namespace Statsd {
@@ -43,8 +45,10 @@ public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address);
 
   // Stats::Sink
+  void beginFlush() override {}
   void flushCounter(const std::string& name, uint64_t delta) override;
   void flushGauge(const std::string& name, uint64_t value) override;
+  void endFlush() override {}
   void onHistogramComplete(const std::string& name, uint64_t value) override {
     // For statsd histograms are just timers.
     onTimespanComplete(name, std::chrono::milliseconds(value));
@@ -68,6 +72,8 @@ public:
                 Stats::Scope& scope);
 
   // Stats::Sink
+  void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
+
   void flushCounter(const std::string& name, uint64_t delta) override {
     tls_->getTyped<TlsSink>().flushCounter(name, delta);
   }
@@ -75,6 +81,8 @@ public:
   void flushGauge(const std::string& name, uint64_t value) override {
     tls_->getTyped<TlsSink>().flushGauge(name, value);
   }
+
+  void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 
   void onHistogramComplete(const std::string& name, uint64_t value) override {
     // For statsd histograms are just timers.
@@ -90,10 +98,15 @@ private:
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink();
 
+    void beginFlush(bool expect_empty_buffer);
+    void checkSize();
+    void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
+    void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
-    void write(const std::string& stat);
+    uint64_t usedBuffer();
+    void write(Buffer::Instance& buffer);
 
     // Network::ConnectionCallbacks
     void onEvent(uint32_t events) override;
@@ -103,10 +116,19 @@ private:
     TcpStatsdSink& parent_;
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
+    Buffer::OwnedImpl buffer_;
+    Buffer::RawSlice current_buffer_slice_;
+    char* current_slice_mem_{};
   };
 
   // Somewhat arbitrary 16MiB limit for buffered stats.
-  static constexpr uint32_t MaxBufferedStatsBytes = (1024 * 1024 * 16);
+  static constexpr uint32_t MAX_BUFFERED_STATS_BYTES = (1024 * 1024 * 16);
+
+  // 16KiB intermediate buffer for flushing.
+  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
+
+  // Prefix for all flushed stats.
+  static char STAT_PREFIX[];
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::SlotPtr tls_;

@@ -83,6 +83,34 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_.live_.set(!fail);
 }
 
+void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                                 Stats::Store& store) {
+  for (const auto& sink : sinks) {
+    sink->beginFlush();
+  }
+
+  for (const Stats::CounterSharedPtr& counter : store.counters()) {
+    uint64_t delta = counter->latch();
+    if (counter->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushCounter(counter->name(), delta);
+      }
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
+    if (gauge->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushGauge(gauge->name(), gauge->value());
+      }
+    }
+  }
+
+  for (const auto& sink : sinks) {
+    sink->endFlush();
+  }
+}
+
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
   HotRestart::GetParentStatsInfo info;
@@ -96,23 +124,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (const Stats::CounterSharedPtr& counter : stats_store_.counters()) {
-    uint64_t delta = counter->latch();
-    if (counter->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushCounter(counter->name(), delta);
-      }
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-    if (gauge->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushGauge(gauge->name(), gauge->value());
-      }
-    }
-  }
-
+  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
