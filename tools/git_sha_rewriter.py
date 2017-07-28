@@ -109,7 +109,7 @@ if __name__ == '__main__':
     print 'Usage: %s <Envoy binary path> ' % sys.argv[0]
     sys.exit(1)
   if platform.system() == 'Darwin':
-    print 'Stamping not supported on OSX'
+    print 'Stamping not supported for Mach-O binaries'
     sys.exit(0)
   envoy_bin_path = sys.argv[1]
   version_generated = ExtractGitSha(envoy_bin_path)
