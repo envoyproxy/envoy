@@ -80,10 +80,31 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "hot_restart_lib",
-    srcs = ["hot_restart.cc"],
-    hdrs = ["hot_restart.h"],
+    name = "shared_mem_lib",
+    srcs = ["shared_memory.cc"],
+    hdrs = ["shared_memory.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/server:instance_interface",
+        "//include/envoy/server:options_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restart_lib",
+    srcs = select({
+        "@bazel_tools//tools/osx:darwin": ["noop/hot_restart.cc"],
+        "//conditions:default": ["hot_restart.cc"],
+    }),
+    hdrs = select({
+        "@bazel_tools//tools/osx:darwin": ["noop/hot_restart.h"],
+        "//conditions:default": ["hot_restart.h"],
+    }),
+    deps = [
+        ":shared_mem_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/server:hot_restart_interface",
@@ -94,6 +115,10 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
     ],
+    strip_include_prefix = select({
+        "@bazel_tools//tools/osx:darwin": "noop",
+        "//conditions:default": None,
+    })
 )
 
 envoy_cc_library(
