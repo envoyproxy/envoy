@@ -82,9 +82,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
 }
 
 int InstanceBase::flagsFromSocketType(SocketType type) const {
-#if defined(__FreeBSD__)
-  int flags = O_NONBLOCK;
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
@@ -142,11 +140,13 @@ int Ipv4Instance::connect(int fd) const {
 
 int Ipv4Instance::socket(SocketType type) const {
   int fd = ::socket(AF_INET, flagsFromSocketType(type), 0);
+  RELEASE_ASSERT(fd != -1);
+
 #ifdef __APPLE__
-  if (fd != -1) {
-    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-  }
+  // Cannot set SOCK_NONBLOCK as a ::socket flag
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
 #endif
+
   return fd;
 }
 
@@ -207,6 +207,7 @@ int Ipv6Instance::socket(SocketType type) const {
   RELEASE_ASSERT(fd != -1);
 
 #ifdef __APPLE__
+  // Cannot set SOCK_NONBLOCK as a ::socket flag
   RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
 #endif
 
@@ -241,11 +242,13 @@ int PipeInstance::connect(int fd) const {
 
 int PipeInstance::socket(SocketType type) const {
   int fd = ::socket(AF_UNIX, flagsFromSocketType(type), 0);
+  RELEASE_ASSERT(fd != -1);
+
 #ifdef __APPLE__
-  if (fd != -1) {
-    RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-  }
+  // Cannot set SOCK_NONBLOCK as a ::socket flag
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
 #endif
+
   return fd;
 }
 
