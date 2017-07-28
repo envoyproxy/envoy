@@ -22,7 +22,7 @@
 # limitations under the License.
 """Configuring the C++ toolchain on macOS."""
 
-load("//bazel/osx:xcode_configure.bzl", "run_xcode_locator")
+load("@bazel_tools//tools/osx:xcode_configure.bzl", "run_xcode_locator")
 
 load(
     "//bazel:lib_cc_configure.bzl",
@@ -63,7 +63,7 @@ def configure_osx_toolchain(repository_ctx):
   xcode_toolchains = []
   (xcode_toolchains, xcodeloc_err) = run_xcode_locator(
       repository_ctx,
-      Label("//bazel/osx:xcode_locator.m"))
+      Label("@bazel_tools//tools/osx:xcode_locator.m"))
   if xcode_toolchains:
     cc = find_cc(repository_ctx)
     tpl(repository_ctx, "osx_cc_wrapper.sh", {
@@ -78,13 +78,13 @@ def configure_osx_toolchain(repository_ctx):
         Label("@bazel_tools//tools/objc:make_hashed_objlist.py"),
         "make_hashed_objlist.py")
     repository_ctx.symlink(
-        Label("//bazel/osx/crosstool:wrapped_ar.tpl"),
+        Label("@bazel_tools//tools/osx/crosstool:wrapped_ar.tpl"),
         "wrapped_ar")
     repository_ctx.symlink(
-        Label("//bazel/osx/crosstool:wrapped_clang.tpl"),
+        Label("@bazel_tools//tools/osx/crosstool:wrapped_clang.tpl"),
         "wrapped_clang")
     repository_ctx.symlink(
-        Label("//bazel/osx/crosstool:wrapped_clang_pp.tpl"),
+        Label("@bazel_tools//tools/osx/crosstool:wrapped_clang_pp.tpl"),
         "wrapped_clang_pp")
     repository_ctx.symlink(
         Label("//bazel/osx/crosstool:wrapped_strip.tpl"),
@@ -93,7 +93,7 @@ def configure_osx_toolchain(repository_ctx):
         Label("//bazel/osx/crosstool:BUILD.tpl"),
         "BUILD")
     repository_ctx.symlink(
-        Label("//bazel/osx/crosstool:osx_archs.bzl"),
+        Label("@bazel_tools//tools/osx/crosstool:osx_archs.bzl"),
         "osx_archs.bzl")
     escaped_include_paths = _get_escaped_xcode_cxx_inc_directories(repository_ctx, cc, xcode_toolchains)
     escaped_cxx_include_directories = []

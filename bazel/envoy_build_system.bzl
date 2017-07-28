@@ -29,7 +29,7 @@ def envoy_copts(repository, test = False):
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
-        "//bazel/osx:darwin": [],
+        "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": [
             "-pthread",
             "-lrt",
@@ -51,7 +51,7 @@ def envoy_linkopts():
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
     return select({
-        "//bazel/osx:darwin": [],
+        "@bazel_tools//tools/osx:darwin": [],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
