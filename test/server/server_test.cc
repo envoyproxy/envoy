@@ -29,7 +29,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushHelper(sinks, store);
+  InstanceUtil::flushCountersAndGaugesToSinks(sinks, store);
 }
 
 // Class creates minimally viable server instance for testing.

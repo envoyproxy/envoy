@@ -52,7 +52,15 @@ public:
   Network::MockClientConnection* connection_{};
 };
 
-TEST_F(TcpStatsdSinkTest, All) {
+TEST_F(TcpStatsdSinkTest, EmptyFlush) {
+  InSequence s;
+
+  sink_->beginFlush();
+  expectCreateConnection();
+  sink_->endFlush();
+}
+
+TEST_F(TcpStatsdSinkTest, BasicFlow) {
   InSequence s;
 
   sink_->beginFlush();

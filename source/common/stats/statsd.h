@@ -122,13 +122,13 @@ private:
   };
 
   // Somewhat arbitrary 16MiB limit for buffered stats.
-  static constexpr uint32_t MaxBufferedStatsBytes = (1024 * 1024 * 16);
+  static constexpr uint32_t MAX_BUFFERED_STATS_BYTES = (1024 * 1024 * 16);
 
   // 16KiB intermediate buffer for flushing.
-  static constexpr uint32_t FlushSliceSizeBytes = (1024 * 16);
+  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
 
   // Prefix for all flushed stats.
-  static char StatPrefix[];
+  static char STAT_PREFIX[];
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::SlotPtr tls_;

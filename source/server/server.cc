@@ -83,7 +83,8 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_.live_.set(!fail);
 }
 
-void InstanceUtil::flushHelper(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store) {
+void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                                 Stats::Store& store) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
@@ -123,7 +124,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  InstanceUtil::flushHelper(stat_sinks_, stats_store_);
+  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 

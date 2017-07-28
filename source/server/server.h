@@ -78,11 +78,13 @@ public:
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
 
   /**
-   * Helper for flushing counters and gauges to sinks.
+   * Helper for flushing counters and gauges to sinks. This takes care of calling beginFlush(),
+   * latching of counters and flushing, flushing of gauges, and calling endFlush(), on each sink.
    * @param sinks supplies the list of sinks.
    * @param store supplies the store to flush.
    */
-  static void flushHelper(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
+  static void flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                            Stats::Store& store);
 };
 
 /**
