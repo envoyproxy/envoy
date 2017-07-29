@@ -147,7 +147,7 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
-  bool using_original_dst_;
+  const bool using_original_dst_;
 };
 
 /**
