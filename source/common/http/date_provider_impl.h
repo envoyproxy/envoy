@@ -27,7 +27,7 @@ protected:
  */
 class TlsCachingDateProviderImpl : public DateProviderImplBase {
 public:
-  TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher, ThreadLocal::Instance& tls);
+  TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
   // Http::DateProvider
   void setDateHeader(HeaderMap& headers) override;
@@ -36,16 +36,12 @@ private:
   struct ThreadLocalCachedDate : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCachedDate(const std::string& date_string) : date_string_(date_string) {}
 
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override {}
-
     const std::string date_string_;
   };
 
   void onRefreshDate();
 
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   Event::TimerPtr refresh_timer_;
 };
 

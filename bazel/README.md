@@ -61,6 +61,12 @@ Though Envoy has been run in production compiled with GCC 4.9 extensively, we no
 recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
 to work.
 
+## Clang STL debug symbols
+
+By default Clang drops some debug symbols that are required for pretty printing to work correctly.
+More information can be found [here](https://bugs.llvm.org/show_bug.cgi?id=24202). The easy solution
+is to set ```--copt=-fno-limit-debug-info``` on the CLI or in your bazel.rc file.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
@@ -98,6 +104,18 @@ environments, set the environment variable ENVOY_IP_TEST_VERSIONS to "v4only" or
 ```
 bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
+```
+
+By default, tests are run with the [gperftools](https://github.com/gperftools/gperftools) heap
+checker enabled in "normal" mode to detect leaks. For other mode options, see the gperftools
+heap checker [documentation](https://gperftools.github.io/gperftools/heap_checker.html). To
+disable the heap checker or change the mode, set the HEAPCHECK environment variable:
+
+```
+# Disables the heap checker
+bazel test //test/... --test_env=HEAPCHECK=
+# Changes the heap checker to "minimal" mode
+bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
 
 Bazel will by default cache successful test results. To force it to rerun tests:

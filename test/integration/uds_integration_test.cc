@@ -16,7 +16,7 @@ TEST_P(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(UdsIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
 }
 
 TEST_P(UdsIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {

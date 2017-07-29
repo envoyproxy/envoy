@@ -7,6 +7,8 @@
 
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/thread_local_store.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -92,12 +94,18 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Thread::MutexBasicLockable lock;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
                                       "cluster_name", "node_name");
-  server_.reset(
-      new Server::InstanceImpl(options, *this, restarter, stats_store_, lock, *this, local_info));
+
+  ThreadLocal::InstanceImpl tls;
+  Stats::HeapRawStatDataAllocator stats_allocator;
+  Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
+  stat_store_ = &stats_store;
+  server_.reset(new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this,
+                                         local_info, tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   server_set_.setReady();
   server_->run();
   server_.reset();
+  stat_store_ = nullptr;
 }
 } // namespace Envoy

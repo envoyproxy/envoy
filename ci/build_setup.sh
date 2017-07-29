@@ -4,7 +4,6 @@
 
 set -e
 
-export HEAPCHECK=normal
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`

@@ -112,7 +112,7 @@ private:
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-               ClientFactory& client_factory, ThreadLocal::Instance& tls,
+               ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
                const Json::Object& config);
 
   // Redis::ConnPool::Instance
@@ -140,18 +140,16 @@ private:
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
                     const std::string& cluster_name);
-
+    ~ThreadLocalPool();
     PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                              PoolCallbacks& callbacks);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
-
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override;
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
     Upstream::ThreadLocalCluster* cluster_;
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
+    Common::CallbackHandle* local_host_set_member_update_cb_handle_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContext {
@@ -166,8 +164,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   ClientFactory& client_factory_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   ConfigImpl config_;
 };
 

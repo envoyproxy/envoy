@@ -163,6 +163,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        "//source/common/config:protocol_json_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",

@@ -120,7 +120,7 @@ struct ClusterManagerStats {
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 
@@ -196,10 +196,7 @@ private:
                                         HostListsConstSharedPtr healthy_hosts_per_zone,
                                         const std::vector<HostSharedPtr>& hosts_added,
                                         const std::vector<HostSharedPtr>& hosts_removed,
-                                        ThreadLocal::Instance& tls, uint32_t thread_local_slot);
-
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override;
+                                        ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -227,9 +224,8 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  ThreadLocal::Instance& tls_;
+  ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
-  uint32_t thread_local_slot_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
   Optional<SdsConfig> sds_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;

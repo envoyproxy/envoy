@@ -121,8 +121,6 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent);
-    ~StreamImpl();
-
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
     int onDataSourceSend(const uint8_t* framehd, size_t length);

@@ -29,7 +29,8 @@ public:
                                        Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                       const std::string& stat_prefix, ThreadLocal::Instance& tls,
+                                       const std::string& stat_prefix,
+                                       ThreadLocal::SlotAllocator& tls,
                                        Init::Manager& init_manager);
 };
 
@@ -96,9 +97,6 @@ private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
     ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
 
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override {}
-
     ConfigConstSharedPtr config_;
   };
 
@@ -106,13 +104,12 @@ private:
                              Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             const std::string& stat_prefix, ThreadLocal::Instance& tls);
+                             const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls);
   void registerInitTarget(Init::Manager& init_manager);
 
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
-  ThreadLocal::Instance& tls_;
-  const uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   const std::string route_config_name_;
   bool initialized_{};
   uint64_t last_config_hash_{};

@@ -50,6 +50,7 @@ public:
   Event::Libevent::BufferPtr& buffer() override {
     return static_cast<LibEventInstance&>(*wrapped_buffer_).buffer();
   }
+  void postProcess() override { checkLowWatermark(); }
 
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
 

@@ -15,6 +15,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -148,39 +149,17 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
-Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
+Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config) {
   Http2Settings ret;
-
-  Json::ObjectSharedPtr http2_settings = config.getObject("http2_settings", true);
-  ret.hpack_table_size_ =
-      http2_settings->getInteger("hpack_table_size", Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
-  ret.max_concurrent_streams_ = http2_settings->getInteger(
-      "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
-  ret.initial_stream_window_size_ = http2_settings->getInteger(
-      "initial_stream_window_size", Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  ret.hpack_table_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
+  ret.max_concurrent_streams_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_concurrent_streams, Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+  ret.initial_stream_window_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_stream_window_size, Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   ret.initial_connection_window_size_ =
-      http2_settings->getInteger("initial_connection_window_size",
-                                 Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
-
-  // http_codec_options config is DEPRECATED
-  std::string options = config.getString("http_codec_options", "");
-  if (options != "") {
-    spdlog::logger& logger = Logger::Registry::getLog(Logger::Id::config);
-    logger.warn("'http_codec_options' is DEPRECATED, please use 'http2_settings' instead");
-  }
-
-  for (const std::string& option : StringUtil::split(options, ',')) {
-    if (option == "no_compression") {
-      if (http2_settings->hasObject("hpack_table_size") && ret.hpack_table_size_ != 0) {
-        throw EnvoyException(
-            "'http_codec_options.no_compression' conflicts with 'http2_settings.hpack_table_size'");
-      }
-      ret.hpack_table_size_ = 0;
-    } else {
-      throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
-    }
-  }
-
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
+                                      Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
   return ret;
 }
 

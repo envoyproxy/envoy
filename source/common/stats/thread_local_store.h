@@ -97,9 +97,6 @@ private:
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override { scope_cache_.clear(); }
-
     std::unordered_map<ScopeImpl*, TlsCacheEntry> scope_cache_;
   };
 
@@ -114,8 +111,7 @@ private:
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::Instance* tls_{};
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   mutable std::mutex lock_;
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;

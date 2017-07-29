@@ -16,49 +16,29 @@ namespace ThreadLocal {
 class ThreadLocalObject {
 public:
   virtual ~ThreadLocalObject() {}
-
-  /**
-   * The owning thread is about to exit. Cleanup any variables that may reference other thread
-   * locals.
-   */
-  virtual void shutdown() PURE;
 };
 
 typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectSharedPtr;
 
 /**
- * Interface for getting and setting thread local data as well as registering a thread
+ * An individual allocated TLS slot. When the slot is destroyed the stored thread local will
+ * be freed on each thread.
  */
-class Instance {
+class Slot {
 public:
-  virtual ~Instance() {}
+  virtual ~Slot() {}
 
   /**
-   * Get a dedicated slot ID for use in further calls to get() and set().
+   * @return ThreadLocalObjectSharedPtr a thread local object stored in the slot.
    */
-  virtual uint32_t allocateSlot() PURE;
-
-  /**
-   * Get a thread local index stored in the specified slot ID.
-   */
-  virtual ThreadLocalObjectSharedPtr get(uint32_t index) PURE;
+  virtual ThreadLocalObjectSharedPtr get() PURE;
 
   /**
    * This is a helper on top of get() that casts the object stored in the slot to the specified
    * type. No type information is specified explicitly in code so dynamic_cast provides some level
    * of protection via RTTI.
    */
-  template <class T> T& getTyped(uint32_t index) {
-    return *std::dynamic_pointer_cast<T>(get(index));
-  }
-
-  /**
-   * A thread (via its dispatcher) must be registered before set() is called to receive thread
-   * local data updates.
-   * @param dispatcher supplies the thread's dispatcher.
-   * @param main_thread supplies whether this is the main program thread or a worker thread.
-   */
-  virtual void registerThread(Event::Dispatcher& dispatcher, bool main_thread) PURE;
+  template <class T> T& getTyped() { return *std::dynamic_pointer_cast<T>(get()); }
 
   /**
    * Run a callback on all registered threads.
@@ -68,17 +48,55 @@ public:
 
   /**
    * Set thread local data on all threads previously registered via registerThread().
-   * @param index species the slot ID which is used in subsequent calls to get() and getTyped().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    */
   typedef std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)> InitializeCb;
-  virtual void set(uint32_t index, InitializeCb cb) PURE;
+  virtual void set(InitializeCb cb) PURE;
+};
+
+typedef std::unique_ptr<Slot> SlotPtr;
+
+/**
+ * Interface used to allocate thread local slots.
+ */
+class SlotAllocator {
+public:
+  virtual ~SlotAllocator() {}
 
   /**
-   * The owning thread is about to exit. Call shutdown() on all thread local objects.
+   * @return SlotPtr a dedicated slot for use in further calls to get(), set(), etc.
+   */
+  virtual SlotPtr allocateSlot() PURE;
+};
+
+/**
+ * Interface for getting and setting thread local data as well as registering a thread
+ */
+class Instance : public SlotAllocator {
+public:
+  /**
+   * A thread (via its dispatcher) must be registered before set() is called on any allocated slots
+   * to receive thread local data updates.
+   * @param dispatcher supplies the thread's dispatcher.
+   * @param main_thread supplies whether this is the main program thread or not. (The only
+   *                    difference is that callbacks fire immediately on the main thread when posted
+   *                    from the main thread).
+   */
+  virtual void registerThread(Event::Dispatcher& dispatcher, bool main_thread) PURE;
+
+  /**
+   * This should be called by the main thread before any worker threads start to exit. This will
+   * block TLS removal during slot destruction, given that worker threads are about to call
+   * shutdownThread(). This avoids having to implement de-registration of threads.
+   */
+  virtual void shutdownGlobalThreading() PURE;
+
+  /**
+   * The owning thread is about to exit. This will free all thread local variables. It must be
+   * called on the thread that is shutting down.
    */
   virtual void shutdownThread() PURE;
 };

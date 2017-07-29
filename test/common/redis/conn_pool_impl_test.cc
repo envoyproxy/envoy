@@ -425,6 +425,13 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   tls_.shutdownThread();
 }
 
+TEST_F(RedisConnPoolImplTest, DeleteFollowedByClusterUpdateCallback) {
+  conn_pool_.reset();
+
+  std::shared_ptr<Upstream::Host> host(new Upstream::MockHost());
+  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host});
+}
+
 TEST_F(RedisConnPoolImplTest, NoHost) {
   InSequence s;
 

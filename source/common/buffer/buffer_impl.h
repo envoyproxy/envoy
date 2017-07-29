@@ -18,7 +18,10 @@ public:
 
 class LibEventInstance : public Instance {
 public:
+  // Allows access into the underlying buffer for move() optimizations.
   virtual Event::Libevent::BufferPtr& buffer() PURE;
+  // Called after accessing the memory in buffer() directly to allow any post-processing.
+  virtual void postProcess() PURE;
 };
 
 /**
@@ -49,6 +52,7 @@ public:
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
   int write(int fd) override;
+  void postProcess() override {}
 
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
 
