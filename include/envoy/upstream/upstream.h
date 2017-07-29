@@ -357,7 +357,6 @@ public:
 
 typedef std::unique_ptr<Cluster> ClusterPtr;
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;
-typedef std::weak_ptr<Cluster> ClusterWeakPtr;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -96,8 +96,8 @@ public:
       std::unordered_multimap<std::string, HostSharedPtr> map_;
     };
 
-    HostSet& host_set_;     // Thread local host set.
-    ClusterWeakPtr parent_; // Primary cluster managed by the main thread.
+    HostSet& host_set_;                        // Thread local host set.
+    std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
     HostMap host_map_;
   };

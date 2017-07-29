@@ -11,8 +11,15 @@
 namespace Envoy {
 namespace Upstream {
 
+// Static cast below is guaranteed to succeed, as code instantiating the cluster
+// configuration, that is run prior to this code, checks that an OriginalDstCluster is
+// always configured with an OriginalDstCluster::LoadBalancer, and that an
+// OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
+// and throws an exception otherwise.
+
 OriginalDstCluster::LoadBalancer::LoadBalancer(HostSet& host_set, ClusterSharedPtr& parent)
-    : host_set_(host_set), parent_(parent), info_(parent->info()) {
+    : host_set_(host_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
+      info_(parent->info()) {
   // host_set_ is initially empty.
   host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                      const std::vector<HostSharedPtr>& hosts_removed) -> void {
@@ -67,19 +74,13 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
         // our local map above, so insert without checking (2nd arg == false).
         host_map_.insert(host, false);
 
-        if (ClusterSharedPtr parent = parent_.lock()) {
-          // Dynamic cast below is guaranteed to succeed, as code instantiating the cluster
-          // configuration, that is run prior to this code, checks that an OriginalDstCluster is
-          // always configured with an OriginalDstCluster::LoadBalancer, and that an
-          // OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
-          // and throws an exception otherwise.
-          Event::Dispatcher& main_dispatcher =
-              dynamic_cast<OriginalDstCluster&>(*parent).dispatcher_;
-          ClusterWeakPtr& post_parent = parent_; // lambda cannot capture a member by value.
-          main_dispatcher.post([post_parent, host]() mutable {
+        if (std::shared_ptr<OriginalDstCluster> parent = parent_.lock()) {
+          // lambda cannot capture a member by value.
+          std::weak_ptr<OriginalDstCluster> post_parent = parent_;
+          parent->dispatcher_.post([post_parent, host]() mutable {
             // The main cluster may have disappeared while this post was queued.
-            if (ClusterSharedPtr parent = post_parent.lock()) {
-              dynamic_cast<OriginalDstCluster&>(*parent).addHost(host);
+            if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
+              parent->addHost(host);
             }
           });
         }
