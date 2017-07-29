@@ -295,7 +295,7 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
 }
 
 void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via_api) {
-  ClusterPtr new_cluster =
+  ClusterSharedPtr new_cluster =
       factory_.clusterFromJson(cluster, *this, sds_config_, outlier_event_logger_, added_via_api);
 
   init_helper_.addCluster(*new_cluster);
@@ -593,7 +593,7 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostC
   }
 }
 
-ClusterPtr ProdClusterManagerFactory::clusterFromJson(
+ClusterSharedPtr ProdClusterManagerFactory::clusterFromJson(
     const Json::Object& cluster, ClusterManager& cm, const Optional<SdsConfig>& sds_config,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   Optional<envoy::api::v2::ConfigSource> eds_config((envoy::api::v2::ConfigSource()));

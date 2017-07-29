@@ -111,7 +111,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
     new std::vector<std::vector<HostSharedPtr>>()};
 
-ClusterPtr
+ClusterSharedPtr
 ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
                         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
                         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,

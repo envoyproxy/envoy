@@ -355,7 +355,6 @@ public:
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
-typedef std::unique_ptr<Cluster> ClusterPtr;
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;
 
 } // namespace Upstream

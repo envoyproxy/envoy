@@ -47,10 +47,10 @@ public:
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
-  ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                             const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerSharedPtr outlier_event_logger,
-                             bool added_via_api) override;
+  ClusterSharedPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
+                                   const Optional<SdsConfig>& sds_config,
+                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                   bool added_via_api) override;
   CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
 
 private:
@@ -206,8 +206,8 @@ private:
   };
 
   struct PrimaryClusterData {
-    PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterPtr&& cluster)
-        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(cluster.release()) {}
+    PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterSharedPtr&& cluster)
+        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
 
     const uint64_t config_hash_;
     const bool added_via_api_;

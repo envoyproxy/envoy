@@ -165,10 +165,10 @@ public:
   /**
    * Allocate a cluster from configuration JSON.
    */
-  virtual ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                                     const Optional<SdsConfig>& sds_config,
-                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                     bool added_via_api) PURE;
+  virtual ClusterSharedPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
+                                           const Optional<SdsConfig>& sds_config,
+                                           Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                           bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration JSON.

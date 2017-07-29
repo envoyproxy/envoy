@@ -105,7 +105,7 @@ protected:
   envoy::api::v2::ConfigSource eds_config_;
   MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  std::unique_ptr<EdsClusterImpl> cluster_;
+  std::shared_ptr<EdsClusterImpl> cluster_;
   Event::MockTimer* timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   ReadyWatcher membership_updated_;

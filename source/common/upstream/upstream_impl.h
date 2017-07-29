@@ -240,13 +240,15 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterPtr create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
-                           ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                           Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                           const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                           const LocalInfo::LocalInfo& local_info,
-                           Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+  static ClusterSharedPtr create(const Json::Object& cluster, ClusterManager& cm,
+                                 Stats::Store& stats, ThreadLocal::Instance& tls,
+                                 Network::DnsResolverSharedPtr dns_resolver,
+                                 Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                                 const LocalInfo::LocalInfo& local_info,
+                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                 bool added_via_api);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
