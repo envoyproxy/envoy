@@ -20,6 +20,7 @@ Cluster
     "features": "...",
     "http_codec_options": "...",
     "http2_settings": "{...}",
+    "cleanup_interval_ms": "...",
     "dns_refresh_rate_ms": "...",
     "dns_lookup_family": "...",
     "dns_resolvers": [],
@@ -38,7 +39,7 @@ name
 type
   *(required, string)* The :ref:`service discovery type <arch_overview_service_discovery_types>` to
   use for resolving the cluster. Possible options are *static*, *strict_dns*, *logical_dns*,
-  *original_dst*, and *sds*.
+  :ref:`*original_dst* <arch_overview_service_discovery_types_original_destination>`, and *sds*.
 
 connect_timeout_ms
   *(required, integer)* The timeout for new network connections to hosts in the cluster specified
@@ -50,11 +51,15 @@ per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the cluster's connections read and write buffers.
   If unspecified, an implementation defined default is applied (1MiB).
 
+.. _config_cluster_manager_cluster_lb_type:
+
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   when picking a host in the cluster. Possible options are *round_robin*, *least_request*,
-  *ring_hash*, *random*, and *original_dst_lb*.  Note that *original_dst_lb* must be used with
-  clusters of type *original_dst*, and may not be used with any other cluster type.
+  *ring_hash*, *random*, and *original_dst_lb*.  Note that :ref:`*original_dst_lb*
+  <arch_overview_load_balancing_types_original_destination>` must be used with clusters of type
+  :ref:`*original_dst* <arch_overview_service_discovery_types_original_destination>`, and may not be
+  used with any other cluster type.
 
 hosts
   *(sometimes required, array)* If the service discovery type is *static*, *strict_dns*, or

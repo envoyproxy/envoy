@@ -54,14 +54,19 @@ The random load balancer selects a random healthy host. The random load balancer
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
 
+.. _arch_overview_load_balancing_types_original_destination:
+
 Original destination
 ^^^^^^^^^^^^^^^^^^^^
 
-This is a special purpose load balancer that can only be used with an original destination
-cluster. Upstream host is selected based on the downstream connection metadata, i.e., connections
-are opened to the same address as the destination address of the incoming connection was before the
-connection was redirected to Envoy. No other load balancing type can be used with original
-destination clusters.
+This is a special purpose load balancer that can only be used with :ref:`an original destination
+cluster <arch_overview_service_discovery_types_original_destination>`. Upstream host is selected
+based on the downstream connection metadata, i.e., connections are opened to the same address as the
+destination address of the incoming connection was before the connection was redirected to
+Envoy. New destinations are added to the cluster by the load balancer on-demand, and the cluster
+:ref:`periodically <config_cluster_manager_cluster_cleanup_interval_ms>` cleans out unused hosts
+from the cluster. No other :ref:`load balancing type <config_cluster_manager_cluster_lb_type>` can
+be used with original destination clusters.
 
 .. _arch_overview_load_balancing_panic_threshold:
 
