@@ -376,7 +376,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
                                                                  LoadBalancerContext* context) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_.getTyped<ThreadLocalClusterManagerImpl>();
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
