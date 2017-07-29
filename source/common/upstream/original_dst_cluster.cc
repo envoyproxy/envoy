@@ -25,9 +25,8 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(HostSet& host_set, ClusterSharedP
                                      const std::vector<HostSharedPtr>& hosts_removed) -> void {
     // Update the hosts map
     for (const HostSharedPtr& host : hosts_removed) {
-      if (host_map_.remove(host)) {
-        ENVOY_LOG(debug, "Removing host {}.", host->address()->asString());
-      }
+      ENVOY_LOG(debug, "Removing host {}.", host->address()->asString());
+      host_map_.remove(host);
     }
     for (const HostSharedPtr& host : hosts_added) {
       if (host_map_.insert(host)) {

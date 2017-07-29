@@ -70,17 +70,14 @@ public:
         return true;
       }
 
-      bool remove(const HostSharedPtr& host) {
+      void remove(const HostSharedPtr& host) {
         auto range = map_.equal_range(host->address()->asString());
         auto it =
             std::find_if(range.first, range.second, [&host](const decltype(map_)::value_type pair) {
               return pair.second == host;
             });
-        if (it != range.second) {
-          map_.erase(it); // found 'host'
-          return true;
-        }
-        return false;
+        ASSERT(it != range.second);
+        map_.erase(it);
       }
 
       HostSharedPtr find(const Network::Address::Instance& address) {
