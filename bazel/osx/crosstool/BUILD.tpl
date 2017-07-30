@@ -1,3 +1,9 @@
+# This file was imported from https://github.com/bazelbuild/bazel at tag 0.5.2. We apply
+# local modifications to deal with known issues in Bazel 0.5.2:
+#
+# https://github.com/bazelbuild/bazel/issues/209
+#
+# See BUILD.tpl.diff for the changes made in this fork.
 package(default_visibility = ["//visibility:public"])
 
 load(":osx_archs.bzl", "OSX_TOOLS_ARCHS")
