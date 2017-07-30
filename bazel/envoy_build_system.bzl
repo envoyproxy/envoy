@@ -29,6 +29,8 @@ def envoy_copts(repository, test = False):
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
+        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
+        # Further, the system library transitively links common libraries (e.g., pthread).
         # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
         # The file could should contain the current git SHA (or enough placeholder data to allow
         # it to be rewritten by tools/git_sha_rewriter.py).
