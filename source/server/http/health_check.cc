@@ -118,7 +118,8 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
     }
 
-    headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
+    headers.insertEnvoyUpstreamHealthCheckedCluster().value().setStatic(
+        context_.localInfo().clusterName());
   }
 
   return Http::FilterHeadersStatus::Continue;

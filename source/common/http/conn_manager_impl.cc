@@ -673,7 +673,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
-  headers.insertServer().value(connection_manager_.config_.serverName());
+  headers.insertServer().value().setStatic(connection_manager_.config_.serverName());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   *snapped_route_config_);
 
@@ -708,7 +708,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
-    headers.insertConnection().value(Headers::get().ConnectionValues.Close);
+    headers.insertConnection().value().setStatic(Headers::get().ConnectionValues.Close);
   }
 
   chargeStats(headers);

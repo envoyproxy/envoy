@@ -246,12 +246,17 @@ TEST(HeaderStringTest, All) {
     string.setStatic(static_string);
     EXPECT_EQ(string.c_str(), static_string.c_str());
     EXPECT_EQ(11U, string.size());
+    EXPECT_EQ(HeaderString::Type::Static, string.type());
+
     const std::string large(128, 'a');
     string.setCopy(large.c_str(), large.size());
     EXPECT_NE(string.c_str(), large.c_str());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+
     string.setStatic(static_string);
     EXPECT_EQ(string.c_str(), static_string.c_str());
     EXPECT_EQ(11U, string.size());
+    EXPECT_EQ(HeaderString::Type::Static, string.type());
   }
 }
 
