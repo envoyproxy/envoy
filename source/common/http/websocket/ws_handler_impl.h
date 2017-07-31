@@ -26,7 +26,7 @@ namespace WebSocket {
 class WsHandlerImpl : public Filter::TcpProxy {
 public:
   WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry& route_entry,
-                StreamDecoderFilterCallbacks& stream, Upstream::ClusterManager& cluster_manager);
+                WsHandlerCallbacks& callbacks, Upstream::ClusterManager& cluster_manager);
   ~WsHandlerImpl();
 
   void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks);
@@ -44,7 +44,7 @@ private:
 
   Http::HeaderMap& request_headers_;
   const Router::RouteEntry& route_entry_;
-  Http::StreamDecoderFilterCallbacks& stream_;
+  Http::WsHandlerCallbacks& ws_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
 };
 

@@ -501,28 +501,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (websocket_requested && websocket_required) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
-      // A very kludgey way to get a handle over the stream
-      // decoder! WsHandlerImpl needs the stream decoder in order to
-      // properly terminate connections with HTTP error codes when
-      // there is an error establishing connection to upstream.
-      // TODO (rshriram) - can decoder_filters_ be empty? Is there a better way to get
-      // a handle over the stream decoder filter callback instead of ** ?
-      const auto entry = decoder_filters_.begin();
-      if (entry != decoder_filters_.end()) {
-        connection_manager_.ws_connection_ =
-            std::unique_ptr<WebSocket::WsHandlerImpl>(new WebSocket::WsHandlerImpl(
-                *request_headers_, *route_entry, **entry, connection_manager_.cluster_manager_));
-        connection_manager_.ws_connection_->initializeUpstreamConnection(
-            *connection_manager_.read_callbacks_);
-        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
-        connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
-        connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
-      } else {
-        // TODO (rshriram) - this can only happen if someone has no router filter. Not sure if its
-        // valid in the config.
-        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
-        encodeHeaders(nullptr, headers, true);
-      }
+      connection_manager_.ws_connection_ =
+          std::unique_ptr<WebSocket::WsHandlerImpl>(new WebSocket::WsHandlerImpl(
+              *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_));
+      connection_manager_.ws_connection_->initializeUpstreamConnection(
+          *connection_manager_.read_callbacks_);
+      connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+      connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+      connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       return;
     } else if (websocket_requested || websocket_required) {
       if (websocket_requested) {

@@ -23,11 +23,10 @@ namespace Http {
 namespace WebSocket {
 
 WsHandlerImpl::WsHandlerImpl(Http::HeaderMap& request_headers,
-                             const Router::RouteEntry& route_entry,
-                             StreamDecoderFilterCallbacks& stream,
+                             const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager)
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
-      route_entry_(route_entry), stream_(stream) {}
+      route_entry_(route_entry), ws_callbacks_(callbacks) {}
 
 WsHandlerImpl::~WsHandlerImpl() {}
 
@@ -41,9 +40,8 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
     ENVOY_CONN_LOG(debug, "creating connection to upstream cluster {}",
                    read_callbacks_->connection(), cluster_name);
   } else {
-    Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
-    headers->addStatic(Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound)));
-    stream_.encodeHeaders(std::move(headers), true);
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
+    ws_callbacks_.sendHeadersOnlyResponse(headers);
     return;
   }
 
@@ -51,10 +49,9 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
 
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
-    Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
-    headers->addStatic(Headers::get().Status,
-                       std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
-    stream_.encodeHeaders(std::move(headers), true);
+    HeaderMapImpl headers{
+        {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
+    ws_callbacks_.sendHeadersOnlyResponse(headers);
     return;
   }
 
@@ -70,10 +67,9 @@ void WsHandlerImpl::initializeUpstreamConnection(Network::ReadFilterCallbacks& c
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
-    Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
-    headers->addStatic(Headers::get().Status,
-                       std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
-    stream_.encodeHeaders(std::move(headers), true);
+    HeaderMapImpl headers{
+        {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
+    ws_callbacks_.sendHeadersOnlyResponse(headers);
     return;
   }
 
@@ -84,9 +80,9 @@ void WsHandlerImpl::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
   upstream_connection_.get()->close(Network::ConnectionCloseType::NoFlush);
-  Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
-  headers->addStatic(Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout)));
-  stream_.encodeHeaders(std::move(headers), true);
+  HeaderMapImpl headers{
+      {Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout))}};
+  ws_callbacks_.sendHeadersOnlyResponse(headers);
 }
 
 void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
@@ -104,9 +100,9 @@ void WsHandlerImpl::onUpstreamEvent(uint32_t event) {
     if (connect_timeout_timer_) {
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
-      Http::HeaderMapPtr headers = std::unique_ptr<Http::HeaderMap>(new Http::HeaderMapImpl());
-      headers->addStatic(Headers::get().Status, std::to_string(enumToInt(Http::Code::BadGateway)));
-      stream_.encodeHeaders(std::move(headers), true);
+      HeaderMapImpl headers{
+          {Headers::get().Status, std::to_string(enumToInt(Http::Code::BadGateway))}};
+      ws_callbacks_.sendHeadersOnlyResponse(headers);
     }
 
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

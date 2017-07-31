@@ -409,6 +409,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
+                        public WsHandlerCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -452,6 +453,11 @@ private:
       addStreamEncoderFilterWorker(filter, true);
     }
     void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
+
+    // Http::WsHandlerCallbacks
+    void sendHeadersOnlyResponse(HeaderMap& headers) override {
+      encodeHeaders(nullptr, headers, true);
+    }
 
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
