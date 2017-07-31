@@ -219,8 +219,6 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   no_cluster, Counter, Total requests in which the target cluster did not exist and resulted in a 404
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_total, Counter, Total routed requests
-  flow_control_paused_downstream_reads_total, Counter, Total times requests backed up enough to pause reading from downstream.
-  flow_control_resumed_downstream_reads_total, Counter, Total number of times requests resumed reading from downstream.
 
 Virtual cluster statistics are output in the
 *vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following

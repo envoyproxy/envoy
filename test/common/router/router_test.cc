@@ -1168,9 +1168,13 @@ TEST_F(RouterTest, Watermarks) {
   router_.decodeHeaders(headers, true);
 
   stream_callbacks->onAboveWriteBufferHighWatermark();
-  EXPECT_EQ(1UL, stats_store_.counter("test.flow_control_paused_downstream_reads_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
   stream_callbacks->onBelowWriteBufferLowWatermark();
-  EXPECT_EQ(1UL, stats_store_.counter("test.flow_control_resumed_downstream_reads_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
 
   Http::HeaderMapPtr response_headers(
       new Http::TestHeaderMapImpl{{":status", "200"},
