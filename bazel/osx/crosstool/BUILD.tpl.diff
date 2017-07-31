@@ -1,10 +1,10 @@
 diff --git a/../../../../bazel/tools/osx/crosstool/BUILD.tpl b/BUILD.tpl
-index 8f5376766..b17f3104d 100644
+index 8f5376766..b121d0a60 100644
 --- a/../../../../bazel/tools/osx/crosstool/BUILD.tpl
 +++ b/BUILD.tpl
 @@ -1,3 +1,9 @@
-+# This file was imported from https://github.com/bazelbuild/bazel at tag 0.5.2. We apply
-+# local modifications to deal with known issues in Bazel 0.5.2:
++# This file was imported from https://github.com/bazelbuild/bazel at tag 0.5.3. We apply
++# local modifications to deal with known issues in Bazel 0.5.3:
 +#
 +# https://github.com/bazelbuild/bazel/issues/209
 +#

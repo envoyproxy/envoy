@@ -1,5 +1,5 @@
-# This file was imported from https://github.com/bazelbuild/bazel at tag 0.5.2. We apply
-# local modifications to deal with known issues in Bazel 0.5.2:
+# This file was imported from https://github.com/bazelbuild/bazel at tag 0.5.3. We apply
+# local modifications to deal with known issues in Bazel 0.5.3:
 #
 # https://github.com/bazelbuild/bazel/issues/209
 #
