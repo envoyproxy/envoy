@@ -115,7 +115,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
     ENVOY_CONN_LOG(debug, "handshake complete", *this);
     handshake_complete_ = true;
     ctx_.logHandshake(ssl_.get());
-    raiseEvents(Network::ConnectionEvent::Connected);
+    raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
     return state() == State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;

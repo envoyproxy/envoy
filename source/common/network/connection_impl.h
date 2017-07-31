@@ -88,7 +88,7 @@ protected:
 
   virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
-  void raiseEvents(ConnectionEvent event);
+  void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
     return read_buffer_limit_ > 0 && read_buffer_->length() >= read_buffer_limit_;

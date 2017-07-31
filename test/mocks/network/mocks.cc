@@ -27,7 +27,7 @@ MockConnectionCallbacks::~MockConnectionCallbacks() {}
 
 uint64_t MockConnectionBase::next_id_;
 
-void MockConnectionBase::raiseEvents(Network::ConnectionEvent event) {
+void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (state_ == Connection::State::Closed) {
@@ -50,7 +50,7 @@ template <class T> static void initializeMockConnection(T& connection) {
         connection.callbacks_.push_back(&callbacks);
       }));
   ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
-    connection.raiseEvents(Network::ConnectionEvent::LocalClose);
+    connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
   ON_CALL(connection, remoteAddress()).WillByDefault(ReturnPointee(connection.remote_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));

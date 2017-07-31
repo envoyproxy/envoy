@@ -29,7 +29,7 @@ public:
 
 class MockConnectionBase {
 public:
-  void raiseEvents(Network::ConnectionEvent event);
+  void raiseEvent(Network::ConnectionEvent event);
 
   static uint64_t next_id_;
 

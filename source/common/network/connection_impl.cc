@@ -147,7 +147,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   ::close(fd_);
   fd_ = -1;
 
-  raiseEvents(close_type);
+  raiseEvent(close_type);
 }
 
 Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
@@ -237,7 +237,7 @@ void ConnectionImpl::readDisable(bool disable) {
   }
 }
 
-void ConnectionImpl::raiseEvents(ConnectionEvent event) {
+void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
     // TODO(mattklein123): If we close while raising a connected event we should not raise further
     // connected events.
@@ -426,7 +426,7 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   return {action, bytes_written};
 }
 
-void ConnectionImpl::onConnected() { raiseEvents(ConnectionEvent::Connected); }
+void ConnectionImpl::onConnected() { raiseEvent(ConnectionEvent::Connected); }
 
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
