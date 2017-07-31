@@ -24,6 +24,10 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+    }) + select({
+        repository + "//bazel:disable_hot_restart": [],
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": ["-DENVOY_HOT_RESTART"],
     })
 
 # Compute the final linkopts based on various options.

@@ -8,7 +8,10 @@
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
+#ifdef ENVOY_HOT_RESTART
 #include "exe/hot_restart.h"
+#endif
+#include "exe/hot_restart_nop.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
@@ -36,7 +39,27 @@ public:
 
 } // namespace Server
 
-int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
+int main_common(OptionsImpl& options) {
+#ifdef ENVOY_HOT_RESTART
+  std::unique_ptr<Envoy::Server::HotRestartImpl> restarter;
+  try {
+    restarter.reset(new Server::HotRestartImpl(options));
+  } catch (Envoy::EnvoyException& e) {
+    std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
+    return 1;
+  }
+
+  Thread::BasicLockable& log_lock = restarter->logLock();
+  Thread::BasicLockable& access_log_lock = restarter->accessLogLock();
+  Stats::RawStatDataAllocator &stats_allocator = *restarter;
+#else
+  std::unique_ptr<Envoy::Server::HotRestartNopImpl> restarter;
+  restarter.reset(new Server::HotRestartNopImpl());
+
+  Thread::MutexBasicLockable log_lock, access_log_lock;
+  Stats::HeapRawStatDataAllocator stats_allocator;
+#endif
+
   Event::Libevent::Global::initialize();
   Server::ProdComponentFactory component_factory;
   LocalInfo::LocalInfoImpl local_info(
@@ -54,12 +77,12 @@ int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
 
   ares_library_init(ARES_LIB_INIT_ALL);
 
-  Logger::Registry::initialize(options.logLevel(), restarter.logLock());
+  Logger::Registry::initialize(options.logLevel(), log_lock);
   DefaultTestHooks default_test_hooks;
   ThreadLocal::InstanceImpl tls;
-  Stats::ThreadLocalStoreImpl stats_store(restarter);
-  Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
-                              restarter.accessLogLock(), component_factory, local_info, tls);
+  Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
+  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
+                              access_log_lock, component_factory, local_info, tls);
   server.run();
   ares_library_cleanup();
   return 0;

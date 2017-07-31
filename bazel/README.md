@@ -195,7 +195,6 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
-
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer
@@ -229,6 +228,11 @@ remove log statements of lower importance during compilation to enhance performa
 ```
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
+
+## Hot Restart
+
+Hot restart can be disabled in any build by specifying `--define=hot_restart=disabled`
+on the Bazel command line.
 
 
 # Release builds

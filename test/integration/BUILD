@@ -10,6 +10,12 @@ load(
 
 envoy_package()
 
+native.genrule(
+    name = "hotrestart_test_disabled",
+    outs = ["hotrestart_disabled"],
+    cmd = "touch $@",
+)
+
 envoy_sh_test(
     name = "hotrestart_test",
     srcs = ["hotrestart_test.sh"],
@@ -19,7 +25,11 @@ envoy_sh_test(
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
-    ],
+    ] + select({
+        "//bazel:disable_hot_restart": [":hotrestart_test_disabled"],
+        "@bazel_tools//tools/osx:darwin": [":hotrestart_test_disabled"],
+        "//conditions:default": [],
+    }),
     # Need to disable test execution sandboxing for this test, since it uses shmem.
     # TODO(htuch): When most folks are using a Bazel with the recent
     # https://github.com/bazelbuild/bazel/commit/8d739f2fad3fd0135b940170691b0119c5baca1e,
