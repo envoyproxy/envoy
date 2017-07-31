@@ -44,9 +44,9 @@ public:
   MockClient();
   ~MockClient();
 
-  void raiseEvents(uint32_t events) {
+  void raiseEvents(Network::ConnectionEvent event) {
     for (Network::ConnectionCallbacks* callbacks : callbacks_) {
-      callbacks->onEvent(events);
+      callbacks->onEvent(event);
     }
   }
 

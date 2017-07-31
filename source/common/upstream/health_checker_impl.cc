@@ -255,9 +255,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
   }
 }
 
-void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::RemoteClose ||
-      events & Network::ConnectionEvent::LocalClose) {
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
@@ -398,17 +398,17 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
   }
 }
 
-void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::RemoteClose) {
+void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     handleFailure(true);
   }
 
-  if (events & Network::ConnectionEvent::RemoteClose ||
-      events & Network::ConnectionEvent::LocalClose) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 
-  if ((events & Network::ConnectionEvent::Connected) && parent_.receive_bytes_.empty()) {
+  if (event == Network::ConnectionEvent::Connected && parent_.receive_bytes_.empty()) {
     // In this case we are just testing that we can connect, so immediately succeed. Also, since
     // we are just doing a connection test, close the connection.
     // NOTE(mattklein123): I've seen cases where the kernel will report a successful connection, and
@@ -476,9 +476,10 @@ RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSe
   }
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::RemoteClose ||
-      events & Network::ConnectionEvent::LocalClose) {
+void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onEvent(
+    Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     // This should only happen after any active requests have been failed/cancelled.
     ASSERT(!current_request_);
     parent_.dispatcher_.deferredDelete(std::move(client_));

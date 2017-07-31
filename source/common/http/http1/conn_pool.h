@@ -75,7 +75,9 @@ protected:
     void onConnectTimeout();
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override { parent_.onConnectionEvent(*this, events); }
+    void onEvent(Network::ConnectionEvent event) override {
+      parent_.onConnectionEvent(*this, event);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -110,7 +112,7 @@ protected:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   void checkForDrained();
   void createNewConnection();
-  void onConnectionEvent(ActiveClient& client, uint32_t events);
+  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent events);
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);

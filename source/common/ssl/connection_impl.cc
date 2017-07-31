@@ -298,7 +298,7 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Co
 
 void ClientConnectionImpl::connect() { doConnect(); }
 
-void ConnectionImpl::closeSocket(uint32_t close_type) {
+void ConnectionImpl::closeSocket(Network::ConnectionEvent close_type) {
   if (handshake_complete_ && state() != State::Closed) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point

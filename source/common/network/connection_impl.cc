@@ -131,7 +131,7 @@ Connection::State ConnectionImpl::state() const {
   }
 }
 
-void ConnectionImpl::closeSocket(uint32_t close_type) {
+void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd_ == -1) {
     return;
   }
@@ -237,11 +237,11 @@ void ConnectionImpl::readDisable(bool disable) {
   }
 }
 
-void ConnectionImpl::raiseEvents(uint32_t events) {
+void ConnectionImpl::raiseEvents(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
     // TODO(mattklein123): If we close while raising a connected event we should not raise further
     // connected events.
-    callback->onEvent(events);
+    callback->onEvent(event);
   }
 }
 

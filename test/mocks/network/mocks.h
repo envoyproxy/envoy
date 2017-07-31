@@ -22,14 +22,14 @@ public:
   ~MockConnectionCallbacks();
 
   // Network::ConnectionCallbacks
-  MOCK_METHOD1(onEvent, void(uint32_t events));
+  MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockConnectionBase {
 public:
-  void raiseEvents(uint32_t events);
+  void raiseEvents(Network::ConnectionEvent event);
 
   static uint64_t next_id_;
 
