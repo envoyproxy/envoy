@@ -148,21 +148,29 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
+  ASSERT(pending_receive_buffer_high_watermark_called_ == false);
+  pending_receive_buffer_high_watermark_called_ = true;
   readDisable(true);
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
+  ASSERT(pending_receive_buffer_high_watermark_called_ == true);
+  pending_receive_buffer_high_watermark_called_ = false;
   readDisable(false);
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "send buffer over limit ", parent_.connection_);
+  ASSERT(pending_send_buffer_high_watermark_called_ == false);
+  pending_send_buffer_high_watermark_called_ = true;
   runHighWatermarkCallbacks();
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "send buffer under limit ", parent_.connection_);
+  ASSERT(pending_send_buffer_high_watermark_called_ == true);
+  pending_send_buffer_high_watermark_called_ = false;
   runLowWatermarkCallbacks();
 }
 

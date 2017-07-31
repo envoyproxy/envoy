@@ -190,6 +190,8 @@ protected:
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
     bool waiting_for_non_informational_headers_ : 1;
+    bool pending_receive_buffer_high_watermark_called_ : 1;
+    bool pending_send_buffer_high_watermark_called_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
