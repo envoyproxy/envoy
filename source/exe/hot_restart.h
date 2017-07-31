@@ -14,91 +14,12 @@
 #include "common/common/assert.h"
 #include "common/stats/stats_impl.h"
 
+#include "exe/shared_memory.h"
+
 namespace Envoy {
 namespace Server {
 
-/**
- * Shared memory segment. This structure is laid directly into shared memory and is used amongst
- * all running envoy processes.
- */
-class SharedMemory {
-public:
-  static std::string version();
-
-private:
-  struct Flags {
-    static const uint64_t INITIALIZING = 0x1;
-  };
-
-  SharedMemory() {}
-
-  /**
-   * Initialize the shared memory segment, depending on whether we should be the first running
-   * envoy, or a host restarted envoy process.
-   */
-  static SharedMemory& initialize(Options& options);
-
-  /**
-   * Initialize a pthread mutex for process shared locking.
-   */
-  void initializeMutex(pthread_mutex_t& mutex);
-
-  static const uint64_t VERSION;
-
-  uint64_t size_;
-  uint64_t version_;
-  std::atomic<uint64_t> flags_;
-  pthread_mutex_t log_lock_;
-  pthread_mutex_t access_log_lock_;
-  pthread_mutex_t stat_lock_;
-  pthread_mutex_t init_lock_;
-  std::array<Stats::RawStatData, 16384> stats_slots_;
-
-  friend class HotRestartImpl;
-};
-
-/**
- * Implementation of Thread::BasicLockable that operates on a process shared pthread mutex.
- */
-class ProcessSharedMutex : public Thread::BasicLockable {
-public:
-  ProcessSharedMutex(pthread_mutex_t& mutex) : mutex_(mutex) {}
-
-  void lock() override {
-    // Deal with robust handling here. If the other process dies without unlocking, we are going
-    // to die shortly but try to make sure that we can handle any signals, etc. that happen without
-    // getting into a further messed up state.
-    int rc = pthread_mutex_lock(&mutex_);
-    ASSERT(rc == 0 || rc == EOWNERDEAD);
-    if (rc == EOWNERDEAD) {
-      pthread_mutex_consistent(&mutex_);
-    }
-  }
-
-  bool try_lock() override {
-    int rc = pthread_mutex_trylock(&mutex_);
-    if (rc == EBUSY) {
-      return false;
-    }
-
-    ASSERT(rc == 0 || rc == EOWNERDEAD);
-    if (rc == EOWNERDEAD) {
-      pthread_mutex_consistent(&mutex_);
-    }
-
-    return true;
-  }
-
-  void unlock() override {
-    int rc = pthread_mutex_unlock(&mutex_);
-    ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
-  }
-
-private:
-  pthread_mutex_t& mutex_;
-};
-
+#ifdef __linux__
 /**
  * Implementation of HotRestart built for Linux.
  */
@@ -200,6 +121,40 @@ private:
   Server::Instance* server_{};
   bool parent_terminated_{};
 };
+
+#else  // __linux__
+
+/**
+ * No-op implementation of HotRestart for everybody else.
+ */
+class HotRestartImpl : public HotRestart, public Stats::RawStatDataAllocator {
+public:
+  HotRestartImpl(Options& options);
+
+  Thread::BasicLockable& logLock() { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
+
+  // Server::HotRestart
+  void drainParentListeners() override {}
+  int duplicateParentListenSocket(const std::string&) override { return -1; }
+  void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
+  void initialize(Event::Dispatcher&, Server::Instance&) override {}
+  void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
+  void terminateParent() override {}
+  void shutdown() override {}
+  std::string version() override { return "disabled"; }
+
+  // RawStatDataAllocator
+  Stats::RawStatData* alloc(const std::string& name) override;
+  void free(Stats::RawStatData& data) override;
+
+private:
+  SharedMemory& shmem_;
+  ProcessSharedMutex log_lock_;
+  ProcessSharedMutex access_log_lock_;
+  ProcessSharedMutex stat_lock_;
+};
+#endif // __linux__
 
 } // namespace Server
 } // namespace Envoy

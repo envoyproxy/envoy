@@ -454,7 +454,6 @@ public:
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
     client_connection_->addConnectionCallbacks(client_callbacks_);
-    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected));
   }
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
@@ -464,10 +463,15 @@ public:
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);
+          server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
+
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     uint32_t filter_seen = 0;
 
@@ -477,6 +481,7 @@ public:
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
+
           if (filter_seen == (write_size * num_writes)) {
             server_connection_->close(Network::ConnectionCloseType::FlushWrite);
           }
@@ -530,9 +535,12 @@ public:
 
     initialize(read_buffer_limit);
 
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);
+          server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
@@ -547,15 +555,20 @@ public:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockBuffer::baseMove)));
-    EXPECT_CALL(*client_write_buffer, drain(_))
-        .WillOnce(Invoke(client_write_buffer, &MockBuffer::baseDrain));
+    EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
+      client_write_buffer->baseDrain(n);
+      dispatcher_->exit();
+    }));
     client_connection_->write(buffer_to_write);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+
     client_connection_->close(Network::ConnectionCloseType::NoFlush);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -587,6 +600,7 @@ public:
   ClientContextPtr client_ctx_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;
+  Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
 };

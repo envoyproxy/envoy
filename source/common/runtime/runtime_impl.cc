@@ -3,6 +3,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <uuid/uuid.h>
+
 #include <cstdint>
 #include <random>
 #include <string>
@@ -22,20 +24,11 @@ namespace Runtime {
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 std::string RandomGeneratorImpl::uuid() {
-  int fd = open("/proc/sys/kernel/random/uuid", O_RDONLY);
-  if (-1 == fd) {
-    throw EnvoyException(fmt::format("unable to open uuid, errno: {}", strerror(errno)));
-  }
-
   char generated_uuid[UUID_LENGTH + 1];
-  ssize_t bytes_read = read(fd, generated_uuid, UUID_LENGTH);
-  close(fd);
-  generated_uuid[UUID_LENGTH] = '\0';
 
-  if (bytes_read != UUID_LENGTH) {
-    throw EnvoyException(fmt::format("cannot read the uuid: bytes read - {}, bytes expected - {}",
-                                     bytes_read, UUID_LENGTH));
-  }
+  uuid_t uuid;
+  uuid_generate_random(uuid);
+  uuid_unparse(uuid, generated_uuid);
 
   return std::string(generated_uuid);
 }

@@ -60,6 +60,7 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
       .WillByDefault(Return(12));
   cluster_.runCallbacks({}, {});
 
+#if !defined(__APPLE__)
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
   // what we are going to get.
@@ -102,6 +103,48 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
   }
+#else
+  // Similarly, this is what you get on OSX/Apple LLVM 8.1.0.
+  // ring hash: hash_key=127.0.0.1:80_0 hash=1785278789362412239
+  // ring hash: hash_key=127.0.0.1:85_0 hash=4449229172670576906
+  // ring hash: hash_key=127.0.0.1:83_1 hash=6055030134139063662
+  // ring hash: hash_key=127.0.0.1:81_1 hash=6131885104641997928
+  // ring hash: hash_key=127.0.0.1:84_0 hash=6367537078542552970
+  // ring hash: hash_key=127.0.0.1:81_0 hash=8908282605774288966
+  // ring hash: hash_key=127.0.0.1:83_0 hash=11126513076073360795
+  // ring hash: hash_key=127.0.0.1:80_1 hash=11937214931531445650
+  // ring hash: hash_key=127.0.0.1:82_0 hash=12081020427914561087
+  // ring hash: hash_key=127.0.0.1:84_1 hash=12813936884733316938
+  // ring hash: hash_key=127.0.0.1:85_1 hash=14420433723247909236
+  // ring hash: hash_key=127.0.0.1:82_1 hash=17574187438183464265
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(8908282605774288966);
+    EXPECT_EQ(cluster_.hosts_[1], lb_.chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(8908282605774288967);
+    EXPECT_EQ(cluster_.hosts_[3], lb_.chooseHost(&context));
+  }
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(12081020427914561087UL));
+    EXPECT_EQ(cluster_.hosts_[2], lb_.chooseHost(nullptr));
+  }
+
+  cluster_.healthy_hosts_.clear();
+  cluster_.runCallbacks({}, {});
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
+#endif
 }
 
 TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
@@ -111,6 +154,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
       .WillByDefault(Return(3));
   cluster_.runCallbacks({}, {});
 
+#if !defined(__APPLE__)
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
   // what we are going to get.
@@ -122,11 +166,22 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[1], lb_.chooseHost(&context));
   }
+#else
+  // Similarly, this is what you get on OSX/Apple LLVM 8.1.0.
+  // ring hash: hash_key=127.0.0.1:80_0 hash=1785278789362412239
+  // ring hash: hash_key=127.0.0.1:80_1 hash=11937214931531445650
+  // ring hash: hash_key=127.0.0.1:81_0 hash=8908282605774288966
+  // ring hash: hash_key=127.0.0.1:81_1 hash=6131885104641997928
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
+#endif
 
   cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
                      newTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
   cluster_.runCallbacks({}, {});
-
+#if !defined(__APPLE__)
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
   // what we are going to get.
@@ -138,6 +193,17 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
   }
+#else
+  // Similarly, this is what you get on OSX/Apple LLVM 8.1.0.
+  // ring hash: hash_key=127.0.0.1:81_0 hash=8908282605774288966
+  // ring hash: hash_key=127.0.0.1:81_1 hash=6131885104641997928
+  // ring hash: hash_key=127.0.0.1:82_0 hash=12081020427914561087
+  // ring hash: hash_key=127.0.0.1:82_1 hash=17574187438183464265
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
+#endif
 }
 
 } // namespace Upstream

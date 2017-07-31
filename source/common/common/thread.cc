@@ -1,6 +1,10 @@
 #include "common/common/thread.h"
 
+#ifdef __linux__
 #include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 #include <functional>
 
@@ -21,7 +25,15 @@ Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_ro
   UNREFERENCED_PARAMETER(rc);
 }
 
-int32_t Thread::currentThreadId() { return syscall(SYS_gettid); }
+int32_t Thread::currentThreadId() {
+#ifdef __linux__
+  return syscall(SYS_gettid);
+#elif defined(__APPLE__)
+  int ret = mach_thread_self();
+  mach_port_deallocate(mach_task_self(), ret);
+  return ret;
+#endif
+}
 
 void Thread::join() {
   int rc = pthread_join(thread_id_, nullptr);

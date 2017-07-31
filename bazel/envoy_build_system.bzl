@@ -72,7 +72,8 @@ def envoy_cc_library(name,
                      repository = "",
                      linkstamp = None,
                      tags = [],
-                     deps = []):
+                     deps = [],
+                     strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     native.cc_library(
@@ -90,7 +91,8 @@ def envoy_cc_library(name,
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = linkstamp,
-    )
+         strip_include_prefix = strip_include_prefix,
+   )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
@@ -128,6 +130,7 @@ def envoy_cc_binary(name,
         linkopts = [
             "-pthread",
             "-lrt",
+            "-luuid",
             # Force MD5 hash in build. This is part of the workaround for
             # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
             # does this by itself prior to
@@ -179,7 +182,7 @@ def envoy_cc_test(name,
         copts = envoy_copts(repository, test = True),
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
-        linkopts = ["-pthread", "-latomic"],
+        linkopts = ["-pthread", "-latomic", "-luuid"],
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [

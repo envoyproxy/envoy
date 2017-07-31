@@ -2,6 +2,12 @@
 
 set -e
 
+if [[ `uname` != "Linux" ]]
+then
+    echo "SKIP: Hot restart disabled on non-Linux systems."
+    exit 0
+fi
+
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
