@@ -54,7 +54,9 @@ HeaderString::HeaderString(HeaderString&& move_value) {
   }
 }
 
-HeaderString::~HeaderString() {
+HeaderString::~HeaderString() { freeDynamic(); }
+
+void HeaderString::freeDynamic() {
   if (type_ == Type::Dynamic) {
     free(buffer_.dynamic_);
   }
@@ -170,6 +172,13 @@ void HeaderString::setInteger(uint64_t value) {
     string_length_ = StringUtil::itoa(buffer_.dynamic_, 32, value);
   }
   }
+}
+
+void HeaderString::setStatic(const std::string& static_value) {
+  freeDynamic();
+  type_ = Type::Static;
+  buffer_.static_ = static_value.c_str();
+  string_length_ = static_value.size();
 }
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}

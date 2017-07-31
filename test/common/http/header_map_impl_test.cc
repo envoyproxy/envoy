@@ -238,6 +238,21 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(9U, string.size());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
   }
+
+  // Set static, switch to dynamic, back to static.
+  {
+    const std::string static_string = "hello world";
+    HeaderString string;
+    string.setStatic(static_string);
+    EXPECT_EQ(string.c_str(), static_string.c_str());
+    EXPECT_EQ(11U, string.size());
+    const std::string large(128, 'a');
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_NE(string.c_str(), large.c_str());
+    string.setStatic(static_string);
+    EXPECT_EQ(string.c_str(), static_string.c_str());
+    EXPECT_EQ(11U, string.size());
+  }
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {

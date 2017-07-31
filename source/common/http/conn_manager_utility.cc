@@ -55,14 +55,14 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     } else {
       Utility::appendXff(request_headers, connection.remoteAddress());
     }
-    request_headers.insertForwardedProto().value(
+    request_headers.insertForwardedProto().value().setStatic(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
   // If we didn't already replace x-forwarded-proto because we are using the remote address, and
   // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
   if (!request_headers.ForwardedProto()) {
-    request_headers.insertForwardedProto().value(
+    request_headers.insertForwardedProto().value().setStatic(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
@@ -76,7 +76,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
 
   // If internal request, set header and do other internal only modifications.
   if (internal_request) {
-    request_headers.insertEnvoyInternalRequest().value(
+    request_headers.insertEnvoyInternalRequest().value().setStatic(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
     if (edge_request) {
@@ -101,11 +101,11 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
-      user_agent_header.value(config.userAgent().value());
+      user_agent_header.value().setStatic(config.userAgent().value());
     }
 
     if (!local_info.nodeName().empty()) {
-      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
+      request_headers.insertEnvoyDownstreamServiceNode().value().setStatic(local_info.nodeName());
     }
   }
 

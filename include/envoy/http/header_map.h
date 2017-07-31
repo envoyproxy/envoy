@@ -111,6 +111,12 @@ public:
   void setInteger(uint64_t value);
 
   /**
+   * Set the value of the string to a static string reference.
+   * @param static_value MUST point to static data.
+   */
+  void setStatic(const std::string& static_value);
+
+  /**
    * @return the size of the string, not including the null terminator.
    */
   uint32_t size() const { return string_length_; }
@@ -133,6 +139,8 @@ private:
     char inline_buffer_[128];
     uint32_t dynamic_capacity_;
   };
+
+  void freeDynamic();
 
   uint32_t string_length_;
   Type type_;
