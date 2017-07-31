@@ -56,7 +56,7 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
     target = san ? json_san : json_plain;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager.createSslClientContext(*client_stats_store, cfg);
 }

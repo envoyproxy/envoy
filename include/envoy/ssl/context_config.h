@@ -62,7 +62,10 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& verifyCertificateHash() const PURE;
+};
 
+class ClientContextConfig : public virtual ContextConfig {
+public:
   /**
    * @return The server name indication if it's set and ssl enabled
    * Otherwise, ""

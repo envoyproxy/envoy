@@ -101,6 +101,12 @@ public:
   virtual ~Sink() {}
 
   /**
+   * This will be called before a sequence of flushCounter() and flushGauge() calls. Sinks can
+   * choose to optimize writing if desired with a paired endFlush() call.
+   */
+  virtual void beginFlush() PURE;
+
+  /**
    * Flush a counter delta.
    */
   virtual void flushCounter(const std::string& name, uint64_t delta) PURE;
@@ -109,6 +115,12 @@ public:
    * Flush a gauge value.
    */
   virtual void flushGauge(const std::string& name, uint64_t value) PURE;
+
+  /**
+   * This will be called after beginFlush(), some number of flushCounter(), and some number of
+   * flushGauge(). Sinks can use this to optimize writing if desired.
+   */
+  virtual void endFlush() PURE;
 
   /**
    * Flush a histogram value.

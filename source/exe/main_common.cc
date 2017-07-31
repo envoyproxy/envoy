@@ -17,7 +17,6 @@
 #include "server/test_hooks.h"
 
 #include "ares.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
@@ -57,9 +56,10 @@ int main_common(OptionsImpl& options, Server::HotRestartImpl& restarter) {
 
   Logger::Registry::initialize(options.logLevel(), restarter.logLock());
   DefaultTestHooks default_test_hooks;
+  ThreadLocal::InstanceImpl tls;
   Stats::ThreadLocalStoreImpl stats_store(restarter);
   Server::InstanceImpl server(options, default_test_hooks, restarter, stats_store,
-                              restarter.accessLogLock(), component_factory, local_info);
+                              restarter.accessLogLock(), component_factory, local_info, tls);
   server.run();
   ares_library_cleanup();
   return 0;

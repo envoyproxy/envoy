@@ -16,7 +16,7 @@ Envoy has the following requirements:
 * `libevent <http://libevent.org/>`_ (last tested with 2.1.8)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
 * `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.5.0)
-* `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ (last tested with sha c8ff30cbe716c72279a6f6a9d7d7d0d4091220fa).
+* `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ (last tested with sha 68f84f5c40644e029ed066999448696b01caba7a).
 * `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.3.0)
 * `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.36)
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)

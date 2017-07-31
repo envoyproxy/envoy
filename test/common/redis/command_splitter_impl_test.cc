@@ -195,7 +195,7 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerTest, RedisSimpleRequestCommandHandlerTest,
-                        testing::ValuesIn(SupportedCommands::allToOneCommands()));
+                        testing::ValuesIn(SupportedCommands::simpleCommands()));
 
 INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                         RedisSimpleRequestCommandHandlerTest, testing::Values("INCR", "inCrBY"));
@@ -381,6 +381,219 @@ TEST_F(RedisMGETCommandHandlerTest, Cancel) {
   EXPECT_CALL(pool_requests_[1], cancel());
   handle_->cancel();
 };
+
+class RedisMSETCommandHandlerTest : public RedisCommandSplitterImplTest {
+public:
+  void setup(uint32_t num_sets, const std::list<uint64_t>& null_handle_indexes) {
+    std::vector<std::string> request_strings = {"mset"};
+    for (uint32_t i = 0; i < num_sets; i++) {
+      // key
+      request_strings.push_back(std::to_string(i));
+      // value
+      request_strings.push_back(std::to_string(i));
+    }
+
+    RespValue request;
+    makeBulkStringArray(request, request_strings);
+
+    std::vector<RespValue> tmp_expected_requests(num_sets);
+    expected_requests_.swap(tmp_expected_requests);
+    pool_callbacks_.resize(num_sets);
+    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_sets);
+    pool_requests_.swap(tmp_pool_requests);
+    for (uint32_t i = 0; i < num_sets; i++) {
+      makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
+      ConnPool::PoolRequest* request_to_use = nullptr;
+      if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
+          null_handle_indexes.end()) {
+        request_to_use = &pool_requests_[i];
+      }
+      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+          .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
+    }
+
+    handle_ = splitter_.makeRequest(request, callbacks_);
+  }
+
+  std::vector<RespValue> expected_requests_;
+  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
+  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+};
+
+TEST_F(RedisMSETCommandHandlerTest, Normal) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  RespValue expected_response;
+  expected_response.type(RespType::SimpleString);
+  expected_response.asString() = "OK";
+
+  RespValuePtr response2(new RespValue());
+  response2->type(RespType::SimpleString);
+  response2->asString() = "OK";
+  pool_callbacks_[1]->onResponse(std::move(response2));
+
+  RespValuePtr response1(new RespValue());
+  response1->type(RespType::SimpleString);
+  response1->asString() = "OK";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(std::move(response1));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
+};
+
+TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForAll) {
+  // No InSequence to avoid making setup() more complicated.
+
+  RespValue expected_response;
+  expected_response.type(RespType::Error);
+  expected_response.asString() = "finished with 2 error(s)";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(2, {0, 1});
+  EXPECT_EQ(nullptr, handle_);
+};
+
+TEST_F(RedisMSETCommandHandlerTest, NoUpstreamHostForOne) {
+  InSequence s;
+
+  setup(2, {0});
+  EXPECT_NE(nullptr, handle_);
+
+  RespValue expected_response;
+  expected_response.type(RespType::Error);
+  expected_response.asString() = "finished with 1 error(s)";
+
+  RespValuePtr response2(new RespValue());
+  response2->type(RespType::SimpleString);
+  response2->asString() = "OK";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[1]->onResponse(std::move(response2));
+};
+
+TEST_F(RedisMSETCommandHandlerTest, Cancel) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  EXPECT_CALL(pool_requests_[0], cancel());
+  EXPECT_CALL(pool_requests_[1], cancel());
+  handle_->cancel();
+};
+
+TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
+  InSequence s;
+
+  RespValue response;
+  response.type(RespType::Error);
+  response.asString() = "wrong number of arguments for command";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  RespValue request;
+  makeBulkStringArray(request, {"mset", "foo", "bar", "fizz"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+};
+
+class RedisSplitKeysSumResultHandlerTest : public RedisCommandSplitterImplTest,
+                                           public testing::WithParamInterface<std::string> {
+public:
+  void setup(uint32_t num_commands, const std::list<uint64_t>& null_handle_indexes) {
+    std::vector<std::string> request_strings = {GetParam()};
+    for (uint32_t i = 0; i < num_commands; i++) {
+      request_strings.push_back(std::to_string(i));
+    }
+
+    RespValue request;
+    makeBulkStringArray(request, request_strings);
+
+    std::vector<RespValue> tmp_expected_requests(num_commands);
+    expected_requests_.swap(tmp_expected_requests);
+    pool_callbacks_.resize(num_commands);
+    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_commands);
+    pool_requests_.swap(tmp_pool_requests);
+    for (uint32_t i = 0; i < num_commands; i++) {
+      makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
+      ConnPool::PoolRequest* request_to_use = nullptr;
+      if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
+          null_handle_indexes.end()) {
+        request_to_use = &pool_requests_[i];
+      }
+      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+          .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
+    }
+
+    handle_ = splitter_.makeRequest(request, callbacks_);
+  }
+
+  std::vector<RespValue> expected_requests_;
+  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
+  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+};
+
+TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  RespValue expected_response;
+  expected_response.type(RespType::Integer);
+  expected_response.asInteger() = 2;
+
+  RespValuePtr response2(new RespValue());
+  response2->type(RespType::Integer);
+  response2->asInteger() = 1;
+  pool_callbacks_[1]->onResponse(std::move(response2));
+
+  RespValuePtr response1(new RespValue());
+  response1->type(RespType::Integer);
+  response1->asInteger() = 1;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(std::move(response1));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+};
+
+TEST_P(RedisSplitKeysSumResultHandlerTest, NormalOneZero) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  RespValue expected_response;
+  expected_response.type(RespType::Integer);
+  expected_response.asInteger() = 1;
+
+  RespValuePtr response2(new RespValue());
+  response2->type(RespType::Integer);
+  response2->asInteger() = 0;
+  pool_callbacks_[1]->onResponse(std::move(response2));
+
+  RespValuePtr response1(new RespValue());
+  response1->type(RespType::Integer);
+  response1->asInteger() = 1;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(std::move(response1));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+};
+
+TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
+  // No InSequence to avoid making setup() more complicated.
+
+  RespValue expected_response;
+  expected_response.type(RespType::Error);
+  expected_response.asString() = "finished with 2 error(s)";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(2, {0, 1});
+  EXPECT_EQ(nullptr, handle_);
+};
+
+INSTANTIATE_TEST_CASE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
+                        testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter
 } // namespace Redis

@@ -184,6 +184,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
 
   store_->shutdownThreading();
+  scope1->deliverHistogramToSinks("h", 100);
+  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
   tls_.shutdownThread();
 
   // Includes overflow stat.

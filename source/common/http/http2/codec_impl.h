@@ -166,14 +166,14 @@ protected:
     // I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
-    bool buffers_overrun() { return buffers_overrun_ > 0; }
+    bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
-    uint32_t buffers_overrun_{0};
+    uint32_t read_disable_count_{0};
     Buffer::WatermarkBuffer pending_recv_data_{
         Buffer::InstancePtr{new Buffer::OwnedImpl},
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },

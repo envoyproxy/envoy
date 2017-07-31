@@ -67,17 +67,22 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, true);
+}
+
+TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
+                                         Http::CodecClient::Type::HTTP2, false);
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {

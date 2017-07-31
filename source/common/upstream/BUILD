@@ -218,6 +218,8 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:protocol_json_lib",
+        "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",

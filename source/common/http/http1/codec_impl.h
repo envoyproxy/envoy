@@ -42,7 +42,7 @@ public:
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
-  void readDisable(bool /*disable*/) override {}
+  void readDisable(bool) override {}
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}

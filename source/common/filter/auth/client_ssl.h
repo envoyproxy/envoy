@@ -57,9 +57,6 @@ public:
   }
   size_t size() const { return allowed_sha256_digests_.size(); }
 
-  // ThreadLocal::ThreadLocalObject
-  void shutdown() override {}
-
 private:
   std::unordered_set<std::string> allowed_sha256_digests_;
 };
@@ -76,7 +73,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Config : public Http::RestApiFetcher {
 public:
-  static ConfigSharedPtr create(const Json::Object& config, ThreadLocal::Instance& tls,
+  static ConfigSharedPtr create(const Json::Object& config, ThreadLocal::SlotAllocator& tls,
                                 Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                 Stats::Scope& scope, Runtime::RandomGenerator& random);
 
@@ -85,7 +82,7 @@ public:
   GlobalStats& stats() { return stats_; }
 
 private:
-  Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
+  Config(const Json::Object& config, ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
@@ -96,8 +93,7 @@ private:
   void onFetchComplete() override {}
   void onFetchFailure(const EnvoyException* e) override;
 
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   Network::Address::IpList ip_white_list_;
   GlobalStats stats_;
 };

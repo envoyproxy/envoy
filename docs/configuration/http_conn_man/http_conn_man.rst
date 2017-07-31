@@ -141,9 +141,9 @@ http2_settings
     window. Currently , this has the same minimum/maximum/default as :ref:`initial_stream_window_size
     <config_http_conn_man_http2_settings_initial_stream_window_size>`.
 
-  per_stream_buffer_limit
-    *(optional, integer)* A soft limit on the number of bytes envoy will buffer per-stream in the
-    codec buffers.  Once the buffer reaches this point, Watermark callbacks will fire to stop the
+  per_stream_buffer_limit_bytes
+    *(optional, integer)* A soft limit on the number of bytes Envoy will buffer per-stream in the
+    codec buffers.  Once the buffer reaches this point, watermark callbacks will fire to stop the
     flow of data to the codec buffers.  If this limit is zero, no buffer limits will be applied.
 
   These are the same options available in the upstream cluster :ref:`http2_settings

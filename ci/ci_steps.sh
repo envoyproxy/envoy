@@ -35,10 +35,10 @@ else
   then
     mkdir -p build_release
     cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy ./build_release
-    # This script builds a lyft/envoy image and pushes that image on merge to master.
+    # This script builds lyft/envoy and lyft/envoy-alpine images and pushes that image on merge to master.
+    # It also makes sure that the docker examples (https://lyft.github.io/envoy/docs/install/sandboxes/sandboxes.html)
+    # can be built and run.
     ./ci/docker_push.sh
-    # This script runs on every PRs release run to test the docker examples.
-    ./ci/verify_examples.sh
   fi
 
 fi

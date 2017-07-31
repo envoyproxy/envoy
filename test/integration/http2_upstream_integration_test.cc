@@ -49,17 +49,17 @@ TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyHttp1) {
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseHttp1) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http1_buffer")),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {

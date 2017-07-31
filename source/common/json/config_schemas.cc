@@ -287,7 +287,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "minimum": 65535,
             "maximum" : 2147483647
           },
-          "per_stream_buffer_limit" : {
+          "per_stream_buffer_limit_bytes" : {
             "type": "integer",
             "minimum": 0,
             "exclusiveMinimum" : true
@@ -382,6 +382,11 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
             "additionalProperties": false
           }
         }
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["stat_prefix", "descriptors", "domain"],
@@ -979,6 +984,11 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
       "request_type" : {
         "type" : "string",
         "enum" : ["internal", "external", "both"]
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required" : ["domain"],
@@ -1386,7 +1396,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum": 65535,
             "maximum" : 2147483647
           },
-          "per_stream_buffer_limit" : {
+          "per_stream_buffer_limit_bytes" : {
             "type": "integer",
             "minimum": 0,
             "exclusiveMinimum" : true

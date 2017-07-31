@@ -16,6 +16,8 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/config/protocol_json.h"
+#include "common/config/tls_context_json.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -64,14 +66,23 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
           config.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
       stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
       stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
-      http2_settings_(Http::Utility::parseHttp2Settings(config)),
+      http2_settings_([&config] {
+        envoy::api::v2::Http2ProtocolOptions http2_protocol_options;
+        Config::ProtocolJson::translateHttp2ProtocolOptions(
+            config.getString("http_codec_options", ""), *config.getObject("http2_settings", true),
+            http2_protocol_options);
+        return Http::Utility::parseHttp2Settings(http2_protocol_options);
+      }()),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       added_via_api_(added_via_api) {
 
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
-    Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
+    envoy::api::v2::UpstreamTlsContext upstream_tls_context;
+    Config::TlsContextJson::translateUpstreamTlsContext(*config.getObject("ssl_context"),
+                                                        upstream_tls_context);
+    Ssl::ClientContextConfigImpl context_config(upstream_tls_context);
     ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
   }
 

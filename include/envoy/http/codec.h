@@ -111,6 +111,7 @@ public:
    * Fires when a stream, or the connection the stream is sending to, goes over its high watermark.
    */
   virtual void onAboveWriteBufferHighWatermark() PURE;
+
   /**
    * Fires when a stream, or the connection the stream is sending to, goes from over its high
    * watermark to under its low watermark.

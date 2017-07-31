@@ -73,12 +73,17 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
+}
+
+TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
+                                         Http::CodecClient::Type::HTTP1, false);
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {

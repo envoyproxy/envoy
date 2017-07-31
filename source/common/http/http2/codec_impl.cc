@@ -62,6 +62,19 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
 
 ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(unconsumed_bytes_ == 0); }
 
+static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
+  uint8_t flags = 0;
+  if (header.key().type() == HeaderString::Type::Static) {
+    flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
+  }
+  if (header.value().type() == HeaderString::Type::Static) {
+    flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
+  }
+  headers.push_back({remove_const<uint8_t>(header.key().c_str()),
+                     remove_const<uint8_t>(header.value().c_str()), header.key().size(),
+                     header.value().size(), flags});
+}
+
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,
                                               const HeaderMap& headers) {
   // nghttp2 requires that all ':' headers come before all other headers. To avoid making higher
@@ -71,9 +84,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       [](const HeaderEntry& header, void* context) -> void {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] == ':') {
-          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                    remove_const<uint8_t>(header.value().c_str()),
-                                    header.key().size(), header.value().size(), 0});
+          insertHeader(*final_headers, header);
         }
       },
       &final_headers);
@@ -82,9 +93,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       [](const HeaderEntry& header, void* context) -> void {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] != ':') {
-          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                    remove_const<uint8_t>(header.value().c_str()),
-                                    header.key().size(), header.value().size(), 0});
+          insertHeader(*final_headers, header);
         }
       },
       &final_headers);
@@ -126,9 +135,9 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   ENVOY_CONN_LOG(debug, "Stream {} disabled: disable {}, unconsumed_bytes {}", parent_.connection_,
                  stream_id_, disable, unconsumed_bytes_);
   if (disable) {
-    ++buffers_overrun_;
+    ++read_disable_count_;
   } else {
-    --buffers_overrun_;
+    --read_disable_count_;
     if (!buffers_overrun()) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
@@ -299,7 +308,11 @@ ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   StreamImpl* stream = getStream(stream_id);
+  // If this results in buffering too much data, the watermark buffer will call
+  // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
   stream->pending_recv_data_.add(data, len);
+  // Update the window to the peer unless some consumer of this stream's data has hit a flow control
+  // limit and disabled reads on this stream
   if (!stream->buffers_overrun()) {
     nghttp2_session_consume(session_, stream_id, len);
   } else {

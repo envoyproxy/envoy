@@ -8,11 +8,9 @@ namespace Http {
 
 DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
 
-// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
-//                     up.
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
-                                                       ThreadLocal::Instance& tls)
-    : tls_(tls), tls_slot_(tls.allocateSlot()),
+                                                       ThreadLocal::SlotAllocator& tls)
+    : tls_(tls.allocateSlot()),
       refresh_timer_(dispatcher.createTimer([this]() -> void { onRefreshDate(); })) {
 
   onRefreshDate();
@@ -20,16 +18,15 @@ TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispat
 
 void TlsCachingDateProviderImpl::onRefreshDate() {
   std::string new_date_string = date_formatter_.now();
-  tls_.set(tls_slot_,
-           [new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-             return std::make_shared<ThreadLocalCachedDate>(new_date_string);
-           });
+  tls_->set([new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalCachedDate>(new_date_string);
+  });
 
   refresh_timer_->enableTimer(std::chrono::milliseconds(500));
 }
 
 void TlsCachingDateProviderImpl::setDateHeader(HeaderMap& headers) {
-  headers.insertDate().value(tls_.getTyped<ThreadLocalCachedDate>(tls_slot_).date_string_);
+  headers.insertDate().value(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
 }
 
 void SlowDateProviderImpl::setDateHeader(HeaderMap& headers) {

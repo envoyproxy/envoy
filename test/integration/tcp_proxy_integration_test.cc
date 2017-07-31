@@ -9,7 +9,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
@@ -77,23 +76,24 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   });
 
   uint32_t upstream_pauses =
-      test_server_->store()
-          .counter("cluster.cluster_with_buffer_limits.upstream_flow_control_paused_reading_total")
-          .value();
+      test_server_
+          ->counter("cluster.cluster_with_buffer_limits.upstream_flow_control_paused_reading_total")
+          ->value();
   uint32_t upstream_resumes =
-      test_server_->store()
-          .counter("cluster.cluster_with_buffer_limits.upstream_flow_control_resumed_reading_total")
-          .value();
+      test_server_
+          ->counter(
+              "cluster.cluster_with_buffer_limits.upstream_flow_control_resumed_reading_total")
+          ->value();
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =
-      test_server_->store()
-          .counter("tcp.tcp_with_write_limits.downstream_flow_control_paused_reading_total")
-          .value();
+      test_server_
+          ->counter("tcp.tcp_with_write_limits.downstream_flow_control_paused_reading_total")
+          ->value();
   uint32_t downstream_resumes =
-      test_server_->store()
-          .counter("tcp.tcp_with_write_limits.downstream_flow_control_resumed_reading_total")
-          .value();
+      test_server_
+          ->counter("tcp.tcp_with_write_limits.downstream_flow_control_resumed_reading_total")
+          ->value();
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 

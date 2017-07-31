@@ -30,7 +30,7 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager,
-                    Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::Instance& tls,
+                    Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
                     Event::Dispatcher& dispatcher, bool added_via_api);
 
   ~LogicalDnsCluster();
@@ -79,9 +79,6 @@ private:
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override {}
-
     Network::Address::InstanceConstSharedPtr current_resolved_address_;
   };
 
@@ -90,8 +87,7 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   std::function<void()> initialize_callback_;
   // Set once the first resolve completes.
   bool initialized_;
