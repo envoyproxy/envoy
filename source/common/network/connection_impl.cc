@@ -177,6 +177,13 @@ void ConnectionImpl::noDelay(bool enable) {
   // Set NODELAY
   int new_value = enable;
   rc = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+#ifdef __APPLE__
+  if (-1 == rc && errno == EINVAL) {
+    // socket has been shut down
+    return;
+  }
+#endif
+
   RELEASE_ASSERT(0 == rc);
   UNREFERENCED_PARAMETER(rc);
 }
@@ -437,6 +444,27 @@ void ConnectionImpl::onWriteReady() {
     int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
     ASSERT(0 == rc);
     UNREFERENCED_PARAMETER(rc);
+
+#ifdef __APPLE__
+    // When a connect() is performed on a non-blocking socket, it'll return -1/EINPROGRESS
+    // immediately and when select()'ed for writability it'll succeed or fail but when it fails the
+    // reason is hidden. `getsockopt(,,SO_ERROR,,)` solves this issue on some systems but in some
+    // cases (FreeBSD, OS X) getsockopt returns 0 even on `EAGAIN`. The following trick issues a
+    // `getpeername()` which will return -1/ENOTCONN if the socket is not connected and read(,,1)
+    // will produce the correct errno.
+    socklen_t slen = sizeof(struct sockaddr_in);
+    struct sockaddr sain;
+    if (error == 0 && getpeername(fd_, &sain, &slen) == -1 && errno == ENOTCONN) {
+      int rc = read_buffer_->read(fd_, 1);
+      ASSERT(-1 == rc);
+      UNREFERENCED_PARAMETER(rc);
+
+      error = errno;
+      if (errno == EAGAIN) {
+        return;
+      }
+    }
+#endif
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);

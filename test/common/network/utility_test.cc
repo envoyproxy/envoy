@@ -4,10 +4,13 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/thread.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -125,7 +128,122 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
 }
 
-TEST(NetworkUtility, GetOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+TEST(NetworkUtility, GetOriginalDstBadFd) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+
+class NetworkUtilityGetOriginalDst : public testing::TestWithParam<Address::IpVersion> {
+public:
+  NetworkUtilityGetOriginalDst() {
+    EXPECT_EQ(pthread_mutex_init(&mutex_, nullptr), 0);
+    EXPECT_EQ(pthread_cond_init(&cond_, nullptr), 0);
+  }
+
+  ~NetworkUtilityGetOriginalDst() {
+    EXPECT_EQ(pthread_cond_destroy(&cond_), 0);
+    EXPECT_EQ(pthread_mutex_destroy(&mutex_), 0);
+  }
+
+  void makeFdBlocking(int fd) {
+    const int flags = ::fcntl(fd, F_GETFL, 0);
+    ASSERT_GE(flags, 0);
+    ASSERT_EQ(::fcntl(fd, F_SETFL, flags & (~O_NONBLOCK)), 0);
+  }
+
+  void wait() {
+    EXPECT_EQ(pthread_mutex_lock(&mutex_), 0);
+
+    int rc = 0;
+    while(rc == 0 && !signaled_) {
+      rc = pthread_cond_wait(&cond_, &mutex_);
+    }
+
+    EXPECT_EQ(pthread_mutex_unlock(&mutex_), 0);
+    EXPECT_EQ(rc, 0);
+  }
+
+  void signal() {
+    EXPECT_EQ(pthread_mutex_lock(&mutex_), 0);
+    signaled_ = 1;
+    EXPECT_EQ(pthread_cond_signal(&cond_), 0);
+    EXPECT_EQ(pthread_mutex_unlock(&mutex_), 0);
+  }
+
+protected:
+  pthread_mutex_t mutex_;
+  pthread_cond_t cond_;
+  bool signaled_ = 0;
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetOriginalDst,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(NetworkUtilityGetOriginalDst, GetOriginalDst) {
+  const std::string& addr_port_str =
+      fmt::format("{}:0", Network::Test::getLoopbackAddressUrlString(GetParam()));
+
+  auto addr_port = Network::Utility::parseInternetAddressAndPort(addr_port_str);
+  ASSERT_NE(addr_port, nullptr);
+  if (addr_port->ip()->port() == 0) {
+    addr_port = Network::Test::findOrCheckFreePort(addr_port, Address::SocketType::Stream);
+  }
+  ASSERT_NE(addr_port, nullptr);
+  ASSERT_NE(addr_port->ip(), nullptr);
+
+  // Create a socket on which we'll listen for connections from clients.
+  const int listen_fd = addr_port->socket(Address::SocketType::Stream);
+  ASSERT_GE(listen_fd, 0) << addr_port->asString();
+  ScopedFdCloser closer1(listen_fd);
+
+  makeFdBlocking(listen_fd);
+
+  // Check that IPv6 sockets accept IPv6 connections only.
+  if (addr_port->ip()->version() == Address::IpVersion::v6) {
+    int v6only = 0;
+    socklen_t size_int = sizeof(v6only);
+    ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &size_int), 0);
+    EXPECT_EQ(v6only, 1);
+  }
+
+  // Bind the socket to the desired address and port.
+  int rc = addr_port->bind(listen_fd);
+  int err = errno;
+  ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+
+  ASSERT_EQ(::listen(listen_fd, 1), 0);
+
+  auto thread = std::unique_ptr<Thread::Thread>();
+  thread.reset(new Thread::Thread([&]() -> void {
+    int client_fd = addr_port->socket(Address::SocketType::Stream);
+    EXPECT_GE(client_fd, 0);
+    ScopedFdCloser closer2(client_fd);
+
+    makeFdBlocking(client_fd);
+
+    int rc = addr_port->connect(client_fd);
+    EXPECT_EQ(rc, 0);
+
+    wait();
+  }));
+
+  int fd = ::accept(listen_fd, nullptr, nullptr);
+  err = errno;
+  ASSERT_GE(fd, 0) << "\naccept error: " << strerror(err) << "\nerrno: " << err;
+  ScopedFdCloser closer3(fd);
+
+  auto orig_dst = Utility::getOriginalDst(fd);
+
+  signal();
+  thread->join();
+
+#if !defined(__APPLE__)
+  // TODO(zuercher): Remove this case when non-OS X implementations of getOriginalDst are fixed
+  if (GetParam() == Address::IpVersion::v6) {
+    EXPECT_EQ(nullptr, orig_dst);
+    return;
+  }
+#endif
+
+  EXPECT_EQ(addr_port->asString(), orig_dst->asString());
+}
 
 TEST(NetworkUtility, InternalAddress) {
   EXPECT_TRUE(Utility::isInternalAddress("127.0.0.1"));
