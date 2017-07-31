@@ -131,18 +131,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "sds",
-      "lb_type": "round_robin"
-    }]
-  }
-  )EOF";
-
+  const std::string json = fmt::sprintf("{%s}", clustersJson({defaultSdsClusterJson("cluster_1")}));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
@@ -165,26 +154,14 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(
+      R"EOF(
   {
     "local_cluster_name": "new_cluster",
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_2",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    }]
+    %s
   }
-  )EOF";
+  )EOF",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
@@ -206,33 +183,15 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(
+      R"EOF(
   {
     "local_cluster_name": "new_cluster",
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_2",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    },
-    {
-      "name": "new_cluster",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    }]
+    %s
   }
-  )EOF";
+  )EOF",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
+                    defaultStaticClusterJson("new_cluster")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -244,26 +203,9 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
-
+  const std::string json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
@@ -360,18 +302,8 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -412,18 +344,8 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -443,34 +365,15 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(
+      R"EOF(
   {
-    "cds": {
-      "cluster": {
-        "name": "cds_cluster",
-        "connect_timeout_ms": 250,
-        "type": "static",
-        "lb_type": "round_robin",
-        "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-      }
-    },
-    "clusters": [
-    {
-      "name": "cluster_0",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
+    "cds": {"cluster": %s},
+    %s
   }
-  )EOF";
+  )EOF",
+      defaultStaticClusterJson("cds_cluster"),
+      clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
 
   MockCdsApi* cds = new MockCdsApi();
   MockCluster* cds_cluster = new NiceMock<MockCluster>();
@@ -514,48 +417,18 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   MockCluster* cluster5 = new NiceMock<MockCluster>();
   cluster5->info_->name_ = "cluster5";
 
-  const std::string json_api_1 = R"EOF(
-  {
-    "name": "cluster3",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_1));
-
-  const std::string json_api_2 = R"EOF(
-  {
-    "name": "cluster4",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster3"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize());
-  cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_2));
-
-  const std::string json_api_3 = R"EOF(
-  {
-    "name": "cluster5",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster4"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_3));
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster5"));
 
   cds->initialized_callback_();
 
@@ -575,20 +448,13 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   InSequence s;
 
   // Setup a cluster manager with a static local cluster.
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(R"EOF(
   {
     "local_cluster_name": "foo",
-    "clusters": [
-      {
-        "name": "fake",
-        "connect_timeout_ms": 250,
-        "type": "static",
-        "lb_type": "round_robin",
-        "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-      }
-    ]
+    %s
   }
-  )EOF";
+  )EOF",
+                                        clustersJson({defaultStaticClusterJson("fake")}));
 
   MockCluster* foo = new NiceMock<MockCluster>();
   foo->info_->name_ = "foo";
@@ -602,22 +468,12 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
   // cluster in its load balancer.
-  const std::string json_api_1 = R"EOF(
-  {
-    "name": "cluster1",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   cluster1->info_->name_ = "cluster1";
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
-  cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_1));
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster1"));
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -654,48 +510,21 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  const std::string json_api = R"EOF(
-  {
-    "name": "fake_cluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize());
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api)));
+  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 
-  // Now try to update again but with the same hash (different white space).
-  const std::string json_api_2 = R"EOF(
-  {
-      "name":   "fake_cluster",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_2)));
+  // Now try to update again but with the same hash.
+  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   // Now do it again with a different hash.
-  const std::string json_api_3 = R"EOF(
-  {
-      "name":   "fake_cluster",
-      "connect_timeout_ms": 251,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
+  auto update_cluster = defaultStaticCluster("fake_cluster");
+  update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->hosts_ = {HostSharedPtr{new HostImpl(
@@ -703,7 +532,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api_3)));
+  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(update_cluster));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -731,19 +560,8 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "some_cluster",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
-
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
@@ -759,17 +577,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  const std::string json_api = R"EOF(
-  {
-    "name": "fake_cluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(parseClusterFromJson(json_api)));
+  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));

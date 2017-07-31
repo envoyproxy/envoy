@@ -6,6 +6,7 @@
 #include "common/json/json_loader.h"
 #include "common/upstream/cds_api_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -114,27 +115,9 @@ TEST_F(CdsApiImplTest, Basic) {
 
   setup();
 
-  std::string response1_json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster2",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }
-    ]
-  }
-  )EOF";
-
+  std::string response1_json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster1"), defaultStaticClusterJson("cluster2")}));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body().reset(new Buffer::OwnedImpl(response1_json));
@@ -149,26 +132,9 @@ TEST_F(CdsApiImplTest, Basic) {
   expectRequest();
   interval_timer_->callback_();
 
-  std::string response2_json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster3",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }
-    ]
-  }
-  )EOF";
+  std::string response2_json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster1"), defaultStaticClusterJson("cluster3")}));
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));

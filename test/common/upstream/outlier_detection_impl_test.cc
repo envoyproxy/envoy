@@ -31,39 +31,23 @@ namespace Upstream {
 namespace Outlier {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  std::string json = R"EOF(
-  {
-    "name": "fake_cluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_EQ(nullptr, DetectorImplFactory::createForCluster(cluster, parseClusterFromJson(json),
-                                                           dispatcher, runtime, nullptr));
+  EXPECT_EQ(nullptr,
+            DetectorImplFactory::createForCluster(cluster, defaultStaticCluster("fake_cluster"),
+                                                  dispatcher, runtime, nullptr));
 }
 
 TEST(OutlierDetectorImplFactoryTest, Detector) {
-  std::string json = R"EOF(
-  {
-    "name": "fake_cluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-    "outlier_detection": {}
-  }
-  )EOF";
+  auto fake_cluster = defaultStaticCluster("fake_cluster");
+  fake_cluster.mutable_outlier_detection();
 
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(cluster, parseClusterFromJson(json),
-                                                           dispatcher, runtime, nullptr));
+  EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(cluster, fake_cluster, dispatcher,
+                                                           runtime, nullptr));
 }
 
 class CallbackChecker {

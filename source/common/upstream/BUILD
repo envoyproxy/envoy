@@ -140,7 +140,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
     ],
 )
@@ -229,8 +228,6 @@ envoy_cc_library(
         "//source/common/config:protocol_json_lib",
         "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",

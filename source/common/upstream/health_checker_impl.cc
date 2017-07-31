@@ -43,7 +43,8 @@ HealthCheckerPtr HealthCheckerFactory::create(const envoy::api::v2::HealthCheck&
         new RedisHealthCheckerImpl(cluster, hc_config, dispatcher, runtime, random,
                                    Redis::ConnPool::ClientFactoryImpl::instance_)};
   default:
-    throw EnvoyException("Health checker not set");
+    // TODO(htuch): This should be subsumed eventually by the constraint checking in #1308.
+    throw EnvoyException("Health checker type not set");
   }
 }
 

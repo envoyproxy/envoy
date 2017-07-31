@@ -19,8 +19,6 @@
 #include "common/config/protocol_json.h"
 #include "common/config/tls_context_json.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
