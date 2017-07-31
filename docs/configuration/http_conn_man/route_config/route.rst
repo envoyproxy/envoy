@@ -20,7 +20,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "host_rewrite": "...",
     "auto_host_rewrite": "...",
     "case_sensitive": "...",
-    "allow_websocket_upgrade": "...",
+    "use_websocket": "...",
     "timeout_ms": "...",
     "runtime": "{...}",
     "retry_policy": "{...}",
@@ -118,11 +118,11 @@ case_sensitive
   *(optional, boolean)* Indicates that prefix/path matching should be case sensitive. The default
   is true.
 
-.. _config_http_conn_man_route_table_route_allow_websocket_upgrade:
+.. _config_http_conn_man_route_table_route_use_websocket:
 
-allow_websocket_upgrade
+use_websocket
   *(optional, boolean)* Indicates that a HTTP/1.1 client connection to this particular route
-  should be allowed to upgrade to a WebSocket connection. The default is false.
+  should be allowed (and expected) to upgrade to a WebSocket connection. The default is false.
 
   .. attention::
 
