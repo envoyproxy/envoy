@@ -203,13 +203,13 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().c_str(), header.value().size());
 }
 
-#define INLINE_HEADER_ref_MAP_ENTRY(name)                                                          \
+#define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
   add(Headers::get().name.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {            \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
 HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
-  ALL_INLINE_HEADERS(INLINE_HEADER_ref_MAP_ENTRY)
+  ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
 
   // Special case where we map a legacy host header to :authority.
   add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {
