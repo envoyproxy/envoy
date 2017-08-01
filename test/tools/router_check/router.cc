@@ -154,9 +154,9 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-
+  Envoy::Http::AccessLog::RequestInfoImpl requestInfo(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, requestInfo);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
@@ -164,9 +164,9 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-
+  Envoy::Http::AccessLog::RequestInfoImpl requestInfo(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, requestInfo);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");

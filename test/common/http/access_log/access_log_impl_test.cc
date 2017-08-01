@@ -65,6 +65,9 @@ public:
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
+  void setDownstreamAddress(const std::string& address) override { downstream_address_ = address; }
+  const std::string& getDownstreamAddress() const override { return downstream_address_; }
+
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
@@ -72,6 +75,7 @@ public:
   uint64_t duration_{3};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
+  std::string downstream_address_;
 };
 
 class AccessLogImplTest : public testing::Test {

@@ -114,6 +114,16 @@ public:
    * Set whether the request is a health check request or not.
    */
   virtual void healthCheck(bool is_hc) PURE;
+
+  /**
+   * Set the downstream address
+   */
+  virtual void setDownstreamAddress(const std::string& address) PURE;
+
+  /**
+   * Get the down stream address.
+   */
+  virtual const std::string& getDownstreamAddress() const PURE;
 };
 
 /**

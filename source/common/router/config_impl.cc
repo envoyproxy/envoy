@@ -16,6 +16,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
@@ -82,7 +83,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       rate_limit_policy_(route), shadow_policy_(route),
-      priority_(ConfigUtility::parsePriority(route)), opaque_config_(parseOpaqueConfig(route)) {
+      priority_(ConfigUtility::parsePriority(route)),
+      request_headers_parser_(RequestHeaderParser::parse(route)),
+      opaque_config_(parseOpaqueConfig(route)) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
@@ -176,19 +179,17 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+void RouteEntryImplBase::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       vhost_.globalRouteConfig().requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
-  }
+
+  request_headers_parser_->evaluateRequestHeaders(headers, requestInfo, requestHeadersToAdd());
+
+  vhost_.requestHeaderParser()->evaluateRequestHeaders(headers, requestInfo,
+                                                       vhost_.requestHeadersToAdd());
+  vhost_.globalRouteConfig().requestHeaderParser()->evaluateRequestHeaders(
+      headers, requestInfo, vhost_.globalRouteConfig().requestHeadersToAdd());
 
   if (host_rewrite_.empty()) {
     return;
@@ -353,8 +354,9 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const J
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.getString("prefix")) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PrefixRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, prefix_);
 }
@@ -372,8 +374,9 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json:
                                        Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.getString("path")) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PathRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
 
   finalizePathHeader(headers, path_);
 }
@@ -410,7 +413,8 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host),
-      global_route_config_(global_route_config) {
+      global_route_config_(global_route_config),
+      request_headers_parser_(RequestHeaderParser::parse(virtual_host)) {
 
   virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
 
@@ -642,6 +646,7 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
+  request_headers_parser_ = RequestHeaderParser::parse(config);
 }
 
 } // namespace Router

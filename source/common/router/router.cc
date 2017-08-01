@@ -159,6 +159,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Determine if there is a route entry or a redirect for the request.
   route_ = callbacks_->route();
+
   if (!route_) {
     config_.stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
@@ -228,8 +229,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
-
-  route_entry_->finalizeRequestHeaders(headers);
+  log().debug("downstream address: '{}'\n", callbacks_->downstreamAddress());
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
   retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                                   config_.random_, callbacks_->dispatcher(), finalPriority());

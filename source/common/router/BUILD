@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["config_impl.h"],
     deps = [
         ":config_utility_lib",
+        ":req_header_formatter_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         "//include/envoy/common:optional",
@@ -27,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
     ],
@@ -145,5 +147,16 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "req_header_formatter_lib",
+    srcs = ["req_header_formatter.cc"],
+    hdrs = ["req_header_formatter.h"],
+    deps = [
+        "//source/common/http:headers_lib",
+        "//source/common/http/access_log:access_log_formatter_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )
