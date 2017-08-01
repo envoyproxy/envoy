@@ -75,7 +75,7 @@ TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   envoy::api::v2::HealthCheck health_check;
-  // Not health checker type set
+  // No health checker type set
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
                EnvoyException);
   health_check.mutable_http_health_check();
