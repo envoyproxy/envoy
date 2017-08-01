@@ -128,7 +128,7 @@ def envoy_cc_library(name,
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = linkstamp,
-         strip_include_prefix = strip_include_prefix,
+        strip_include_prefix = strip_include_prefix,
    )
 
 def _git_stamped_genrule(repository, name):
