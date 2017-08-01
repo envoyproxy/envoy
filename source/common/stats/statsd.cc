@@ -155,9 +155,9 @@ void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
   }
 }
 
-void TcpStatsdSink::TlsSink::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::LocalClose ||
-      events & Network::ConnectionEvent::RemoteClose) {
+void TcpStatsdSink::TlsSink::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
     dispatcher_.deferredDelete(std::move(connection_));
   }
 }

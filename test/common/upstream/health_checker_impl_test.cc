@@ -489,7 +489,7 @@ TEST_F(HttpHealthCheckerImplTest, Disconnect) {
 
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  test_sessions_[0]->client_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 
   expectClientCreate(0);
@@ -500,7 +500,7 @@ TEST_F(HttpHealthCheckerImplTest, Disconnect) {
   EXPECT_CALL(*this, onHostStatus(cluster_->hosts_[0], true));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  test_sessions_[0]->client_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 }
@@ -529,7 +529,7 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*this, onHostStatus(_, true));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  test_sessions_[0]->client_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 }
@@ -589,7 +589,7 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   respond(0, "200", false);
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 
-  test_sessions_[0]->client_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate(0);
   expectStreamCreate(0);
@@ -765,7 +765,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -788,7 +788,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   cluster_->runCallbacks({cluster_->hosts_.back()}, {});
 
-  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response;
   add_uint8(response, 1);
@@ -805,11 +805,11 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
-  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 
@@ -818,7 +818,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
-  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
   cluster_->hosts_.clear();
@@ -841,7 +841,7 @@ TEST_F(TcpHealthCheckerImplTest, NoData) {
   EXPECT_CALL(*connection_, close(_));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_)).Times(0);
@@ -938,7 +938,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   pool_callbacks_->onFailure();
-  client_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
   expectRequestCreate();

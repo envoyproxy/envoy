@@ -175,7 +175,7 @@ private:
     void onResetStream(Http::StreamResetReason reason) override;
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -278,7 +278,7 @@ private:
     TcpSessionCallbacks(TcpActiveHealthCheckSession& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override { parent_.onEvent(events); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -297,7 +297,7 @@ private:
     ~TcpActiveHealthCheckSession();
 
     void onData(Buffer::Instance& data);
-    void onEvent(uint32_t events);
+    void onEvent(Network::ConnectionEvent event);
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -357,7 +357,7 @@ private:
     void onFailure() override;
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
