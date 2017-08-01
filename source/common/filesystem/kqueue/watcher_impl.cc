@@ -1,5 +1,3 @@
-#include "common/filesystem/watcher_impl.h"
-
 #include <sys/event.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
@@ -10,6 +8,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/filesystem/watcher_impl.h"
 
 #include "event2/event.h"
 
@@ -29,10 +28,6 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
 
 WatcherImpl::~WatcherImpl() {
   close(queue_);
-
-  for (const auto& entry : watches_) {
-    close(entry.first);
-  }
   watches_.clear();
 }
 
@@ -44,11 +39,11 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::On
 }
 
 WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32_t events,
-                                                 Watcher::OnChangedCb cb, bool pathMustExist) {
-  bool watchingDir = false;
+                                                 Watcher::OnChangedCb cb, bool path_must_exist) {
+  bool watching_dir = false;
   int watch_fd = open(path.c_str(), O_SYMLINK);
   if (watch_fd == -1) {
-    if (pathMustExist) {
+    if (path_must_exist) {
       return nullptr;
     }
 
@@ -63,7 +58,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
       return nullptr;
     }
 
-    watchingDir = true;
+    watching_dir = true;
   }
 
   FileWatchPtr watch(new FileWatch());
@@ -71,10 +66,10 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
   watch->file_ = path;
   watch->events_ = events;
   watch->callback_ = cb;
-  watch->watchingDir_ = watchingDir;
+  watch->watching_dir_ = watching_dir;
 
   int flags = NOTE_DELETE | NOTE_RENAME;
-  if (watchingDir) {
+  if (watching_dir) {
     flags = NOTE_DELETE | NOTE_WRITE;
   }
 
@@ -92,16 +87,15 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(event.data)));
   }
 
-  log_debug("added watch for file: '{}' fd: {}", path, watch_fd);
+  ENVOY_LOG(debug, "added watch for file: '{}' fd: {}", path, watch_fd);
 
   watches_[watch_fd] = watch;
 
   return watch;
 }
 
-void WatcherImpl::removeWatch_(FileWatchPtr& watch) {
+void WatcherImpl::removeWatch(FileWatchPtr& watch) {
   int fd = watch->fd_;
-  close(fd);
   watches_.erase(fd);
 }
 
@@ -124,19 +118,19 @@ void WatcherImpl::onKqueueEvent() {
     }
     ASSERT(watch_fd == file->fd_);
 
-    if (file->watchingDir_) {
+    if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {
         // directory was deleted
-        removeWatch_(file);
+        removeWatch(file);
         return;
       }
 
       if (event.fflags & NOTE_WRITE) {
         // directory was written -- check if the file we're actually watching appeared
-        FileWatchPtr newFile = addWatch_(file->file_, file->events_, file->callback_, true);
-        if (newFile != nullptr) {
-          removeWatch_(file);
-          file = newFile;
+        FileWatchPtr new_file = addWatch_(file->file_, file->events_, file->callback_, true);
+        if (new_file != nullptr) {
+          removeWatch(file);
+          file = new_file;
 
           events |= Events::MovedTo;
         }
@@ -146,15 +140,15 @@ void WatcherImpl::onKqueueEvent() {
       // get a NOTE_DELETE on the symlink we check if there is another file with the same
       // name we assume a NOTE_RENAME and re-attach another event to the new file.
       if (event.fflags & NOTE_DELETE) {
-        removeWatch_(file);
+        removeWatch(file);
 
-        FileWatchPtr newFile = addWatch_(file->file_, file->events_, file->callback_, true);
-        if (newFile == nullptr) {
+        FileWatchPtr new_file = addWatch_(file->file_, file->events_, file->callback_, true);
+        if (new_file == nullptr) {
           return;
         }
 
         event.fflags |= NOTE_RENAME;
-        file = newFile;
+        file = new_file;
       }
 
       if (event.fflags & NOTE_RENAME) {
@@ -163,11 +157,12 @@ void WatcherImpl::onKqueueEvent() {
     }
 
     if (events & file->events_) {
-      log_debug("matched callback: file: {}", file->file_);
+      ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
       file->callback_(events);
     }
 
-    log_debug("notification: fd: {} flags: {:x} file: {}", file->fd_, event.fflags, file->file_);
+    ENVOY_LOG(debug, "notification: fd: {} flags: {:x} file: {}", file->fd_, event.fflags,
+              file->file_);
   }
 }
 

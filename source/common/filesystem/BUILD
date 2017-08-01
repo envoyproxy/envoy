@@ -28,15 +28,21 @@ envoy_cc_library(
         ],
         "//conditions:default": [
             "inotify/watcher_impl.cc",
-        ]}),
+        ],
+    }),
     hdrs = select({
         "@bazel_tools//tools/osx:darwin": [
             "kqueue/watcher_impl.h",
         ],
         "//conditions:default": [
             "inotify/watcher_impl.h",
-        ]}),
+        ],
+    }),
     external_deps = ["event"],
+    strip_include_prefix = select({
+        "@bazel_tools//tools/osx:darwin": "kqueue",
+        "//conditions:default": "inotify",
+    }),
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -44,8 +50,4 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
     ],
-    strip_include_prefix = select({
-        "@bazel_tools//tools/osx:darwin": "kqueue",
-        "//conditions:default": "inotify",
-    }),
 )

@@ -28,11 +28,15 @@ public:
 
 private:
   struct FileWatch : LinkedObject<FileWatch> {
+    ~FileWatch() {
+      close(fd_);
+    }
+
     int fd_;
     uint32_t events_;
     std::string file_;
     OnChangedCb callback_;
-    bool watchingDir_;
+    bool watching_dir_;
   };
 
   typedef std::shared_ptr<FileWatch> FileWatchPtr;
@@ -40,7 +44,7 @@ private:
   void onKqueueEvent();
   FileWatchPtr addWatch_(const std::string& path, uint32_t events, Watcher::OnChangedCb cb,
                          bool pathMustExist);
-  void removeWatch_(FileWatchPtr& watch);
+  void removeWatch(FileWatchPtr& watch);
 
   int queue_;
   std::unordered_map<int, FileWatchPtr> watches_;
