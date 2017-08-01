@@ -77,7 +77,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
   EV_SET(&event, watch_fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, flags, 0,
          reinterpret_cast<void*>(watch_fd));
 
-  if (kevent(queue_, &event, 1, NULL, 0, NULL) == -1 || event.flags & EV_ERROR) {
+  if (kevent(queue_, &event, 1, nullptr, 0, nullptr) == -1 || event.flags & EV_ERROR) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
   }
@@ -90,6 +90,8 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
 }
 
 void WatcherImpl::removeWatch(FileWatchPtr& watch) {
+  // Removing the map entry closes the fd, which will automatically
+  // unregister the kqueue event.
   int fd = watch->fd_;
   watches_.erase(fd);
 }
@@ -100,7 +102,7 @@ void WatcherImpl::onKqueueEvent() {
 
   while (true) {
     uint32_t events = 0;
-    int nevents = kevent(queue_, NULL, 0, &event, 1, &nullts);
+    int nevents = kevent(queue_, nullptr, 0, &event, 1, &nullts);
     if (nevents < 1 || event.udata == nullptr) {
       return;
     }
@@ -108,9 +110,7 @@ void WatcherImpl::onKqueueEvent() {
     int watch_fd = reinterpret_cast<std::intptr_t>(event.udata);
 
     FileWatchPtr file = watches_[watch_fd];
-    if (file == nullptr) {
-      continue;
-    }
+    ASSERT(file != nullptr);
     ASSERT(watch_fd == file->fd_);
 
     if (file->watching_dir_) {
@@ -151,13 +151,13 @@ void WatcherImpl::onKqueueEvent() {
       }
     }
 
+    ENVOY_LOG(debug, "notification: fd: {} flags: {:x} file: {}", file->fd_, event.fflags,
+              file->file_);
+
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
       file->callback_(events);
     }
-
-    ENVOY_LOG(debug, "notification: fd: {} flags: {:x} file: {}", file->fd_, event.fflags,
-              file->file_);
   }
 }
 

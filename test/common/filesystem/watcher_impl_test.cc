@@ -88,7 +88,7 @@ TEST(WatcherImplTest, Create) {
   UNREFERENCED_PARAMETER(rc);
 
   rc = rename(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str(),
-               TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+              TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
   RELEASE_ASSERT(0 == rc);
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -98,15 +98,14 @@ TEST(WatcherImplTest, BadPath) {
   Event::DispatcherImpl dispatcher;
   Filesystem::WatcherPtr watcher = dispatcher.createFilesystemWatcher();
 
-  EXPECT_THROW(watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo,
-                                 [&](uint32_t) -> void {}),
-               EnvoyException);
+  EXPECT_THROW(
+      watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo, [&](uint32_t) -> void {}),
+      EnvoyException);
 
   EXPECT_THROW(watcher->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo,
                                  [&](uint32_t) -> void {}),
                EnvoyException);
 }
-
 
 } // namespace Filesystem
 } // namespace Envoy

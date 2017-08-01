@@ -28,9 +28,7 @@ public:
 
 private:
   struct FileWatch : LinkedObject<FileWatch> {
-    ~FileWatch() {
-      close(fd_);
-    }
+    ~FileWatch() { close(fd_); }
 
     int fd_;
     uint32_t events_;
