@@ -10,7 +10,37 @@ fire, informing the sender it can resume sending data.
 
 ### TCP implementation details
 
-TODO(alyssawilk) document the existing connection level flow control and configuration.
+Flow control for TCP and TCP-with-TLS-termination are handled by coordination
+between the `Network::ConnectionImpl` write buffer, and the `Network::TcpProxy`
+filter.
+
+The downstream flow control goes as follows.
+
+ * The downstream `Network::ConnectionImpl::write_buffer_` buffers too much
+   data.  It calls
+   `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
+ * The `Network::TcpProxy::DownstreamCallbacks` receives
+   `onAboveWriteBufferHighWatermark()` and calls `readDisable(true)` on the upstream
+   connection.
+ * When the downstream buffer is drained, it calls
+   `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`
+ * The `Network::TcpProxy::DownstreamCallbacks` receives
+   `onBelowWriteBufferLowWatermark()` and calls `readDisable(false)` on the upstream
+   connection.
+
+Flow control for the upstream path is much the same.
+
+ * The upstream `Network::ConnectionImpl::write_buffer_` buffers too much
+   data.  It calls
+   `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
+ * The Network::TcpProxy::UpstreamCallbacks receives
+   `onAboveWriteBufferHighWatermark()` and calls `readDisable(true)` on the downstream
+   connection.
+ * When the upstream buffer is drained, it calls
+   `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`
+ * The `Network::TcpProxy::UpstreamCallbacks` receives
+   `onBelowWriteBufferLowWatermark()` and calls `readDisable(false)` on the downstream
+   connection.
 
 ### HTTP2 implementation details
 

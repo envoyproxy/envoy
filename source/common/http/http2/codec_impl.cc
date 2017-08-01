@@ -521,6 +521,9 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
+    // Any unconsumed data must be consumed before the stream is deleted.
+    // nghttp2 does not appear to track this internally, and any stream deleted
+    // with outstanding window will contribute to a slow connection-window leak.
     nghttp2_session_consume(session_, stream_id, stream->unconsumed_bytes_);
     stream->unconsumed_bytes_ = 0;
     nghttp2_session_set_stream_user_data(session_, stream->stream_id_, nullptr);
