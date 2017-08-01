@@ -21,6 +21,7 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
@@ -414,10 +415,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& config
   }
 
   for (const auto& host : config.dns_hosts().addresses()) {
-    resolve_targets_.emplace_back(
-        new ResolveTarget(*this, dispatcher,
-                          fmt::format("tcp://{}:{}", host.named_address().address(),
-                                      host.named_address().port().value())));
+    resolve_targets_.emplace_back(new ResolveTarget(
+        *this, dispatcher,
+        fmt::format("tcp://{}:{}", ProtobufTypes::FromString(host.named_address().address()),
+                    host.named_address().port().value())));
   }
 
   // We have to first construct resolve_targets_ before invoking startResolve(),
