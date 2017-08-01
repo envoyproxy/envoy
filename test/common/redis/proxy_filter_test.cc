@@ -170,7 +170,7 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponse) {
   EXPECT_CALL(filter_callbacks_.connection_, write(_));
   request_callbacks1->onResponse(std::move(response1));
 
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) {
@@ -201,7 +201,7 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) 
   request_callbacks2->onResponse(std::move(response2));
   EXPECT_CALL(*request_handle1, cancel());
 
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
@@ -219,7 +219,7 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data));
 
   EXPECT_CALL(*request_handle1, cancel());
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(RedisProxyFilterTest, ImmediateResponse) {
@@ -244,7 +244,7 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
           }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data));
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(RedisProxyFilterTest, ProtocolError) {

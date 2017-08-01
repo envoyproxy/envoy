@@ -98,8 +98,8 @@ Network::FilterStatus Instance::onNewConnection() {
   }
 }
 
-void Instance::onEvent(uint32_t events) {
-  if (!(events & Network::ConnectionEvent::Connected)) {
+void Instance::onEvent(Network::ConnectionEvent event) {
+  if (event != Network::ConnectionEvent::Connected) {
     return;
   }
 

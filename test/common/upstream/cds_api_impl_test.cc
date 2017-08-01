@@ -6,6 +6,7 @@
 #include "common/json/json_loader.h"
 #include "common/upstream/cds_api_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -28,7 +29,7 @@ public:
   CdsApiImplTest() : request_(&cm_.async_client_) {}
 
   void setup() {
-    std::string config_json = R"EOF(
+    const std::string config_json = R"EOF(
     {
       "cds": {
         "cluster": {
@@ -39,7 +40,8 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    cds_ = CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_);
+    cds_ = CdsApiImpl::create(*config, Optional<SdsConfig>(), cm_, dispatcher_, random_,
+                              local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -48,8 +50,8 @@ public:
 
   void expectAdd(const std::string& cluster_name) {
     EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
-        .WillOnce(Invoke([cluster_name](const Json::Object& config) -> bool {
-          EXPECT_EQ(cluster_name, config.getString("name"));
+        .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& config) -> bool {
+          EXPECT_EQ(cluster_name, config.name());
           return true;
         }));
   }
@@ -90,7 +92,7 @@ public:
 };
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
-  std::string config_json = R"EOF(
+  const std::string config_json = R"EOF(
   {
     "cds": {
       "cluster": {
@@ -103,7 +105,8 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
-  EXPECT_THROW(CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_),
+  EXPECT_THROW(CdsApiImpl::create(*config, Optional<SdsConfig>(), cm_, dispatcher_, random_,
+                                  local_info_, store_),
                EnvoyException);
 }
 
@@ -112,19 +115,9 @@ TEST_F(CdsApiImplTest, Basic) {
 
   setup();
 
-  std::string response1_json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster1"
-    },
-    {
-      "name": "cluster2"
-    }
-    ]
-  }
-  )EOF";
-
+  std::string response1_json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster1"), defaultStaticClusterJson("cluster2")}));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body().reset(new Buffer::OwnedImpl(response1_json));
@@ -139,18 +132,9 @@ TEST_F(CdsApiImplTest, Basic) {
   expectRequest();
   interval_timer_->callback_();
 
-  std::string response2_json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster1"
-    },
-    {
-      "name": "cluster3"
-    }
-    ]
-  }
-  )EOF";
+  std::string response2_json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster1"), defaultStaticClusterJson("cluster3")}));
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -172,7 +156,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   {
     "clusters" : {}
   }
@@ -201,7 +185,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   []
   )EOF";
 

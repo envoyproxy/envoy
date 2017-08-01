@@ -171,11 +171,11 @@ void IntegrationCodecClient::waitForDisconnect() {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::Connected) {
+void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
     parent_.connection_->dispatcher().exit();
-  } else if (events & Network::ConnectionEvent::RemoteClose) {
+  } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }
@@ -237,8 +237,8 @@ void IntegrationTcpClient::write(const std::string& data) {
   }
 }
 
-void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events == Network::ConnectionEvent::RemoteClose) {
+void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }

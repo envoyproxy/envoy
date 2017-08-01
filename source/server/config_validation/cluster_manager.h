@@ -30,7 +30,8 @@ public:
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
-  CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
+  CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                      ClusterManager& cm) override;
 };
 
 /**

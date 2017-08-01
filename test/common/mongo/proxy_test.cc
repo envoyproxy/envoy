@@ -314,7 +314,7 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
     filter_->callbacks_->decodeReply(std::move(message));
   }));
   filter_->onWrite(fake_data_);
-  read_filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
@@ -330,7 +330,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
   }));
   filter_->onData(fake_data_);
 
-  read_filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
@@ -346,7 +346,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
   }));
   filter_->onData(fake_data_);
 
-  read_filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::LocalClose);
+  read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 }
