@@ -17,22 +17,22 @@ HeaderString::HeaderString() : type_(Type::Inline) {
   clear();
 }
 
-HeaderString::HeaderString(const LowerCaseString& static_value) : type_(Type::Static) {
-  buffer_.static_ = static_value.get().c_str();
-  string_length_ = static_value.get().size();
+HeaderString::HeaderString(const LowerCaseString& ref_value) : type_(Type::Reference) {
+  buffer_.ref_ = ref_value.get().c_str();
+  string_length_ = ref_value.get().size();
 }
 
-HeaderString::HeaderString(const std::string& static_value) : type_(Type::Static) {
-  buffer_.static_ = static_value.c_str();
-  string_length_ = static_value.size();
+HeaderString::HeaderString(const std::string& ref_value) : type_(Type::Reference) {
+  buffer_.ref_ = ref_value.c_str();
+  string_length_ = ref_value.size();
 }
 
 HeaderString::HeaderString(HeaderString&& move_value) {
   type_ = move_value.type_;
   string_length_ = move_value.string_length_;
   switch (move_value.type_) {
-  case Type::Static: {
-    buffer_.static_ = move_value.buffer_.static_;
+  case Type::Reference: {
+    buffer_.ref_ = move_value.buffer_.ref_;
     break;
   }
   case Type::Dynamic: {
@@ -64,7 +64,7 @@ void HeaderString::freeDynamic() {
 
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {
-  case Type::Static: {
+  case Type::Reference: {
     // Switch back to inline and fall through. We do not actually append to the static string
     // currently which would require a copy.
     type_ = Type::Inline;
@@ -106,7 +106,7 @@ void HeaderString::append(const char* data, uint32_t size) {
 
 void HeaderString::clear() {
   switch (type_) {
-  case Type::Static: {
+  case Type::Reference: {
     break;
   }
   case Type::Inline: {
@@ -121,7 +121,7 @@ void HeaderString::clear() {
 
 void HeaderString::setCopy(const char* data, uint32_t size) {
   switch (type_) {
-  case Type::Static: {
+  case Type::Reference: {
     // Switch back to inline and fall through.
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;
@@ -160,7 +160,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
 
 void HeaderString::setInteger(uint64_t value) {
   switch (type_) {
-  case Type::Static: {
+  case Type::Reference: {
     // Switch back to inline and fall through.
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;
@@ -174,11 +174,11 @@ void HeaderString::setInteger(uint64_t value) {
   }
 }
 
-void HeaderString::setStatic(const std::string& static_value) {
+void HeaderString::setReference(const std::string& ref_value) {
   freeDynamic();
-  type_ = Type::Static;
-  buffer_.static_ = static_value.c_str();
-  string_length_ = static_value.size();
+  type_ = Type::Reference;
+  buffer_.ref_ = ref_value.c_str();
+  string_length_ = ref_value.size();
 }
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}
@@ -203,13 +203,13 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().c_str(), header.value().size());
 }
 
-#define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
+#define INLINE_HEADER_ref_MAP_ENTRY(name)                                                          \
   add(Headers::get().name.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {            \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
 HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
-  ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
+  ALL_INLINE_HEADERS(INLINE_HEADER_ref_MAP_ENTRY)
 
   // Special case where we map a legacy host header to :authority.
   add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {
@@ -298,9 +298,8 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     // that it should be appended to. In that case, we would do an append here. We can do this in
     // a follow up.
     key.clear();
-    StaticLookupResponse static_lookup_response = cb(*this);
-    maybeCreateInline(static_lookup_response.entry_, *static_lookup_response.key_,
-                      std::move(value));
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
   } else {
     std::list<HeaderEntryImpl>::iterator i =
         headers_.emplace(headers_.end(), std::move(key), std::move(value));
@@ -312,25 +311,25 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   insertByKey(std::move(key), std::move(value));
 }
 
-void HeaderMapImpl::addStatic(const LowerCaseString& key, const std::string& value) {
-  HeaderString static_key(key);
-  HeaderString static_value(value);
-  addViaMove(std::move(static_key), std::move(static_value));
+void HeaderMapImpl::addReference(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString ref_value(value);
+  addViaMove(std::move(ref_key), std::move(ref_value));
 }
 
-void HeaderMapImpl::addStaticKey(const LowerCaseString& key, uint64_t value) {
-  HeaderString static_key(key);
+void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) {
+  HeaderString ref_key(key);
   HeaderString new_value;
   new_value.setInteger(value);
-  insertByKey(std::move(static_key), std::move(new_value));
+  insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty());
 }
 
-void HeaderMapImpl::addStaticKey(const LowerCaseString& key, const std::string& value) {
-  HeaderString static_key(key);
+void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
   HeaderString new_value;
   new_value.setCopy(value.c_str(), value.size());
-  insertByKey(std::move(static_key), std::move(new_value));
+  insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty());
 }
 
@@ -363,8 +362,8 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
-    StaticLookupResponse static_lookup_response = cb(*this);
-    removeInline(static_lookup_response.entry_);
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    removeInline(ref_lookup_response.entry_);
   } else {
     for (auto i = headers_.begin(); i != headers_.end();) {
       if (i->key() == key.get().c_str()) {

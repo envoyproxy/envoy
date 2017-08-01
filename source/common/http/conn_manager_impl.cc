@@ -673,8 +673,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
-  // Following setStatic() is safe because serverName() is constant for the life of the listener.
-  headers.insertServer().value().setStatic(connection_manager_.config_.serverName());
+  // Following setReference() is safe because serverName() is constant for the life of the listener.
+  headers.insertServer().value().setReference(connection_manager_.config_.serverName());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   *snapped_route_config_);
 
@@ -709,7 +709,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
-    headers.insertConnection().value().setStatic(Headers::get().ConnectionValues.Close);
+    headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
   }
 
   chargeStats(headers);

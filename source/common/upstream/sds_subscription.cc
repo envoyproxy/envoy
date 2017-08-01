@@ -87,7 +87,7 @@ void SdsSubscription::createRequest(Http::Message& message) {
   ENVOY_LOG(debug, "starting sds refresh for cluster: {}", cluster_name_);
   stats_.update_attempt_.inc();
 
-  message.headers().insertMethod().value().setStatic(Http::Headers::get().MethodValues.Get);
+  message.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   message.headers().insertPath().value("/v1/registration/" + cluster_name_);
 }
 

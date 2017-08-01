@@ -40,13 +40,13 @@ private:
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 3 different types of storage and can switch between them:
- * 1) A static reference.
+ * 1) A reference.
  * 2) Interned string.
  * 3) Heap allocated storage.
  */
 class HeaderString {
 public:
-  enum class Type { Inline, Static, Dynamic };
+  enum class Type { Inline, Reference, Dynamic };
 
   /**
    * Default constructor. Sets up for inline storage.
@@ -54,23 +54,25 @@ public:
   HeaderString();
 
   /**
-   * Constructor for a static string reference.
-   * @param static_value MUST point to static data.
+   * Constructor for a string reference.
+   * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
+   *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const LowerCaseString& static_value);
+  explicit HeaderString(const LowerCaseString& ref_value);
 
   /**
-   * Constructor for a static string reference.
-   * @param static_value MUST point to static data.
+   * Constructor for a string reference.
+   * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
+   *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const std::string& static_value);
+  explicit HeaderString(const std::string& ref_value);
 
   HeaderString(HeaderString&& move_value);
   ~HeaderString();
 
   /**
-   * Append data to an existing string. If the string is a static string the static data is not
-   * copied.
+   * Append data to an existing string. If the string is a reference string the reference data is
+   * not copied.
    */
   void append(const char* data, uint32_t size);
 
@@ -82,10 +84,10 @@ public:
   /**
    * @return a null terminated C string.
    */
-  const char* c_str() const { return buffer_.static_; }
+  const char* c_str() const { return buffer_.ref_; }
 
   /**
-   * Return the string to a default state. Static strings are not touched. Both inline/dynamic
+   * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
    * strings are reset to zero size.
    */
   void clear();
@@ -111,10 +113,11 @@ public:
   void setInteger(uint64_t value);
 
   /**
-   * Set the value of the string to a static string reference.
-   * @param static_value MUST point to static data.
+   * Set the value of the string to a string reference.
+   * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
+   *        using the string (since a codec may optimize for zero copy).
    */
-  void setStatic(const std::string& static_value);
+  void setReference(const std::string& ref_value);
 
   /**
    * @return the size of the string, not including the null terminator.
@@ -132,7 +135,7 @@ public:
 private:
   union {
     char* dynamic_;
-    const char* static_;
+    const char* ref_;
   } buffer_;
 
   union {
@@ -272,22 +275,25 @@ public:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
 
   /**
-   * Add a fully static header to the map. Both key and value MUST point to fully static data.
-   * Nothing will be copied.
+   * Add a reference header to the map. Both key and value MUST point to data that will live beyond
+   * the lifetime of any request/response using the string (since a codec may optimize for zero
+   * copy). Nothing will be copied.
    */
-  virtual void addStatic(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReference(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
-   * Add a header with a static key to the map. The key MUST point to fully static data. The value
-   * will be copied.
+   * Add a header with a reference key to the map. The key MUST point to data that will live beyond
+   * the lifetime of any request/response using the string (since a codec may optimize for zero
+   * copy). The value will be copied.
    */
-  virtual void addStaticKey(const LowerCaseString& key, uint64_t value) PURE;
+  virtual void addReferenceKey(const LowerCaseString& key, uint64_t value) PURE;
 
   /**
-   * Add a header with a static key to the map. The key MUST point to fully static data. The value
-   * will be copied.
+   * Add a header with a reference key to the map. The key MUST point to point to data that will
+   * live beyond the lifetime of any request/response using the string (since a codec may optimize
+   * for zero copy). The value will be copied.
    */
-  virtual void addStaticKey(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
    * @return uint64_t the approximate size of the header map in bytes.

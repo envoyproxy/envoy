@@ -96,9 +96,9 @@ TEST(HeaderStringTest, All) {
   {
     std::string static_string("HELLO");
     HeaderString string(static_string);
-    EXPECT_EQ(HeaderString::Type::Static, string.type());
+    EXPECT_EQ(HeaderString::Type::Reference, string.type());
     string.clear();
-    EXPECT_EQ(HeaderString::Type::Static, string.type());
+    EXPECT_EQ(HeaderString::Type::Reference, string.type());
     EXPECT_STREQ("HELLO", string.c_str());
   }
 
@@ -106,7 +106,7 @@ TEST(HeaderStringTest, All) {
   {
     std::string static_string("HELLO");
     HeaderString string(static_string);
-    EXPECT_EQ(HeaderString::Type::Static, string.type());
+    EXPECT_EQ(HeaderString::Type::Reference, string.type());
     string.append("a", 1);
     EXPECT_STREQ("a", string.c_str());
   }
@@ -243,20 +243,20 @@ TEST(HeaderStringTest, All) {
   {
     const std::string static_string = "hello world";
     HeaderString string;
-    string.setStatic(static_string);
+    string.setReference(static_string);
     EXPECT_EQ(string.c_str(), static_string.c_str());
     EXPECT_EQ(11U, string.size());
-    EXPECT_EQ(HeaderString::Type::Static, string.type());
+    EXPECT_EQ(HeaderString::Type::Reference, string.type());
 
     const std::string large(128, 'a');
     string.setCopy(large.c_str(), large.size());
     EXPECT_NE(string.c_str(), large.c_str());
     EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
 
-    string.setStatic(static_string);
+    string.setReference(static_string);
     EXPECT_EQ(string.c_str(), static_string.c_str());
     EXPECT_EQ(11U, string.size());
-    EXPECT_EQ(HeaderString::Type::Static, string.type());
+    EXPECT_EQ(HeaderString::Type::Reference, string.type());
   }
 }
 
@@ -285,10 +285,10 @@ TEST(HeaderMapImplTest, Remove) {
 
   // Add random header and then remove by name.
   LowerCaseString static_key("hello");
-  std::string static_value("value");
-  headers.addStatic(static_key, static_value);
+  std::string ref_value("value");
+  headers.addReference(static_key, ref_value);
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
-  EXPECT_EQ(HeaderString::Type::Static, headers.get(static_key)->value().type());
+  EXPECT_EQ(HeaderString::Type::Reference, headers.get(static_key)->value().type());
   EXPECT_EQ(1UL, headers.size());
   headers.remove(static_key);
   EXPECT_EQ(nullptr, headers.get(static_key));
@@ -313,8 +313,8 @@ TEST(HeaderMapImplTest, Remove) {
 
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   HeaderMapImpl headers;
-  headers.addStaticKey(Headers::get().ContentLength, 5);
-  headers.addStaticKey(Headers::get().ContentLength, 6);
+  headers.addReferenceKey(Headers::get().ContentLength, 5);
+  headers.addReferenceKey(Headers::get().ContentLength, 6);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
 }
@@ -334,8 +334,8 @@ TEST(HeaderMapImplTest, Equality) {
 TEST(HeaderMapImplTest, LargeCharInHeader) {
   HeaderMapImpl headers;
   LowerCaseString static_key("\x90hello");
-  std::string static_value("value");
-  headers.addStatic(static_key, static_value);
+  std::string ref_value("value");
+  headers.addReference(static_key, ref_value);
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
 }
 

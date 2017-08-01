@@ -55,14 +55,14 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     } else {
       Utility::appendXff(request_headers, connection.remoteAddress());
     }
-    request_headers.insertForwardedProto().value().setStatic(
+    request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
   // If we didn't already replace x-forwarded-proto because we are using the remote address, and
   // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
   if (!request_headers.ForwardedProto()) {
-    request_headers.insertForwardedProto().value().setStatic(
+    request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
@@ -76,7 +76,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
 
   // If internal request, set header and do other internal only modifications.
   if (internal_request) {
-    request_headers.insertEnvoyInternalRequest().value().setStatic(
+    request_headers.insertEnvoyInternalRequest().value().setReference(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
     if (edge_request) {
@@ -101,13 +101,15 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
-      // Following setStatic() is safe because user agent is constant for the life of the listener.
-      user_agent_header.value().setStatic(config.userAgent().value());
+      // Following setReference() is safe because user agent is constant for the life of the
+      // listener.
+      user_agent_header.value().setReference(config.userAgent().value());
     }
 
     if (!local_info.nodeName().empty()) {
-      // Following setStatic() is safe because local info is constant for the life of the server.
-      request_headers.insertEnvoyDownstreamServiceNode().value().setStatic(local_info.nodeName());
+      // Following setReference() is safe because local info is constant for the life of the server.
+      request_headers.insertEnvoyDownstreamServiceNode().value().setReference(
+          local_info.nodeName());
     }
   }
 
@@ -216,7 +218,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
 
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        route_config.responseHeadersToAdd()) {
-    response_headers.addStatic(to_add.first, to_add.second);
+    response_headers.addReference(to_add.first, to_add.second);
   }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {

@@ -78,7 +78,7 @@ void Config::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(
 static const std::string Path = "/v1/certs/list/approved";
 
 void Config::createRequest(Http::Message& request) {
-  request.headers().insertMethod().value().setStatic(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(Path);
 }
 
