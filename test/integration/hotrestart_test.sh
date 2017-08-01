@@ -2,11 +2,6 @@
 
 set -e
 
-if [[ -f "test/integration/hotrestart_disabled" ]]; then
-    echo "SKIP: hot restart disabled in this build"
-    exit 0
-fi
-
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.

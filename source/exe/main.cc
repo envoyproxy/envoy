@@ -31,9 +31,9 @@ int main(int argc, char** argv) {
 #endif
 
 #ifdef ENVOY_HOT_RESTART
-  const std::string& shared_mem_version = Envoy::Server::SharedMemory::version();
+  const std::string shared_mem_version = Envoy::Server::SharedMemory::version();
 #else
-  const std::string& shared_mem_version = "disabled";
+  const std::string shared_mem_version = "disabled";
 #endif
 
   Envoy::OptionsImpl options(argc, argv, shared_mem_version, spdlog::level::warn);

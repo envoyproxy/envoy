@@ -6,6 +6,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_sh_test",
+    "envoy_select_hot_restart",
 )
 
 envoy_package()
@@ -18,18 +19,14 @@ native.genrule(
 
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = ["hotrestart_test.sh"],
+    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
     data = [
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
-    ] + select({
-        "//bazel:disable_hot_restart": [":hotrestart_test_disabled"],
-        "@bazel_tools//tools/osx:darwin": [":hotrestart_test_disabled"],
-        "//conditions:default": [],
-    }),
+    ],
     # Need to disable test execution sandboxing for this test, since it uses shmem.
     # TODO(htuch): When most folks are using a Bazel with the recent
     # https://github.com/bazelbuild/bazel/commit/8d739f2fad3fd0135b940170691b0119c5baca1e,
@@ -139,6 +136,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/hot_restart:hot_restart_nop_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

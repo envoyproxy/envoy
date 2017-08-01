@@ -3,6 +3,7 @@
 
 #include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
+#include "common/hot_restart/hot_restart_nop.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
@@ -11,7 +12,6 @@
 #ifdef ENVOY_HOT_RESTART
 #include "exe/hot_restart.h"
 #endif
-#include "exe/hot_restart_nop.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"

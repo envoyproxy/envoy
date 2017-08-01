@@ -5,6 +5,7 @@ load(
     "envoy_cc_binary",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_hot_restart",
 )
 
 envoy_package()
@@ -75,24 +76,15 @@ envoy_cc_library(
         ":envoy_common_lib",
         ":hot_restart_lib",
         "//source/common/common:compiler_requirements_lib",
+        "//source/common/hot_restart:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
     ],
 )
 
 envoy_cc_library(
     name = "hot_restart_lib",
-    srcs = select({
-        "//bazel:disable_hot_restart": [],
-        "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": ["hot_restart.cc"],
-    }),
-    hdrs = [
-        "hot_restart_nop.h",
-    ] + select({
-        "//bazel:disable_hot_restart": [],
-        "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": ["hot_restart.h"],
-    }),
+    srcs = envoy_select_hot_restart(["hot_restart.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restart.h"]),
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",

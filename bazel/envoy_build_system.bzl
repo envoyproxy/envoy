@@ -24,11 +24,7 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
-    }) + select({
-        repository + "//bazel:disable_hot_restart": [],
-        "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": ["-DENVOY_HOT_RESTART"],
-    })
+    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"])
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
@@ -265,7 +261,7 @@ def envoy_sh_test(name,
       name = name + "_gen_test_runner",
       srcs = srcs,
       outs = [test_runner_cc],
-      cmd = "$(location //bazel:gen_sh_test_runner.sh) $(location " + srcs[0] + ") >> $@",
+      cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
       tools = ["//bazel:gen_sh_test_runner.sh"],
   )
   envoy_cc_test_library(
@@ -279,7 +275,7 @@ def envoy_sh_test(name,
       name = name,
       srcs = ["//bazel:sh_test_wrapper.sh"],
       data = srcs + data,
-      args = ["$(location " + srcs[0] + ")"],
+      args = srcs,
       **kargs
   )
 
@@ -336,3 +332,11 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         cmd = cmd,
         tools = ["//external:protoc"],
     )
+
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_hot_restart(xs):
+    return select({
+        "//bazel:disable_hot_restart": [],
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": xs,
+    })
