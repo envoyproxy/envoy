@@ -11,12 +11,6 @@ load(
 
 envoy_package()
 
-native.genrule(
-    name = "hotrestart_test_disabled",
-    outs = ["hotrestart_disabled"],
-    cmd = "touch $@",
-)
-
 envoy_sh_test(
     name = "hotrestart_test",
     srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
