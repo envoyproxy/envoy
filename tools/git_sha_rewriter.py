@@ -12,6 +12,7 @@
 # This is a workaround to https://github.com/bazelbuild/bazel/issues/2805.
 
 import binascii
+import platform
 import re
 import subprocess as sp
 import sys
@@ -107,6 +108,9 @@ if __name__ == '__main__':
   if len(sys.argv) != 2:
     print 'Usage: %s <Envoy binary path> ' % sys.argv[0]
     sys.exit(1)
+  if platform.system() == 'Darwin':
+    print 'Stamping not supported for Mach-O binaries'
+    sys.exit(0)
   envoy_bin_path = sys.argv[1]
   version_generated = ExtractGitSha(envoy_bin_path)
   build_id_note_offset = ExtractBuildIdNoteOffset(envoy_bin_path)
