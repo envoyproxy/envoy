@@ -121,6 +121,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -230,6 +231,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:connection_lib",
         "//source/common/ssl:context_config_lib",
