@@ -34,9 +34,10 @@ struct CdsStats {
  */
 class CdsApiImpl : public CdsApi, Http::RestApiFetcher, Logger::Loggable<Logger::Id::upstream> {
 public:
-  static CdsApiPtr create(const Json::Object& config, ClusterManager& cm,
-                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+  static CdsApiPtr create(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                          ClusterManager& cm, Event::Dispatcher& dispatcher,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          Stats::Scope& scope);
 
   // Upstream::CdsApi
   void initialize() override { RestApiFetcher::initialize(); }
@@ -45,9 +46,9 @@ public:
   }
 
 private:
-  CdsApiImpl(const Json::Object& config, ClusterManager& cm, Event::Dispatcher& dispatcher,
-             Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-             Stats::Scope& scope);
+  CdsApiImpl(const Json::Object& config, const Optional<SdsConfig>& sds_config, ClusterManager& cm,
+             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
@@ -58,6 +59,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CdsStats stats_;
   std::function<void()> initialize_callback_;
+  const Optional<SdsConfig> sds_config_;
 };
 
 } // Upstream

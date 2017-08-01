@@ -20,9 +20,10 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromJson(
 }
 
 CdsApiPtr ValidationClusterManagerFactory::createCds(const Json::Object& config,
+                                                     const Optional<SdsConfig>& sds_config,
                                                      ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(config, cm);
+  ProdClusterManagerFactory::createCds(config, sds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }

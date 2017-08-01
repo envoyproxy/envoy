@@ -1,5 +1,8 @@
 #include "common/config/utility.h"
 
+#include "common/common/hex.h"
+#include "common/common/utility.h"
+#include "common/config/json_utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
@@ -38,9 +41,11 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
 }
 
 void Utility::localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node) {
+  checkLocalInfo("envoy::api::v2::Node", local_info);
   node.set_id(local_info.nodeName());
   node.mutable_locality()->set_zone(local_info.zoneName());
-  // TODO(htuch): Fill in more fields, e.g. cluster name in metadata, etc.
+  (*node.mutable_metadata()->mutable_fields())["cluster"].set_string_value(
+      local_info.clusterName());
 }
 
 std::chrono::milliseconds
