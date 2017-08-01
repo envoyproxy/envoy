@@ -21,7 +21,7 @@ namespace Network {
 /**
  * Events that occur on a connection.
  */
-enum ConnectionEvent {
+enum class ConnectionEvent {
   RemoteClose,
   LocalClose,
   Connected,

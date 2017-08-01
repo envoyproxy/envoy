@@ -136,7 +136,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     return;
   }
 
-  ENVOY_CONN_LOG(debug, "closing socket: {}", *this, close_type);
+  ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
