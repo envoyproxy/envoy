@@ -201,12 +201,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
   }
 
   headers.removeContentLength();
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertContentType().value().setStatic(Http::Headers::get().ContentTypeValues.Grpc);
   headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
-
-  headers.insertMethod().value(Http::Headers::get().MethodValues.Post);
-
-  headers.insertTE().value(Http::Headers::get().TEValues.Trailers);
+  headers.insertMethod().value().setStatic(Http::Headers::get().MethodValues.Post);
+  headers.insertTE().value().setStatic(Http::Headers::get().TEValues.Trailers);
 
   if (end_stream) {
     request_in_.finish();
@@ -291,7 +289,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   }
 
   response_headers_ = &headers;
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Json);
+  headers.insertContentType().value().setStatic(Http::Headers::get().ContentTypeValues.Json);
   if (!method_->server_streaming() && !end_stream) {
     return Http::FilterHeadersStatus::StopIteration;
   }

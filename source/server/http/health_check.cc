@@ -118,6 +118,7 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
     }
 
+    // Following setStatic() is safe because local info is constant for the life of the server.
     headers.insertEnvoyUpstreamHealthCheckedCluster().value().setStatic(
         context_.localInfo().clusterName());
   }

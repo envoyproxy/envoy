@@ -37,7 +37,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
 void CdsApiImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "cds: starting request");
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setStatic(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/clusters/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
 }

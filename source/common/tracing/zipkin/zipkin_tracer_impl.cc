@@ -36,7 +36,7 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
+  request_headers.insertXB3Sampled().value().setStatic(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
 
   // Set the ot-span-context header with the new context.
   SpanContext context(span_);
@@ -168,10 +168,11 @@ void ReporterImpl::flushSpans() {
 
     const std::string request_body = span_buffer_.toStringifiedJsonArray();
     Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+    message->headers().insertMethod().value().setStatic(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
-    message->headers().insertContentType().value(std::string("application/json"));
+    message->headers().insertContentType().value().setStatic(
+        Http::Headers::get().ContentTypeValues.Json);
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
     body->add(request_body);

@@ -101,10 +101,12 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
+      // Following setStatic() is safe because user agent is constant for the life of the listener.
       user_agent_header.value().setStatic(config.userAgent().value());
     }
 
     if (!local_info.nodeName().empty()) {
+      // Following setStatic() is safe because local info is constant for the life of the server.
       request_headers.insertEnvoyDownstreamServiceNode().value().setStatic(local_info.nodeName());
     }
   }
