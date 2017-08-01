@@ -59,5 +59,54 @@ TEST(WatcherImplTest, All) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
+TEST(WatcherImplTest, Create) {
+  Event::DispatcherImpl dispatcher;
+  Filesystem::WatcherPtr watcher = dispatcher.createFilesystemWatcher();
+
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/other_file").c_str());
+
+  mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
+  { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target")); }
+
+  WatchCallback callback;
+  EXPECT_CALL(callback, called(Watcher::Events::MovedTo)).Times(1);
+  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                    Watcher::Events::MovedTo, [&](uint32_t events) -> void {
+                      callback.called(events);
+                      dispatcher.exit();
+                    });
+
+  { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/other_file")); }
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+
+  int rc = symlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str(),
+                   TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+  RELEASE_ASSERT(0 == rc);
+  UNREFERENCED_PARAMETER(rc);
+
+  rc = rename(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str(),
+               TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  RELEASE_ASSERT(0 == rc);
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST(WatcherImplTest, BadPath) {
+  Event::DispatcherImpl dispatcher;
+  Filesystem::WatcherPtr watcher = dispatcher.createFilesystemWatcher();
+
+  EXPECT_THROW(watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo,
+                                 [&](uint32_t) -> void {}),
+               EnvoyException);
+
+  EXPECT_THROW(watcher->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo,
+                                 [&](uint32_t) -> void {}),
+               EnvoyException);
+}
+
+
 } // namespace Filesystem
 } // namespace Envoy

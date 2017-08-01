@@ -49,7 +49,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
 
     size_t last_slash = path.rfind('/');
     if (last_slash == std::string::npos) {
-      throw EnvoyException(fmt::format("invalid watch path {}", path));
+      return nullptr;
     }
 
     std::string directory = path.substr(0, last_slash);
@@ -77,14 +77,9 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32
   EV_SET(&event, watch_fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, flags, 0,
          reinterpret_cast<void*>(watch_fd));
 
-  if (kevent(queue_, &event, 1, NULL, 0, NULL) == -1) {
+  if (kevent(queue_, &event, 1, NULL, 0, NULL) == -1 || event.flags & EV_ERROR) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
-  }
-
-  if (event.flags & EV_ERROR) {
-    throw EnvoyException(
-        fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(event.data)));
   }
 
   ENVOY_LOG(debug, "added watch for file: '{}' fd: {}", path, watch_fd);
