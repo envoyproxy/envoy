@@ -170,7 +170,7 @@ TEST_F(LdsApiTest, Basic) {
   makeListenersAndExpectCall({"listener1", "listener2"});
   expectAdd("listener1", false);
   expectAdd("listener3", true);
-  EXPECT_CALL(listener_manager_, removeListener("listener2"));
+  EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
