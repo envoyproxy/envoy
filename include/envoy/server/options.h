@@ -65,6 +65,11 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
+   * @return const std::string& the path to the v2 bootstrap file.
+   */
+  virtual const std::string& bootstrapPath() PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() PURE;

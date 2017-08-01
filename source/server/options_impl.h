@@ -25,6 +25,7 @@ public:
   uint64_t baseId() override { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& bootstrapPath() override { return bootstrap_path_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return drain_time_; }
@@ -38,6 +39,7 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
+  std::string bootstrap_path_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

@@ -30,6 +30,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
                                            "", "string", cmd);
+  TCLAP::ValueArg<std::string> bootstrap_path("b", "bootstrap-path", "Path to v2 bootstrap file",
+                                              false, "", "string", cmd);
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",
@@ -104,6 +106,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   base_id_ = base_id.getValue() * 10;
   concurrency_ = concurrency.getValue();
   config_path_ = config_path.getValue();
+  bootstrap_path_ = bootstrap_path.getValue();
   admin_address_path_ = admin_address_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();

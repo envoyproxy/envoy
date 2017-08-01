@@ -20,6 +20,7 @@ envoy_cc_library(
     name = "configuration_lib",
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
+    external_deps = ["envoy_bootstrap"],
     deps = [
         ":lds_api_lib",
         "//include/envoy/http:filter_interface",
@@ -156,6 +157,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
+    external_deps = ["envoy_bootstrap"],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
@@ -181,6 +183,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:statsd_lib",
         "//source/common/upstream:cluster_manager_lib",
