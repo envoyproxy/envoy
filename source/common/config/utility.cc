@@ -1,7 +1,5 @@
 #include "common/config/utility.h"
 
-#include <iostream>
-
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"

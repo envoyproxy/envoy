@@ -107,14 +107,13 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   NiceMock<Runtime::MockLoader> runtime;
   ReadyWatcher initialized;
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "strict_dns",
-  )EOF";
-  json += std::get<0>(GetParam());
-  json += R"EOF(
+  )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
@@ -144,7 +143,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   ResolverData resolver2(*dns_resolver, dispatcher);
   ResolverData resolver1(*dns_resolver, dispatcher);
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
@@ -305,7 +304,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "staticcluster",
     "connect_timeout_ms": 250,
@@ -325,7 +324,7 @@ TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "staticcluster",
     "connect_timeout_ms": 250,
@@ -345,7 +344,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -385,7 +384,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -442,7 +441,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -478,7 +477,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -495,7 +494,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
 }
 
 TEST(ClusterDefinitionTest, BadClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "cluster_1",
     "connect_timeout_ms": 250,
@@ -511,7 +510,7 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
 }
 
 TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "cluster_1",
     "connect_timeout_ms": 250,

@@ -87,7 +87,7 @@ public:
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "interval_ms" : 100,
     "base_ejection_time_ms" : 10000,

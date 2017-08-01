@@ -71,6 +71,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

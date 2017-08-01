@@ -29,7 +29,7 @@ public:
   CdsApiImplTest() : request_(&cm_.async_client_) {}
 
   void setup() {
-    std::string config_json = R"EOF(
+    const std::string config_json = R"EOF(
     {
       "cds": {
         "cluster": {
@@ -92,7 +92,7 @@ public:
 };
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
-  std::string config_json = R"EOF(
+  const std::string config_json = R"EOF(
   {
     "cds": {
       "cluster": {
@@ -156,7 +156,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   {
     "clusters" : {}
   }
@@ -185,7 +185,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   []
   )EOF";
 

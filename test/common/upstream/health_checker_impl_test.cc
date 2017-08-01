@@ -8,6 +8,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -63,6 +64,24 @@ TEST(HealthCheckerFactoryTest, createRedis) {
                          HealthCheckerFactory::create(parseHealthCheckFromJson(json), cluster,
                                                       runtime, random, dispatcher)
                              .get()));
+}
+
+// TODO(htuch): This provides coverage on MissingFieldException and missing health check type
+// handling for HealthCheck construction, but should eventually be subsumed by whatever we do for
+// #1308.
+TEST(HealthCheckerFactoryTest, MissingFieldiException) {
+  NiceMock<Upstream::MockCluster> cluster;
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+  envoy::api::v2::HealthCheck health_check;
+  // Not health checker type set
+  EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
+               EnvoyException);
+  health_check.mutable_http_health_check();
+  // No timeout field set.
+  EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
+               MissingFieldException);
 }
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {

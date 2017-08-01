@@ -104,15 +104,14 @@ INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "logical_dns",
     "lb_type": "round_robin",
-  )EOF";
-  json += std::get<0>(GetParam());
-  json += R"EOF(
+  )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
   )EOF";
@@ -133,7 +132,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
 }
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
@@ -147,7 +146,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
