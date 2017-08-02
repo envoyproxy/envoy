@@ -27,7 +27,8 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path) : config_path_(config_path) {}
+  TestOptionsImpl(const std::string& config_path, const std::string& bootstrap_path)
+      : config_path_(config_path), bootstrap_path_(bootstrap_path) {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
@@ -175,6 +176,7 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public Server::ComponentFactory {
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
+                                         const std::string& bootstrap_path,
                                          const Network::Address::IpVersion version);
   ~IntegrationTestServer();
 
@@ -212,7 +214,8 @@ public:
   }
 
 protected:
-  IntegrationTestServer(const std::string& config_path) : config_path_(config_path) {}
+  IntegrationTestServer(const std::string& config_path, const std::string& bootstrap_path)
+      : config_path_(config_path), bootstrap_path_(bootstrap_path) {}
 
 private:
   /**
@@ -221,6 +224,7 @@ private:
   void threadRoutine(const Network::Address::IpVersion version);
 
   const std::string config_path_;
+  const std::string bootstrap_path_;
   Thread::ThreadPtr thread_;
   std::condition_variable listeners_cv_;
   std::mutex listeners_mutex_;

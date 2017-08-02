@@ -20,6 +20,8 @@
 #include "common/json/json_loader.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "api/bootstrap.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -50,8 +52,8 @@ public:
   ClusterPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                               Outlier::EventLoggerSharedPtr outlier_event_logger,
                               bool added_via_api) override;
-  CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
-                      ClusterManager& cm) override;
+  CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
+                      const Optional<SdsConfig>& sds_config, ClusterManager& cm) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -215,6 +217,8 @@ private:
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
+  void initializeClustersFromV1Json(const Json::Object& config);
+  void initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap);
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,

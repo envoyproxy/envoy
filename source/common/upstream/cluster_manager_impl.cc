@@ -154,6 +154,38 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
+void ClusterManagerImpl::initializeClustersFromV1Json(const Json::Object& config) {
+  envoy::api::v2::ConfigSource cds_config;
+  if (config.hasObject("cds")) {
+    envoy::api::v2::Cluster cds_cluster;
+    Config::CdsJson::translateCluster(*config.getObject("cds")->getObject("cluster"), sds_config_,
+                                      cds_cluster);
+    loadCluster(cds_cluster, false);
+    Config::Utility::translateCdsConfig(*config.getObject("cds"), cds_config);
+    // We can now potentially create the CDS API once the backing cluster exists.
+    cds_api_ = factory_.createCds(cds_config, sds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
+
+  for (const Json::ObjectSharedPtr& cluster_config : config.getObjectArray("clusters")) {
+    envoy::api::v2::Cluster cluster;
+    Config::CdsJson::translateCluster(*cluster_config, sds_config_, cluster);
+    loadCluster(cluster, false);
+  }
+}
+
+void ClusterManagerImpl::initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap) {
+  for (const auto& cluster : bootstrap.bootstrap_clusters()) {
+    loadCluster(cluster, false);
+  }
+
+  // We can now potentially create the CDS API once the backing cluster exists.
+  cds_api_ = factory_.createCds(bootstrap.cds_config(), sds_config_, *this);
+  init_helper_.setCds(cds_api_.get());
+}
+
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
                                        const envoy::api::v2::Bootstrap& bootstrap,
                                        ClusterManagerFactory& factory, Stats::Store& stats,
@@ -165,7 +197,6 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)) {
 
   config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
-  UNREFERENCED_PARAMETER(bootstrap);
 
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =
@@ -190,21 +221,13 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
     sds_config_.value(sds_config);
   }
 
-  if (config.hasObject("cds")) {
-    envoy::api::v2::Cluster cds_cluster;
-    Config::CdsJson::translateCluster(*config.getObject("cds")->getObject("cluster"), sds_config_,
-                                      cds_cluster);
-    loadCluster(cds_cluster, false);
-  }
-
-  // We can now potentially create the CDS API once the backing cluster exists.
-  cds_api_ = factory_.createCds(config, sds_config_, *this);
-  init_helper_.setCds(cds_api_.get());
-
-  for (const Json::ObjectSharedPtr& cluster_config : config.getObjectArray("clusters")) {
-    envoy::api::v2::Cluster cluster;
-    Config::CdsJson::translateCluster(*cluster_config, sds_config_, cluster);
-    loadCluster(cluster, false);
+  if (bootstrap.has_cds_config()) {
+    initializeClustersFromV2Proto(bootstrap);
+  } else {
+    // TODO(htuch): Make this similar to the v1 -> v2 translation elsewhere,
+    // convert the JSON to envoy::api::v2::Bootstrap and use initializeClustersFromV2Proto()
+    // instead.
+    initializeClustersFromV1Json(config);
   }
 
   Optional<std::string> local_cluster_name;
@@ -607,10 +630,10 @@ ClusterPtr ProdClusterManagerFactory::clusterFromProto(
                                  outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config,
+CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
                                                const Optional<SdsConfig>& sds_config,
                                                ClusterManager& cm) {
-  return CdsApiImpl::create(config, sds_config, cm, primary_dispatcher_, random_, local_info_,
+  return CdsApiImpl::create(cds_config, sds_config, cm, primary_dispatcher_, random_, local_info_,
                             stats_);
 }
 

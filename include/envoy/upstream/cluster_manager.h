@@ -173,10 +173,10 @@ public:
                                       bool added_via_api) PURE;
 
   /**
-   * Create a CDS API provider from configuration JSON.
+   * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
-                              ClusterManager& cm) PURE;
+  virtual CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
+                              const Optional<SdsConfig>& sds_config, ClusterManager& cm) PURE;
 };
 
 } // namespace Upstream

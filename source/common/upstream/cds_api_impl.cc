@@ -9,16 +9,10 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const Json::Object& config, const Optional<SdsConfig>& sds_config,
-                             ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
+CdsApiPtr CdsApiImpl::create(const envoy::api::v2::ConfigSource& cds_config,
+                             const Optional<SdsConfig>& sds_config, ClusterManager& cm,
+                             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Store& store) {
-  if (!config.hasObject("cds")) {
-    return nullptr;
-  }
-
-  envoy::api::v2::ConfigSource cds_config;
-  Config::Utility::translateCdsConfig(*config.getObject("cds"), cds_config);
   return CdsApiPtr{
       new CdsApiImpl(cds_config, sds_config, cm, dispatcher, random, local_info, store)};
 }
