@@ -211,8 +211,8 @@ struct Http2Settings {
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
 
-  // By default, do not enforce stream buffer limits beyond the connection level limits.
-  static const uint32_t DEFAULT_PER_STREAM_BUFFER_LIMIT = 0;
+  // By default, limit the per-steam buffer limit to the initial window size.
+  static const uint32_t DEFAULT_PER_STREAM_BUFFER_LIMIT = DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 };
 
 /**
