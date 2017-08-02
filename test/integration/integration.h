@@ -212,6 +212,12 @@ protected:
   void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
+  void testAbsolutePath();
+  void testConnect();
+  void testAllowAbsoluteSameRelative();
+  // Test that a request returns the same content with both allow_absolute_urls enabled and
+  // allow_absolute_urls disabled
+  void testEquivalent(const std::string& request);
   void testValidZeroLengthContent(Http::CodecClient::Type type);
   void testInvalidContentLength(Http::CodecClient::Type type);
   void testMultipleContentLengths(Http::CodecClient::Type type);

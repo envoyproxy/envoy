@@ -244,7 +244,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks);
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Http1Settings settings);
 
 private:
   /**
@@ -259,6 +260,16 @@ private:
     bool remote_complete_{};
   };
 
+  /**
+   * Manipulate the request's first line, parsing the url and converting to a relative path if
+   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
+   *
+   * @param is_connect true if the request has the CONNECT method
+   * @param headers the request's headers
+   * @throws CodecProtocolException on an invalid url in the request line
+   */
+  void handlePath(HeaderMapImpl& headers, unsigned int method);
+
   // ConnectionImpl
   void onEncodeComplete() override;
   void onMessageBegin() override;
@@ -271,6 +282,7 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
+  Http1Settings codec_settings_;
 };
 
 /**
