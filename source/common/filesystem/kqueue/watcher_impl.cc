@@ -32,14 +32,14 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb) {
-  FileWatchPtr watch = addWatch_(path, events, cb, false);
+  FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
     throw EnvoyException(fmt::format("invalid watch path {}", path));
   }
 }
 
-WatcherImpl::FileWatchPtr WatcherImpl::addWatch_(const std::string& path, uint32_t events,
-                                                 Watcher::OnChangedCb cb, bool path_must_exist) {
+WatcherImpl::FileWatchPtr WatcherImpl::addWatch(const std::string& path, uint32_t events,
+                                                Watcher::OnChangedCb cb, bool path_must_exist) {
   bool watching_dir = false;
   int watch_fd = open(path.c_str(), O_SYMLINK);
   if (watch_fd == -1) {
@@ -122,7 +122,7 @@ void WatcherImpl::onKqueueEvent() {
 
       if (event.fflags & NOTE_WRITE) {
         // directory was written -- check if the file we're actually watching appeared
-        FileWatchPtr new_file = addWatch_(file->file_, file->events_, file->callback_, true);
+        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
         if (new_file != nullptr) {
           removeWatch(file);
           file = new_file;
@@ -137,7 +137,7 @@ void WatcherImpl::onKqueueEvent() {
       if (event.fflags & NOTE_DELETE) {
         removeWatch(file);
 
-        FileWatchPtr new_file = addWatch_(file->file_, file->events_, file->callback_, true);
+        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
         if (new_file == nullptr) {
           return;
         }

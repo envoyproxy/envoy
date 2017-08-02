@@ -40,8 +40,8 @@ private:
   typedef std::shared_ptr<FileWatch> FileWatchPtr;
 
   void onKqueueEvent();
-  FileWatchPtr addWatch_(const std::string& path, uint32_t events, Watcher::OnChangedCb cb,
-                         bool pathMustExist);
+  FileWatchPtr addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb,
+                        bool pathMustExist);
   void removeWatch(FileWatchPtr& watch);
 
   int queue_;
