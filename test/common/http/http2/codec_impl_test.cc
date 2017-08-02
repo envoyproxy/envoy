@@ -291,7 +291,6 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   request_encoder_->encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  ;
   request_encoder_->encodeData(body, true);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
   request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -330,7 +329,6 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  ;
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
