@@ -149,6 +149,8 @@ public:
 
   /**
    * Allocate a cluster manager from configuration JSON.
+   * TODO(htuch): Once bootstrap is sufficiently capable, switch to a translation from the JSON v1
+   * cluster manager config -> v2 proto and drop the config parameter.
    */
   virtual ClusterManagerPtr
   clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
