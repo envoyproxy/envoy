@@ -54,7 +54,9 @@ template <typename T> static T* remove_const(const void* object) {
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
       local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
-      waiting_for_non_informational_headers_(false) {
+      waiting_for_non_informational_headers_(false),
+      pending_receive_buffer_high_watermark_called_(false),
+      pending_send_buffer_high_watermark_called_(false) {
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
   }
@@ -743,7 +745,6 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
-
   StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &decoder;
   stream->moveIntoList(std::move(stream), active_streams_);

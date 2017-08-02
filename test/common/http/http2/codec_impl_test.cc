@@ -30,21 +30,16 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
+typedef ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t> Http2SettingsTuple;
 typedef ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple> Http2SettingsTestParam;
 
-const char SMALL_WINDOW = 10;
-
 namespace {
-
 Http2Settings Http2SettingsFromTuple(const Http2SettingsTuple& tp) {
   Http2Settings ret;
   ret.hpack_table_size_ = ::testing::get<0>(tp);
   ret.max_concurrent_streams_ = ::testing::get<1>(tp);
   ret.initial_stream_window_size_ = ::testing::get<2>(tp);
   ret.initial_connection_window_size_ = ::testing::get<3>(tp);
-  ret.per_stream_buffer_limit_ = ::testing::get<4>(tp);
-
   return ret;
 }
 } // namespace
@@ -295,6 +290,8 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_->encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+  ;
   request_encoder_->encodeData(body, true);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
   request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -332,6 +329,8 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+  ;
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -376,10 +375,6 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
-  // The one giant write will cause the buffer to go over the limit, then drain and go back under
-  // the limit.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   request_encoder_->encodeData(long_data, false);
 
   // Verify that the window is full.  The client will not send more data to the server for this
@@ -389,26 +384,27 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(initial_stream_window, server_.getStream(1)->unconsumed_bytes_);
 
   // Now that the flow control window is full, further data causes the send buffer to back up.
-  Buffer::OwnedImpl ten_bytes("0123456789");
-  request_encoder_->encodeData(ten_bytes, false);
-  EXPECT_EQ(SMALL_WINDOW, client_.getStream(1)->pending_send_data_.length());
+  Buffer::OwnedImpl more_long_data(std::string(initial_stream_window, 'a'));
+  request_encoder_->encodeData(more_long_data, false);
+  EXPECT_EQ(initial_stream_window, client_.getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->unconsumed_bytes_);
 
   // If we go over the limit, the stream callbacks should fire.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl last_byte("!");
   request_encoder_->encodeData(last_byte, false);
-  EXPECT_EQ(SMALL_WINDOW + 1, client_.getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window + 1, client_.getStream(1)->pending_send_data_.length());
 
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   server_.getStream(1)->readDisable(false);
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
-  // The 11 bytes sent won't trigger another window update, so the final window should be the
-  // initial window minus the last 11 byte flush from the client to server.
-  EXPECT_EQ(initial_stream_window - (SMALL_WINDOW + 1),
+  // The extra 1 byte sent won't trigger another window update, so the final window should be the
+  // initial window minus the last 1 byte flush from the client to server.
+  EXPECT_EQ(initial_stream_window - 1,
             nghttp2_session_get_stream_local_window_size(server_.session(), 1));
-  EXPECT_EQ(initial_stream_window - (SMALL_WINDOW + 1),
+  EXPECT_EQ(initial_stream_window - 1,
             nghttp2_session_get_stream_remote_window_size(client_.session(), 1));
 }
 
@@ -436,13 +432,11 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames.  Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
-  // One large write gets broken into smaller frames.
+  // One large write may get broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
   // The one giant write will cause the buffer to go over the limit, then drain and go back under
   // the limit.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   request_encoder_->encodeData(long_data, false);
 
   // Verify that the window is full.  The client will not send more data to the server for this
@@ -460,32 +454,28 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
 }
 
-#define HTTP2SETTINGS_DEFERRED_RESET_COMBINE                                                       \
-  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
-                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE),         \
-                     ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
-
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE),         \
-                     ::testing::Values(SMALL_WINDOW))
+                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_CASE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
-                        ::testing::Combine(HTTP2SETTINGS_DEFERRED_RESET_COMBINE,
-                                           HTTP2SETTINGS_DEFERRED_RESET_COMBINE));
+                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
+
+// Flow control tests only use only small windows so that we can test certain conditions.
+INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
+                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 // we seperate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
-                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE),     \
-                     ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
+                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
@@ -499,16 +489,10 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
                         Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
-                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE),                        \
-      ::testing::Values(Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT))
+                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE, HTTP2SETTINGS_EDGE_COMBINE));
-
-// Flow control tests only use only small windows so that we can test certain conditions.
-INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControlTest,
-                        ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
-                                           HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

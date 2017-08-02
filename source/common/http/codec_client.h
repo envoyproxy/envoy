@@ -184,8 +184,12 @@ private:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass watermark events from the connection on to the codec which will pass it to the underlying
   // streams.
-  void onAboveWriteBufferHighWatermark() override { codec_->onAboveWriteBufferHighWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { codec_->onBelowWriteBufferLowWatermark(); }
+  void onAboveWriteBufferHighWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  }
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};

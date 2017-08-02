@@ -13,7 +13,6 @@ void ProtocolJson::translateHttp2ProtocolOptions(
   JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options, initial_stream_window_size);
   JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options,
                         initial_connection_window_size);
-  JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options, per_stream_buffer_limit_bytes);
   if (json_http_codec_options == "no_compression") {
     if (http2_protocol_options.hpack_table_size().value() != 0) {
       throw EnvoyException(

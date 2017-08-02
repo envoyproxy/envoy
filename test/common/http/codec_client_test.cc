@@ -159,10 +159,10 @@ TEST_F(CodecClientTest, PrematureResponse) {
 }
 
 TEST_F(CodecClientTest, WatermarkPassthrough) {
-  EXPECT_CALL(*codec_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
   connection_cb_->onAboveWriteBufferHighWatermark();
 
-  EXPECT_CALL(*codec_, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 

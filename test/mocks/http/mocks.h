@@ -202,8 +202,8 @@ public:
 
   // Http::ClientConnection
   MOCK_METHOD1(newStream, StreamEncoder&(StreamDecoder& response_decoder));
-  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
-  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 };
 
 class MockFilterChainFactory : public FilterChainFactory {

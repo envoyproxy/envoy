@@ -72,8 +72,9 @@ public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                  const Http2Settings& http2_settings)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection), per_stream_buffer_limit_(http2_settings.per_stream_buffer_limit_),
-        dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
+        connection_(connection),
+        per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
+        raised_goaway_(false), pending_deferred_reset_(false) {}
 
   ~ConnectionImpl();
 
@@ -261,14 +262,14 @@ public:
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  // Propogate connection watermark events to each stream on the connection.
+  // Propogate network connection watermark events to each stream on the connection.
   // The router will propogate it downstream.
-  void onAboveWriteBufferHighWatermark() override {
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     for (auto& stream : active_streams_) {
       stream->runHighWatermarkCallbacks();
     }
   }
-  void onBelowWriteBufferLowWatermark() override {
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
     for (auto& stream : active_streams_) {
       stream->runLowWatermarkCallbacks();
     }

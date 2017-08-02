@@ -158,8 +158,6 @@ Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOpt
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
-  ret.per_stream_buffer_limit_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, per_stream_buffer_limit_bytes, Http::Http2Settings::DEFAULT_PER_STREAM_BUFFER_LIMIT);
   return ret;
 }
 

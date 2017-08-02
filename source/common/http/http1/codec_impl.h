@@ -283,8 +283,8 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  void onBelowWriteBufferLowWatermark() override {}
-  void onAboveWriteBufferHighWatermark() override {}
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
 
 private:
   struct PendingResponse {
