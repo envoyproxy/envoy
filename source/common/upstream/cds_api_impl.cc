@@ -61,8 +61,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
   runInitializeCallbackIfAny();
 }
 
-void CdsApiImpl::onConfigUpdateFailed(const EnvoyException* e) {
-  UNREFERENCED_PARAMETER(e);
+void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   runInitializeCallbackIfAny();
