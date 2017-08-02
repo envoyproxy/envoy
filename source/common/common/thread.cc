@@ -4,6 +4,7 @@
 #include <sys/syscall.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
+#include <pthread.h>
 #endif
 
 #include <functional>
@@ -29,9 +30,7 @@ int32_t Thread::currentThreadId() {
 #ifdef __linux__
   return syscall(SYS_gettid);
 #elif defined(__APPLE__)
-  int ret = mach_thread_self();
-  mach_port_deallocate(mach_task_self(), ret);
-  return ret;
+  return pthread_mach_thread_np(pthread_self());
 #endif
 }
 
