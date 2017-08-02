@@ -109,7 +109,8 @@ def envoy_cc_library(name,
                      repository = "",
                      linkstamp = None,
                      tags = [],
-                     deps = []):
+                     deps = [],
+                     strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     native.cc_library(
@@ -127,7 +128,8 @@ def envoy_cc_library(name,
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = linkstamp,
-    )
+        strip_include_prefix = strip_include_prefix,
+   )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
