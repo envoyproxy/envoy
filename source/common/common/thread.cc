@@ -32,6 +32,8 @@ int32_t Thread::currentThreadId() {
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
   return static_cast<int32_t>(tid);
+#else
+#error "Enable and test pthread id retrieval code for you arch in thread.cc"
 #endif
 }
 
