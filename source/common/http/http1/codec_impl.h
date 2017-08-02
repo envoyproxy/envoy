@@ -261,7 +261,7 @@ private:
   };
 
   /**
-   * Manipulate the request's request line, parsing the url and converting to a relative path if
+   * Manipulate the request's first line, parsing the url and converting to a relative path if
    * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
    *
    * @param is_connect true if the request has the CONNECT method
