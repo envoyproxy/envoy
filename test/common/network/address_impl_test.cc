@@ -315,7 +315,9 @@ TEST(AddressFromSockAddr, Pipe) {
 
   // Empty path (== start of Abstract socket name) is invalid.
   StringUtil::strlcpy(sun.sun_path, "", sizeof sun.sun_path);
-  EXPECT_THROW(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path) + 1), EnvoyException);
+  EXPECT_THROW(
+      addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path)),
+      EnvoyException);
 }
 
 } // namespace Address

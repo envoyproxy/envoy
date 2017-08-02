@@ -382,17 +382,13 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   client_connection_->write(second_buffer_to_write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  // Clean up the connection.  The close() will attempt to flush.  The call to
-  // write() will succeed, bringing the connection back under the low watermark.
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  // Clean up the connection.  The close() (called via disconnect) will attempt to flush.  The
+  // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
-  client_connection_->close(ConnectionCloseType::NoFlush);
 
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  disconnect(false);
 }
 
 // Read and write random bytes and ensure we don't encounter issues.
