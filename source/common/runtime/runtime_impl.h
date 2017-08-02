@@ -84,7 +84,7 @@ public:
 
   bool featureEnabled(const std::string& key, uint64_t default_value) const override {
     // Avoid PNRG if we know we don't need it.
-    uint64_t cutoff = std::min(getInteger(key, default_value), 100UL);
+    uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
     if (cutoff == 0) {
       return false;
     } else if (cutoff == 100) {
