@@ -234,7 +234,7 @@ protected:
   uint32_t per_stream_buffer_limit_;
 
 private:
-  virtual Http::ConnectionCallbacks& callbacks() PURE;
+  virtual ConnectionCallbacks& callbacks() PURE;
   virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   int onFrameReceived(const nghttp2_frame* frame);
@@ -256,7 +256,7 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        Stats::Scope& stats, const Http2Settings& http2_settings);
 
   // Http::ClientConnection
@@ -276,7 +276,7 @@ public:
 
 private:
   // ConnectionImpl
-  Http::ConnectionCallbacks& callbacks() override { return callbacks_; }
+  ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
@@ -293,7 +293,7 @@ public:
 
 private:
   // ConnectionImpl
-  Http::ConnectionCallbacks& callbacks() override { return callbacks_; }
+  ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 

@@ -1,6 +1,6 @@
 ### Overview
 
-Flow control in envoy is done by having limits on each buffer, and watermark callbacks.  When a
+Flow control in Envoy is done by having limits on each buffer, and watermark callbacks.  When a
 buffer contains more data than the configured limit, the high watermark callback will fire, kicking
 off a chain of events which eventually informs the data source to stop sending data.  This back-off
 may be immediate (stop reading from a socket) or gradual (stop HTTP/2 window updates) so all
@@ -49,37 +49,37 @@ going over the watermark limit to disabling data from the data source is documen
 
 ![HTTP2 data flow diagram](h2_buffers.png)
 
-For HTTP/2, when filters, streams, or connections back up, the end result is readDisable(true)
+For HTTP/2, when filters, streams, or connections back up, the end result is `readDisable(true)`
 being called on the source stream.  This results in the stream ceasing to consume window, and so
 not sending further flow control window updates to the peer.  This will result in the peer
 eventually stopping sending data when the available window is consumed (or nghttp2 closing the
-connection if the peer violates the flow control limit).  When readDisable(false) is called, any
+connection if the peer violates the flow control limit).  When `readDisable(false)` is called, any
 outstanding unconsumed data is immediately consumed, which results in resuming window updates to the
 peer and the resumption of data.
 
-Note that readDisable() on a stream may be called by multiple entities.  It is called when any
+Note that `readDisable(true)` on a stream may be called by multiple entities.  It is called when any
 filter buffers too much, when the stream backs up and has too much data buffered, or the
-connection has too much data buffered.  Because of this, readDisable() maintains a count of
-the number of times it has been called to both enable and disable the stream,  resumes reads when
+connection has too much data buffered.  Because of this, `readDisable()` maintains a count of
+the number of times it has been called to both enable and disable the stream,  resuming reads when
 each caller has called the equivalent low watermark callback.  For example, if
 the TCP window upstream fills up and results in the network buffer backing up,
-all the streams associated with that connection will readDisable(true) their
-downstream data sources.   While the HTTP/2 flow control window fills up an
+all the streams associated with that connection will `readDisable(true)` their
+downstream data sources.   When the HTTP/2 flow control window fills up an
 individual stream may use all of the window available and call a second
-readDisable() its downstream data source.  When the upstream TCP socket drains,
+`readDisable(true)` on its downstream data source.  When the upstream TCP socket drains,
 the connection will go below its low watermark and each stream will call
-readDisable(false) to resume the flow of data.   The stream which had both a
+`readDisable(false)` to resume the flow of data.   The stream which had both a
 network level block and a H2 flow control block will still not be fully enabled.
 Once the upstream peer sends window updates, the stream buffer will drain and
-the second readDisable(false) will be called on the downstream data source,
+the second `readDisable(false)` will be called on the downstream data source,
 which will finally result in data flowing from downstream again.
 
 The two main parties involved in flow control are the router filter (`Envoy::Router::Filter`) and
 the connection manager (`Envoy::Http::ConnectionManagerImpl`).  The router is
 responsible for intercepting watermark events for its own buffers, the individual upstream streams
 (if codec buffers fill up) and the upstream connection (if the network buffer fills up).  It passes
-any events to the connection manager, which the ability to call readDisable() to enable and disable
-further data from downstream.
+any events to the connection manager, which the ability to call `readDisable()` to enable and
+disable further data from downstream.
 
 TODO(alyssawilk) document the reverse path.
 

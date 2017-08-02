@@ -288,12 +288,12 @@ public:
   /**
    * Called when the connection goes over its high watermark.
    */
-  virtual void onBelowWriteBufferLowWatermark() PURE;
+  virtual void onAboveWriteBufferHighWatermark() PURE;
 
   /**
    * Called when the connection goes from over its high watermark to under its low watermark.
    */
-  virtual void onAboveWriteBufferHighWatermark() PURE;
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
