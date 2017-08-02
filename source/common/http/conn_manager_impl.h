@@ -12,6 +12,7 @@
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"

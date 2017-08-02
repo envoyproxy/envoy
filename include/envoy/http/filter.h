@@ -343,20 +343,6 @@ class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
 typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
 
 /**
- * Callback interface for WebSocket connection management.
- */
-class WsHandlerCallbacks {
-public:
-  virtual ~WsHandlerCallbacks() {}
-
-  /**
-   * Used by WsHandlerImpl to send HTTP error codes back to the client when there are errors
-   * establishing a connection to upstream server.
-   */
-  virtual void sendHeadersOnlyResponse(HeaderMap& headers) PURE;
-};
-
-/**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
  */

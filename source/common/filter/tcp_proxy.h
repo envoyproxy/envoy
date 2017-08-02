@@ -95,12 +95,16 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
+
+  virtual void initializeUpstreamHelperCallbacks() {
+    upstream_helper_callbacks_.reset(new TcpUpstreamHelperCallbacks(*this));
+  }
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -134,18 +138,58 @@ protected:
     bool on_high_watermark_called_{false};
   };
 
-  void commonInitializeUpstreamConnection(const Upstream::ClusterInfo& cluster);
+  struct UpstreamHelperCallbacks {
+    virtual ~UpstreamHelperCallbacks() {}
+
+    virtual const std::string& getUpstreamCluster() PURE;
+    virtual void onInitFailure() PURE;
+    virtual void onUpstreamHostReady() PURE;
+    virtual void onConnectTimeout() PURE;
+    virtual void onConnectionFailure() PURE;
+    virtual void onConnectionSuccess() PURE;
+  };
+
+  typedef std::unique_ptr<UpstreamHelperCallbacks> UpstreamHelperCallbacksPtr;
+
+  struct TcpUpstreamHelperCallbacks : public UpstreamHelperCallbacks {
+    TcpUpstreamHelperCallbacks(TcpProxy& parent) : parent_(parent) {}
+
+    // UpstreamHelperBase
+    const std::string& getUpstreamCluster() override {
+      return parent_.config_->getRouteFromEntries(parent_.read_callbacks_->connection());
+    }
+
+    void onInitFailure() override {
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
+
+    void onUpstreamHostReady() override {}
+
+    void onConnectTimeout() override {
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
+
+    void onConnectionFailure() override {
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    }
+
+    void onConnectionSuccess() override {}
+
+    TcpProxy& parent_;
+  };
+
   Network::FilterStatus initializeUpstreamConnection();
-  virtual void onConnectTimeout();
+  void onConnectTimeout();
   void onDownstreamEvent(uint32_t event);
   void onUpstreamData(Buffer::Instance& data);
-  virtual void onUpstreamEvent(uint32_t event);
+  void onUpstreamEvent(uint32_t event);
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_;
   DownstreamCallbacks downstream_callbacks_;
+  UpstreamHelperCallbacksPtr upstream_helper_callbacks_;
   Event::TimerPtr connect_timeout_timer_;
   Stats::TimespanPtr connect_timespan_;
   Stats::TimespanPtr connected_timespan_;

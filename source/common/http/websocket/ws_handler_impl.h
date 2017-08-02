@@ -2,14 +2,14 @@
 
 #include <string>
 
-#include "envoy/http/filter.h"
-#include "envoy/network/connection.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/websocket.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/router.h"
 #include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/upstream.h"
 
 #include "common/filter/tcp_proxy.h"
-#include "common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -27,14 +27,29 @@ class WsHandlerImpl : public Filter::TcpProxy {
 public:
   WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry& route_entry,
                 WsHandlerCallbacks& callbacks, Upstream::ClusterManager& cluster_manager);
-  ~WsHandlerImpl();
+  ~WsHandlerImpl(){};
 
-  void initializeUpstreamConnection(Network::ReadFilterCallbacks& callbacks);
+  // Filter::TcpProxy
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  void initializeUpstreamHelperCallbacks() override {
+    upstream_helper_callbacks_.reset(new WsUpstreamHelperCallbacks(*this));
+  }
 
 protected:
-  // Filter::TcpProxy
-  void onConnectTimeout() override;
-  void onUpstreamEvent(uint32_t event) override;
+  struct WsUpstreamHelperCallbacks : public UpstreamHelperCallbacks {
+    WsUpstreamHelperCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
+
+    // UpstreamHelperBase
+    const std::string& getUpstreamCluster() override { return parent_.route_entry_.clusterName(); }
+
+    void onInitFailure() override;
+    void onUpstreamHostReady() override;
+    void onConnectTimeout() override;
+    void onConnectionFailure() override;
+    void onConnectionSuccess() override;
+
+    WsHandlerImpl& parent_;
+  };
 
 private:
   struct NullHttpConnectionCallbacks : public Http::ConnectionCallbacks {
