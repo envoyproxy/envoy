@@ -63,5 +63,15 @@ void Utility::sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
       Protobuf::util::TimeUtil::MillisecondsToDuration(sds_config.refresh_delay_.count()));
 }
 
+void Utility::translateCdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& cds_config) {
+  auto* api_config_source = cds_config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  api_config_source->add_cluster_name(json_config.getObject("cluster")->getString("name"));
+  api_config_source->mutable_refresh_delay()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(
+          json_config.getInteger("refresh_delay_ms", 30000)));
+}
+
 } // namespace Config
 } // namespace Envoy

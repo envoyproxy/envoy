@@ -83,6 +83,14 @@ public:
                                    envoy::api::v2::ConfigSource& eds_config);
 
   /**
+   * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.
+   * @param json_config source v1 CDS JSON config.
+   * @param cds_config destination v2 CDS envoy::api::v2::ConfigSource.
+   */
+  static void translateCdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& cds_config);
+
+  /**
    * Generate a SubscriptionStats object from stats scope.
    * @param scope for stats.
    * @return SubscriptionStats for scope.
