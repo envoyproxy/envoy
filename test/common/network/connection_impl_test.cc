@@ -107,7 +107,7 @@ public:
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     } else {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
       dispatcher_->run(Event::Dispatcher::RunType::Block);
     }
@@ -391,7 +391,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   client_connection_->close(ConnectionCloseType::NoFlush);
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

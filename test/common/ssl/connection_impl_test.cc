@@ -470,7 +470,7 @@ public:
         }));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     uint32_t filter_seen = 0;
@@ -565,7 +565,7 @@ public:
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
     client_connection_->close(Network::ConnectionCloseType::NoFlush);
     dispatcher_->run(Event::Dispatcher::RunType::Block);

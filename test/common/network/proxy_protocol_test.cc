@@ -50,7 +50,7 @@ public:
           printf("argh!\n");
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
@@ -58,7 +58,7 @@ public:
   void connectNoRead() {
     conn_->connect();
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
@@ -70,7 +70,7 @@ public:
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
     conn_->close(ConnectionCloseType::NoFlush);
 
@@ -79,7 +79,7 @@ public:
 
   void expectProxyProtoError() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
 
@@ -258,7 +258,7 @@ TEST_P(ProxyProtocolTest, Truncated) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
   conn_->close(ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -270,7 +270,7 @@ TEST_P(ProxyProtocolTest, Closed) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
   conn_->close(ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -308,7 +308,7 @@ public:
           server_connection_->addReadFilter(read_filter_);
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
@@ -324,7 +324,7 @@ public:
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     } else {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_.exit(); }));
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
       dispatcher_.run(Event::Dispatcher::RunType::Block);
     }
