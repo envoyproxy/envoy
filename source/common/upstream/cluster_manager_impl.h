@@ -39,11 +39,11 @@ public:
         local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
-  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
-                                           ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                           Runtime::RandomGenerator& random,
-                                           const LocalInfo::LocalInfo& local_info,
-                                           AccessLog::AccessLogManager& log_manager) override;
+  ClusterManagerPtr
+  clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
+                         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
@@ -119,8 +119,9 @@ struct ClusterManagerStats {
  */
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+  ClusterManagerImpl(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
+                     ClusterManagerFactory& factory, Stats::Store& stats,
+                     ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 

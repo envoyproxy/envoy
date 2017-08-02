@@ -154,15 +154,18 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
-ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                                       Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
-                                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
+                                       const envoy::api::v2::Bootstrap& bootstrap,
+                                       ClusterManagerFactory& factory, Stats::Store& stats,
+                                       ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                                       Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)) {
 
   config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
+  UNREFERENCED_PARAMETER(bootstrap);
 
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =
@@ -576,11 +579,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromJson(
-    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
-  return ClusterManagerPtr{
-      new ClusterManagerImpl(config, *this, stats, tls, runtime, random, local_info, log_manager)};
+  return ClusterManagerPtr{new ClusterManagerImpl(config, bootstrap, *this, stats, tls, runtime,
+                                                  random, local_info, log_manager)};
 }
 
 Http::ConnectionPool::InstancePtr

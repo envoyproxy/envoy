@@ -70,7 +70,8 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
+  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config,
+                                           const envoy::api::v2::Bootstrap&, Stats::Store& stats,
                                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random,
                                            const LocalInfo::LocalInfo& local_info,
@@ -105,9 +106,10 @@ public:
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const Json::Object& config) {
-    cluster_manager_.reset(new ClusterManagerImpl(config, factory_, factory_.stats_, factory_.tls_,
-                                                  factory_.runtime_, factory_.random_,
-                                                  factory_.local_info_, log_manager_));
+    envoy::api::v2::Bootstrap bootstrap;
+    cluster_manager_.reset(new ClusterManagerImpl(
+        config, bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
+        factory_.random_, factory_.local_info_, log_manager_));
   }
 
   NiceMock<TestClusterManagerFactory> factory_;

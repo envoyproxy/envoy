@@ -18,6 +18,7 @@
 #include "common/common/version.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -26,6 +27,8 @@
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
+
+#include "api/bootstrap.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -59,7 +62,9 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   try {
     initialize(options, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
+              options.configPath() +
+                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
               e.what());
     thread_local_.shutdownThread();
     exit(1);
@@ -141,6 +146,11 @@ void InstanceImpl::initialize(Options& options, ComponentFactory& component_fact
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  envoy::api::v2::Bootstrap bootstrap;
+  if (!options.bootstrapPath().empty()) {
+    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  }
+
   Configuration::InitialImpl initial_config(*config_json);
   ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
 
@@ -184,7 +194,7 @@ void InstanceImpl::initialize(Options& options, ComponentFactory& component_fact
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
+  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
 
   // Setup signals.
   sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {

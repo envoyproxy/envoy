@@ -109,6 +109,7 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
+        ":empty_bootstrap.json",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
