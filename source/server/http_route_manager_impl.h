@@ -60,13 +60,13 @@ public:
   Router::ConfigConstSharedPtr config() override;
 
   // Http::RestApiFetcher
-  void createRequest(Http::Message &request) override;
+  void createRequest(Http::Message& request) override;
 
-  void parseResponse(const Http::Message &response) override;
+  void parseResponse(const Http::Message& response) override;
 
   void onFetchComplete() override;
 
-  void onFetchFailure(const EnvoyException *e) override;
+  void onFetchFailure(const EnvoyException* e) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -75,16 +75,16 @@ private:
     Router::ConfigConstSharedPtr config_;
   };
 
-  RdsRouteConfigProviderImpl(const Json::Object &config, Runtime::Loader &runtime,
-                             Upstream::ClusterManager &cm, Event::Dispatcher &dispatcher,
-                             Runtime::RandomGenerator &random,
-                             const LocalInfo::LocalInfo &local_info, Stats::Scope &scope,
-                             const std::string &stat_prefix, ThreadLocal::SlotAllocator &tls);
+  RdsRouteConfigProviderImpl(const Json::Object& config, Runtime::Loader& runtime,
+                             Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                             Runtime::RandomGenerator& random,
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls);
 
-  void registerInitTarget(Init::Manager &init_manager);
+  void registerInitTarget(Init::Manager& init_manager);
 
-  Runtime::Loader &runtime_;
-  const LocalInfo::LocalInfo &local_info_;
+  Runtime::Loader& runtime_;
+  const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotPtr tls_;
   const std::string route_config_name_;
   bool initialized_{};
@@ -94,6 +94,5 @@ private:
 
   friend class Router::RouteConfigProviderUtil;
 };
-
 }
-}
+} // namespace Envoy

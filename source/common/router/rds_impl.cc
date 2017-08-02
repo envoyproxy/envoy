@@ -33,8 +33,9 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
   } else {
     Json::ObjectSharedPtr rds_config = config.getObject("rds");
     rds_config->validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-    std::unique_ptr<Server::RdsRouteConfigProviderImpl> provider{new Server::RdsRouteConfigProviderImpl(
-        *rds_config, runtime, cm, dispatcher, random, local_info, scope, stat_prefix, tls)};
+    std::unique_ptr<Server::RdsRouteConfigProviderImpl> provider{
+        new Server::RdsRouteConfigProviderImpl(*rds_config, runtime, cm, dispatcher, random,
+                                               local_info, scope, stat_prefix, tls)};
     provider->registerInitTarget(init_manager);
     return std::move(provider);
   }

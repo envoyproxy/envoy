@@ -9,16 +9,16 @@ namespace Envoy {
 namespace Server {
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
-  const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-  const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-  ThreadLocal::SlotAllocator& tls)
+    const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
+    ThreadLocal::SlotAllocator& tls)
 
-  : RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
-                   std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
-    runtime_(runtime), local_info_(local_info), tls_(tls.allocateSlot()),
-    route_config_name_(config.getString("route_config_name")),
-    stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}) {
+    : RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
+                     std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
+      runtime_(runtime), local_info_(local_info), tls_(tls.allocateSlot()),
+      route_config_name_(config.getString("route_config_name")),
+      stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}) {
 
   ::Envoy::Config::Utility::checkClusterAndLocalInfo("rds", remote_cluster_name_, cm, local_info);
   Router::ConfigConstSharedPtr initial_config(new Router::NullConfigImpl());
@@ -51,14 +51,15 @@ void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   uint64_t new_hash = response_json->hash();
   if (new_hash != last_config_hash_ || !initialized_) {
     response_json->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
-    Router::ConfigConstSharedPtr new_config(new Router::ConfigImpl(*response_json, runtime_, cm_, false));
+    Router::ConfigConstSharedPtr new_config(
+        new Router::ConfigImpl(*response_json, runtime_, cm_, false));
     initialized_ = true;
     last_config_hash_ = new_hash;
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               new_hash);
     tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+        [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
   }
 
   stats_.update_success_.inc();
@@ -84,5 +85,5 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-} // namespace Router
+} // namespace Server
 } // namespace Envoy
