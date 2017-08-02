@@ -89,7 +89,7 @@ private:
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -135,7 +135,7 @@ private:
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

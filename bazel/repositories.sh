@@ -2,11 +2,18 @@
 
 set -e
 
+if [[ `uname` == "Darwin" ]]
+then
+  function md5sum {
+    md5
+  }
+fi
+
 # Tell build_and_install_deps.sh to build sequentially when performance debugging.
 # export BUILD_CONCURRENCY=0
 
 # Hash environment variables we care about to force rebuilds when they change.
-ENV_HASH=$(echo "${CC} ${CXX} ${LD_LIBRARY_PATH}" | md5sum - | cut -f 1 -d\ )
+ENV_HASH=$(echo "${CC} ${CXX} ${LD_LIBRARY_PATH}" | md5sum | cut -f 1 -d\ )
 
 # Don't build inside the directory Bazel believes the repository_rule output goes. Instead, do so in
 # a parallel directory. This allows the build artifacts to survive Bazel clobbering the repostory

@@ -63,8 +63,8 @@ def checkProtobufExternalDeps(file_path):
     if re.search('"google/protobuf', text, re.MULTILINE) or re.search(
         "google::protobuf", text, re.MULTILINE):
       printError(
-          "%s has unexpected direct external dependency on protobuf, use "
-          "//source/common/protobuf instead." % file_path)
+          "%s has unexpected direct dependency on google.protobuf, use "
+          "the definitions in common/protobuf/protobuf.h instead." % file_path)
       return False
     return True
 

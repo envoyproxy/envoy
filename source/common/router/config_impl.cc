@@ -180,14 +180,14 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        vhost_.globalRouteConfig().requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
 
   if (host_rewrite_.empty()) {
@@ -381,17 +381,23 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
-    // TODO(mattklein123) PERF: Avoid copy.
-    std::string path = headers.Path()->value().c_str();
-    size_t query_string_start = path.find("?");
+    const Http::HeaderString& path = headers.Path()->value();
+    const char* query_string_start = strchr(path.c_str(), '?');
+    size_t compare_length = path.size();
+    if (query_string_start != nullptr) {
+      compare_length = query_string_start - path.c_str();
+    }
+
+    if (compare_length != path_.size()) {
+      return nullptr;
+    }
 
     if (case_sensitive_) {
-      if (path.substr(0, query_string_start) == path_) {
+      if (0 == strncmp(path.c_str(), path_.c_str(), compare_length)) {
         return clusterEntry(headers, random_value);
       }
     } else {
-      if (StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start).c_str(),
-                                             path_.c_str()) == 0) {
+      if (0 == strncasecmp(path.c_str(), path_.c_str(), compare_length)) {
         return clusterEntry(headers, random_value);
       }
     }

@@ -135,11 +135,13 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/protobuf",
     ],
 )

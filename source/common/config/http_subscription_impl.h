@@ -68,7 +68,7 @@ public:
     const auto status = Protobuf::util::MessageToJsonString(request_, &request_json, json_options);
     // If the status isn't OK, we just send an empty body.
     ASSERT(status.ok());
-    request.headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+    request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
     request.body().reset(new Buffer::OwnedImpl(ProtobufTypes::FromString(request_json)));
   }

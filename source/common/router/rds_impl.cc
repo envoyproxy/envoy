@@ -74,7 +74,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 void RdsRouteConfigProviderImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "rds: starting request");
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(fmt::format("/v1/routes/{}/{}/{}", route_config_name_,
                                                    local_info_.clusterName(),
                                                    local_info_.nodeName()));

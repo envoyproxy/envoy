@@ -18,9 +18,10 @@
 
 #include "common/common/logger.h"
 #include "common/http/codec_client.h"
-#include "common/json/json_loader.h"
-#include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
+#include "common/protobuf/protobuf.h"
+
+#include "api/health_check.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -32,16 +33,16 @@ class HealthCheckerFactory {
 public:
   /**
    * Create a health checker.
-   * @param hc_config supplies the JSON Configuration.
+   * @param hc_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @return a health checker.
    */
-  static HealthCheckerPtr create(const Json::Object& hc_config, Upstream::Cluster& cluster,
-                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                 Event::Dispatcher& dispatcher);
+  static HealthCheckerPtr create(const envoy::api::v2::HealthCheck& hc_config,
+                                 Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
 };
 
 /**
@@ -103,7 +104,7 @@ protected:
 
   typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
 
-  HealthCheckerImplBase(const Cluster& cluster, const Json::Object& config,
+  HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
@@ -143,7 +144,7 @@ private:
  */
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  HttpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+  HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
@@ -175,13 +176,13 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    void onEvent(uint32_t events);
+    void onEvent(Network::ConnectionEvent event);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
       ConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
       // Network::ConnectionCallbacks
-      void onEvent(uint32_t events) override { parent_.onEvent(events); }
+      void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
       void onAboveWriteBufferHighWatermark() override {}
       void onBelowWriteBufferLowWatermark() override {}
 
@@ -268,7 +269,8 @@ class TcpHealthCheckMatcher {
 public:
   typedef std::list<std::vector<uint8_t>> MatchSegments;
 
-  static MatchSegments loadJsonBytes(const std::vector<Json::ObjectSharedPtr>& byte_array);
+  static MatchSegments loadProtoBytes(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 
@@ -277,7 +279,7 @@ public:
  */
 class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  TcpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+  TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random);
 
@@ -289,7 +291,7 @@ private:
     TcpSessionCallbacks(TcpActiveHealthCheckSession& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override { parent_.onEvent(events); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -308,7 +310,7 @@ private:
     ~TcpActiveHealthCheckSession();
 
     void onData(Buffer::Instance& data);
-    void onEvent(uint32_t events);
+    void onEvent(Network::ConnectionEvent event);
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -335,7 +337,7 @@ private:
  */
 class RedisHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  RedisHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+  RedisHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random,
                          Redis::ConnPool::ClientFactory& client_factory);
@@ -368,7 +370,7 @@ private:
     void onFailure() override;
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

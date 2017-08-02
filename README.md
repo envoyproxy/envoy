@@ -2,11 +2,20 @@
 
 C++ L7 proxy and communication bus
 
-https://lyft.github.io/envoy
+## Documentation
 
-Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
+* [Offical documentation](https://lyft.github.io/envoy).
+* Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy.
+* [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model.
+
+## Related
+
+* [envoy-api](https://github.com/lyft/envoy-api): v2 API definitions.
+* [envoy-perf](https://github.com/lyft/envoy-perf): Performance testing framework.
+* [envoy-filter-example](https://github.com/lyft/envoy-filter-example): Example of how to add new filters
+  and link to the main repository.
 
 ## Contact
 

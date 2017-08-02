@@ -280,7 +280,7 @@ public:
   StreamDecoder& newStream(StreamEncoder& response_encoder) override;
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
   // TODO(alyssawilk) disable upstream reads.
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}

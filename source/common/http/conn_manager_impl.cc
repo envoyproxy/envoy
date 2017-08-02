@@ -232,17 +232,17 @@ void ConnectionManagerImpl::resetAllStreams() {
   }
 }
 
-void ConnectionManagerImpl::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::LocalClose) {
+void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::LocalClose) {
     stats_.named_.downstream_cx_destroy_local_.inc();
   }
 
-  if (events & Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     stats_.named_.downstream_cx_destroy_remote_.inc();
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     if (idle_timer_) {
       idle_timer_->disableTimer();
       idle_timer_.reset();
@@ -255,15 +255,15 @@ void ConnectionManagerImpl::onEvent(uint32_t events) {
   }
 
   if (!streams_.empty()) {
-    if (events & Network::ConnectionEvent::LocalClose) {
+    if (event == Network::ConnectionEvent::LocalClose) {
       stats_.named_.downstream_cx_destroy_local_active_rq_.inc();
     }
-    if (events & Network::ConnectionEvent::RemoteClose) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
       stats_.named_.downstream_cx_destroy_remote_active_rq_.inc();
     }
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
-    user_agent_.onConnectionDestroy(events, true);
+    user_agent_.onConnectionDestroy(event, true);
     resetAllStreams();
   }
 }
@@ -673,7 +673,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
-  headers.insertServer().value(connection_manager_.config_.serverName());
+  // Following setReference() is safe because serverName() is constant for the life of the listener.
+  headers.insertServer().value().setReference(connection_manager_.config_.serverName());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   *snapped_route_config_);
 
@@ -708,7 +709,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
-    headers.insertConnection().value(Headers::get().ConnectionValues.Close);
+    headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
   }
 
   chargeStats(headers);

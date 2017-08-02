@@ -7,6 +7,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+#include "api/address.pb.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -72,6 +74,14 @@ public:
    * @return pointer to the Instance.
    */
   static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address);
+
+  /**
+   * Create an Instance from a envoy::api::v2::ResolvedAddress.
+   * @param resolved_address address message.
+   * @return pointer to the Instance.
+   */
+  static Address::InstanceConstSharedPtr
+  fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address);
 
   /**
    * Get the local address of the first interface address that is of type
