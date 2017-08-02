@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/router/http_route_manager.h"
 #include "envoy/router/rds.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -25,13 +27,12 @@ public:
    * @return RouteConfigProviderPtr a new route configuration provider based on the supplied JSON
    *         configuration.
    */
-  static RouteConfigProviderPtr create(const Json::Object& config, Runtime::Loader& runtime,
-                                       Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                       Runtime::RandomGenerator& random,
-                                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                       const std::string& stat_prefix,
-                                       ThreadLocal::SlotAllocator& tls,
-                                       Init::Manager& init_manager);
+  static RouteConfigProviderSharedPtr
+  create(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+         Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+         const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+         const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
+         Init::Manager& init_manager, HttpRouteManager& http_route_manager);
 };
 
 /**
@@ -66,6 +67,8 @@ private:
 struct RdsStats {
   ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
 };
+
+class HttpRouteManagerImpl;
 
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
@@ -104,7 +107,8 @@ private:
                              Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls);
+                             const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
+                             HttpRouteManagerImpl& http_route_manager);
   void registerInitTarget(Init::Manager& init_manager);
 
   Runtime::Loader& runtime_;
@@ -115,8 +119,30 @@ private:
   uint64_t last_config_hash_{};
   RdsStats stats_;
   std::function<void()> initialize_callback_;
+  HttpRouteManagerImpl& http_route_manager_;
 
-  friend class RouteConfigProviderUtil;
+  friend class HttpRouteManagerImpl;
+};
+
+class HttpRouteManagerImpl : public ServerHttpRouteManager {
+public:
+  HttpRouteManagerImpl() {}
+  ~HttpRouteManagerImpl() {}
+
+  // Server::ServerHttpRouteManager
+  std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() override;
+  // Server::HttpRouteManager
+  RouteConfigProviderSharedPtr
+  getRouteConfigProvider(const Json::Object& config, Runtime::Loader& runtime,
+                         Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         Stats::Scope& scope, const std::string& stat_prefix,
+                         ThreadLocal::SlotAllocator& tls, Init::Manager& init_manager) override;
+
+private:
+  std::unordered_map<std::string, std::weak_ptr<RouteConfigProvider>> route_config_providers_;
+
+  friend class RdsRouteConfigProviderImpl;
 };
 
 } // namespace Router

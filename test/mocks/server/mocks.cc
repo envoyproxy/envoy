@@ -96,6 +96,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
+  ON_CALL(*this, httpRouteManager()).WillByDefault(ReturnRef(http_route_manager_));
 }
 
 MockInstance::~MockInstance() {}
@@ -123,6 +124,7 @@ MockFactoryContext::MockFactoryContext() {
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, server()).WillByDefault(ReturnRef(server_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+  ON_CALL(*this, httpRouteManager()).WillByDefault(ReturnRef(http_route_manager_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}

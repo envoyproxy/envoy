@@ -77,5 +77,8 @@ MockConfig::~MockConfig() {}
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() {}
 
+MockHttpRouteManager::MockHttpRouteManager() {}
+MockHttpRouteManager::~MockHttpRouteManager() {}
+
 } // namespace Router
 } // namespace Envoy

@@ -10,6 +10,7 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
@@ -84,6 +85,7 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  Router::ServerHttpRouteManager& httpRouteManager() override { return http_route_manager_; }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
@@ -124,6 +126,7 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
+  Router::HttpRouteManagerImpl http_route_manager_;
   ListenerManagerImpl listener_manager_;
 };
 

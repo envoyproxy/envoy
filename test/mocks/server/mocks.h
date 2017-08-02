@@ -24,6 +24,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -258,6 +259,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(httpRouteManager, Router::ServerHttpRouteManager&());
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -278,6 +280,7 @@ public:
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<Router::MockHttpRouteManager> http_route_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
 };
 
@@ -329,9 +332,11 @@ public:
   MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(server, Instance&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
+  MOCK_METHOD0(httpRouteManager, Router::HttpRouteManager&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Router::MockHttpRouteManager> http_route_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;

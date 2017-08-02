@@ -9,6 +9,22 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "http_route_manager_interface",
+    hdrs = ["http_route_manager.h"],
+    deps = [
+        ":rds_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/init:init_interface",
+        "//include/envoy/json:json_object_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "rds_interface",
     hdrs = ["rds.h"],
     deps = [":router_interface"],

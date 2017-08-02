@@ -56,6 +56,7 @@ envoy_cc_library(
         "//include/envoy/init:init_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/router:http_route_manager_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
