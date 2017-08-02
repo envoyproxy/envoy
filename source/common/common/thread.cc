@@ -3,7 +3,6 @@
 #ifdef __linux__
 #include <sys/syscall.h>
 #elif defined(__APPLE__)
-#include <mach/mach.h>
 #include <pthread.h>
 #endif
 
@@ -30,7 +29,9 @@ int32_t Thread::currentThreadId() {
 #ifdef __linux__
   return syscall(SYS_gettid);
 #elif defined(__APPLE__)
-  return pthread_mach_thread_np(pthread_self());
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+  return static_cast<int32_t>(tid);
 #endif
 }
 
