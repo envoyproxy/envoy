@@ -7,6 +7,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -27,10 +28,10 @@ namespace Upstream {
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
-    cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
-                                         dns_resolver_, tls_, dispatcher_, false));
+    cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
+                                         ssl_context_manager_, dns_resolver_, tls_, dispatcher_,
+                                         false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
@@ -103,15 +104,14 @@ INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "logical_dns",
     "lb_type": "round_robin",
-  )EOF";
-  json += std::get<0>(GetParam());
-  json += R"EOF(
+  )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
   )EOF";
@@ -132,7 +132,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
 }
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
@@ -146,7 +146,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,

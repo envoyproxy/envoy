@@ -72,7 +72,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
   if (expect_success) {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           if (!expected_digest.empty()) {
             EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
           }
@@ -84,7 +84,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           client_connection->close(Network::ConnectionCloseType::NoFlush);
           dispatcher.exit();
         }));
@@ -366,7 +366,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -419,7 +419,7 @@ TEST_P(SslConnectionImplTest, SslError) {
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void {
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
       }));
@@ -489,7 +489,7 @@ public:
         }));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ((write_size * num_writes), filter_seen);
           dispatcher_->exit();
         }));

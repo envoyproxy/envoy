@@ -132,14 +132,14 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
                                         const std::string& method_name) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(service_full_name.c_str(),
                                                  service_full_name.size());
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
   message->headers().insertHost().value(upstream_cluster);
-  message->headers().insertContentType().value(Common::GRPC_CONTENT_TYPE);
+  message->headers().insertContentType().value().setReference(Common::GRPC_CONTENT_TYPE);
 
   return message;
 }

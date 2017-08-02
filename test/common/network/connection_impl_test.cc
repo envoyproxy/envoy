@@ -84,6 +84,7 @@ public:
 
     client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
     client_connection_->addConnectionCallbacks(client_callbacks_);
+    EXPECT_EQ(nullptr, client_connection_->ssl());
   }
 
   void connect() {
@@ -158,8 +159,9 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   client_connection_->connect();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
-      .WillOnce(Invoke(
-          [&](uint32_t) -> void { client_connection_->close(ConnectionCloseType::NoFlush); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::NoFlush);
+      }));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
@@ -171,7 +173,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -234,7 +236,7 @@ TEST_P(ConnectionImplTest, BufferStats) {
       }));
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   Buffer::OwnedImpl data("1234");
   client_connection_->write(data);
@@ -507,7 +509,7 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(buffer_size, filter_seen);
           dispatcher_->exit();
         }));

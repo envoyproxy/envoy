@@ -58,10 +58,10 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
   uint8_t flags = 0;
-  if (header.key().type() == HeaderString::Type::Static) {
+  if (header.key().type() == HeaderString::Type::Reference) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
   }
-  if (header.value().type() == HeaderString::Type::Static) {
+  if (header.value().type() == HeaderString::Type::Reference) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
   headers.push_back({remove_const<uint8_t>(header.key().c_str()),
