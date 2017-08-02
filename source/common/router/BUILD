@@ -63,6 +63,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
+        "//source/server:http_route_manager_lib",
     ],
 )
 

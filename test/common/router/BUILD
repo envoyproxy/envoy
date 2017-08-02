@@ -23,21 +23,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "rds_impl_test",
-    srcs = ["rds_impl_test.cc"],
-    deps = [
-        "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
-        "//source/common/router:rds_lib",
-        "//test/mocks/init:init_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "retry_state_impl_test",
     srcs = ["retry_state_impl_test.cc"],
     deps = [
