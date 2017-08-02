@@ -26,6 +26,7 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <config_http_conn_man_route_table_route_auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <config_http_conn_man_route_table_route_prefix_rewrite>`.
+* :ref:`Websocket upgrades <config_http_conn_man_route_table_route_use_websocket>` at route level.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
