@@ -51,7 +51,7 @@ int main_common(OptionsImpl& options) {
 
   Thread::BasicLockable& log_lock = restarter->logLock();
   Thread::BasicLockable& access_log_lock = restarter->accessLogLock();
-  Stats::RawStatDataAllocator &stats_allocator = *restarter;
+  Stats::RawStatDataAllocator& stats_allocator = *restarter;
 #else
   std::unique_ptr<Envoy::Server::HotRestartNopImpl> restarter;
   restarter.reset(new Server::HotRestartNopImpl());
@@ -81,8 +81,8 @@ int main_common(OptionsImpl& options) {
   DefaultTestHooks default_test_hooks;
   ThreadLocal::InstanceImpl tls;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
-  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
-                              access_log_lock, component_factory, local_info, tls);
+  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store, access_log_lock,
+                              component_factory, local_info, tls);
   server.run();
   ares_library_cleanup();
   return 0;
