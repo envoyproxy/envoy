@@ -28,13 +28,13 @@ SlotPtr InstanceImpl::allocateSlot() {
     if (slots_[i] == nullptr) {
       std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, i));
       slots_[i] = slot.get();
-      return slot;
+      return std::move(slot);
     }
   }
 
   std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
   slots_.push_back(slot.get());
-  return slot;
+  return std::move(slot);
 }
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {

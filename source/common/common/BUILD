@@ -27,6 +27,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "byte_order_lib",
+    hdrs = ["byte_order.h"],
+)
+
+envoy_cc_library(
     name = "c_smart_ptr_lib",
     hdrs = ["c_smart_ptr.h"],
 )
