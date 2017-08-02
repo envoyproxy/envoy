@@ -84,6 +84,7 @@ public:
 
     client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
     client_connection_->addConnectionCallbacks(client_callbacks_);
+    EXPECT_EQ(nullptr, client_connection_->ssl());
   }
 
   void connect() {

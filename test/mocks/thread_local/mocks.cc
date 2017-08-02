@@ -15,7 +15,7 @@ MockInstance::MockInstance() {
   ON_CALL(*this, shutdownThread()).WillByDefault(Invoke(this, &MockInstance::shutdownThread_));
 }
 
-MockInstance::~MockInstance() {}
+MockInstance::~MockInstance() { shutdownThread_(); }
 
 } // namespace ThreadLocal
 } // namespace Envoy

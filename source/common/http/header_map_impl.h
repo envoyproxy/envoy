@@ -54,9 +54,9 @@ public:
   bool operator==(const HeaderMapImpl& rhs) const;
 
   // Http::HeaderMap
-  void addStatic(const LowerCaseString& key, const std::string& value) override;
-  void addStaticKey(const LowerCaseString& key, uint64_t value) override;
-  void addStaticKey(const LowerCaseString& key, const std::string& value) override;
+  void addReference(const LowerCaseString& key, const std::string& value) override;
+  void addReferenceKey(const LowerCaseString& key, uint64_t value) override;
+  void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
   uint64_t byteSize() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
   void iterate(ConstIterateCb cb, void* context) const override;

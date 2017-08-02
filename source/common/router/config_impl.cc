@@ -180,14 +180,14 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        vhost_.globalRouteConfig().requestHeadersToAdd()) {
-    headers.addStatic(to_add.first, to_add.second);
+    headers.addReference(to_add.first, to_add.second);
   }
 
   if (host_rewrite_.empty()) {
