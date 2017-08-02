@@ -95,6 +95,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http_route_manager_lib",
+    srcs = ["http_route_manager_impl.cc"],
+    hdrs = ["http_route_manager_impl.h"],
+    deps = [
+        "//include/envoy/init:init_interface",
+        "//include/envoy/json:json_object_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:rest_api_fetcher_lib",
+        "//source/common/router:config_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "init_manager_lib",
     srcs = ["init_manager_impl.cc"],
     hdrs = ["init_manager_impl.h"],
