@@ -112,7 +112,7 @@ protected:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   void checkForDrained();
   void createNewConnection();
-  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent events);
+  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
