@@ -78,7 +78,7 @@ The two main parties involved in flow control are the router filter (`Envoy::Rou
 the connection manager (`Envoy::Http::ConnectionManagerImpl`).  The router is
 responsible for intercepting watermark events for its own buffers, the individual upstream streams
 (if codec buffers fill up) and the upstream connection (if the network buffer fills up).  It passes
-any events to the connection manager, which the ability to call `readDisable()` to enable and
+any events to the connection manager, which has the ability to call `readDisable()` to enable and
 disable further data from downstream.
 
 TODO(alyssawilk) document the reverse path.
