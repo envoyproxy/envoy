@@ -5,45 +5,57 @@
 #include <string>
 #include <vector>
 
+#include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Upstream {
 
-// TODO(mattklein123): The TLS slot will never get cleaned up in the CDS case. Will fix in a follow
-//                     up.
-LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
-                                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
+                                     Runtime::Loader& runtime, Stats::Store& stats,
+                                     Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolverSharedPtr dns_resolver,
-                                     ThreadLocal::Instance& tls, Event::Dispatcher& dispatcher,
+                                     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
                                      bool added_via_api)
-    : ClusterImplBase(config, runtime, stats, ssl_context_manager, added_via_api),
-      dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
-                                       config.getInteger("dns_refresh_rate_ms", 5000))),
-      tls_(tls), tls_slot_(tls.allocateSlot()), initialized_(false),
+    : ClusterImplBase(cluster, runtime, stats, ssl_context_manager, added_via_api),
+      dns_resolver_(dns_resolver),
+      dns_refresh_rate_ms_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      tls_(tls.allocateSlot()), initialized_(false),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
-  if (hosts_json.size() != 1) {
+  const auto& hosts = cluster.dns_hosts().addresses();
+  if (hosts.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
-  std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
-  if (dns_lookup_family == "v6_only") {
+  switch (cluster.dns_lookup_family()) {
+  case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-  } else if (dns_lookup_family == "auto") {
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-  } else {
-    ASSERT(dns_lookup_family == "v4_only");
+    break;
+  case envoy::api::v2::Cluster::V4_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
+    break;
+  case envoy::api::v2::Cluster::AUTO:
+    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
+    break;
+  default:
+    NOT_REACHED;
   }
-  dns_url_ = hosts_json[0]->getString("url");
+
+  const auto& named_address = hosts[0].named_address();
+  dns_url_ = fmt::format("tcp://{}:{}", ProtobufTypes::FromString(named_address.address()),
+                         named_address.port().value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
   // This must come before startResolve(), since the resolve callback relies on
   // tls_slot_ being initialized.
-  tls.set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
   });
 
@@ -78,9 +90,8 @@ void LogicalDnsCluster::startResolve() {
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
-            tls_.runOnAllThreads([this, new_address]() -> void {
-              tls_.getTyped<PerThreadCurrentHostData>(tls_slot_).current_resolved_address_ =
-                  new_address;
+            tls_->runOnAllThreads([this, new_address]() -> void {
+              tls_->getTyped<PerThreadCurrentHostData>().current_resolved_address_ = new_address;
             });
           }
 
@@ -118,8 +129,7 @@ void LogicalDnsCluster::startResolve() {
 
 Upstream::Host::CreateConnectionData
 LogicalDnsCluster::LogicalHost::createConnection(Event::Dispatcher& dispatcher) const {
-  PerThreadCurrentHostData& data =
-      parent_.tls_.getTyped<PerThreadCurrentHostData>(parent_.tls_slot_);
+  PerThreadCurrentHostData& data = parent_.tls_->getTyped<PerThreadCurrentHostData>();
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_),
           HostDescriptionConstSharedPtr{

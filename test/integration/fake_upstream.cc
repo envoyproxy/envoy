@@ -164,10 +164,10 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
   return *new_streams_.back();
 }
 
-void FakeConnectionBase::onEvent(uint32_t events) {
+void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
   std::unique_lock<std::mutex> lock(lock_);
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     disconnected_ = true;
     connection_event_.notify_one();
   }

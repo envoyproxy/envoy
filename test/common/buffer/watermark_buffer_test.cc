@@ -171,13 +171,33 @@ TEST_F(WatermarkBufferTest, Search) {
   EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
 }
 
-TEST_F(WatermarkBufferTest, MoveBack) {
-  buffer_.add(TEN_BYTES, 10);
-  OwnedImpl data("a");
+TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
+  int high_watermark_buffer1 = 0;
+  int low_watermark_buffer1 = 0;
+  Buffer::WatermarkBuffer buffer1{InstancePtr{new OwnedImpl()},
+                                  [&]() -> void { ++low_watermark_buffer1; },
+                                  [&]() -> void { ++high_watermark_buffer1; }};
+  buffer1.setWatermarks(5, 10);
 
-  EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.move(data);
-  data.move(buffer_);
+  // Stick 20 bytes in buffer_ and expect the high watermark is hit.
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_high_watermark_called_);
+
+  // Now move 10 bytes to the new buffer.  Nothing should happen.
+  buffer1.move(buffer_, 10);
+  EXPECT_EQ(0, times_low_watermark_called_);
+  EXPECT_EQ(0, high_watermark_buffer1);
+
+  // Move 10 more bytes to the new buffer.  Both buffers should hit watermark callbacks.
+  buffer1.move(buffer_, 10);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  EXPECT_EQ(1, high_watermark_buffer1);
+
+  // Now move all the data back to the original buffer.  Watermarks should trigger immediately.
+  buffer_.move(buffer1);
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, low_watermark_buffer1);
 }
 
 } // namespace

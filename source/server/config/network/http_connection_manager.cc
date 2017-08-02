@@ -11,6 +11,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
+#include "common/config/protocol_json.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -70,7 +71,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
-      http2_settings_(Http::Utility::parseHttp2Settings(config)),
+      http2_settings_([&config] {
+        envoy::api::v2::Http2ProtocolOptions http2_protocol_options;
+        Config::ProtocolJson::translateHttp2ProtocolOptions(
+            config.getString("http_codec_options", ""), *config.getObject("http2_settings", true),
+            http2_protocol_options);
+        return Http::Utility::parseHttp2Settings(http2_protocol_options);
+      }()),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(context_.dispatcher(), context_.threadLocal()) {

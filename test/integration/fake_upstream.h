@@ -92,10 +92,10 @@ public:
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override {
+  void onEvent(Network::ConnectionEvent event) override {
     std::unique_lock<std::mutex> lock(lock_);
-    RELEASE_ASSERT(parented_ || (!(events & Network::ConnectionEvent::RemoteClose) &&
-                                 !(events & Network::ConnectionEvent::LocalClose)));
+    RELEASE_ASSERT(parented_ || (event != Network::ConnectionEvent::RemoteClose &&
+                                 event != Network::ConnectionEvent::LocalClose));
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
@@ -122,7 +122,7 @@ public:
   void waitForDisconnect(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

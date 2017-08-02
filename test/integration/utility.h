@@ -110,10 +110,10 @@ public:
   bool closed() const { return closed_; }
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override {
-    closed_ |= (events & Network::ConnectionEvent::RemoteClose ||
-                events & Network::ConnectionEvent::LocalClose);
-    connected_ |= events & Network::ConnectionEvent::Connected;
+  void onEvent(Network::ConnectionEvent event) override {
+    closed_ |= (event == Network::ConnectionEvent::RemoteClose ||
+                event == Network::ConnectionEvent::LocalClose);
+    connected_ |= (event == Network::ConnectionEvent::Connected);
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}

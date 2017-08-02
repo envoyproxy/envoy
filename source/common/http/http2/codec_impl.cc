@@ -56,7 +56,18 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
       local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
       waiting_for_non_informational_headers_(false) {}
 
-ConnectionImpl::StreamImpl::~StreamImpl() {}
+static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
+  uint8_t flags = 0;
+  if (header.key().type() == HeaderString::Type::Reference) {
+    flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
+  }
+  if (header.value().type() == HeaderString::Type::Reference) {
+    flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
+  }
+  headers.push_back({remove_const<uint8_t>(header.key().c_str()),
+                     remove_const<uint8_t>(header.value().c_str()), header.key().size(),
+                     header.value().size(), flags});
+}
 
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,
                                               const HeaderMap& headers) {
@@ -67,9 +78,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       [](const HeaderEntry& header, void* context) -> void {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] == ':') {
-          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                    remove_const<uint8_t>(header.value().c_str()),
-                                    header.key().size(), header.value().size(), 0});
+          insertHeader(*final_headers, header);
         }
       },
       &final_headers);
@@ -78,9 +87,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       [](const HeaderEntry& header, void* context) -> void {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] != ':') {
-          final_headers->push_back({remove_const<uint8_t>(header.key().c_str()),
-                                    remove_const<uint8_t>(header.value().c_str()),
-                                    header.key().size(), header.value().size(), 0});
+          insertHeader(*final_headers, header);
         }
       },
       &final_headers);

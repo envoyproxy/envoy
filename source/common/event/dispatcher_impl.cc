@@ -119,9 +119,7 @@ DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
-  // TODO(htuch): Figure out why we can't set this assertion, see
-  // https://github.com/lyft/envoy/issues/1294.
-  // ASSERT(isThreadSafe());
+  ASSERT(isThreadSafe());
   return TimerPtr{new TimerImpl(*this, cb)};
 }
 

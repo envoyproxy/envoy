@@ -26,6 +26,43 @@ def envoy_copts(repository, test = False):
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
     })
 
+# Compute the final linkopts based on various options.
+def envoy_linkopts():
+    return select({
+        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
+        # Further, the system library transitively links common libraries (e.g., pthread).
+        # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
+        # The file could should contain the current git SHA (or enough placeholder data to allow
+        # it to be rewritten by tools/git_sha_rewriter.py).
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": [
+            "-pthread",
+            "-lrt",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
+            "-static-libstdc++",
+            "-static-libgcc",
+        ],
+    })
+
+# Compute the test linkopts based on various options.
+def envoy_test_linkopts():
+    return select({
+        "@bazel_tools//tools/osx:darwin": [],
+
+        # TODO(mattklein123): It's not great that we universally link against the following libs.
+        # In particular, -latomic is not needed on all platforms. Make this more granular.
+        "//conditions:default": ["-pthread", "-latomic"],
+    })
+
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
     return "//external:%s" % dep
@@ -53,6 +90,13 @@ def envoy_include_prefix(path):
     if path.startswith('source/') or path.startswith('include/'):
         return '/'.join(path.split('/')[1:])
     return None
+
+# Envoy C++ library targets that need no transformations or additional dependencies before being
+# passed to cc_library should be specified with this function. Note: this exists to ensure that
+# all envoy targets pass through an envoy-declared skylark function where they can be modified
+# before being passed to a native bazel function.
+def envoy_basic_cc_library(name, **kargs):
+    native.cc_library(name = name, **kargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
@@ -118,22 +162,7 @@ def envoy_cc_binary(name,
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository),
-        linkopts = [
-            "-pthread",
-            "-lrt",
-            # Force MD5 hash in build. This is part of the workaround for
-            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
-            # does this by itself prior to
-            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
-            # Ironically, forcing it here so that in future releases we will
-            # have the same behavior. When everyone is using an updated version
-            # of Bazel, we can use linkopts to set the git SHA1 directly in the
-            # --build-id and avoid doing the following.
-            '-Wl,--build-id=md5',
-            '-Wl,--hash-style=gnu',
-            "-static-libstdc++",
-            "-static-libgcc",
-        ],
+        linkopts = envoy_linkopts(),
         testonly = testonly,
         linkstatic = 1,
         visibility = visibility,
@@ -170,9 +199,7 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
-        # TODO(mattklein123): It's not great that we universally link against the following libs.
-        # In particular, -latomic is not needed on all platforms. Make this more granular.
-        linkopts = ["-pthread", "-latomic"],
+        linkopts = envoy_test_linkopts(),
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
@@ -281,7 +308,7 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
 
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
-def envoy_proto_descriptor(name, out, srcs = [], protocopts = [], external_deps = []):
+def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     input_files = ["$(location " + src + ")" for src in srcs]
     include_paths = [".", PACKAGE_NAME]
 
@@ -293,7 +320,7 @@ def envoy_proto_descriptor(name, out, srcs = [], protocopts = [], external_deps 
         srcs.append("@protobuf_bzl//:well_known_protos")
         include_paths.append("external/protobuf_bzl/src")
 
-    options = protocopts[:]
+    options = ["--include_imports"]
     options.extend(["-I" + include_path for include_path in include_paths])
     options.append("--descriptor_set_out=$@")
 

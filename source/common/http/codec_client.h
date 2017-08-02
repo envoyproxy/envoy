@@ -179,7 +179,7 @@ private:
   void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

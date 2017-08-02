@@ -90,16 +90,16 @@ void ClientImpl::onData(Buffer::Instance& data) {
   }
 }
 
-void ClientImpl::onEvent(uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void ClientImpl::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
-      if (events & Network::ConnectionEvent::RemoteClose) {
+      if (event == Network::ConnectionEvent::RemoteClose) {
         host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
-      if (events & Network::ConnectionEvent::LocalClose) {
+      if (event == Network::ConnectionEvent::LocalClose) {
         host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
       }
     }
@@ -115,13 +115,13 @@ void ClientImpl::onEvent(uint32_t events) {
     }
 
     connect_or_op_timer_->disableTimer();
-  } else if (events & Network::ConnectionEvent::Connected) {
+  } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     ASSERT(!pending_requests_.empty());
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) && !connected_) {
+  if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
     host_->cluster().stats().upstream_cx_connect_fail_.inc();
     host_->stats().cx_connect_fail_.inc();
   }
@@ -174,23 +174,19 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                             config);
 }
 
-// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
-//                     up.
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                           ClientFactory& client_factory, ThreadLocal::Instance& tls,
+                           ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
                            const Json::Object& config)
-    : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()),
-      config_(config) {
-  tls.set(tls_slot_,
-          [this,
-           cluster_name](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-            return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
-          });
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
+  tls_->set([this, cluster_name](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
+  });
 }
 
 PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
                                        PoolCallbacks& callbacks) {
-  return tls_.getTyped<ThreadLocalPool>(tls_slot_).makeRequest(hash_key, value, callbacks);
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(hash_key, value, callbacks);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
@@ -200,17 +196,19 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   // TODO(mattklein123): Redis is not currently safe for use with CDS. In order to make this work
   //                     we will need to add thread local cluster removal callbacks so that we can
   //                     safely clean things up and fail requests.
-  // TODO(mattklein123): This is also currently broken for LDS. If this gets destroyed we need to
-  //                     remove member update callbacks on the cluster. However, if we do this
-  //                     universally right now there is no guaranteed order between TLS shutdown
-  //                     operations. It's not immediately clear how to fix this. Will fix in a
-  //                     follow up.
   ASSERT(!cluster_->info()->addedViaApi());
-  cluster_->hostSet().addMemberUpdateCb(
+  local_host_set_member_update_cb_handle_ = cluster_->hostSet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });
+}
+
+InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
+  local_host_set_member_update_cb_handle_->remove();
+  while (!client_map_.empty()) {
+    client_map_.begin()->second->redis_client_->close();
+  }
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
@@ -245,19 +243,13 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
   return client->redis_client_->makeRequest(request, callbacks);
 }
 
-void InstanceImpl::ThreadLocalActiveClient::onEvent(uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     auto client_to_delete = parent_.client_map_.find(host_);
     ASSERT(client_to_delete != parent_.client_map_.end());
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
-  }
-}
-
-void InstanceImpl::ThreadLocalPool::shutdown() {
-  while (!client_map_.empty()) {
-    client_map_.begin()->second->redis_client_->close();
   }
 }
 

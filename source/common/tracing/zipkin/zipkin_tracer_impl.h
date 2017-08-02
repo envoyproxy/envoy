@@ -90,7 +90,7 @@ public:
    * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
    */
   Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+         ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
          const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
 
   /**
@@ -119,8 +119,6 @@ private:
   struct TlsTracer : ThreadLocal::ThreadLocalObject {
     TlsTracer(TracerPtr&& tracer, Driver& driver);
 
-    void shutdown() override { tracer_.reset(); }
-
     TracerPtr tracer_;
     Driver& driver_;
   };
@@ -128,10 +126,9 @@ private:
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   ZipkinTracerStats tracer_stats_;
-  ThreadLocal::Instance& tls_;
+  ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
-  const uint32_t tls_slot_;
 };
 
 /**

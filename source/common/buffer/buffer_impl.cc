@@ -70,6 +70,7 @@ void OwnedImpl::move(Instance& rhs) {
   int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
+  static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
@@ -78,6 +79,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
                                   length);
   ASSERT(static_cast<uint64_t>(rc) == length);
   UNREFERENCED_PARAMETER(rc);
+  static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {

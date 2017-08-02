@@ -55,7 +55,7 @@
         },
         "filters": [
           { "type": "decoder", "name": "rate_limit",
-            "config": { "domain": "some_domain" }},
+            "config": { "domain": "some_domain", "timeout_ms": 500 }},
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
@@ -63,7 +63,7 @@
   }],
 
   "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
-  "statsd_local_udp_port": 8125,
+  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
 
   "rate_limit_service": {
     "type": "grpc_service",

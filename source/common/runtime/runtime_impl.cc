@@ -125,11 +125,11 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
   }
 }
 
-LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::Instance& tls,
+LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
                        const std::string& override_dir, Stats::Store& store,
                        RandomGenerator& generator)
-    : watcher_(dispatcher.createFilesystemWatcher()), tls_(tls), tls_slot_(tls.allocateSlot()),
+    : watcher_(dispatcher.createFilesystemWatcher()), tls_(tls.allocateSlot()),
       generator_(generator), root_path_(root_symlink_path + "/" + subdir),
       override_path_(root_symlink_path + "/" + override_dir), stats_(generateStats(store)) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
@@ -148,12 +148,12 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 void LoaderImpl::onSymlinkSwap() {
   current_snapshot_.reset(new SnapshotImpl(root_path_, override_path_, stats_, generator_));
   ThreadLocal::ThreadLocalObjectSharedPtr ptr_copy = current_snapshot_;
-  tls_.set(tls_slot_, [ptr_copy](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_->set([ptr_copy](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return ptr_copy;
   });
 }
 
-Snapshot& LoaderImpl::snapshot() { return tls_.getTyped<Snapshot>(tls_slot_); }
+Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 } // namespace Runtime
 } // namespace Envoy

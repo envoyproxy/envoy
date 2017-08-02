@@ -102,9 +102,6 @@ public:
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string&, uint64_t default_value) const override;
 
-  // ThreadLocal::ThreadLocalObject
-  void shutdown() override {}
-
 private:
   struct Directory {
     Directory(const std::string& path) {
@@ -138,7 +135,7 @@ private:
  */
 class LoaderImpl : public Loader {
 public:
-  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::Instance& tls,
+  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const std::string& root_symlink_path, const std::string& subdir,
              const std::string& override_dir, Stats::Store& store, RandomGenerator& generator);
 
@@ -150,8 +147,7 @@ private:
   void onSymlinkSwap();
 
   Filesystem::WatcherPtr watcher_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   RandomGenerator& generator_;
   std::string root_path_;
   std::string override_path_;

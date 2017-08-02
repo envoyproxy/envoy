@@ -17,18 +17,19 @@ public:
   virtual ~ContextManager() {}
 
   /**
-   * Builds an ClientContext from an ContextConfig
+   * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextPtr createSslClientContext(Stats::Scope& scope, ContextConfig& config) PURE;
+  virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
+                                                  ClientContextConfig& config) PURE;
 
   /**
-   * Builds an ServerContext from an ContextConfig
+   * Builds a ServerContext from a ServerContextConfig.
    */
   virtual ServerContextPtr createSslServerContext(Stats::Scope& scope,
                                                   ServerContextConfig& config) PURE;
 
   /**
-   * @return the number of days until the next certificate being managed will expire
+   * @return the number of days until the next certificate being managed will expire.
    */
   virtual size_t daysUntilFirstCertExpires() PURE;
 

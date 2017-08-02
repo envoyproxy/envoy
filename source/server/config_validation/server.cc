@@ -70,6 +70,7 @@ void ValidationInstance::shutdown() {
   // This normally happens at the bottom of InstanceImpl::run(), but we don't have a run(). We can
   // do an abbreviated shutdown here since there's less to clean up -- for example, no workers to
   // exit.
+  thread_local_.shutdownGlobalThreading();
   config_->clusterManager().shutdown();
   thread_local_.shutdownThread();
 }

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/config/cds_json.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
@@ -13,31 +14,34 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const Json::Object& config, ClusterManager& cm,
-                             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+CdsApiPtr CdsApiImpl::create(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                             ClusterManager& cm, Event::Dispatcher& dispatcher,
+                             Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
   if (!config.hasObject("cds")) {
     return nullptr;
   }
 
-  return CdsApiPtr{
-      new CdsApiImpl(*config.getObject("cds"), cm, dispatcher, random, local_info, scope)};
+  return CdsApiPtr{new CdsApiImpl(*config.getObject("cds"), sds_config, cm, dispatcher, random,
+                                  local_info, scope)};
 }
 
-CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+CdsApiImpl::CdsApiImpl(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                       ClusterManager& cm, Event::Dispatcher& dispatcher,
+                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                       Stats::Scope& scope)
     : RestApiFetcher(cm, config.getObject("cluster")->getString("name"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info),
-      stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}) {
+      stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}),
+      sds_config_(sds_config) {
   Config::Utility::checkLocalInfo("cds", local_info);
 }
 
 void CdsApiImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "cds: starting request");
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/clusters/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
 }
@@ -53,7 +57,9 @@ void CdsApiImpl::parseResponse(const Http::Message& response) {
   for (auto& cluster : clusters) {
     const std::string cluster_name = cluster->getString("name");
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdatePrimaryCluster(*cluster)) {
+    envoy::api::v2::Cluster cluster_proto;
+    Config::CdsJson::translateCluster(*cluster, sds_config_, cluster_proto);
+    if (cm_.addOrUpdatePrimaryCluster(cluster_proto)) {
       ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster_name);
     }
   }

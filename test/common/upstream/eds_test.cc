@@ -1,7 +1,7 @@
 #include "common/config/utility.h"
-#include "common/json/json_loader.h"
 #include "common/upstream/eds.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -27,18 +27,17 @@ protected:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
-    Config::Utility::sdsConfigToEdsConfig(SdsConfig{"eds", std::chrono::milliseconds(30000)},
-                                          eds_config_);
+    SdsConfig sds_config{"eds", std::chrono::milliseconds(30000)};
     local_info_.zone_name_ = "us-east-1a";
-    cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, eds_config_,
+    eds_cluster_ = parseSdsClusterFromJson(raw_config, sds_config);
+    cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  envoy::api::v2::ConfigSource eds_config_;
+  envoy::api::v2::Cluster eds_cluster_;
   MockClusterManager cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<EdsClusterImpl> cluster_;

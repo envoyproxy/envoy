@@ -257,9 +257,9 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   return Network::FilterStatus::StopIteration;
 }
 
-void TcpProxy::onDownstreamEvent(uint32_t event) {
-  if ((event & Network::ConnectionEvent::RemoteClose ||
-       event & Network::ConnectionEvent::LocalClose) &&
+void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
+  if ((event == Network::ConnectionEvent::RemoteClose ||
+       event == Network::ConnectionEvent::LocalClose) &&
       upstream_connection_) {
     // TODO(mattklein123): If we close without flushing here we may drop some data. The downstream
     // connection is about to go away. So to support this we need to either have a way for the
@@ -274,23 +274,23 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   ASSERT(0 == data.length());
 }
 
-void TcpProxy::onUpstreamEvent(uint32_t event) {
-  if (event & Network::ConnectionEvent::RemoteClose) {
+void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
   }
 
-  if (event & Network::ConnectionEvent::LocalClose) {
+  if (event == Network::ConnectionEvent::LocalClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
   }
 
-  if (event & Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     if (connect_timeout_timer_) {
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
     }
 
     upstream_helper_callbacks_->onConnectionFailure();
-  } else if (event & Network::ConnectionEvent::Connected) {
+  } else if (event == Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
     upstream_helper_callbacks_->onConnectionSuccess();
   }

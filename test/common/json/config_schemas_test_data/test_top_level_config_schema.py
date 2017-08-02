@@ -14,7 +14,11 @@ TOP_LEVEL_CONFIG_BLOB = {
     "admin": {
         "access_log_path": "/var/log/envoy/admin_access.log", 
         "address": "tcp://0.0.0.0:9901"
-    }, 
+    },
+    "watchdog_miss_timeout_ms": 100,
+    "watchdog_megamiss_timeout_ms": 200,
+    "watchdog_kill_timeout_ms": 300,
+    "watchdog_multikill_timeout_ms": 400,
     "tracing": {
         "http": {
             "driver": {
@@ -30,7 +34,6 @@ TOP_LEVEL_CONFIG_BLOB = {
 
 
 def test(writer):
-    
     writer.write_test_file(
         'Valid',
         schema='TOP_LEVEL_CONFIG_SCHEMA',

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/coded_stream.h"
@@ -15,6 +19,7 @@
 #include "google/protobuf/util/time_util.h"
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
+#include "google/protobuf/wrappers.pb.h"
 
 namespace Envoy {
 
@@ -23,6 +28,9 @@ namespace Envoy {
 // alternative implementations during import into other repositories. E.g. at
 // Google we have more than one protobuf implementation.
 namespace Protobuf = google::protobuf;
+
+// Allows mapping from google::protobuf::util to other util libraries.
+namespace ProtobufUtil = google::protobuf::util;
 
 // Protobuf well-known types (WKT) should be referenced via the ProtobufWkt
 // namespace.
@@ -35,8 +43,15 @@ namespace ProtobufTypes {
 
 typedef std::string String;
 
-inline const String ToString(const std::string& s) { return s; }
-inline const std::string FromString(const String& s) { return s; }
+inline String ToString(const std::string& s) { return s; }
+inline std::string FromString(const String& s) { return s; }
+
+inline std::vector<std::string>
+stringVector(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source) {
+  std::vector<std::string> result;
+  std::transform(source.begin(), source.end(), std::back_inserter(result), FromString);
+  return result;
+}
 
 typedef int64_t Int64;
 

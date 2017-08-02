@@ -13,3 +13,14 @@ envoy_cc_library(
     hdrs = ["protobuf.h"],
     external_deps = ["protobuf"],
 )
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    external_deps = ["protobuf"],
+    deps = [
+        ":protobuf",
+        "//source/common/common:utility_lib",
+    ],
+)

@@ -36,7 +36,7 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
+  request_headers.insertXB3Sampled().value().setReference(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
 
   // Set the ot-span-context header with the new context.
   SpanContext context(span_);
@@ -61,11 +61,11 @@ Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
 Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-               Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+               Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator)
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))},
-      tls_(tls), runtime_(runtime), local_info_(local_info), tls_slot_(tls.allocateSlot()) {
+      tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info) {
 
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
@@ -77,21 +77,19 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   const std::string collector_endpoint =
       config.getString("collector_endpoint", ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
 
-  tls_.set(
-      tls_slot_,
-      [this, collector_endpoint, &random_generator](
-          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        TracerPtr tracer(
-            new Tracer(local_info_.clusterName(), local_info_.address(), random_generator));
-        tracer->setReporter(
-            ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
-        return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
-      });
+  tls_->set([this, collector_endpoint, &random_generator](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    TracerPtr tracer(
+        new Tracer(local_info_.clusterName(), local_info_.address(), random_generator));
+    tracer->setReporter(
+        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
+    return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
+  });
 }
 
 Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::string&,
                                    SystemTime start_time) {
-  Tracer& tracer = *tls_.getTyped<TlsTracer>(tls_slot_).tracer_;
+  Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
 
   if (request_headers.OtSpanContext()) {
@@ -170,10 +168,11 @@ void ReporterImpl::flushSpans() {
 
     const std::string request_body = span_buffer_.toStringifiedJsonArray();
     Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
-    message->headers().insertContentType().value(std::string("application/json"));
+    message->headers().insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
     body->add(request_body);

@@ -106,7 +106,7 @@ public:
   void decodeReply(ReplyMessagePtr&& message) override;
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t event) override;
+  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

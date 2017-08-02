@@ -319,7 +319,7 @@ bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ContextConfig& config)
+                                     ClientContextConfig& config)
     : ContextImpl(parent, scope, config) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],

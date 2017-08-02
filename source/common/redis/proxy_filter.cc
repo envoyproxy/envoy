@@ -61,11 +61,13 @@ void ProxyFilter::onRespValue(RespValuePtr&& value) {
   }
 }
 
-void ProxyFilter::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::RemoteClose ||
-      events & Network::ConnectionEvent::LocalClose) {
+void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     while (!pending_requests_.empty()) {
-      pending_requests_.front().request_handle_->cancel();
+      if (pending_requests_.front().request_handle_ != nullptr) {
+        pending_requests_.front().request_handle_->cancel();
+      }
       pending_requests_.pop_front();
     }
   }

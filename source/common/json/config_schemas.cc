@@ -377,6 +377,11 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
             "additionalProperties": false
           }
         }
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["stat_prefix", "descriptors", "domain"],
@@ -975,6 +980,11 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
       "request_type" : {
         "type" : "string",
         "enum" : ["internal", "external", "both"]
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required" : ["domain"],
@@ -1167,6 +1177,10 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
+      "watchdog_miss_timeout_ms" : {"type" : "integer"},
+      "watchdog_megamiss_timeout_ms" : {"type" : "integer"},
+      "watchdog_kill_timeout_ms" : {"type" : "integer"},
+      "watchdog_multikill_timeout_ms" : {"type" : "integer"},
       "tracing" : {
         "type" : "object",
         "properties" : {

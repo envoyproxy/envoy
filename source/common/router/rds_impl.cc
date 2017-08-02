@@ -17,7 +17,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-    ThreadLocal::Instance& tls, Init::Manager& init_manager) {
+    ThreadLocal::SlotAllocator& tls, Init::Manager& init_manager) {
   bool has_rds = config.hasObject("rds");
   bool has_route_config = config.hasObject("route_config");
   if (!(has_rds ^ has_route_config)) {
@@ -43,26 +43,23 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(const Json::Object&
                                                              Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
-// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
-//                     up. (The global HTTP route manager will also fix this).
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-    ThreadLocal::Instance& tls)
+    ThreadLocal::SlotAllocator& tls)
 
     : RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
-      runtime_(runtime), local_info_(local_info), tls_(tls), tls_slot_(tls.allocateSlot()),
+      runtime_(runtime), local_info_(local_info), tls_(tls.allocateSlot()),
       route_config_name_(config.getString("route_config_name")),
       stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}) {
 
   ::Envoy::Config::Utility::checkClusterAndLocalInfo("rds", remote_cluster_name_, cm, local_info);
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
-  tls_.set(tls_slot_,
-           [initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-             return std::make_shared<ThreadLocalConfig>(initial_config);
-           });
+  tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalConfig>(initial_config);
+  });
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
@@ -71,13 +68,13 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
 }
 
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
-  return tls_.getTyped<ThreadLocalConfig>(tls_slot_).config_;
+  return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
 void RdsRouteConfigProviderImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "rds: starting request");
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(fmt::format("/v1/routes/{}/{}/{}", route_config_name_,
                                                    local_info_.clusterName(),
                                                    local_info_.nodeName()));
@@ -95,9 +92,8 @@ void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               new_hash);
-    tls_.runOnAllThreads([this, new_config]() -> void {
-      tls_.getTyped<ThreadLocalConfig>(tls_slot_).config_ = new_config;
-    });
+    tls_->runOnAllThreads(
+        [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
   }
 
   stats_.update_success_.inc();

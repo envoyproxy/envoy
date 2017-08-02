@@ -21,8 +21,8 @@ using Envoy::Protobuf::DescriptorPool;
 using Envoy::Protobuf::FileDescriptor;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
-using Envoy::Protobuf::util::Status;
-using Envoy::Protobuf::util::error::Code;
+using Envoy::ProtobufUtil::Status;
+using Envoy::ProtobufUtil::error::Code;
 using google::grpc::transcoding::JsonRequestTranslator;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
@@ -123,9 +123,9 @@ Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
-  const std::string method = headers.Method()->value().c_str();
-  std::string path = headers.Path()->value().c_str();
-  std::string args;
+  const ProtobufTypes::String method = headers.Method()->value().c_str();
+  ProtobufTypes::String path = headers.Path()->value().c_str();
+  ProtobufTypes::String args;
 
   const size_t pos = path.find('?');
   if (pos != std::string::npos) {
@@ -171,7 +171,7 @@ Status JsonTranscoderConfig::createTranscoder(
 
   transcoder.reset(
       new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
-  return Status::OK;
+  return Status();
 }
 
 Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
@@ -179,11 +179,12 @@ Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescripto
   auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
-    ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());
+    ENVOY_LOG(debug, "Cannot resolve input-type: {}",
+              ProtobufTypes::FromString(method->input_type()->full_name()));
     return Status(Code::NOT_FOUND, "Could not resolve type: " + method->input_type()->full_name());
   }
 
-  return Status::OK;
+  return Status();
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
@@ -200,22 +201,21 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
   }
 
   headers.removeContentLength();
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
   headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
-
-  headers.insertMethod().value(Http::Headers::get().MethodValues.Post);
-
-  headers.insertTE().value(Http::Headers::get().TEValues.Trailers);
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
+  headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
   if (end_stream) {
     request_in_.finish();
 
     const auto& request_status = transcoder_->RequestStatus();
     if (!request_status.ok()) {
-      ENVOY_LOG(debug, "Transcoding request error " + request_status.ToString());
+      ENVOY_LOG(debug, "Transcoding request error " +
+                           ProtobufTypes::FromString(request_status.ToString()));
       error_ = true;
       Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
-                                    request_status.error_message().ToString());
+                                    request_status.error_message());
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -248,10 +248,11 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   const auto& request_status = transcoder_->RequestStatus();
 
   if (!request_status.ok()) {
-    ENVOY_LOG(debug, "Transcoding request error " + request_status.ToString());
+    ENVOY_LOG(debug,
+              "Transcoding request error " + ProtobufTypes::FromString(request_status.ToString()));
     error_ = true;
     Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
-                                  request_status.error_message().ToString());
+                                  request_status.error_message());
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -288,7 +289,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   }
 
   response_headers_ = &headers;
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Json);
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   if (!method_->server_streaming() && !end_stream) {
     return Http::FilterHeadersStatus::StopIteration;
   }

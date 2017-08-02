@@ -72,13 +72,13 @@ public:
   SystemTime start_time_;
   Http::AccessLog::MockRequestInfo request_info_;
 
+  NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 

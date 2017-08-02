@@ -76,7 +76,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -92,7 +92,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -115,7 +115,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -133,7 +133,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
@@ -159,7 +159,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
 TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  ContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;

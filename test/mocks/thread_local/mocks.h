@@ -17,27 +17,51 @@ public:
   MockInstance();
   ~MockInstance();
 
-  // Server::ThreadLocal
-  MOCK_METHOD0(allocateSlot, uint32_t());
-  MOCK_METHOD1(get, ThreadLocalObjectSharedPtr(uint32_t index));
-  MOCK_METHOD2(registerThread, void(Event::Dispatcher& dispatcher, bool main_thread));
   MOCK_METHOD1(runOnAllThreads, void(Event::PostCb cb));
-  MOCK_METHOD2(set, void(uint32_t index, InitializeCb cb));
+
+  // Server::ThreadLocal
+  MOCK_METHOD0(allocateSlot, SlotPtr());
+  MOCK_METHOD2(registerThread, void(Event::Dispatcher& dispatcher, bool main_thread));
+  MOCK_METHOD0(shutdownGlobalThreading, void());
   MOCK_METHOD0(shutdownThread, void());
 
-  uint32_t allocateSlot_() { return current_slot_++; }
-  ThreadLocalObjectSharedPtr get_(uint32_t index) { return data_[index]; }
+  SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void set_(uint32_t index, InitializeCb cb) { data_[index] = cb(dispatcher_); }
   void shutdownThread_() {
-    for (auto& entry : data_) {
-      entry.second->shutdown();
+    shutdown_ = true;
+    // Reverse order which is same as the production code.
+    for (auto it = data_.rbegin(); it != data_.rend(); ++it) {
+      it->reset();
     }
+    data_.clear();
   }
 
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  struct SlotImpl : public Slot {
+    SlotImpl(MockInstance& parent, uint32_t index) : parent_(parent), index_(index) {
+      parent_.data_.resize(index_ + 1);
+    }
+
+    ~SlotImpl() {
+      // Do not actually clear slot data during shutdown. This mimics the production code.
+      if (!parent_.shutdown_) {
+        EXPECT_LT(index_, parent_.data_.size());
+        parent_.data_[index_].reset();
+      }
+    }
+
+    // ThreadLocal::Slot
+    ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
+    void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
+    void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
+
+    MockInstance& parent_;
+    const uint32_t index_;
+  };
+
   uint32_t current_slot_{};
-  std::unordered_map<uint32_t, ThreadLocalObjectSharedPtr> data_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  std::vector<ThreadLocalObjectSharedPtr> data_;
+  bool shutdown_{};
 };
 
 } // namespace ThreadLocal

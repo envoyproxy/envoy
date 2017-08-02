@@ -14,12 +14,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
 
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
@@ -51,18 +52,29 @@ public:
   Network::MockClientConnection* connection_{};
 };
 
-TEST_F(TcpStatsdSinkTest, All) {
+TEST_F(TcpStatsdSinkTest, EmptyFlush) {
   InSequence s;
 
+  sink_->beginFlush();
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n")));
-  sink_->flushCounter("test_counter", 1);
+  EXPECT_CALL(*connection_, write(BufferStringEqual("")));
+  sink_->endFlush();
+}
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_gauge:2|g\n")));
+TEST_F(TcpStatsdSinkTest, BasicFlow) {
+  InSequence s;
+
+  sink_->beginFlush();
+  sink_->flushCounter("test_counter", 1);
   sink_->flushGauge("test_gauge", 2);
 
+  expectCreateConnection();
+  EXPECT_CALL(*connection_,
+              write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n")));
+  sink_->endFlush();
+
   // Test a disconnect. We should connect again.
-  connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n")));
@@ -75,26 +87,51 @@ TEST_F(TcpStatsdSinkTest, All) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, BufferReallocate) {
+  InSequence s;
+
+  sink_->beginFlush();
+  for (int i = 0; i < 2000; i++) {
+    sink_->flushCounter("test_counter", 1);
+  }
+
+  expectCreateConnection();
+  EXPECT_CALL(*connection_, write(_)).WillOnce(Invoke([](Buffer::Instance& buffer) -> void {
+    std::string compare;
+    for (int i = 0; i < 2000; i++) {
+      compare += "envoy.test_counter:1|c\n";
+    }
+    EXPECT_EQ(compare, TestUtility::bufferToString(buffer));
+  }));
+  sink_->endFlush();
+}
+
 TEST_F(TcpStatsdSinkTest, Overflow) {
   InSequence s;
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 17);
+  sink_->beginFlush();
   sink_->flushCounter("test_counter", 1);
+  sink_->endFlush();
 
   // Lower and make sure we write.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 15);
+  sink_->beginFlush();
+  sink_->flushCounter("test_counter", 1);
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n")));
-  sink_->flushCounter("test_counter", 1);
+  sink_->endFlush();
 
   // Raise and make sure we don't write and kill connection.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 17);
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  sink_->beginFlush();
   sink_->flushCounter("test_counter", 1);
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  sink_->endFlush();
 
   EXPECT_EQ(2UL, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("statsd.cx_overflow")

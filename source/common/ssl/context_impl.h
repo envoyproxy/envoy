@@ -122,7 +122,7 @@ protected:
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
+  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ClientContextConfig& config);
 
   bssl::UniquePtr<SSL> newSsl() const override;
 

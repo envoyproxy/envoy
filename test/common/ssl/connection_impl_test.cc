@@ -56,7 +56,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
@@ -72,7 +72,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
   if (expect_success) {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           if (!expected_digest.empty()) {
             EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
           }
@@ -84,7 +84,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           client_connection->close(Network::ConnectionCloseType::NoFlush);
           dispatcher.exit();
         }));
@@ -338,7 +338,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
@@ -366,7 +366,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](uint32_t) -> void {
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -419,7 +419,7 @@ TEST_P(SslConnectionImplTest, SslError) {
       }));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](uint32_t) -> void {
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
       }));
@@ -446,7 +446,7 @@ public:
          .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
-    client_ctx_config_.reset(new ContextConfigImpl(*client_ctx_loader_));
+    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
     client_ctx_ = manager_->createSslClientContext(stats_store_, *client_ctx_config_);
 
     client_connection_ =
@@ -484,7 +484,7 @@ public:
         }));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](uint32_t) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ((write_size * num_writes), filter_seen);
           dispatcher_->exit();
         }));
@@ -583,7 +583,7 @@ public:
   ServerContextPtr server_ctx_;
   Network::ListenerPtr listener_;
   Json::ObjectSharedPtr client_ctx_loader_;
-  std::unique_ptr<ContextConfigImpl> client_ctx_config_;
+  std::unique_ptr<ClientContextConfigImpl> client_ctx_config_;
   ClientContextPtr client_ctx_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;

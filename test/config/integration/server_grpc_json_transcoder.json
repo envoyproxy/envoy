@@ -60,7 +60,7 @@
   }],
 
   "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
-  "statsd_local_udp_port": 8125,
+  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
 
   "cluster_manager": {
     "clusters": [

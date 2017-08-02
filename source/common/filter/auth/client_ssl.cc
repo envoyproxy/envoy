@@ -21,13 +21,12 @@ namespace Filter {
 namespace Auth {
 namespace ClientSsl {
 
-// TODO(mattklein123): The TLS slot will never get cleaned up in the LDS case. Will fix in a follow
-//                     up.
-Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
+Config::Config(const Json::Object& config, ThreadLocal::SlotAllocator& tls,
+               Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+               Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 60000))),
-      tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
+      tls_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
       stats_(generateStats(scope, config.getString("stat_prefix"))) {
 
   config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
@@ -38,12 +37,11 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
   }
 
   AllowedPrincipalsSharedPtr empty(new AllowedPrincipals());
-  tls_.set(tls_slot_, [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return empty;
-  });
+  tls_->set(
+      [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 }
 
-ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
+ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::SlotAllocator& tls,
                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                Stats::Scope& scope, Runtime::RandomGenerator& random) {
   ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, scope, random));
@@ -51,9 +49,7 @@ ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance
   return new_config;
 }
 
-const AllowedPrincipals& Config::allowedPrincipals() {
-  return tls_.getTyped<AllowedPrincipals>(tls_slot_);
-}
+const AllowedPrincipals& Config::allowedPrincipals() { return tls_->getTyped<AllowedPrincipals>(); }
 
 GlobalStats Config::generateStats(Stats::Scope& scope, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
@@ -69,10 +65,9 @@ void Config::parseResponse(const Http::Message& message) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
   }
 
-  tls_.set(tls_slot_,
-           [new_principals](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-             return new_principals;
-           });
+  tls_->set([new_principals](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return new_principals;
+  });
 
   stats_.update_success_.inc();
   stats_.total_principals_.set(new_principals->size());
@@ -83,7 +78,7 @@ void Config::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(
 static const std::string Path = "/v1/certs/list/approved";
 
 void Config::createRequest(Http::Message& request) {
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(Path);
 }
 
@@ -103,8 +98,8 @@ Network::FilterStatus Instance::onNewConnection() {
   }
 }
 
-void Instance::onEvent(uint32_t events) {
-  if (!(events & Network::ConnectionEvent::Connected)) {
+void Instance::onEvent(Network::ConnectionEvent event) {
+  if (event != Network::ConnectionEvent::Connected) {
     return;
   }
 

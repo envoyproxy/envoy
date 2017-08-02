@@ -87,7 +87,7 @@ private:
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -133,7 +133,7 @@ private:
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -154,7 +154,6 @@ typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  ~BaseIntegrationTest();
   BaseIntegrationTest(Network::Address::IpVersion version);
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
@@ -192,7 +191,7 @@ protected:
                                             Http::CodecClient::Type type, uint64_t request_size,
                                             uint64_t response_size, bool big_header);
   void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
-                                              Http::CodecClient::Type type);
+                                              Http::CodecClient::Type type, bool close_upstream);
   void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                          Http::CodecClient::Type type);
   void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,

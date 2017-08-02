@@ -12,16 +12,16 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                               const envoy::api::v2::ConfigSource& eds_config,
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager, added_via_api),
-      local_info_(local_info), cluster_name_(config.getString("service_name")) {
+    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
+      local_info_(local_info), cluster_name_(cluster.deprecated_v1().service_name()) {
   envoy::api::v2::Node node;
   Config::Utility::localInfoToNode(local_info, node);
+  const auto& eds_config = cluster.eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
       eds_config, node, dispatcher, cm, random, info_->statsScope(),

@@ -19,7 +19,6 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -77,6 +76,15 @@ public:
    * integration tests where a mock runtime is not needed.
    */
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
+
+  /**
+   * Helper for flushing counters and gauges to sinks. This takes care of calling beginFlush(),
+   * latching of counters and flushing, flushing of gauges, and calling endFlush(), on each sink.
+   * @param sinks supplies the list of sinks.
+   * @param store supplies the store to flush.
+   */
+  static void flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                            Stats::Store& store);
 };
 
 /**
@@ -86,7 +94,7 @@ class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               const LocalInfo::LocalInfo& local_info);
+               const LocalInfo::LocalInfo& local_info, ThreadLocal::Instance& tls);
 
   ~InstanceImpl() override;
 
@@ -139,7 +147,7 @@ private:
   Stats::StoreRoot& stats_store_;
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
-  ThreadLocal::InstanceImpl thread_local_;
+  ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;

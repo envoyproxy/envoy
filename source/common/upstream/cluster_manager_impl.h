@@ -47,11 +47,11 @@ public:
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
-  ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                             const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerSharedPtr outlier_event_logger,
-                             bool added_via_api) override;
-  CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
+  ClusterPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                              Outlier::EventLoggerSharedPtr outlier_event_logger,
+                              bool added_via_api) override;
+  CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
+                      ClusterManager& cm) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -120,12 +120,12 @@ struct ClusterManagerStats {
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 
   // Upstream::ClusterManager
-  bool addOrUpdatePrimaryCluster(const Json::Object& config) override;
+  bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -195,10 +195,7 @@ private:
                                         HostListsConstSharedPtr healthy_hosts_per_zone,
                                         const std::vector<HostSharedPtr>& hosts_added,
                                         const std::vector<HostSharedPtr>& hosts_removed,
-                                        ThreadLocal::Instance& tls, uint32_t thread_local_slot);
-
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override;
+                                        ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -217,7 +214,7 @@ private:
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const Json::Object& cluster, bool added_via_api);
+  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
                                     const std::vector<HostSharedPtr>& hosts_added,
@@ -226,9 +223,8 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  ThreadLocal::Instance& tls_;
+  ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
-  uint32_t thread_local_slot_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
   Optional<SdsConfig> sds_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;

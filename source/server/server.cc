@@ -27,20 +27,19 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Server {
 
 InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
                            Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
-                           const LocalInfo::LocalInfo& local_info)
+                           const LocalInfo::LocalInfo& local_info, ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_),
       stats_store_(store), server_stats_{ALL_SERVER_STATS(
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
+      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
+      dispatcher_(api_->allocateDispatcher()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})), local_info_(local_info),
@@ -84,6 +83,34 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_.live_.set(!fail);
 }
 
+void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                                 Stats::Store& store) {
+  for (const auto& sink : sinks) {
+    sink->beginFlush();
+  }
+
+  for (const Stats::CounterSharedPtr& counter : store.counters()) {
+    uint64_t delta = counter->latch();
+    if (counter->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushCounter(counter->name(), delta);
+      }
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
+    if (gauge->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushGauge(gauge->name(), gauge->value());
+      }
+    }
+  }
+
+  for (const auto& sink : sinks) {
+    sink->endFlush();
+  }
+}
+
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
   HotRestart::GetParentStatsInfo info;
@@ -97,23 +124,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (const Stats::CounterSharedPtr& counter : stats_store_.counters()) {
-    uint64_t delta = counter->latch();
-    if (counter->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushCounter(counter->name(), delta);
-      }
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-    if (gauge->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushGauge(gauge->name(), gauge->value());
-      }
-    }
-  }
-
+  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
@@ -289,6 +300,9 @@ void InstanceImpl::run() {
   ENVOY_LOG(warn, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
+
+  // Before starting to shutdown anything else, stop slot destruction updates.
+  thread_local_.shutdownGlobalThreading();
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();

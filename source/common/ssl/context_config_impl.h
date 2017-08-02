@@ -7,13 +7,13 @@
 
 #include "common/json/json_loader.h"
 
+#include "api/tls_context.pb.h"
+
 namespace Envoy {
 namespace Ssl {
 
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
-  ContextConfigImpl(const Json::Object& config);
-
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
@@ -26,22 +26,36 @@ public:
     return verify_subject_alt_name_list_;
   };
   const std::string& verifyCertificateHash() const override { return verify_certificate_hash_; };
-  const std::string& serverNameIndication() const override { return server_name_indication_; }
+
+protected:
+  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config,
+                    const envoy::api::v2::TlsCertificate& cert);
 
 private:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;
 
-  std::string alpn_protocols_;
-  std::string alt_alpn_protocols_;
-  std::string cipher_suites_;
-  std::string ecdh_curves_;
-  std::string ca_cert_file_;
-  std::string cert_chain_file_;
-  std::string private_key_file_;
-  std::vector<std::string> verify_subject_alt_name_list_;
-  std::string verify_certificate_hash_;
-  std::string server_name_indication_;
+  const std::string alpn_protocols_;
+  const std::string alt_alpn_protocols_;
+  const std::string cipher_suites_;
+  const std::string ecdh_curves_;
+  const std::string ca_cert_file_;
+  const std::string cert_chain_file_;
+  const std::string private_key_file_;
+  const std::vector<std::string> verify_subject_alt_name_list_;
+  const std::string verify_certificate_hash_;
+};
+
+class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
+public:
+  ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
+  ClientContextConfigImpl(const Json::Object& config);
+
+  // Ssl::ClientContextConfig
+  const std::string& serverNameIndication() const override { return server_name_indication_; }
+
+private:
+  const std::string server_name_indication_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
