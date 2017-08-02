@@ -31,22 +31,15 @@ public:
    * isn't one with the same <route_config_name>_<cluster> already. Otherwise, it returns a
    * Router::RouteConfigProviderSharedPtr created from the manager held weak_ptr.
    * @param config supplies the json configuration of an RdsRouteConfigProvider.
-   * @param runtime supplies the runtime loader.
-   * @param cm supplies the ClusterManager.
-   * @param dispatcher supplies the dispatcher.
-   * @param random supplies the random generator.
-   * @param local_info supplies the local info.
    * @param scope supplies the scope to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
-   * @param tls supplies the tls slot allocator.
    * @param init_manager supplies the init manager.
    */
-  virtual RouteConfigProviderSharedPtr
-  getRouteConfigProvider(const Json::Object& config, Runtime::Loader& runtime,
-                         Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         Stats::Scope& scope, const std::string& stat_prefix,
-                         ThreadLocal::SlotAllocator& tls, Init::Manager& init_manager) PURE;
+  virtual RouteConfigProviderSharedPtr getRouteConfigProvider(const Json::Object& config,
+                                                              Upstream::ClusterManager& cm,
+                                                              Stats::Scope& scope,
+                                                              const std::string& stat_prefix,
+                                                              Init::Manager& init_manager) PURE;
 };
 
 /**

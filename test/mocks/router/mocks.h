@@ -220,13 +220,11 @@ public:
   ~MockHttpRouteManager();
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
-  MOCK_METHOD10(getRouteConfigProvider,
-                RouteConfigProviderSharedPtr(
-                    const Json::Object& config, Runtime::Loader& runtime,
-                    Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                    Stats::Scope& scope, const std::string& stat_prefix,
-                    ThreadLocal::SlotAllocator& tls, Init::Manager& init_manager));
+  MOCK_METHOD5(getRouteConfigProvider,
+               RouteConfigProviderSharedPtr(const Json::Object& config,
+                                            Upstream::ClusterManager& cm, Stats::Scope& scope,
+                                            const std::string& stat_prefix,
+                                            Init::Manager& init_manager));
   MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
 };
 

@@ -191,7 +191,8 @@ void InstanceImpl::initialize(Options& options, ComponentFactory& component_fact
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo()));
 
-  http_route_manager_.reset(new Router::HttpRouteManagerImpl());
+  http_route_manager_.reset(new Router::HttpRouteManagerImpl(runtime(), dispatcher(), random(),
+                                                             localInfo(), threadLocal()));
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.

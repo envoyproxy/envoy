@@ -15,11 +15,9 @@ namespace Router {
 
 RouteConfigProviderSharedPtr
 RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& runtime,
-                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                Runtime::RandomGenerator& random,
-                                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
-                                Init::Manager& init_manager, HttpRouteManager& http_route_manager) {
+                                Upstream::ClusterManager& cm, Stats::Scope& scope,
+                                const std::string& stat_prefix, Init::Manager& init_manager,
+                                HttpRouteManager& http_route_manager) {
   bool has_rds = config.hasObject("rds");
   bool has_route_config = config.hasObject("route_config");
   if (!(has_rds ^ has_route_config)) {
@@ -33,8 +31,7 @@ RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& run
   } else {
     Json::ObjectSharedPtr rds_config = config.getObject("rds");
     rds_config->validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-    return http_route_manager.getRouteConfigProvider(*rds_config, runtime, cm, dispatcher, random,
-                                                     local_info, scope, stat_prefix, tls,
+    return http_route_manager.getRouteConfigProvider(*rds_config, cm, scope, stat_prefix,
                                                      init_manager);
   }
 }
@@ -128,6 +125,13 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
+HttpRouteManagerImpl::HttpRouteManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+                                           Runtime::RandomGenerator& random,
+                                           const LocalInfo::LocalInfo& local_info,
+                                           ThreadLocal::SlotAllocator& tls)
+    : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
+      tls_(tls) {}
+
 std::vector<Router::RouteConfigProviderSharedPtr> HttpRouteManagerImpl::routeConfigProviders() {
   std::vector<Router::RouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
@@ -138,10 +142,8 @@ std::vector<Router::RouteConfigProviderSharedPtr> HttpRouteManagerImpl::routeCon
 };
 
 Router::RouteConfigProviderSharedPtr HttpRouteManagerImpl::getRouteConfigProvider(
-    const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-    ThreadLocal::SlotAllocator& tls, Init::Manager& init_manager) {
+    const Json::Object& config, Upstream::ClusterManager& cm, Stats::Scope& scope,
+    const std::string& stat_prefix, Init::Manager& init_manager) {
 
   // RdsRouteConfigProviders are unique based on their <route_config_name>_<cluster>.
   std::string map_identifier = config.getString("route_config_name") + "_";
@@ -150,7 +152,7 @@ Router::RouteConfigProviderSharedPtr HttpRouteManagerImpl::getRouteConfigProvide
   auto it = route_config_providers_.find(map_identifier);
   if (it == route_config_providers_.end()) {
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{new RdsRouteConfigProviderImpl(
-        config, runtime, cm, dispatcher, random, local_info, scope, stat_prefix, tls, *this)};
+        config, runtime_, cm, dispatcher_, random_, local_info_, scope, stat_prefix, tls_, *this)};
 
     new_provider->registerInitTarget(init_manager);
 
