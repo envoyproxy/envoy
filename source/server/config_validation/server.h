@@ -76,6 +76,7 @@ public:
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   void shutdownAdmin() override { NOT_IMPLEMENTED; }
+  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED; }
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED; }
@@ -115,6 +116,7 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;

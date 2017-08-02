@@ -13,6 +13,7 @@
 
 #include "common/config/protocol_json.h"
 #include "common/http/access_log/access_log_impl.h"
+#include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
@@ -27,12 +28,26 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
+static const char date_provider_singleton_name[] = "date_provider_singleton";
+static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singleton_name>,
+                                 Singleton::Registration>
+    date_provider_singleton_registered_;
+
 NetworkFilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& config,
                                                               FactoryContext& context) {
+  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
+      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          date_provider_singleton_name);
+  if (date_provider == nullptr) {
+    date_provider = std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
+                                                                       context.threadLocal());
+    context.singletonManager().set(date_provider_singleton_name, date_provider);
+  }
+
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
-      new HttpConnectionManagerConfig(config, context));
-  return [http_config, &context](Network::FilterManager& filter_manager) mutable -> void {
+      new HttpConnectionManagerConfig(config, context, *date_provider));
+  return [http_config, &context, date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo())});
@@ -65,7 +80,8 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 }
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
-                                                         FactoryContext& context)
+                                                         FactoryContext& context,
+                                                         Http::DateProvider& date_provider)
     : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), context_(context),
       stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
@@ -81,7 +97,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       http1_settings_(Http::Utility::parseHttp1Settings(config)),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
-      date_provider_(context_.dispatcher(), context_.threadLocal()) {
+      date_provider_(date_provider) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.dispatcher(),

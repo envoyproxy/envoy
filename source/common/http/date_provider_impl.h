@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/utility.h"
@@ -25,7 +26,7 @@ protected:
  * A caching thread local provider. This implementation updates the date string every 500ms and
  * caches on each thread.
  */
-class TlsCachingDateProviderImpl : public DateProviderImplBase {
+class TlsCachingDateProviderImpl : public DateProviderImplBase, public Singleton::Instance {
 public:
   TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
