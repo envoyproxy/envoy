@@ -27,7 +27,7 @@ namespace HotRestart {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 8;
 
-  SharedMemory& SharedMemory::initialize(Server::Options& options) {
+SharedMemory& SharedMemory::initialize(Server::Options& options) {
   int flags = O_RDWR;
   std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
