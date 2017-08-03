@@ -171,7 +171,12 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "ring_hash_lb_test",
-    srcs = ["ring_hash_lb_test.cc"],
+    srcs = select({
+        # TODO(zuercher): enable test for OSX once a known algorithm is in use (see TODO in
+        # ring_hash_lb_test.cc)
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": ["ring_hash_lb_test.cc"],
+    }),
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/upstream:ring_hash_lb_lib",

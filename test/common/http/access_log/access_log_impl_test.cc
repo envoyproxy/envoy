@@ -41,6 +41,7 @@ public:
   TestRequestInfo() {
     tm fake_time;
     memset(&fake_time, 0, sizeof(fake_time));
+    fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on osx
     fake_time.tm_mday = 1;
     start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
   }
@@ -108,7 +109,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   request_headers_.addViaCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
 
   log->log(&request_headers_, &response_headers_, request_info_);
-  EXPECT_EQ("[1900-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF 1 2 3 - \"x.x.x.x\" "
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF 1 2 3 - \"x.x.x.x\" "
             "\"user-agent-set\" \"id\" \"host\" \"-\"\n",
             output_);
 }
@@ -128,7 +129,7 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
 
   log->log(&request_headers_, &response_headers_, request_info_);
   EXPECT_EQ(
-      "[1900-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 999 \"-\" \"-\" \"-\" \"-\" \"-\"\n",
+      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 999 \"-\" \"-\" \"-\" \"-\" \"-\"\n",
       output_);
 }
 
@@ -145,7 +146,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
   EXPECT_EQ(
-      "[1900-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
+      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
       output_);
 }
 
@@ -165,7 +166,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
-  EXPECT_EQ("[1900-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"10.0.0.5:1234\"\n",
             output_);
 }
@@ -264,7 +265,7 @@ TEST_F(AccessLogImplTest, PathRewrite) {
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
-  EXPECT_EQ("[1900-01-01T00:00:00.000Z] \"GET /bar HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET /bar HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
             "\"-\"\n",
             output_);
 }

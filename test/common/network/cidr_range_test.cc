@@ -323,14 +323,14 @@ TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
 
 TEST(Ipv6CidrRange, StringAndLengthCtor) {
   CidrRange rng;
-  rng = CidrRange::create("::ffff", 122); // Assignment operator.
+  rng = CidrRange::create("ff::ffff", 122); // Assignment operator.
   EXPECT_TRUE(rng.isValid());
-  EXPECT_EQ(rng.asString(), "::ffc0/122");
+  EXPECT_EQ(rng.asString(), "ff::ffc0/122");
   EXPECT_EQ(rng.length(), 122);
   EXPECT_EQ(rng.version(), IpVersion::v6);
-  EXPECT_FALSE(rng.isInRange(Ipv6Instance("::ffbf")));
-  EXPECT_TRUE(rng.isInRange(Ipv6Instance("::ffc0")));
-  EXPECT_TRUE(rng.isInRange(Ipv6Instance("::ffff")));
+  EXPECT_FALSE(rng.isInRange(Ipv6Instance("ff::ffbf")));
+  EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffc0")));
+  EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:0")));
 
   rng = CidrRange::create("::ffff", -2); // Invalid length.
@@ -340,14 +340,14 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
 }
 
 TEST(Ipv6CidrRange, StringCtor) {
-  CidrRange rng = CidrRange::create("::fc1f/118");
+  CidrRange rng = CidrRange::create("ff::fc1f/118");
   EXPECT_TRUE(rng.isValid());
-  EXPECT_EQ(rng.asString(), "::fc00/118");
+  EXPECT_EQ(rng.asString(), "ff::fc00/118");
   EXPECT_EQ(rng.length(), 118);
   EXPECT_EQ(rng.version(), IpVersion::v6);
-  EXPECT_FALSE(rng.isInRange(Ipv6Instance("::fbff")));
-  EXPECT_TRUE(rng.isInRange(Ipv6Instance("::fc00")));
-  EXPECT_TRUE(rng.isInRange(Ipv6Instance("::ffff")));
+  EXPECT_FALSE(rng.isInRange(Ipv6Instance("ff::fbff")));
+  EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::fc00")));
+  EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("::1:00")));
 
   CidrRange rng2 = CidrRange::create("::fc1f/-10"); // Invalid length.
