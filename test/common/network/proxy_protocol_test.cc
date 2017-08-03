@@ -317,17 +317,13 @@ public:
     conn_->write(buf);
   }
 
-  void disconnect(bool async) {
+  void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
     conn_->close(ConnectionCloseType::NoFlush);
-    if (async) {
-      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-    } else {
-      EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+    EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
-      dispatcher_.run(Event::Dispatcher::RunType::Block);
-    }
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
   Event::DispatcherImpl dispatcher_;
@@ -363,7 +359,7 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
         return Network::FilterStatus::Continue;
       }));
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  disconnect(false);
+  disconnect();
 }
 
 TEST_P(WildcardProxyProtocolTest, BasicV6) {
@@ -382,7 +378,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
       }));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  disconnect(false);
+  disconnect();
 }
 
 } // namespace Network

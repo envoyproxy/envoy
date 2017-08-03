@@ -100,16 +100,16 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  void disconnect(bool async) {
+  void disconnect(bool wait_for_remote_close) {
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
-    if (async) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    } else {
+    if (wait_for_remote_close) {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
           .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
       dispatcher_->run(Event::Dispatcher::RunType::Block);
+    } else {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -264,7 +264,7 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   client_connection_->readDisable(false);
   client_connection_->readDisable(false);
 
-  disconnect(true);
+  disconnect(false);
 }
 
 // Test that as watermark levels are changed, the appropriate callbacks are triggered.
@@ -309,7 +309,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
     client_connection_->setBufferLimits(buffer_len * 2);
   }
 
-  disconnect(true);
+  disconnect(false);
 }
 
 // Write some data to the connection.  It will automatically attempt to flush
@@ -335,7 +335,7 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
 
-  disconnect(false);
+  disconnect(true);
 }
 
 // Similar to BasicWrite, only with watermarks set.
@@ -388,7 +388,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
-  disconnect(false);
+  disconnect(true);
 }
 
 // Read and write random bytes and ensure we don't encounter issues.
@@ -461,7 +461,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  disconnect(false);
+  disconnect(true);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

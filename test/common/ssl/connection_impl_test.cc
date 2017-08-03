@@ -481,7 +481,6 @@ public:
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
-
           if (filter_seen == (write_size * num_writes)) {
             server_connection_->close(Network::ConnectionCloseType::FlushWrite);
           }
