@@ -8,9 +8,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
 using testing::StrictMock;
-
 namespace Http {
 
 TEST(UserAgentTest, All) {

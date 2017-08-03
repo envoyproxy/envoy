@@ -13,9 +13,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
 using testing::StrictMock;
-
 namespace Ssl {
 
 class SslContextImplTest : public SslCertsTest {};

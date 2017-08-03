@@ -21,7 +21,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
-using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 

@@ -13,7 +13,6 @@
 
 namespace Envoy {
 using testing::StrictMock;
-
 namespace Upstream {
 
 class EdsTest : public testing::Test {

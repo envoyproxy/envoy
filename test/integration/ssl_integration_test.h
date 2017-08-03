@@ -11,7 +11,6 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Ssl {

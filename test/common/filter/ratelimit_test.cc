@@ -20,7 +20,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::StrictMock;
 using testing::WithArgs;
 using testing::_;
 

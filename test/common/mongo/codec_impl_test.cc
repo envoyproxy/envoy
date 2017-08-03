@@ -14,7 +14,6 @@ namespace Envoy {
 using testing::Eq;
 using testing::NiceMock;
 using testing::Pointee;
-using testing::StrictMock;
 
 namespace Mongo {
 
