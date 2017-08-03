@@ -30,6 +30,7 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -100,7 +101,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  LocalInfo::MockLocalInfo local_info_;
+  StrictMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 class ClusterManagerImplTest : public testing::Test {
@@ -114,7 +115,7 @@ public:
 
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
-  AccessLog::MockAccessLogManager log_manager_;
+  StrictMock<AccessLog::MockAccessLogManager> log_manager_;
 };
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {

@@ -13,6 +13,7 @@ using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 

@@ -16,6 +16,7 @@ using testing::ByRef;
 using testing::Eq;
 using testing::Invoke;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Network {

@@ -25,6 +25,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -111,7 +112,7 @@ public:
     EXPECT_EQ(nullptr, test.pool_.newStream(decoder_, callbacks_));
   }
 
-  Http::MockStreamDecoder decoder_;
+  StrictMock<Http::MockStreamDecoder> decoder_;
   ConnPoolCallbacks callbacks_;
   Http::StreamDecoder* inner_decoder_{};
   NiceMock<Http::MockStreamEncoder> inner_encoder_;

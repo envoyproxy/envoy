@@ -15,6 +15,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -27,7 +28,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  Network::MockFilterChainFactory factory_;
+  StrictMock<Network::MockFilterChainFactory> factory_;
   NiceMock<Network::MockListenSocket> socket_;
 };
 

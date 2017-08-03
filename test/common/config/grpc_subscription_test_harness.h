@@ -17,6 +17,7 @@ using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -99,7 +100,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;

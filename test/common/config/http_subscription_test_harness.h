@@ -19,6 +19,7 @@
 
 using testing::Invoke;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -133,13 +134,13 @@ public:
   std::string version_;
   std::vector<std::string> cluster_names_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Upstream::MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Upstream::MockClusterManager> cm_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
-  Runtime::MockRandomGenerator random_gen_;
-  Http::MockAsyncClientRequest http_request_;
+  StrictMock<Runtime::MockRandomGenerator> random_gen_;
+  StrictMock<Http::MockAsyncClientRequest> http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;

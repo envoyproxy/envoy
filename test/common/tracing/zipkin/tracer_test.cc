@@ -14,6 +14,7 @@
 
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Zipkin {

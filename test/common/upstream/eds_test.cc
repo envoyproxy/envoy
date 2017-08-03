@@ -12,6 +12,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::StrictMock;
+
 namespace Upstream {
 
 class EdsTest : public testing::Test {
@@ -36,9 +38,9 @@ protected:
   }
 
   Stats::IsolatedStoreImpl stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::api::v2::Cluster eds_cluster_;
-  MockClusterManager cm_;
+  StrictMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<EdsClusterImpl> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;

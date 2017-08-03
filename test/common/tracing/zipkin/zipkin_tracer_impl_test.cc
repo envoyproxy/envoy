@@ -27,6 +27,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::Test;
 using testing::_;
 
@@ -65,7 +66,7 @@ public:
   Http::TestHeaderMapImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
-  Http::AccessLog::MockRequestInfo request_info_;
+  StrictMock<Http::AccessLog::MockRequestInfo> request_info_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;

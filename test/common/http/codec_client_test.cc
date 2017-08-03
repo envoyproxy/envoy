@@ -25,6 +25,7 @@ using testing::Pointee;
 using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 
@@ -49,7 +50,7 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;

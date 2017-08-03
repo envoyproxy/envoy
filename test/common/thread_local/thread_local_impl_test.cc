@@ -7,6 +7,7 @@
 using testing::InSequence;
 using testing::Ref;
 using testing::ReturnPointee;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -42,8 +43,8 @@ public:
   }
 
   InstanceImpl tls_;
-  Event::MockDispatcher main_dispatcher_;
-  Event::MockDispatcher thread_dispatcher_;
+  StrictMock<Event::MockDispatcher> main_dispatcher_;
+  StrictMock<Event::MockDispatcher> thread_dispatcher_;
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {

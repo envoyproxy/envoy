@@ -130,8 +130,8 @@ protected:
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), true};
-  Network::MockListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;

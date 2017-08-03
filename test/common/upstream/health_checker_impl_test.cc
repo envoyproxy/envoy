@@ -31,6 +31,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -895,7 +896,7 @@ public:
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Redis::ConnPool::MockClient* client_{};
-  Redis::ConnPool::MockPoolRequest pool_request_;
+  StrictMock<Redis::ConnPool::MockPoolRequest> pool_request_;
   Redis::ConnPool::PoolCallbacks* pool_callbacks_{};
   std::unique_ptr<RedisHealthCheckerImpl> health_checker_;
 };

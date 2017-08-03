@@ -31,6 +31,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -99,16 +100,16 @@ protected:
   }
 
   Stats::IsolatedStoreImpl stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::api::v2::Cluster sds_cluster_;
-  MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<MockClusterManager> cm_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<EdsClusterImpl> cluster_;
   Event::MockTimer* timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   ReadyWatcher membership_updated_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Http::MockAsyncClientRequest request_;
+  StrictMock<Http::MockAsyncClientRequest> request_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };

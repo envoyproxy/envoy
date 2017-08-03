@@ -26,6 +26,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
+using testing::StrictMock;
 using testing::WithArgs;
 using testing::_;
 

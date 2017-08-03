@@ -11,6 +11,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRefOfCopy;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -72,13 +73,13 @@ public:
   }
 
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Init::MockManager init_;
+  StrictMock<Init::MockManager> init_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
-  MockListenerManager listener_manager_;
-  Http::MockAsyncClientRequest request_;
+  StrictMock<MockListenerManager> listener_manager_;
+  StrictMock<Http::MockAsyncClientRequest> request_;
   std::unique_ptr<LdsApi> lds_;
   Event::MockTimer* interval_timer_{new Event::MockTimer(&dispatcher_)};
   Http::AsyncClient::Callbacks* callbacks_{};

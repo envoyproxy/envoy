@@ -31,6 +31,7 @@ namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -87,7 +88,7 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_;
   std::string output_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Envoy::AccessLog::MockAccessLogManager log_manager_;
+  StrictMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {

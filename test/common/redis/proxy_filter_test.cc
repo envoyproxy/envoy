@@ -21,6 +21,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -129,7 +130,7 @@ public:
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
   DecoderCallbacks* decoder_callbacks_{};
-  CommandSplitter::MockInstance splitter_;
+  StrictMock<CommandSplitter::MockInstance> splitter_;
   Stats::IsolatedStoreImpl store_;
   ProxyFilterConfigSharedPtr config_;
   std::unique_ptr<ProxyFilter> filter_;

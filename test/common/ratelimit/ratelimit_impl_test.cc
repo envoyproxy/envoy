@@ -19,6 +19,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -38,9 +39,9 @@ public:
 
   Grpc::MockAsyncClient<pb::lyft::ratelimit::RateLimitRequest,
                         pb::lyft::ratelimit::RateLimitResponse>* async_client_;
-  Grpc::MockAsyncRequest async_request_;
+  StrictMock<Grpc::MockAsyncRequest> async_request_;
   GrpcClientImpl client_;
-  MockRequestCallbacks request_callbacks_;
+  StrictMock<MockRequestCallbacks> request_callbacks_;
 };
 
 TEST_F(RateLimitGrpcClientTest, Basic) {

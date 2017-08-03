@@ -13,6 +13,7 @@
 
 namespace Envoy {
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace AccessLog {

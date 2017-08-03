@@ -12,6 +12,7 @@
 
 namespace Envoy {
 using testing::NiceMock;
+using testing::StrictMock;
 
 namespace Http {
 

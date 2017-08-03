@@ -8,6 +8,7 @@
 namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Upstream {
 

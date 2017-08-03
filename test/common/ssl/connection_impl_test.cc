@@ -561,8 +561,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_{new Event::DispatcherImpl};
   Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), true};
-  Network::MockListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   std::string server_ctx_json_ = R"EOF(
     {
       "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
@@ -576,7 +576,7 @@ public:
       "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
     }
   )EOF";
-  Runtime::MockLoader runtime_;
+  StrictMock<Runtime::MockLoader> runtime_;
   Json::ObjectSharedPtr server_ctx_loader_;
   std::unique_ptr<ServerContextConfigImpl> server_ctx_config_;
   std::unique_ptr<ContextManagerImpl> manager_;

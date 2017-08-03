@@ -19,6 +19,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 class HealthCheckFilterTest : public testing::Test {
@@ -42,7 +43,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::MockTimer* cache_timer_{};
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   HealthCheckCacheManagerSharedPtr cache_manager_;
   std::unique_ptr<HealthCheckFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;

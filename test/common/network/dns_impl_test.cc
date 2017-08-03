@@ -32,6 +32,7 @@ using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -302,7 +303,7 @@ protected:
   virtual bool zero_timeout() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;

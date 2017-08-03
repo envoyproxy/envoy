@@ -20,6 +20,7 @@
 namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
+using testing::StrictMock;
 using testing::_;
 
 namespace Network {
@@ -46,8 +47,8 @@ public:
   Event::DispatcherImpl dispatcher_;
   TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockListenerCallbacks callbacks_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<MockListenerCallbacks> callbacks_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   ListenerImpl listener_;
   ClientConnectionPtr conn_;
   NiceMock<MockConnectionCallbacks> connection_callbacks_;
@@ -276,8 +277,8 @@ public:
   TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockListenerCallbacks callbacks_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<MockListenerCallbacks> callbacks_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   ListenerImpl listener_;
   ClientConnectionPtr conn_;
   NiceMock<MockConnectionCallbacks> connection_callbacks_;

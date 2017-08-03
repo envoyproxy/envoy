@@ -25,6 +25,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Upstream {
@@ -81,7 +82,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* interval_timer_ = new Event::MockTimer(&dispatcher_);
   CallbackChecker checker_;
-  MockMonotonicTimeSource time_source_;
+  StrictMock<MockMonotonicTimeSource> time_source_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
   envoy::api::v2::Cluster::OutlierDetection empty_outlier_detection_;
 };

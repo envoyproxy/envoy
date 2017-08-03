@@ -28,6 +28,7 @@
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -61,7 +62,7 @@ struct ResolverData {
 
   Event::MockTimer* timer_;
   Network::DnsResolver::ResolveCb dns_callback_;
-  Network::MockActiveDnsQuery active_dns_query_;
+  StrictMock<Network::MockActiveDnsQuery> active_dns_query_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>

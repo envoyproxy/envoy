@@ -15,6 +15,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 
@@ -28,7 +29,7 @@ public:
 
   MOCK_METHOD0(onDestroy, void());
 
-  Init::MockTarget target_;
+  StrictMock<Init::MockTarget> target_;
   MockDrainManager* drain_manager_ = new MockDrainManager();
   Configuration::FactoryContext* context_{};
 };
