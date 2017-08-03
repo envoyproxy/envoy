@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+#include <uuid/uuid.h>
+#endif
+
 #include <cstdint>
 #include <random>
 #include <string>
@@ -22,6 +26,15 @@ namespace Runtime {
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 std::string RandomGeneratorImpl::uuid() {
+#ifdef __APPLE__
+  // TODO (zuercher): factor out a sensible interface for UUID generation to make it easier
+  // to put a faster implementation in later.
+  char generated_uuid[UUID_LENGTH + 1];
+  uuid_t uuid;
+  uuid_generate_random(uuid);
+  uuid_unparse(uuid, generated_uuid);
+  return std::string(generated_uuid);
+#else
   int fd = open("/proc/sys/kernel/random/uuid", O_RDONLY);
   if (-1 == fd) {
     throw EnvoyException(fmt::format("unable to open uuid, errno: {}", strerror(errno)));
@@ -38,6 +51,7 @@ std::string RandomGeneratorImpl::uuid() {
   }
 
   return std::string(generated_uuid);
+#endif
 }
 
 SnapshotImpl::SnapshotImpl(const std::string& root_path, const std::string& override_path,

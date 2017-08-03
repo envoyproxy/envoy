@@ -61,6 +61,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
+    thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
     exit(1);
   }

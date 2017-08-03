@@ -24,6 +24,10 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+    }) + select({
+        # TCLAP command line parser needs this to support int64_t/uint64_t
+        "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
+        "//conditions:default": [],
     })
 
 # Compute the final linkopts based on various options.
