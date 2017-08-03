@@ -368,7 +368,7 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   expectClientConnect(0);
 
   ConnPoolCallbacks callbacks;
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
 

@@ -185,7 +185,7 @@ struct MockBufferStats {
 TEST_P(ConnectionImplTest, BufferStats) {
   setUpBasicConnection();
 
-  MockBufferStats client_buffer_stats;
+  StrictMock<MockBufferStats> client_buffer_stats;
   client_connection_->setBufferStats(client_buffer_stats.toBufferStats());
   client_connection_->connect();
 
@@ -204,7 +204,7 @@ TEST_P(ConnectionImplTest, BufferStats) {
   EXPECT_CALL(client_buffer_stats.tx_total_, add(4)).InSequence(s1);
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
-  MockBufferStats server_buffer_stats;
+  StrictMock<MockBufferStats> server_buffer_stats;
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);

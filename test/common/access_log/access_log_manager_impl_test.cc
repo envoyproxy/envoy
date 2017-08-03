@@ -19,8 +19,8 @@ using testing::_;
 namespace AccessLog {
 
 TEST(AccessLogManagerImpl, reopenAllFiles) {
-  Api::MockApi api;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Api::MockApi> api;
+  StrictMock<Event::MockDispatcher> dispatcher;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl stats_store;
 

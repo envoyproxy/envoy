@@ -128,7 +128,7 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  Upstream::MockClusterManager cm;
+  StrictMock<Upstream::MockClusterManager> cm;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
   EXPECT_THROW(GrpcFactoryImpl(*config, cm), EnvoyException);
@@ -142,7 +142,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  Upstream::MockClusterManager cm;
+  StrictMock<Upstream::MockClusterManager> cm;
 
   EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
   GrpcFactoryImpl factory(*config, cm);
@@ -152,7 +152,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
   ClientPtr client = factory.create(Optional<std::chrono::milliseconds>());
-  MockRequestCallbacks request_callbacks;
+  StrictMock<MockRequestCallbacks> request_callbacks;
   EXPECT_CALL(request_callbacks, complete(LimitStatus::OK));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::EMPTY_CONTEXT);
   client->cancel();

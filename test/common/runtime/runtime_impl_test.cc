@@ -17,6 +17,7 @@ namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
+using testing::StrictMock;
 
 namespace Runtime {
 
@@ -56,11 +57,11 @@ public:
                                 "envoy", override_dir, store, generator));
   }
 
-  Event::MockDispatcher dispatcher;
+  StrictMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
 
   Stats::IsolatedStoreImpl store;
-  MockRandomGenerator generator;
+  StrictMock<MockRandomGenerator> generator;
   std::unique_ptr<LoaderImpl> loader;
 };
 
@@ -105,7 +106,7 @@ TEST_F(RuntimeImplTest, OverrideFolderDoesNotExist) {
 }
 
 TEST(NullRuntimeImplTest, All) {
-  MockRandomGenerator generator;
+  StrictMock<MockRandomGenerator> generator;
   NullLoaderImpl loader(generator);
   EXPECT_EQ("", loader.snapshot().get("foo"));
   EXPECT_EQ(1UL, loader.snapshot().getInteger("foo", 1));

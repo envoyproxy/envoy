@@ -593,7 +593,7 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 // immediately.
 TEST(DnsImplUnitTest, PendingTimerEnable) {
   InSequence s;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Event::MockDispatcher> dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
   DnsResolverImpl resolver(dispatcher, {});

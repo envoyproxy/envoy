@@ -16,8 +16,8 @@
 
 using ::testing::Invoke;
 using ::testing::Return;
-using ::testing::_;
 using ::testing::StrictMock;
+using ::testing::_;
 
 namespace Envoy {
 namespace Config {

@@ -28,8 +28,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   Event::DispatcherImpl dispatcher;
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
                                 {.bind_to_port_ = true,
@@ -99,7 +99,7 @@ TEST_P(ListenerImplTest, NormalRedirect) {
   Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // The traffic should redirect from binding listener to the virtual listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store,
@@ -140,7 +140,7 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(Network::Test::getAnyAddress(version_), false);
   Network::MockListenerCallbacks listener_callbacks1;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store,
@@ -180,8 +180,8 @@ TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // The virtual listener of exact address does not exist, fall back to the wild card listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
                                      stats_store,
@@ -217,8 +217,8 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // The virtual listener of exact address does not exist, fall back to the wild card listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
                                      stats_store,
@@ -256,7 +256,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
   Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // Do not redirect since use_original_dst is false.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store,
@@ -294,8 +294,8 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
-  Network::MockListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   // Do not redirect since use_original_dst is false.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
                                      stats_store,

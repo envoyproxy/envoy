@@ -13,6 +13,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using testing::StrictMock;
+
 namespace Ssl {
 
 class SslContextImplTest : public SslCertsTest {};
@@ -77,7 +80,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ClientContextConfigImpl cfg(*loader);
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW(manager.createSslClientContext(store, cfg), EnvoyException);
@@ -93,7 +96,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ClientContextConfigImpl cfg(*loader);
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
@@ -116,7 +119,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ClientContextConfigImpl cfg(*loader);
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
@@ -134,7 +137,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ClientContextConfigImpl cfg(*loader);
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
 
@@ -160,7 +163,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ClientContextConfigImpl cfg(*loader);
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));

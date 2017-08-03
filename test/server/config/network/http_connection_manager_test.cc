@@ -12,6 +12,7 @@
 
 using testing::ContainerEq;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Server {
@@ -123,42 +124,42 @@ TEST(HttpConnectionManagerConfigTest, MiscConfig) {
 
 TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
     Buffer::OwnedImpl data("");
     EXPECT_EQ("hello", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
   }
 
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("");
     EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
   }
 
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("GET / HTTP/1.1");
     EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
   }
 
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
     EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
   }
 
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2");
     EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
   }
 
   {
-    Network::MockConnection connection;
+    StrictMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/");
     EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));

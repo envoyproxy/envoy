@@ -17,7 +17,7 @@ using testing::StrictMock;
 namespace Http {
 
 TEST(DateProviderImplTest, All) {
-  Event::MockDispatcher dispatcher;
+  StrictMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Event::MockTimer* timer = new Event::MockTimer(&dispatcher);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500)));

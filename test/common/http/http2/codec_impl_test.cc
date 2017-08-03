@@ -167,7 +167,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_.encodeHeaders(request_headers, false);
 
-  MockStreamCallbacks callbacks;
+  StrictMock<MockStreamCallbacks> callbacks;
   request_encoder_.getStream().addCallbacks(callbacks);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
@@ -238,7 +238,7 @@ class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   InSequence s;
 
-  MockStreamCallbacks client_stream_callbacks;
+  StrictMock<MockStreamCallbacks> client_stream_callbacks;
   request_encoder_.getStream().addCallbacks(client_stream_callbacks);
 
   // Do a request, but pause server dispatch so we don't send window updates. This will result in a
@@ -290,7 +290,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
-  MockStreamCallbacks client_stream_callbacks;
+  StrictMock<MockStreamCallbacks> client_stream_callbacks;
   request_encoder_.getStream().addCallbacks(client_stream_callbacks);
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));

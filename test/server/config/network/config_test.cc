@@ -19,6 +19,7 @@
 
 namespace Envoy {
 using testing::NiceMock;
+using testing::StrictMock;
 using testing::_;
 
 namespace Server {
@@ -40,7 +41,7 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   RedisProxyFilterConfigFactory factory;
   EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
@@ -58,7 +59,7 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
   MongoProxyFilterConfigFactory factory;
   EXPECT_EQ(NetworkFilterType::Both, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
 }
@@ -124,7 +125,7 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   TcpProxyConfigFactory factory;
   EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 
@@ -152,7 +153,7 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuth) {
   ClientSslAuthConfigFactory factory;
   EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
@@ -172,7 +173,7 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   RateLimitConfigFactory factory;
   EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }

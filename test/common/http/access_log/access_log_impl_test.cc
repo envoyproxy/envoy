@@ -345,8 +345,8 @@ TEST_F(AccessLogImplTest, requestTracing) {
 }
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
-  Runtime::MockLoader runtime;
-  Envoy::AccessLog::MockAccessLogManager log_manager;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Envoy::AccessLog::MockAccessLogManager> log_manager;
 
   {
     std::string json = R"EOF(

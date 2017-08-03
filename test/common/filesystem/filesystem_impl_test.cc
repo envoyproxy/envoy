@@ -21,11 +21,12 @@ using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
+using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 
 TEST(FileSystemImpl, BadFile) {
-  Event::MockDispatcher dispatcher;
+  NiceMock<Event::MockDispatcher> dispatcher;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
   Filesystem::OsSysCallsImpl os_sys_calls;

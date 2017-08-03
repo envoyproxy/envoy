@@ -12,12 +12,13 @@
 
 namespace Envoy {
 using testing::Invoke;
+using testing::StrictMock;
 using testing::_;
 
 namespace Router {
 
 TEST(ShadowWriterImplTest, All) {
-  Upstream::MockClusterManager cm;
+  StrictMock<Upstream::MockClusterManager> cm;
   ShadowWriterImpl writer(cm);
 
   // Success case

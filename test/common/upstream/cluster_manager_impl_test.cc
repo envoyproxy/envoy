@@ -610,7 +610,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-  Network::MockActiveDnsQuery active_dns_query;
+  StrictMock<Network::MockActiveDnsQuery> active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);

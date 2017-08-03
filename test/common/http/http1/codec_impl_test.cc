@@ -21,6 +21,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -53,7 +54,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
     codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
   }
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
@@ -72,7 +73,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
     codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
   }
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
@@ -84,7 +85,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{
@@ -103,7 +104,7 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
 TEST_F(Http1ServerConnectionImplTest, Http10) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -189,7 +190,7 @@ TEST_F(Http1ServerConnectionImplTest, Http11Options) {
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -213,7 +214,7 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   std::string output;
   ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("G");
@@ -227,7 +228,7 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
 TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{":authority", "hello"}, {":path", "/"}, {":method", "GET"}};
@@ -241,7 +242,7 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
@@ -259,7 +260,7 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   InSequence sequence;
 
-  Http::MockStreamDecoder decoder;
+  StrictMock<Http::MockStreamDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
@@ -438,7 +439,7 @@ public:
 };
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
-  Http::MockStreamDecoder response_decoder;
+  StrictMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
   std::string output;
@@ -450,7 +451,7 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
-  Http::MockStreamDecoder response_decoder;
+  StrictMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
   std::string output;
@@ -462,17 +463,17 @@ TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, Reset) {
-  Http::MockStreamDecoder response_decoder;
+  StrictMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
-  Http::MockStreamCallbacks callbacks;
+  StrictMock<Http::MockStreamCallbacks> callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset));
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
 }
 
 TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
-  Http::MockStreamDecoder response_decoder;
+  StrictMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder* request_encoder = &codec_->newStream(response_decoder);
 
   std::string output;

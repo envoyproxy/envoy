@@ -70,7 +70,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -87,7 +87,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -108,9 +108,9 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
-  Http::MockStreamCallbacks callbacks;
+  StrictMock<Http::MockStreamCallbacks> callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a remote close with an active request we should try to send zero bytes through

@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {
+using testing::StrictMock;
 namespace Upstream {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
@@ -28,7 +29,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   Ssl::ContextManagerImpl ssl_context_manager{runtime};
   NiceMock<Event::MockDispatcher> dispatcher;
-  LocalInfo::MockLocalInfo local_info;
+  StrictMock<LocalInfo::MockLocalInfo> local_info;
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info);
@@ -39,7 +40,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   }
   )EOF";
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  AccessLog::MockAccessLogManager log_manager;
+  StrictMock<AccessLog::MockAccessLogManager> log_manager;
   envoy::api::v2::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromJson(
       *config, bootstrap, stats, tls, runtime, random, local_info, log_manager);
@@ -50,7 +51,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   EXPECT_EQ(nullptr, data.host_description_);
 
   Http::AsyncClient& client = cluster_manager->httpAsyncClientForCluster("cluster");
-  Http::MockAsyncClientStreamCallbacks stream_callbacks;
+  StrictMock<Http::MockAsyncClientStreamCallbacks> stream_callbacks;
   EXPECT_EQ(nullptr, client.start(stream_callbacks, Optional<std::chrono::milliseconds>()));
 }
 

@@ -74,7 +74,7 @@ TEST(AccessLogFormatUtilsTest, protocolToString) {
 TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
-  MockRequestInfo request_info;
+  StrictMock<MockRequestInfo> request_info;
 
   EXPECT_EQ("plain", formatter.format(header, header, request_info));
 }
@@ -164,7 +164,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 }
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
-  MockRequestInfo request_info;
+  StrictMock<MockRequestInfo> request_info;
   TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   TestHeaderMapImpl response_header{{":method", "PUT"}};
 
@@ -190,7 +190,7 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
 }
 
 TEST(AccessLogFormatterTest, responseHeaderFormatter) {
-  MockRequestInfo request_info;
+  StrictMock<MockRequestInfo> request_info;
   TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
@@ -216,7 +216,7 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
-  MockRequestInfo request_info;
+  StrictMock<MockRequestInfo> request_info;
   TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
 

@@ -520,7 +520,7 @@ TEST(DetectorHostSinkNullImplTest, All) {
 }
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
-  AccessLog::MockAccessLogManager log_manager;
+  StrictMock<AccessLog::MockAccessLogManager> log_manager;
   std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
   NiceMock<MockClusterInfo> cluster;
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());

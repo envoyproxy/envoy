@@ -58,9 +58,9 @@ TEST(HealthCheckerFactoryTest, createRedis) {
   )EOF";
 
   NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Runtime::MockRandomGenerator> random;
+  StrictMock<Event::MockDispatcher> dispatcher;
   EXPECT_NE(nullptr, dynamic_cast<RedisHealthCheckerImpl*>(
                          HealthCheckerFactory::create(parseHealthCheckFromJson(json), cluster,
                                                       runtime, random, dispatcher)
@@ -72,9 +72,9 @@ TEST(HealthCheckerFactoryTest, createRedis) {
 // #1308.
 TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Runtime::MockRandomGenerator> random;
+  StrictMock<Event::MockDispatcher> dispatcher;
   envoy::api::v2::HealthCheck health_check;
   // No health checker type set
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
