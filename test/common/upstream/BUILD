@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["cds_api_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/upstream:cds_api_lib",

@@ -311,11 +311,31 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
 
+void BaseIntegrationTest::createApiTestServer(const std::string& json_path,
+                                              const ApiFilesystemConfig& api_filesystem_config,
+                                              const std::vector<std::string>& port_names) {
+  if (api_filesystem_config.bootstrap_path_.empty()) {
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), std::string(),
+        version_);
+  } else {
+    const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.eds_path_, port_map_, version_);
+    const std::string cds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.cds_path_, {{"eds_json_path", eds_path}}, port_map_, version_);
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_),
+        TestEnvironment::temporaryFileSubstitute(api_filesystem_config.bootstrap_path_,
+                                                 {{"cds_json_path", cds_path}}, port_map_,
+                                                 version_),
+        version_);
+  }
+  registerTestServerPorts(port_names);
+}
+
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
-  registerTestServerPorts(port_names);
+  createApiTestServer(json_path, {}, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,

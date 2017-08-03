@@ -17,7 +17,6 @@ envoy_cc_library(
         ":cds_subscription_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:subscription_factory_lib",
@@ -50,6 +49,7 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":cds_api_lib",
         ":load_balancer_lib",

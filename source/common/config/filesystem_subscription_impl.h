@@ -59,6 +59,8 @@ private:
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources);
       stats_.update_success_.inc();
+      ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
+                message.DebugString());
       // TODO(htuch): Add some notion of current version for every API in stats/admin.
     } catch (const EnvoyException& e) {
       if (config_update_available) {

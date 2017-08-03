@@ -64,9 +64,8 @@ public:
     return ClusterPtr{clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api)};
   }
 
-  CdsApiPtr createCds(const Json::Object&, const Optional<SdsConfig>& sds_config,
+  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&, const Optional<SdsConfig>&,
                       ClusterManager&) override {
-    UNREFERENCED_PARAMETER(sds_config);
     return CdsApiPtr{createCds_()};
   }
 
