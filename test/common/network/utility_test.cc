@@ -152,7 +152,7 @@ public:
     EXPECT_EQ(pthread_mutex_lock(&mutex_), 0);
 
     int rc = 0;
-    while(rc == 0 && !signaled_) {
+    while (rc == 0 && !signaled_) {
       rc = pthread_cond_wait(&cond_, &mutex_);
     }
 
