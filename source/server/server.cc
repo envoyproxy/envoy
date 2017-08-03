@@ -66,6 +66,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
               options.configPath() +
                   (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
               e.what());
+    thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
     exit(1);
   }
