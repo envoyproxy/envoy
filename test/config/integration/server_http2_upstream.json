@@ -267,61 +267,16 @@
            "per_stream_buffer_limit": 1024
         },
         "drain_timeout_ms": 5000,
-        "access_log": [
-        {
-          "path": "/dev/null",
-          "filter" : {
-            "type": "logical_or",
-            "filters": [
-              {
-                "type": "status_code",
-                "op": ">=",
-                "value": 500
-              },
-              {
-                "type": "duration",
-                "op": ">=",
-                "value": 1000000
-              }
-            ]
-          }
-        },
-        {
-          "path": "/dev/null"
-        }],
         "stat_prefix": "router",
         "route_config":
         {
           "virtual_hosts": [
             {
-              "name": "redirect",
-              "domains": [ "www.redirect.com" ],
-              "require_ssl": "all",
-              "routes": [
-                {
-                  "prefix": "/",
-                  "cluster": "cluster_1"
-                }
-              ]
-            },
-            {
               "name": "integration",
               "domains": [ "*" ],
               "routes": [
                 {
-                  "prefix": "/",
-                  "cluster": "cluster_3",
-                  "runtime": {
-                    "key": "some_key",
-                    "default": 0
-                  }
-                },
-                {
                   "prefix": "/test/long/url",
-                  "cluster": "cluster_3"
-                },
-                {
-                  "prefix": "/test/",
                   "cluster": "cluster_3"
                 }
               ]
@@ -329,11 +284,6 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
-            "config": {
-              "pass_through_mode": false, "endpoint": "/healthcheck"
-            }
-          },
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
