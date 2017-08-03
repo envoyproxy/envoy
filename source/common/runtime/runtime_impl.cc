@@ -27,7 +27,7 @@ const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 std::string RandomGeneratorImpl::uuid() {
 #ifdef __APPLE__
-  // TODO (zuercher): factor out a sensible interface for UUID generation to make it easier
+  // TODO(zuercher): factor out a sensible interface for UUID generation to make it easier
   // to put a faster implementation in later.
   char generated_uuid[UUID_LENGTH + 1];
   uuid_t uuid;
