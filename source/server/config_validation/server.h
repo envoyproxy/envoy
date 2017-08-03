@@ -85,7 +85,7 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
-  Router::ServerHttpRouteManager& httpRouteManager() override { return http_route_manager_; }
+  Router::ServerHttpRouteManager& httpRouteManager() override { return *http_route_manager_; }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>

@@ -32,7 +32,6 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), local_info_(local_info),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
-      http_route_manager_(runtime(), dispatcher(), random(), localInfo(), threadLocal()),
       listener_manager_(*this, *this, *this) {
   try {
     initialize(options, component_factory);
@@ -64,8 +63,8 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
-  http_route_manager_.reset(
-      new HttpRouteManagerImpl(runtime(), dispatcher(), random(), localInfo(), threadLocal()));
+  http_route_manager_.reset(new Router::HttpRouteManagerImpl(runtime(), dispatcher(), random(),
+                                                             localInfo(), threadLocal()));
   cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo()));
