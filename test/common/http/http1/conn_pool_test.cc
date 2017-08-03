@@ -28,6 +28,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -368,7 +369,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // We should get a reset callback when the connection disconnects.
-  Http::MockStreamCallbacks stream_callbacks;
+  StrictMock<Http::MockStreamCallbacks> stream_callbacks;
   EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   request_encoder.getStream().addCallbacks(stream_callbacks);
 

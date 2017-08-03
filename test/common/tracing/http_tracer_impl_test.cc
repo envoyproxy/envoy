@@ -27,6 +27,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::Test;
 using testing::_;
 
@@ -342,7 +343,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   request_headers.addViaCopy(Http::LowerCaseString("aa"), "a");
   request_headers.addViaCopy(Http::LowerCaseString("bb"), "b");
   request_headers.addViaCopy(Http::LowerCaseString("cc"), "c");
-  MockConfig config;
+  StrictMock<MockConfig> config;
   config.headers_.push_back(Http::LowerCaseString("aa"));
   config.headers_.push_back(Http::LowerCaseString("cc"));
   config.headers_.push_back(Http::LowerCaseString("ee"));
@@ -372,8 +373,8 @@ TEST(HttpTracerUtilityTest, operationTypeToString) {
 
 TEST(HttpNullTracerTest, BasicFunctionality) {
   HttpNullTracer null_tracer;
-  MockConfig config;
-  Http::AccessLog::MockRequestInfo request_info;
+  StrictMock<MockConfig> config;
+  StrictMock<Http::AccessLog::MockRequestInfo> request_info;
   Http::TestHeaderMapImpl request_headers;
 
   SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
@@ -394,9 +395,9 @@ public:
 
   Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
-  Http::AccessLog::MockRequestInfo request_info_;
+  StrictMock<Http::AccessLog::MockRequestInfo> request_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  MockConfig config_;
+  StrictMock<MockConfig> config_;
   MockDriver* driver_;
   HttpTracerPtr tracer_;
 };

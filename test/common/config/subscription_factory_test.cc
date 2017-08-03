@@ -16,6 +16,7 @@
 
 using ::testing::Invoke;
 using ::testing::Return;
+using ::testing::StrictMock;
 using ::testing::_;
 
 namespace Envoy {
@@ -39,13 +40,13 @@ public:
   }
 
   envoy::api::v2::Node node_;
-  Upstream::MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  StrictMock<Upstream::MockClusterManager> cm_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
+  StrictMock<Runtime::MockRandomGenerator> random_;
   MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<MockSubscription<envoy::api::v2::ClusterLoadAssignment>> legacy_subscription_;
-  Http::MockAsyncClientRequest http_request_;
-  Stats::MockIsolatedStatsStore stats_store_;
+  StrictMock<Http::MockAsyncClientRequest> http_request_;
+  StrictMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {

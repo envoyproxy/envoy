@@ -20,6 +20,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::_;
 
 namespace Router {
@@ -68,13 +69,13 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
-  Http::MockAsyncClientRequest request_;
+  StrictMock<Http::MockAsyncClientRequest> request_;
   RouteConfigProviderPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};

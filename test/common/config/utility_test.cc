@@ -9,6 +9,7 @@
 
 using testing::AtLeast;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Config {
@@ -39,7 +40,7 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
 }
 
 TEST(UtilityTest, LocalInfoToNode) {
-  LocalInfo::MockLocalInfo local_info;
+  StrictMock<LocalInfo::MockLocalInfo> local_info;
   std::string foo_id("foo_id");
   EXPECT_CALL(local_info, nodeName()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(foo_id));
   std::string foo_zone("foo_zone");

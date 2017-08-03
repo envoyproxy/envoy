@@ -23,6 +23,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrNe;
+using testing::StrictMock;
 using testing::_;
 
 namespace Router {
@@ -869,7 +870,7 @@ TEST(RouteMatcherTest, Runtime) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  Runtime::MockSnapshot snapshot;
+  StrictMock<Runtime::MockSnapshot> snapshot;
 
   ON_CALL(runtime, snapshot()).WillByDefault(ReturnRef(snapshot));
 

@@ -28,6 +28,7 @@
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -61,7 +62,7 @@ struct ResolverData {
 
   Event::MockTimer* timer_;
   Network::DnsResolver::ResolveCb dns_callback_;
-  Network::MockActiveDnsQuery active_dns_query_;
+  StrictMock<Network::MockActiveDnsQuery> active_dns_query_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
@@ -101,7 +102,7 @@ INSTANTIATE_TEST_CASE_P(DnsParam, StrictDnsParamTest, testing::ValuesIn(generate
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -134,7 +135,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 
 TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -253,7 +254,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 }
 
 TEST(HostImplTest, HostCluster) {
-  MockCluster cluster;
+  StrictMock<MockCluster> cluster;
   HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
                 "");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
@@ -263,7 +264,7 @@ TEST(HostImplTest, HostCluster) {
 }
 
 TEST(HostImplTest, Weight) {
-  MockCluster cluster;
+  StrictMock<MockCluster> cluster;
 
   {
     HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 0,
@@ -291,7 +292,7 @@ TEST(HostImplTest, Weight) {
 }
 
 TEST(HostImplTest, HostameCanaryAndZone) {
-  MockCluster cluster;
+  StrictMock<MockCluster> cluster;
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 true, 1, "hello");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
@@ -302,7 +303,7 @@ TEST(HostImplTest, HostameCanaryAndZone) {
 
 TEST(StaticClusterImplTest, EmptyHostname) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {
@@ -322,7 +323,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
 
 TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {
@@ -342,7 +343,7 @@ TEST(StaticClusterImplTest, RingHash) {
 
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {
@@ -382,7 +383,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
 
 TEST(StaticClusterImplTest, HealthyStat) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {
@@ -439,7 +440,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
 TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {
@@ -475,7 +476,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
 TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string json = R"EOF(
   {

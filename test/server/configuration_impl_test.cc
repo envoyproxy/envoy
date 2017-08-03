@@ -18,12 +18,13 @@ namespace Envoy {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Server {
 namespace Configuration {
 
 TEST(FilterChainUtility, buildFilterChain) {
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   std::vector<NetworkFilterFactoryCb> factories;
   ReadyWatcher watcher;
   NetworkFilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
@@ -36,7 +37,7 @@ TEST(FilterChainUtility, buildFilterChain) {
 }
 
 TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
-  Network::MockConnection connection;
+  StrictMock<Network::MockConnection> connection;
   std::vector<NetworkFilterFactoryCb> factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);

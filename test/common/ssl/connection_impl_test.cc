@@ -40,7 +40,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
               const std::string& expected_stats, bool expect_success,
               const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
@@ -49,8 +49,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
-  Network::MockListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
@@ -63,7 +63,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
+  StrictMock<Network::MockConnectionCallbacks> server_connection_callbacks;
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -307,7 +307,7 @@ TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
 
 TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -324,8 +324,8 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
-  Network::MockListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
@@ -358,7 +358,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
+  StrictMock<Network::MockConnectionCallbacks> server_connection_callbacks;
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -380,7 +380,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
 
 TEST_P(SslConnectionImplTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
+  StrictMock<Runtime::MockLoader> runtime;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -398,8 +398,8 @@ TEST_P(SslConnectionImplTest, SslError) {
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
-  Network::MockListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
+  StrictMock<Network::MockListenerCallbacks> callbacks;
+  StrictMock<Network::MockConnectionHandler> connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
@@ -411,7 +411,7 @@ TEST_P(SslConnectionImplTest, SslError) {
   client_connection->write(bad_data);
 
   Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
+  StrictMock<Network::MockConnectionCallbacks> server_connection_callbacks;
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -561,8 +561,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_{new Event::DispatcherImpl};
   Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), true};
-  Network::MockListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
+  StrictMock<Network::MockListenerCallbacks> listener_callbacks_;
+  StrictMock<Network::MockConnectionHandler> connection_handler_;
   std::string server_ctx_json_ = R"EOF(
     {
       "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
@@ -576,7 +576,7 @@ public:
       "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
     }
   )EOF";
-  Runtime::MockLoader runtime_;
+  StrictMock<Runtime::MockLoader> runtime_;
   Json::ObjectSharedPtr server_ctx_loader_;
   std::unique_ptr<ServerContextConfigImpl> server_ctx_config_;
   std::unique_ptr<ContextManagerImpl> manager_;

@@ -18,6 +18,7 @@ namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::_;
 
 namespace Dynamo {
@@ -40,7 +41,7 @@ public:
   std::unique_ptr<DynamoFilter> filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};
-  Stats::MockStore stats_;
+  StrictMock<Stats::MockStore> stats_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };

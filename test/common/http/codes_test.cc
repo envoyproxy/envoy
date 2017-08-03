@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -175,8 +176,8 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 }
 
 TEST(CodeUtilityResponseTimingTest, All) {
-  Stats::MockStore global_store;
-  Stats::MockStore cluster_scope;
+  StrictMock<Stats::MockStore> global_store;
+  StrictMock<Stats::MockStore> cluster_scope;
 
   CodeUtility::ResponseTimingInfo info{
       global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),

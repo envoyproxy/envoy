@@ -31,6 +31,7 @@ namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -87,7 +88,7 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_;
   std::string output_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Envoy::AccessLog::MockAccessLogManager log_manager_;
+  StrictMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -344,8 +345,8 @@ TEST_F(AccessLogImplTest, requestTracing) {
 }
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
-  Runtime::MockLoader runtime;
-  Envoy::AccessLog::MockAccessLogManager log_manager;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Envoy::AccessLog::MockAccessLogManager> log_manager;
 
   {
     std::string json = R"EOF(

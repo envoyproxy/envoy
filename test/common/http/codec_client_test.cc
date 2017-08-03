@@ -25,6 +25,7 @@ using testing::Pointee;
 using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::Throw;
 using testing::_;
 
@@ -49,7 +50,7 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
@@ -69,7 +70,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -86,7 +87,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -107,9 +108,9 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  StrictMock<Http::MockStreamDecoder> outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
-  Http::MockStreamCallbacks callbacks;
+  StrictMock<Http::MockStreamCallbacks> callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a remote close with an active request we should try to send zero bytes through

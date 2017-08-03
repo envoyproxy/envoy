@@ -27,6 +27,7 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::_;
 
 namespace Http {
@@ -58,8 +59,8 @@ public:
   }
 
   MessagePtr message_{new RequestMessageImpl()};
-  MockAsyncClientCallbacks callbacks_;
-  MockAsyncClientStreamCallbacks stream_callbacks_;
+  StrictMock<MockAsyncClientCallbacks> callbacks_;
+  StrictMock<MockAsyncClientStreamCallbacks> stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<MockStreamEncoder> stream_encoder_;
   StreamDecoder* response_decoder_{};

@@ -18,6 +18,7 @@
 namespace Envoy {
 using testing::Invoke;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Grpc {
@@ -43,11 +44,11 @@ public:
   }
 
   NiceMock<Upstream::MockClusterManager> cm_;
-  MockRpcChannelCallbacks grpc_callbacks_;
+  StrictMock<MockRpcChannelCallbacks> grpc_callbacks_;
   RpcChannelImpl grpc_request_{cm_, "fake_cluster", grpc_callbacks_,
                                Optional<std::chrono::milliseconds>()};
   helloworld::Greeter::Stub service_{&grpc_request_};
-  Http::MockAsyncClientRequest http_async_client_request_;
+  StrictMock<Http::MockAsyncClientRequest> http_async_client_request_;
   Http::MessagePtr http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_{};
 };

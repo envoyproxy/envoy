@@ -19,6 +19,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -38,9 +39,9 @@ public:
 
   Grpc::MockAsyncClient<pb::lyft::ratelimit::RateLimitRequest,
                         pb::lyft::ratelimit::RateLimitResponse>* async_client_;
-  Grpc::MockAsyncRequest async_request_;
+  StrictMock<Grpc::MockAsyncRequest> async_request_;
   GrpcClientImpl client_;
-  MockRequestCallbacks request_callbacks_;
+  StrictMock<MockRequestCallbacks> request_callbacks_;
 };
 
 TEST_F(RateLimitGrpcClientTest, Basic) {
@@ -127,7 +128,7 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  Upstream::MockClusterManager cm;
+  StrictMock<Upstream::MockClusterManager> cm;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
   EXPECT_THROW(GrpcFactoryImpl(*config, cm), EnvoyException);
@@ -141,7 +142,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  Upstream::MockClusterManager cm;
+  StrictMock<Upstream::MockClusterManager> cm;
 
   EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
   GrpcFactoryImpl factory(*config, cm);
@@ -151,7 +152,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
   ClientPtr client = factory.create(Optional<std::chrono::milliseconds>());
-  MockRequestCallbacks request_callbacks;
+  StrictMock<MockRequestCallbacks> request_callbacks;
   EXPECT_CALL(request_callbacks, complete(LimitStatus::OK));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::EMPTY_CONTEXT);
   client->cancel();

@@ -21,6 +21,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Ref;
 using testing::Return;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -43,7 +44,7 @@ public:
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   Stats::IsolatedStoreImpl store_;
   InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
-  MockSplitCallbacks callbacks_;
+  StrictMock<MockSplitCallbacks> callbacks_;
   SplitRequestPtr handle_;
 };
 
@@ -120,7 +121,7 @@ public:
   }
 
   ConnPool::PoolCallbacks* pool_callbacks_;
-  ConnPool::MockPoolRequest pool_request_;
+  StrictMock<ConnPool::MockPoolRequest> pool_request_;
 };
 
 TEST_P(RedisSimpleRequestCommandHandlerTest, Success) {

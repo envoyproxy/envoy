@@ -8,12 +8,13 @@
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {
+using testing::StrictMock;
 namespace Http {
 
 TEST(ValidationAsyncClientTest, MockedMethods) {
   MessagePtr message{new RequestMessageImpl()};
-  MockAsyncClientCallbacks callbacks;
-  MockAsyncClientStreamCallbacks stream_callbacks;
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  StrictMock<MockAsyncClientStreamCallbacks> stream_callbacks;
 
   ValidationAsyncClient client;
   EXPECT_EQ(nullptr,

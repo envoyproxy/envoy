@@ -22,6 +22,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Redis {
@@ -79,7 +80,7 @@ public:
 
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* connect_or_op_timer_{new Event::MockTimer(&dispatcher_)};
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};

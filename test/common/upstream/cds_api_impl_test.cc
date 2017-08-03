@@ -20,6 +20,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -80,12 +81,12 @@ public:
     return map;
   }
 
-  MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<MockClusterManager> cm_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
-  Http::MockAsyncClientRequest request_;
+  StrictMock<Http::MockAsyncClientRequest> request_;
   CdsApiPtr cds_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};

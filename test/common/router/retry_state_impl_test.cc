@@ -16,6 +16,7 @@
 namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Router {
@@ -41,7 +42,7 @@ public:
   NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* retry_timer_{};
   RetryStatePtr state_;
   ReadyWatcher callback_ready_;

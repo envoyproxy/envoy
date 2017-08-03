@@ -23,6 +23,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Mongo {
@@ -72,12 +73,12 @@ public:
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Event::MockDispatcher dispatcher_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
   AccessLogSharedPtr access_log_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
-  Envoy::AccessLog::MockAccessLogManager log_manager_;
+  StrictMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
 };
 
 TEST_F(MongoProxyFilterTest, Stats) {

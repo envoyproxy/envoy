@@ -8,11 +8,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::StrictMock;
 namespace Http {
 
 TEST(UserAgentTest, All) {
-  Stats::MockStore stat_store;
-  Stats::MockTimespan span;
+  StrictMock<Stats::MockStore> stat_store;
+  StrictMock<Stats::MockTimespan> span;
 
   EXPECT_CALL(stat_store.counter_, inc()).Times(4);
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));

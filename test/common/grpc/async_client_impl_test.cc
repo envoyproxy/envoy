@@ -326,7 +326,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
 TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  Http::MockAsyncClientStream http_stream;
+  StrictMock<Http::MockAsyncClientStream> http_stream;
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(Invoke(
           [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -352,7 +352,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
 TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  Http::MockAsyncClientStream http_stream;
+  StrictMock<Http::MockAsyncClientStream> http_stream;
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(Invoke(
           [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,

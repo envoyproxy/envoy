@@ -31,6 +31,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -57,9 +58,9 @@ TEST(HealthCheckerFactoryTest, createRedis) {
   )EOF";
 
   NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Runtime::MockRandomGenerator> random;
+  StrictMock<Event::MockDispatcher> dispatcher;
   EXPECT_NE(nullptr, dynamic_cast<RedisHealthCheckerImpl*>(
                          HealthCheckerFactory::create(parseHealthCheckFromJson(json), cluster,
                                                       runtime, random, dispatcher)
@@ -71,9 +72,9 @@ TEST(HealthCheckerFactoryTest, createRedis) {
 // #1308.
 TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
+  StrictMock<Runtime::MockLoader> runtime;
+  StrictMock<Runtime::MockRandomGenerator> random;
+  StrictMock<Event::MockDispatcher> dispatcher;
   envoy::api::v2::HealthCheck health_check;
   // No health checker type set
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
@@ -895,7 +896,7 @@ public:
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Redis::ConnPool::MockClient* client_{};
-  Redis::ConnPool::MockPoolRequest pool_request_;
+  StrictMock<Redis::ConnPool::MockPoolRequest> pool_request_;
   Redis::ConnPool::PoolCallbacks* pool_callbacks_{};
   std::unique_ptr<RedisHealthCheckerImpl> health_checker_;
 };

@@ -25,6 +25,7 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
+using testing::StrictMock;
 using testing::WithArg;
 using testing::_;
 
@@ -82,15 +83,15 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Upstream::MockClusterManager cm_;
-  Event::MockDispatcher dispatcher_;
-  Http::MockAsyncClientRequest request_;
+  StrictMock<Upstream::MockClusterManager> cm_;
+  StrictMock<Event::MockDispatcher> dispatcher_;
+  StrictMock<Http::MockAsyncClientRequest> request_;
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Instance> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnection ssl_;
+  StrictMock<Ssl::MockConnection> ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 };

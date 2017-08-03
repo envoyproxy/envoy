@@ -27,6 +27,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::_;
 
 namespace Router {
@@ -76,7 +77,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Http::ConnectionPool::MockCancellable cancellable_;
+  StrictMock<Http::ConnectionPool::MockCancellable> cancellable_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -643,7 +644,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
 
-  Http::ConnectionPool::MockCancellable cancellable;
+  StrictMock<Http::ConnectionPool::MockCancellable> cancellable;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder,
                            Http::ConnectionPool::Callbacks&) -> Http::ConnectionPool::Cancellable* {
@@ -863,7 +864,7 @@ TEST_F(RouterTest, AltStatName) {
 }
 
 TEST_F(RouterTest, Redirect) {
-  MockRedirectEntry redirect;
+  StrictMock<MockRedirectEntry> redirect;
   EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
   EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
 
@@ -956,7 +957,7 @@ TEST(RouterFilterUtilityTest, finalTimeout) {
 
 TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   {
-    Upstream::MockClusterInfo cluster;
+    StrictMock<Upstream::MockClusterInfo> cluster;
     Http::TestHeaderMapImpl headers;
     EXPECT_CALL(cluster, sslContext()).WillOnce(Return(nullptr));
     FilterUtility::setUpstreamScheme(headers, cluster);
@@ -964,8 +965,8 @@ TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   }
 
   {
-    Upstream::MockClusterInfo cluster;
-    Ssl::MockClientContext context;
+    StrictMock<Upstream::MockClusterInfo> cluster;
+    StrictMock<Ssl::MockClientContext> context;
     Http::TestHeaderMapImpl headers;
     EXPECT_CALL(cluster, sslContext()).WillOnce(Return(&context));
     FilterUtility::setUpstreamScheme(headers, cluster);

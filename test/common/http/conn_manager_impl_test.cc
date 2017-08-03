@@ -44,6 +44,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Sequence;
+using testing::StrictMock;
 using testing::Test;
 using testing::_;
 
@@ -194,7 +195,7 @@ public:
   SlowDateProviderImpl date_provider_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
-  MockStreamEncoder response_encoder_;
+  StrictMock<MockStreamEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
 };

@@ -21,6 +21,7 @@
 namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
+using testing::StrictMock;
 using testing::_;
 
 namespace Upstream {
@@ -49,10 +50,10 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Ssl::MockContextManager ssl_context_manager_;
+  StrictMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  Network::MockActiveDnsQuery active_dns_query_;
+  StrictMock<Network::MockActiveDnsQuery> active_dns_query_;
   Network::DnsResolver::ResolveCb dns_callback_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;

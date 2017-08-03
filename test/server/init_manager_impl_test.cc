@@ -7,6 +7,7 @@
 
 using testing::InSequence;
 using testing::Invoke;
+using testing::StrictMock;
 using testing::_;
 
 namespace Envoy {
@@ -25,7 +26,7 @@ TEST_F(InitManagerImplTest, NoTargets) {
 
 TEST_F(InitManagerImplTest, Targets) {
   InSequence s;
-  Init::MockTarget target;
+  StrictMock<Init::MockTarget> target;
 
   manager_.registerTarget(target);
   EXPECT_CALL(target, initialize(_));
@@ -36,7 +37,7 @@ TEST_F(InitManagerImplTest, Targets) {
 
 TEST_F(InitManagerImplTest, TargetRemoveWhileInitializing) {
   InSequence s;
-  Init::MockTarget target;
+  StrictMock<Init::MockTarget> target;
 
   manager_.registerTarget(target);
   EXPECT_CALL(target, initialize(_)).WillOnce(Invoke([](std::function<void()> callback) -> void {

@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::StrictMock;
 namespace Config {
 
 /**
@@ -55,7 +56,7 @@ public:
     EXPECT_EQ(failure, stats_.update_failure_.value());
   }
 
-  Stats::MockIsolatedStatsStore stats_store_;
+  StrictMock<Stats::MockIsolatedStatsStore> stats_store_;
   SubscriptionStats stats_;
 };
 

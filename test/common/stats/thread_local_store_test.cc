@@ -18,6 +18,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Stats {
@@ -84,7 +85,7 @@ public:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   TestAllocator alloc_;
-  MockSink sink_;
+  StrictMock<MockSink> sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
 

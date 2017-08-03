@@ -23,6 +23,7 @@
 namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
+using testing::StrictMock;
 using testing::_;
 
 namespace Server {
@@ -41,7 +42,7 @@ TEST(HttpFilterConfigTest, BufferFilter) {
   BufferFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
@@ -73,7 +74,7 @@ TEST(HttpFilterConfigTest, RateLimitFilter) {
   RateLimitFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
@@ -103,7 +104,7 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   DynamoFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
@@ -124,7 +125,7 @@ TEST(HttpFilterConfigTest, FaultFilter) {
   FaultFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
@@ -140,7 +141,7 @@ TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   GrpcHttp1BridgeFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
@@ -156,7 +157,7 @@ TEST(HttpFilterConfigTest, GrpcWebFilter) {
   GrpcWebFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
@@ -174,7 +175,7 @@ TEST(HttpFilterConfigTest, HealthCheckFilter) {
   HealthCheckFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
@@ -206,7 +207,7 @@ TEST(HttpFilterConfigTest, RouterFilter) {
   RouterFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
@@ -242,7 +243,7 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
   IpTaggingFilterConfig factory;
   EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
