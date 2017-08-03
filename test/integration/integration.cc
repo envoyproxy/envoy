@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,14 @@ using testing::Invoke;
 using testing::_;
 
 namespace Envoy {
+
+namespace {
+std::string normalizeDate(const std::string& s) {
+  const std::regex date_regex("date:[^\r]+");
+  return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
+}
+} // namespace
+
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -973,7 +982,7 @@ void BaseIntegrationTest::testEquivalent(const std::string& request) {
 
   connection2.run();
 
-  EXPECT_TRUE(response1 == response2);
+  EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
 void BaseIntegrationTest::testBadPath() {
