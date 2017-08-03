@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/http/header_map.h"
-#include "envoy/server/hot_restart.h"
 
 #include "common/hot_restart/hot_restart_nop.h"
 #include "common/local_info/local_info_impl.h"
@@ -75,7 +74,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
   Server::TestOptionsImpl options(config_path_);
-  Server::HotRestartNopImpl restarter;
+  HotRestart::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
                                       "cluster_name", "node_name");

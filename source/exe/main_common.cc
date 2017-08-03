@@ -41,9 +41,9 @@ public:
 
 int main_common(OptionsImpl& options) {
 #ifdef ENVOY_HOT_RESTART
-  std::unique_ptr<Envoy::Server::HotRestartImpl> restarter;
+  std::unique_ptr<HotRestart::HotRestartImpl> restarter;
   try {
-    restarter.reset(new Server::HotRestartImpl(options));
+    restarter.reset(new HotRestart::HotRestartImpl(options));
   } catch (Envoy::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;
@@ -53,8 +53,8 @@ int main_common(OptionsImpl& options) {
   Thread::BasicLockable& access_log_lock = restarter->accessLogLock();
   Stats::RawStatDataAllocator& stats_allocator = *restarter;
 #else
-  std::unique_ptr<Envoy::Server::HotRestartNopImpl> restarter;
-  restarter.reset(new Server::HotRestartNopImpl());
+  std::unique_ptr<HotRestart::HotRestartNopImpl> restarter;
+  restarter.reset(new HotRestart::HotRestartNopImpl());
 
   Thread::MutexBasicLockable log_lock, access_log_lock;
   Stats::HeapRawStatDataAllocator stats_allocator;

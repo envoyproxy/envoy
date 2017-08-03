@@ -15,7 +15,7 @@
 #include "common/stats/stats_impl.h"
 
 namespace Envoy {
-namespace Server {
+namespace HotRestart {
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
@@ -36,7 +36,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(Options& options);
+  static SharedMemory& initialize(Server::Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -102,11 +102,11 @@ private:
 /**
  * Implementation of HotRestart built for Linux.
  */
-class HotRestartImpl : public HotRestart,
+class HotRestartImpl : public Server::HotRestart,
                        public Stats::RawStatDataAllocator,
                        Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Options& options);
+  HotRestartImpl(Server::Options& options);
 
   Thread::BasicLockable& logLock() { return log_lock_; }
   Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
@@ -186,7 +186,7 @@ private:
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
 
-  Options& options_;
+  Server::Options& options_;
   SharedMemory& shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
@@ -201,5 +201,5 @@ private:
   bool parent_terminated_{};
 };
 
-} // namespace Server
+} // namespace HotRestart
 } // namespace Envoy
