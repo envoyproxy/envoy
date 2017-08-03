@@ -1,4 +1,4 @@
-#include "exe/hot_restart.h"
+#include "common/hot_restart/hot_restart.h"
 
 #include <signal.h>
 #include <sys/mman.h>

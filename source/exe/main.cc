@@ -8,7 +8,7 @@
 #endif
 
 #ifdef ENVOY_HOT_RESTART
-#include "exe/hot_restart.h"
+#include "common/hot_restart/hot_restart.h"
 #endif
 
 #include "server/options_impl.h"
@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
 #endif
 
 #ifdef ENVOY_HOT_RESTART
+  // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
   const std::string shared_mem_version = Envoy::Server::SharedMemory::version();
 #else
   const std::string shared_mem_version = "disabled";

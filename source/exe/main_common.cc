@@ -10,7 +10,7 @@
 #include "common/stats/thread_local_store.h"
 
 #ifdef ENVOY_HOT_RESTART
-#include "exe/hot_restart.h"
+#include "common/hot_restart/hot_restart.h"
 #endif
 
 #include "server/config_validation/server.h"
