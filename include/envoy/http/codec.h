@@ -148,6 +148,15 @@ public:
 };
 
 /**
+ * HTTP/1.* Codec settings
+ */
+struct Http1Settings {
+  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // traffic
+  bool allow_absolute_url_{false};
+};
+
+/**
  * HTTP/2 codec settings
  */
 struct Http2Settings {

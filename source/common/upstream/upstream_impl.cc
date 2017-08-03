@@ -153,7 +153,7 @@ ClusterPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, Clust
     NOT_REACHED;
   }
 
-  if (cluster.health_checks().size() > 0) {
+  if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     ASSERT(cluster.health_checks().size() == 1);
     new_cluster->setHealthChecker(HealthCheckerFactory::create(
@@ -294,12 +294,12 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
-StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& config,
+StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : ClusterImplBase(config, runtime, stats, ssl_context_manager, added_via_api) {
+    : ClusterImplBase(cluster, runtime, stats, ssl_context_manager, added_via_api) {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
-  for (const auto& host : config.static_hosts().addresses()) {
+  for (const auto& host : cluster.static_hosts().addresses()) {
     new_hosts->emplace_back(HostSharedPtr{
         new HostImpl(info_, "", Network::Utility::fromProtoResolvedAddress(host), false, 1, "")});
   }
@@ -391,16 +391,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
   }
 }
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& config,
+StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster,
                                            Runtime::Loader& runtime, Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            Event::Dispatcher& dispatcher, bool added_via_api)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager, added_via_api),
+    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 5000))) {
-  switch (config.dns_lookup_family()) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+  switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
     break;
@@ -414,7 +414,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& config
     NOT_REACHED;
   }
 
-  for (const auto& host : config.dns_hosts().addresses()) {
+  for (const auto& host : cluster.dns_hosts().addresses()) {
     resolve_targets_.emplace_back(new ResolveTarget(
         *this, dispatcher,
         fmt::format("tcp://{}:{}", ProtobufTypes::FromString(host.named_address().address()),

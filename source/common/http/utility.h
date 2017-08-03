@@ -80,6 +80,11 @@ public:
   static Http2Settings parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config);
 
   /**
+   * @return Http1Settings An Http1Settings populated from http1_settings JSON.
+   */
+  static Http1Settings parseHttp1Settings(const Json::Object& config);
+
+  /**
    * Create a locally generated response using filter callbacks.
    * @param callbacks supplies the filter callbacks to use.
    * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
