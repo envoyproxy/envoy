@@ -126,7 +126,7 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  Router::HttpRouteManagerImpl http_route_manager_;
+  std::unique_ptr<Router::HttpRouteManagerImpl> http_route_manager_;
   ListenerManagerImpl listener_manager_;
 };
 
