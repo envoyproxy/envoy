@@ -495,17 +495,20 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // should return 404. The current returns no response if there is no router filter.
   if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    bool websocket_required = (route_entry != nullptr) && route_entry->useWebSocket();
-    bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
+    const bool websocket_required = (route_entry != nullptr) && route_entry->useWebSocket();
+    const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
     if (websocket_requested || websocket_required) {
       if (websocket_requested && websocket_required) {
         ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
         connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-            *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_));
-        connection_manager_.ws_connection_->initializeReadFilterCallbacks(
-            *connection_manager_.read_callbacks_);
+            *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_,
+            connection_manager_.read_callbacks_));
+
+        // If there is an error in establishing the upstream connection, we fall through as
+        // the WebSocket implementation will take care of sending the appropriate error
+        // response to the downstream client.
         if (connection_manager_.ws_connection_->onNewConnection() ==
             Network::FilterStatus::Continue) {
           connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();

@@ -95,16 +95,12 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
-  virtual void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
-
-  virtual void initializeUpstreamHelperCallbacks() {
-    upstream_helper_callbacks_.reset(new TcpUpstreamHelperCallbacks(*this));
-  }
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -138,45 +134,25 @@ protected:
     bool on_high_watermark_called_{false};
   };
 
-  struct UpstreamHelperCallbacks {
-    virtual ~UpstreamHelperCallbacks() {}
+  // Callbacks for different error and success states during connection establishment
+  virtual const std::string& getUpstreamCluster() {
+    return config_->getRouteFromEntries(read_callbacks_->connection());
+  }
 
-    virtual const std::string& getUpstreamCluster() PURE;
-    virtual void onInitFailure() PURE;
-    virtual void onUpstreamHostReady() PURE;
-    virtual void onConnectTimeout() PURE;
-    virtual void onConnectionFailure() PURE;
-    virtual void onConnectionSuccess() PURE;
-  };
+  virtual void onInitFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
 
-  typedef std::unique_ptr<UpstreamHelperCallbacks> UpstreamHelperCallbacksPtr;
+  virtual void onConnectTimeoutError() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
 
-  struct TcpUpstreamHelperCallbacks : public UpstreamHelperCallbacks {
-    TcpUpstreamHelperCallbacks(TcpProxy& parent) : parent_(parent) {}
+  virtual void onConnectionFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 
-    // UpstreamHelperBase
-    const std::string& getUpstreamCluster() override {
-      return parent_.config_->getRouteFromEntries(parent_.read_callbacks_->connection());
-    }
-
-    void onInitFailure() override {
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    }
-
-    void onUpstreamHostReady() override {}
-
-    void onConnectTimeout() override {
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    }
-
-    void onConnectionFailure() override {
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    }
-
-    void onConnectionSuccess() override {}
-
-    TcpProxy& parent_;
-  };
+  virtual void onConnectionSuccess() {}
+  virtual void onUpstreamHostReady() {}
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
@@ -189,7 +165,6 @@ protected:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_;
   DownstreamCallbacks downstream_callbacks_;
-  UpstreamHelperCallbacksPtr upstream_helper_callbacks_;
   Event::TimerPtr connect_timeout_timer_;
   Stats::TimespanPtr connect_timespan_;
   Stats::TimespanPtr connected_timespan_;

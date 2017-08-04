@@ -13,55 +13,51 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
-WsHandlerImpl::WsHandlerImpl(Http::HeaderMap& request_headers,
-                             const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
-                             Upstream::ClusterManager& cluster_manager)
+WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const Router::RouteEntry& route_entry,
+                             WsHandlerCallbacks& callbacks,
+                             Upstream::ClusterManager& cluster_manager,
+                             Network::ReadFilterCallbacks* read_callbacks)
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
-      route_entry_(route_entry), ws_callbacks_(callbacks) {}
+      route_entry_(route_entry), ws_callbacks_(callbacks)  {
 
-void WsHandlerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
-  read_callbacks_ = &callbacks;
+  read_callbacks_ = read_callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  initializeUpstreamHelperCallbacks();
 }
 
-void WsHandlerImpl::WsUpstreamHelperCallbacks::onInitFailure() {
+void WsHandlerImpl::onInitFailure() {
   HeaderMapImpl headers{
-      {Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
-  parent_.ws_callbacks_.sendHeadersOnlyResponse(headers);
+      {Headers::get().Status, std::to_string(enumToInt(Code::ServiceUnavailable))}};
+  ws_callbacks_.sendHeadersOnlyResponse(headers);
 }
 
-void WsHandlerImpl::WsUpstreamHelperCallbacks::onUpstreamHostReady() {
+void WsHandlerImpl::onUpstreamHostReady() {
   // path and host rewrites
-  parent_.route_entry_.finalizeRequestHeaders(parent_.request_headers_);
+  route_entry_.finalizeRequestHeaders(request_headers_);
   // for auto host rewrite
-  if (parent_.route_entry_.autoHostRewrite() &&
-      !parent_.read_callbacks_->upstreamHost()->hostname().empty()) {
-    parent_.request_headers_.Host()->value(parent_.read_callbacks_->upstreamHost()->hostname());
+  if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
+    request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());
   }
 }
 
-void WsHandlerImpl::WsUpstreamHelperCallbacks::onConnectTimeout() {
-  HeaderMapImpl headers{
-      {Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout))}};
-  parent_.ws_callbacks_.sendHeadersOnlyResponse(headers);
+void WsHandlerImpl::onConnectTimeoutError() {
+  HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
+  ws_callbacks_.sendHeadersOnlyResponse(headers);
 }
 
-void WsHandlerImpl::WsUpstreamHelperCallbacks::onConnectionFailure() {
+void WsHandlerImpl::onConnectionFailure() {
   // We send a 503 response if the upstream refuses to accept connections
   // (i.e. non-null connect_timeout_timer). If the upstream closes connection
   // after the starting data transfer, we close and flush the connection as
   // in TCP proxy.
-  if (parent_.connect_timeout_timer_) {
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout))}};
-    parent_.ws_callbacks_.sendHeadersOnlyResponse(headers);
+  if (connect_timeout_timer_) {
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
+    ws_callbacks_.sendHeadersOnlyResponse(headers);
   } else {
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
-void WsHandlerImpl::WsUpstreamHelperCallbacks::onConnectionSuccess() {
+void WsHandlerImpl::onConnectionSuccess() {
   // Wrap upstream connection in HTTP Connection, so that we can
   // re-use the HTTP1 codec to send upgrade headers to upstream
   // host.
@@ -79,11 +75,9 @@ void WsHandlerImpl::WsUpstreamHelperCallbacks::onConnectionSuccess() {
   // the connection pool. The current approach is a stop gap solution, where
   // we put the onus on the user to tell us if a route (and corresponding upstream)
   // is supposed to allow websocket upgrades or not.
-  Http::Http1::ClientConnectionImpl upstream_http(*parent_.upstream_connection_,
-                                                  parent_.http_conn_callbacks_);
-  Http::Http1::RequestStreamEncoderImpl upstream_request =
-      Http1::RequestStreamEncoderImpl(upstream_http);
-  upstream_request.encodeHeaders(parent_.request_headers_, false);
+  Http1::ClientConnectionImpl upstream_http(*upstream_connection_, http_conn_callbacks_);
+  Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
+  upstream_request.encodeHeaders(request_headers_, false);
 }
 
 } // namespace WebSocket

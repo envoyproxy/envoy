@@ -25,41 +25,29 @@ namespace WebSocket {
  */
 class WsHandlerImpl : public Filter::TcpProxy {
 public:
-  WsHandlerImpl(Http::HeaderMap& request_headers, const Router::RouteEntry& route_entry,
-                WsHandlerCallbacks& callbacks, Upstream::ClusterManager& cluster_manager);
-  ~WsHandlerImpl(){};
-
-  // Filter::TcpProxy
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
-  void initializeUpstreamHelperCallbacks() override {
-    upstream_helper_callbacks_.reset(new WsUpstreamHelperCallbacks(*this));
-  }
+  WsHandlerImpl(HeaderMap& request_headers, const Router::RouteEntry& route_entry,
+                WsHandlerCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+                Network::ReadFilterCallbacks* read_callbacks);
 
 protected:
-  struct WsUpstreamHelperCallbacks : public UpstreamHelperCallbacks {
-    WsUpstreamHelperCallbacks(WsHandlerImpl& parent) : parent_(parent) {}
+  // Filter::TcpProxy
+  const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
 
-    // UpstreamHelperBase
-    const std::string& getUpstreamCluster() override { return parent_.route_entry_.clusterName(); }
-
-    void onInitFailure() override;
-    void onUpstreamHostReady() override;
-    void onConnectTimeout() override;
-    void onConnectionFailure() override;
-    void onConnectionSuccess() override;
-
-    WsHandlerImpl& parent_;
-  };
+  void onInitFailure() override;
+  void onUpstreamHostReady() override;
+  void onConnectTimeoutError() override;
+  void onConnectionFailure() override;
+  void onConnectionSuccess() override;
 
 private:
-  struct NullHttpConnectionCallbacks : public Http::ConnectionCallbacks {
+  struct NullHttpConnectionCallbacks : public ConnectionCallbacks {
     // Http::ConnectionCallbacks
-    void onGoAway() override{};
+    void onGoAway() override {}
   };
 
-  Http::HeaderMap& request_headers_;
+  HeaderMap& request_headers_;
   const Router::RouteEntry& route_entry_;
-  Http::WsHandlerCallbacks& ws_callbacks_;
+  WsHandlerCallbacks& ws_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
 };
 
