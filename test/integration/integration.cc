@@ -344,7 +344,7 @@ void BaseIntegrationTest::createApiTestServer(const std::string& json_path,
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
-  createApiTestServer(json_path, {}, port_names);
+  createApiTestServer(json_path, {"", "", ""}, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
