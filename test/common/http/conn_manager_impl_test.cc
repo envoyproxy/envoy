@@ -142,6 +142,33 @@ public:
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   }
 
+  void expectOnUpstreamInitFailure() {
+    StreamDecoder* decoder = nullptr;
+    NiceMock<MockStreamEncoder> encoder;
+
+    ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
+        .WillByDefault(Return(true));
+
+    EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+      decoder = &conn_manager_->newStream(encoder);
+      HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                                 {":method", "GET"},
+                                                 {":path", "/"},
+                                                 {"connection", "Upgrade"},
+                                                 {"upgrade", "websocket"}}};
+      decoder->decodeHeaders(std::move(headers), true);
+      data.drain(4);
+    }));
+
+    EXPECT_CALL(encoder, encodeHeaders(_, true))
+        .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+          EXPECT_STREQ("503", headers.Status()->value().c_str());
+        }));
+
+    Buffer::OwnedImpl fake_input("1234");
+    conn_manager_->onData(fake_input);
+  }
+
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
@@ -555,6 +582,27 @@ TEST_F(HttpConnectionManagerImplTest, RejectNonWebSocketOnWebSocketRoute) {
   conn_manager_->onData(fake_input);
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_non_ws_on_ws_route_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
+  setup(false, "");
+
+  ON_CALL(cluster_manager_, get(_)).WillByDefault(Return(nullptr));
+  expectOnUpstreamInitFailure();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, WebSocketNoTcpConnPool) {
+  setup(false, "");
+
+  // MockHost::MockCreateConnectionData has a null upstream connection
+  // by default
+  expectOnUpstreamInitFailure();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {

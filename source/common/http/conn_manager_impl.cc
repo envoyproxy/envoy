@@ -505,15 +505,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
             *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_,
             connection_manager_.read_callbacks_));
-
-        // If there is an error in establishing the upstream connection, we fall through as
-        // the WebSocket implementation will take care of sending the appropriate error
-        // response to the downstream client.
-        if (connection_manager_.ws_connection_->onNewConnection() ==
-            Network::FilterStatus::Continue) {
-          connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
-          connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
-        }
+        connection_manager_.ws_connection_->onNewConnection();
+        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+        connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
         connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
       } else if (websocket_requested) {
         // Do not allow WebSocket upgrades if the route does not support it.

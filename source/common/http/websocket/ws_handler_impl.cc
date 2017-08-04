@@ -18,7 +18,7 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const Router::RouteEntr
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks)
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
-      route_entry_(route_entry), ws_callbacks_(callbacks)  {
+      route_entry_(route_entry), ws_callbacks_(callbacks) {
 
   read_callbacks_ = read_callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
