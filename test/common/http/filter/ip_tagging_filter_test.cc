@@ -58,6 +58,8 @@ public:
     config_.reset(new IpTaggingFilterConfig(*config));
     filter_.reset(new IpTaggingFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
+    filter_->provideWatermarkCallbacks(mock_provider);
   }
 
   IpTaggingFilterConfigSharedPtr config_;

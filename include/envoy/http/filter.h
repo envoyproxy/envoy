@@ -224,6 +224,12 @@ public:
   virtual ~StreamFilterBase() {}
 
   /**
+   * This routine is called on filter creation, allowing filters to subscribe to watermark events
+   * on the downstream stream and downstream connection.
+   */
+  virtual void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider& provider) PURE;
+
+  /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
    * sure that any async events are cleaned up in the context of this routine. This includes timers,

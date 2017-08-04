@@ -51,6 +51,7 @@ public:
   static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   // Http::StreamFilterBase
+  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider&) override {}
   void onDestroy() override;
 
   // Http::StreamDecoderFilter

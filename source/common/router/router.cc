@@ -301,6 +301,22 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::onBelowWriteBufferLowWatermark() {
+  // The downstream connection has buffer available.  Resume reads from upstream.
+  cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(false);
+  }
+}
+
+void Filter::onAboveWriteBufferHighWatermark() {
+  // The downstream connection is overrun.  Pause reads from upstream.
+  cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(true);
+  }
+}
+
 void Filter::cleanup() {
   upstream_request_.reset();
   retry_state_.reset();

@@ -96,6 +96,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase
+  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider&) override {}
   void onDestroy() override { stream_reset_ = true; }
 
 private:

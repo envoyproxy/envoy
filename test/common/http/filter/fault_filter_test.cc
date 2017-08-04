@@ -116,6 +116,8 @@ public:
     config_.reset(new FaultFilterConfig(*config, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
+    filter_->provideWatermarkCallbacks(mock_provider);
   }
 
   void expectDelayTimer(uint64_t duration_ms) {

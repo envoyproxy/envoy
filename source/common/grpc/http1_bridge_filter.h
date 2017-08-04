@@ -16,6 +16,7 @@ public:
   Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Http::StreamFilterBase
+  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider&) override {}
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter

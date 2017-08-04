@@ -31,6 +31,8 @@ public:
                                        std::chrono::seconds(0)}},
         filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
+    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
+    filter_.provideWatermarkCallbacks(mock_provider);
   }
 
   void expectTimerCreate() { timer_ = new NiceMock<Event::MockTimer>(&callbacks_.dispatcher_); }
