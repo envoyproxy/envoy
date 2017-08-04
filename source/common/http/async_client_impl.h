@@ -198,6 +198,8 @@ private:
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
+  void onDecoderFilterAboveWriteBufferHighWatermark() override {}
+  void onDecoderFilterBelowWriteBufferLowWatermark() override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

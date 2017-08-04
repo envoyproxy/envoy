@@ -158,5 +158,13 @@ TEST_F(CodecClientTest, PrematureResponse) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
 }
 
+TEST_F(CodecClientTest, WatermarkPassthrough) {
+  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
+  connection_cb_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
+  connection_cb_->onBelowWriteBufferLowWatermark();
+}
+
 } // namespace Http
 } // namespace Envoy

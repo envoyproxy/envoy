@@ -129,6 +129,10 @@ TEST_P(IntegrationTest, NoHost) { testNoHost(); }
 
 TEST_P(IntegrationTest, BadPath) { testBadPath(); }
 
+TEST_P(IntegrationTest, AbsolutePath) { testAbsolutePath(); }
+
+TEST_P(IntegrationTest, Connect) { testConnect(); }
+
 TEST_P(IntegrationTest, ValidZeroLengthContent) {
   testValidZeroLengthContent(Http::CodecClient::Type::HTTP1);
 }

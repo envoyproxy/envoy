@@ -7,6 +7,19 @@ namespace Http {
 
 class StreamCallbackHelper {
 public:
+  void runLowWatermarkCallbacks() {
+    // TODO(alyssawilk) see if we can make this safe for disconnects mid-loop
+    for (StreamCallbacks* callbacks : callbacks_) {
+      callbacks->onBelowWriteBufferLowWatermark();
+    }
+  }
+
+  void runHighWatermarkCallbacks() {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      callbacks->onAboveWriteBufferHighWatermark();
+    }
+  }
+
   void runResetCallbacks(StreamResetReason reason) {
     if (reset_callbacks_run_) {
       return;

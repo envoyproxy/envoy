@@ -1,0 +1,5 @@
+{
+  "cds_config": {
+    "path": "{{ cds_json_path }}"
+  }
+}

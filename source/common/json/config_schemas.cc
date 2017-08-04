@@ -264,6 +264,17 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["no_compression"]
       },
+      "http1_settings": {
+        "type": "object",
+        "properties": {
+          "allow_absolute_url": {
+            "type": "boolean"
+          },
+          "allow_connect": {
+            "type": "boolean"
+          }
+        }
+      },
       "http2_settings" : {
         "type" : "object",
         "properties" : {

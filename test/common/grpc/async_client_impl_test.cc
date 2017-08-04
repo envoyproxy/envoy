@@ -170,7 +170,8 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},
                                     {":path", "/helloworld.Greeter/SayHello"},
                                     {":authority", "test_cluster"},
-                                    {"content-type", "application/grpc"}};
+                                    {"content-type", "application/grpc"},
+                                    {"te", "trailers"}};
     for (auto& value : initial_metadata) {
       headers.addReference(value.first, value.second);
     }

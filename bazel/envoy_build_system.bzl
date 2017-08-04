@@ -24,6 +24,10 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+    }) + select({
+        # TCLAP command line parser needs this to support int64_t/uint64_t
+        "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
+        "//conditions:default": [],
     })
 
 # Compute the final linkopts based on various options.
@@ -109,7 +113,8 @@ def envoy_cc_library(name,
                      repository = "",
                      linkstamp = None,
                      tags = [],
-                     deps = []):
+                     deps = [],
+                     strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     native.cc_library(
@@ -127,7 +132,8 @@ def envoy_cc_library(name,
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = linkstamp,
-    )
+        strip_include_prefix = strip_include_prefix,
+   )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
