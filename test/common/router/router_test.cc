@@ -1141,5 +1141,47 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   router_.decodeHeaders(incoming_headers, true);
 }
 
+TEST_F(RouterTest, Watermarks) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  NiceMock<Http::MockStream> stream;
+  Http::StreamCallbacks* stream_callbacks;
+  EXPECT_CALL(stream, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
+    stream_callbacks = &callbacks;
+  }));
+  EXPECT_CALL(encoder, getStream()).WillOnce(ReturnRef(stream));
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
+                                  {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  stream_callbacks->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
+  stream_callbacks->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
+
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"},
+                                  {"x-envoy-upstream-canary", "false"},
+                                  {"x-envoy-virtual-cluster", "hello"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 } // namespace Router
 } // namespace Envoy

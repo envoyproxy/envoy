@@ -271,7 +271,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
     client_.reset(parent_.createCodecClient(conn));
-    client_->addConnectionCallbacks(*this);
+    client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
   }
 

@@ -146,6 +146,10 @@ http2_settings
     NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increasing the default window
     size now, so it's also the minimum.
 
+    This field also acts as a soft limit on the number of bytes Envoy will buffer per-stream in the
+    HTTP/2 codec buffers.  Once the buffer reaches this pointer, watermark callbacks will fire to
+    stop the flow of data to the codec buffers.
+
   initial_connection_window_size
     *(optional, integer)* Similar to :ref:`initial_stream_window_size
     <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control

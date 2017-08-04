@@ -42,6 +42,7 @@ public:
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
+  void readDisable(bool) override {}
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
@@ -294,6 +295,8 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
 
 private:
   struct PendingResponse {

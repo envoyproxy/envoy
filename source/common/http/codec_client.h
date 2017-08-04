@@ -157,6 +157,8 @@ private:
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // StreamDecoderWrapper
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
@@ -180,8 +182,14 @@ private:
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  // Pass watermark events from the connection on to the codec which will pass it to the underlying
+  // streams.
+  void onAboveWriteBufferHighWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  }
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};
