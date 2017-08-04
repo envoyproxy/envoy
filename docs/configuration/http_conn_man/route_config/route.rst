@@ -400,6 +400,21 @@ specified in the following form:
     {"key": "header2", "value": "value2"}
   ]
 
+Envoy also supports adding the Original Client IP and Protocol to the request that matches a specific route:
+
+.. code-block:: json
+
+ [
+   {"key": "X-Client-IP", "value":"%CLIENT_IP%"},
+   {"key": "X-Client-Proto", "value":"%PROTOCOL%"}
+ ]
+
+The Original Client IP and Protocol are already added by envoy as an  
+:ref:`X-Forwarded-For <config_http_conn_man_headers_x-forwarded-for>` 
+and :ref:`X-Forwarded-Proto <config_http_conn_man_headers_x-forwarded-proto>` headers. 
+The above feature lets you customize the header name to be added to the request(X-Client-IP 
+and X-Client-Proto in the above example).
+
 *Note:* Headers are appended to requests in the following order:
 route-level headers, :ref:`virtual host level <config_http_conn_man_route_table_vhost_add_req_headers>`
 headers and finally global :ref:`route_config <config_http_conn_man_route_table_add_req_headers>`
