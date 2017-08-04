@@ -116,7 +116,7 @@ public:
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * Set the downstream address
+   * Set the downstream address.
    */
   virtual void setDownstreamAddress(const std::string& address) PURE;
 

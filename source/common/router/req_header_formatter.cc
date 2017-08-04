@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Router {
 
-HeaderFormatterSharedPtr RequestHeaderParser::parseInternal(const std::string& format) {
+HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format) {
   std::string variable_name;
   if (format.find("%") == 0) {
     size_t last_occ_pos = format.rfind("%");
@@ -25,26 +25,27 @@ HeaderFormatterSharedPtr RequestHeaderParser::parseInternal(const std::string& f
     variable_name = format.substr(1, last_occ_pos - 1);
 
   } else {
-    HeaderFormatterSharedPtr plain_header_formatter_shared_ptr(new PlainHeaderFormatter(format));
+    HeaderFormatterPtr plain_header_formatter_shared_ptr(new PlainHeaderFormatter(format));
     return plain_header_formatter_shared_ptr;
   }
-  HeaderFormatterSharedPtr request_header_formatter_shared_ptr(
-      new RequestHeaderFormatter(variable_name));
+  HeaderFormatterPtr request_header_formatter_shared_ptr(new RequestHeaderFormatter(variable_name));
   return request_header_formatter_shared_ptr;
 }
 
-RequestHeaderParserSharedPtr RequestHeaderParser::parse(const Json::Object& config) {
-
-  RequestHeaderParserSharedPtr request_header_parser(new RequestHeaderParser());
+RequestHeaderParser RequestHeaderParser::parse(const Json::Object& config) {
+  RequestHeaderParser request_header_parser;
+  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
+      header_formatter_map;
   if (config.hasObject("request_headers_to_add")) {
     std::vector<Json::ObjectSharedPtr> request_headers =
         config.getObjectArray("request_headers_to_add");
     for (const Json::ObjectSharedPtr& header : request_headers) {
       if (!header->getString("key").empty() && !header->getString("value").empty()) {
         ENVOY_LOG(debug, "adding key {} to header formatter map", header->getString("key"));
-        request_header_parser->header_formatter_map_.emplace(
-            Http::LowerCaseString(header->getString("key")),
-            RequestHeaderParser::parseInternal(header->getString("value")));
+        HeaderFormatterPtr header_formatter =
+            RequestHeaderParser::parseInternal(header->getString("value"));
+        request_header_parser.header_formatter_map_.emplace(
+            Http::LowerCaseString(header->getString("key")), header_formatter);
       }
     }
   }
@@ -84,7 +85,7 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name) {
   }
 }
 
-std::string
+const std::string
 RequestHeaderFormatter::format(const Envoy::Http::AccessLog::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }

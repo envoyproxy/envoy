@@ -57,8 +57,7 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
 	   	]
 	  })EOF";
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  RequestHeaderParserSharedPtr req_header_parser_shared_ptr =
-      Envoy::Router::RequestHeaderParser::parse(*loader.get());
+  RequestHeaderParser req_header_parser = Envoy::Router::RequestHeaderParser::parse(*loader.get());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::string s1 = "127.0.0.1";
@@ -67,7 +66,7 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
       Http::LowerCaseString{"x-client-ip"}, "%CLIENT_IP%");
   std::list<std::pair<Http::LowerCaseString, std::string>> requestHeadersToAdd = {
       client_ip_req_header};
-  req_header_parser_shared_ptr->evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
+  req_header_parser.evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
 }
 
@@ -82,15 +81,14 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
 	   	]
 	  })EOF";
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  RequestHeaderParserSharedPtr req_header_parser_shared_ptr =
-      Envoy::Router::RequestHeaderParser::parse(*loader.get());
+  RequestHeaderParser req_header_parser = Envoy::Router::RequestHeaderParser::parse(*loader.get());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::pair<Http::LowerCaseString, std::string> static_req_header(
       Http::LowerCaseString{"static-header"}, "static-value");
   std::list<std::pair<Http::LowerCaseString, std::string>> requestHeadersToAdd = {
       static_req_header};
-  req_header_parser_shared_ptr->evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
+  req_header_parser.evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
   EXPECT_TRUE(headerMap.has("static-header"));
 }
 
