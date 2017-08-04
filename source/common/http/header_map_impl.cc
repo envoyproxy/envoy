@@ -70,6 +70,8 @@ void HeaderString::append(const char* data, uint32_t size) {
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;
     string_length_ = 0;
+
+    FALLTHRU;
   }
 
   case Type::Inline: {
@@ -78,7 +80,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       break;
     }
 
-    // Fall through.
+    FALLTHRU;
   }
 
   case Type::Dynamic: {
@@ -111,7 +113,7 @@ void HeaderString::clear() {
   }
   case Type::Inline: {
     inline_buffer_[0] = 0;
-    // fall through
+    FALLTHRU;
   }
   case Type::Dynamic: {
     string_length_ = 0;
@@ -125,6 +127,8 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
     // Switch back to inline and fall through.
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;
+
+    FALLTHRU;
   }
 
   case Type::Inline: {
@@ -133,7 +137,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
       break;
     }
 
-    // Fall through.
+    FALLTHRU;
   }
 
   case Type::Dynamic: {
@@ -164,6 +168,8 @@ void HeaderString::setInteger(uint64_t value) {
     // Switch back to inline and fall through.
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;
+
+    FALLTHRU;
   }
 
   case Type::Inline:
