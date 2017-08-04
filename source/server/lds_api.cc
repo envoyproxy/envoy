@@ -1,5 +1,7 @@
 #include "server/lds_api.h"
 
+#include <functional>
+
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
