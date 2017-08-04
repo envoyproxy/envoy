@@ -29,12 +29,16 @@ std::string Base64::decode(const std::string& input) {
     return EMPTY_STRING;
   }
 
+  // First position of "valid" padding character.
+  uint64_t first_padding_index = input.length();
   int max_length = input.length() / 4 * 3;
   // At most last two chars can be '='.
   if (input[input.length() - 1] == '=') {
     max_length--;
+    first_padding_index = input.length() - 1;
     if (input[input.length() - 2] == '=') {
       max_length--;
+      first_padding_index = input.length() - 2;
     }
   }
   std::string result;
@@ -49,23 +53,47 @@ std::string Base64::decode(const std::string& input) {
     // Take first 6 bits from 1st converted char and first 2 bits from 2nd converted char,
     // make 8 bits char from it.
     // Use conversion table to map char to decoded value (value is between 0 and 64).
-    result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])] << 2 |
-                     REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])] >> 4);
+    unsigned char a = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])];
+    unsigned char b = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])];
+    if (a == 64 || b == 64) {
+      // input contains an invalid character.
+      return EMPTY_STRING;
+    }
+    result.push_back(a << 2 | b >> 4);
     unsigned char c = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])];
 
-    // Chars not less than 64 will be skipped, '=' for example.
-    // Everything less than 64 is going to be decoded.
-    if (c < 64) {
-      // Take last 4 bits from 2nd converted char and 4 first bits from 3rd converted char.
-      result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])] << 4 |
-                       c >> 2);
-      unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
-
-      if (d < 64) {
-        // Take last 2 bits from 3rd converted char and all(6) bits from 4th converted char.
-        result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])] << 6 | d);
+    // Decoded value 64 means invalid character unless we already know it is a valid padding.
+    // If so, following characters are all padding.
+    // Also we should check there is no unused bits.
+    if(c == 64){
+      if (first_padding_index != cur_read + 2){
+        // input contains an invalid character.
+        return EMPTY_STRING;
+      }else if (b & 0b1111){
+        // there are unused bits at tail.
+        return EMPTY_STRING;
+      }else{
+        return result;
       }
     }
+    // Take last 4 bits from 2nd converted char and 4 first bits from 3rd converted char.
+    result.push_back(b << 4 | c >> 2);
+
+    unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
+    if(d == 64){
+      if (first_padding_index != cur_read + 3){
+        // input contains an invalid character.
+        return EMPTY_STRING;
+      }else if (c & 0b11){
+        // there are unused bits at tail.
+        return EMPTY_STRING;
+      }else{
+        return result;
+      }
+    }
+    // Take last 2 bits from 3rd converted char and all(6) bits from 4th converted char.
+    result.push_back(c << 6 | d);
+
     cur_read += 4;
     bytes_left -= 4;
   }
