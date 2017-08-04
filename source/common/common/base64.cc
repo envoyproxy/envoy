@@ -65,14 +65,14 @@ std::string Base64::decode(const std::string& input) {
     // Decoded value 64 means invalid character unless we already know it is a valid padding.
     // If so, following characters are all padding.
     // Also we should check there is no unused bits.
-    if(c == 64){
-      if (first_padding_index != cur_read + 2){
+    if (c == 64) {
+      if (first_padding_index != cur_read + 2) {
         // input contains an invalid character.
         return EMPTY_STRING;
-      }else if (b & 0b1111){
+      } else if (b & 0b1111) {
         // there are unused bits at tail.
         return EMPTY_STRING;
-      }else{
+      } else {
         return result;
       }
     }
@@ -80,14 +80,14 @@ std::string Base64::decode(const std::string& input) {
     result.push_back(b << 4 | c >> 2);
 
     unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
-    if(d == 64){
-      if (first_padding_index != cur_read + 3){
+    if (d == 64) {
+      if (first_padding_index != cur_read + 3) {
         // input contains an invalid character.
         return EMPTY_STRING;
-      }else if (c & 0b11){
+      } else if (c & 0b11) {
         // there are unused bits at tail.
         return EMPTY_STRING;
-      }else{
+      } else {
         return result;
       }
     }

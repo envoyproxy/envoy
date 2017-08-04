@@ -75,12 +75,12 @@ TEST(Base64Test, Decode) {
   }
 }
 
-TEST(Base64Test, DecodeFailure){
+TEST(Base64Test, DecodeFailure) {
   EXPECT_EQ("", Base64::decode("==Zg"));
   EXPECT_EQ("", Base64::decode("=Zm8"));
   EXPECT_EQ("", Base64::decode("Zm=8"));
   EXPECT_EQ("", Base64::decode("Zg=A"));
-  EXPECT_EQ("", Base64::decode("Zm9="));  // 011001 100110 111101 <- unused bit at tail
+  EXPECT_EQ("", Base64::decode("Zm9=")); // 011001 100110 111101 <- unused bit at tail
   EXPECT_EQ("", Base64::decode("Zg.."));
   EXPECT_EQ("", Base64::decode("..Zg"));
 }
