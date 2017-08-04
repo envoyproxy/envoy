@@ -18,6 +18,8 @@
 #include "common/router/config_utility.h"
 #include "common/router/router_ratelimit.h"
 
+#include "api/rds.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -87,7 +89,7 @@ private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
   struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const Json::Object& virtual_cluster);
+    VirtualClusterEntry(const envoy::api::v2::VirtualCluster& virtual_cluster);
 
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }

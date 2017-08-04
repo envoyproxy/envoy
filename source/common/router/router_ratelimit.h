@@ -8,8 +8,8 @@
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
+#include "common/config/rds_json.h"
 #include "common/http/filter/ratelimit.h"
-#include "common/json/json_validator.h"
 #include "common/router/config_utility.h"
 
 namespace Envoy {
@@ -42,9 +42,8 @@ public:
  */
 class RequestHeadersAction : public RateLimitAction {
 public:
-  RequestHeadersAction(const Json::Object& action)
-      : header_name_(action.getString("header_name")),
-        descriptor_key_(action.getString("descriptor_key")) {}
+  RequestHeadersAction(const envoy::api::v2::RateLimit::Action::RequestHeaders& action)
+      : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()) {}
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -72,8 +71,8 @@ public:
  */
 class GenericKeyAction : public RateLimitAction {
 public:
-  GenericKeyAction(const Json::Object& action)
-      : descriptor_value_(action.getString("descriptor_value")) {}
+  GenericKeyAction(const envoy::api::v2::RateLimit::Action::GenericKey& action)
+      : descriptor_value_(action.descriptor_value()) {}
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -89,7 +88,7 @@ private:
  */
 class HeaderValueMatchAction : public RateLimitAction {
 public:
-  HeaderValueMatchAction(const Json::Object& action);
+  HeaderValueMatchAction(const envoy::api::v2::RateLimit::Action::HeaderValueMatch& action);
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -105,9 +104,9 @@ private:
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::Validator {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
-  RateLimitPolicyEntryImpl(const Json::Object& config);
+  RateLimitPolicyEntryImpl(const envoy::api::v2::RateLimit& config);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }

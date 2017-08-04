@@ -7,7 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -62,12 +62,12 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
   return true;
 }
 
-HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
-    : descriptor_value_(action.getString("descriptor_value")),
-      expect_match_(action.getBoolean("expect_match", true)) {
-  std::vector<Json::ObjectSharedPtr> config_headers = action.getObjectArray("headers");
-  for (const Json::ObjectSharedPtr& header_map : config_headers) {
-    action_headers_.push_back(*header_map);
+HeaderValueMatchAction::HeaderValueMatchAction(
+    const envoy::api::v2::RateLimit::Action::HeaderValueMatch& action)
+    : descriptor_value_(action.descriptor_value()),
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
+  for (const auto& header_matcher : action.headers()) {
+    action_headers_.push_back(header_matcher);
   }
 }
 
@@ -83,25 +83,31 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
   }
 }
 
-RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
-    : Json::Validator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
-      disable_key_(config.getString("disable_key", "")),
-      stage_(static_cast<uint64_t>(config.getInteger("stage", 0))) {
-  for (const Json::ObjectSharedPtr& action : config.getObjectArray("actions")) {
-    std::string type = action->getString("type");
-    if (type == "source_cluster") {
+RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::RateLimit& config)
+    : disable_key_(config.disable_key()),
+      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
+  for (const auto& action : config.actions()) {
+    switch (action.action_specifier_case()) {
+    case envoy::api::v2::RateLimit::Action::kSourceCluster:
       actions_.emplace_back(new SourceClusterAction());
-    } else if (type == "destination_cluster") {
+      break;
+    case envoy::api::v2::RateLimit::Action::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
-    } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(*action));
-    } else if (type == "remote_address") {
+      break;
+    case envoy::api::v2::RateLimit::Action::kRequestHeaders:
+      actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
+      break;
+    case envoy::api::v2::RateLimit::Action::kRemoteAddress:
       actions_.emplace_back(new RemoteAddressAction());
-    } else if (type == "generic_key") {
-      actions_.emplace_back(new GenericKeyAction(*action));
-    } else {
-      ASSERT(type == "header_value_match");
-      actions_.emplace_back(new HeaderValueMatchAction(*action));
+      break;
+    case envoy::api::v2::RateLimit::Action::kGenericKey:
+      actions_.emplace_back(new GenericKeyAction(action.generic_key()));
+      break;
+    case envoy::api::v2::RateLimit::Action::kHeaderValueMatch:
+      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
+      break;
+    default:
+      NOT_REACHED;
     }
   }
 }
@@ -129,9 +135,11 @@ void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& rou
 RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   if (config.hasObject("rate_limits")) {
-    for (const Json::ObjectSharedPtr& rate_limit : config.getObjectArray("rate_limits")) {
+    for (const Json::ObjectSharedPtr& json_rate_limit : config.getObjectArray("rate_limits")) {
+      envoy::api::v2::RateLimit rate_limit;
+      Envoy::Config::RdsJson::translateRateLimit(*json_rate_limit, rate_limit);
       std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-          new RateLimitPolicyEntryImpl(*rate_limit));
+          new RateLimitPolicyEntryImpl(rate_limit));
       uint64_t stage = rate_limit_policy_entry->stage();
       ASSERT(stage < rate_limit_entries_reference_.size());
       rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

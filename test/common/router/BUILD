@@ -54,6 +54,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
+    external_deps = ["envoy_rds"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",

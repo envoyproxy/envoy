@@ -16,10 +16,12 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/config/rds_json.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -122,17 +124,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   if (have_weighted_clusters) {
     uint64_t total_weight = 0UL;
 
-    const Json::ObjectSharedPtr weighted_clusters_json = route.getObject("weighted_clusters");
-    const std::vector<Json::ObjectSharedPtr> cluster_list =
-        weighted_clusters_json->getObjectArray("clusters");
-    const std::string runtime_key_prefix =
-        weighted_clusters_json->getString("runtime_key_prefix", EMPTY_STRING);
+    envoy::api::v2::WeightedCluster weighted_cluster;
+    Envoy::Config::RdsJson::translateWeightedCluster(*route.getObject("weighted_clusters"),
+                                                     weighted_cluster);
+    const std::string& runtime_key_prefix = weighted_cluster.runtime_key_prefix();
 
-    for (const Json::ObjectSharedPtr& cluster : cluster_list) {
-      const std::string cluster_name = cluster->getString("name");
+    for (const auto& cluster : weighted_cluster.clusters()) {
+      const std::string& cluster_name = cluster.name();
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
           new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
-                                   cluster_name, cluster->getInteger("weight")));
+                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -464,9 +465,11 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
   }
 
   if (virtual_host.hasObject("virtual_clusters")) {
-    for (const Json::ObjectSharedPtr& virtual_cluster :
+    for (const Json::ObjectSharedPtr& json_virtual_cluster :
          virtual_host.getObjectArray("virtual_clusters")) {
-      virtual_clusters_.push_back(VirtualClusterEntry(*virtual_cluster));
+      envoy::api::v2::VirtualCluster virtual_cluster;
+      Envoy::Config::RdsJson::translateVirtualCluster(*json_virtual_cluster, virtual_cluster);
+      virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
     }
   }
 }
@@ -481,13 +484,14 @@ bool VirtualHostImpl::usesRuntime() const {
   return uses;
 }
 
-VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& virtual_cluster) {
-  if (virtual_cluster.hasObject("method")) {
-    method_ = virtual_cluster.getString("method");
+VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
+    const envoy::api::v2::VirtualCluster& virtual_cluster) {
+  if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
+    method_ = envoy::api::v2::RequestMethod_Name(virtual_cluster.method());
   }
 
-  pattern_ = std::regex{virtual_cluster.getString("pattern"), std::regex::optimize};
-  name_ = virtual_cluster.getString("name");
+  pattern_ = std::regex{virtual_cluster.pattern(), std::regex::optimize};
+  name_ = virtual_cluster.name();
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {

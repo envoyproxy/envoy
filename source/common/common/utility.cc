@@ -196,4 +196,11 @@ const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
   return s.empty() ? default_value : s;
 }
 
+std::string StringUtil::toUpper(const std::string& s) {
+  std::string upper_s;
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s),
+                 [](unsigned char c) -> unsigned char { return std::toupper(c); });
+  return upper_s;
+}
+
 } // namespace Envoy
