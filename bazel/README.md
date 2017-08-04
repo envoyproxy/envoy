@@ -48,7 +48,7 @@ and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used
 Bazel can also be built with the Docker image used for CI, by installing Docker and executing:
 
 ```
-./ci/run_envoy_docker.sh ./ci/do_ci.sh bazel.fastbuild
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 See also the [documentation](https://github.com/lyft/envoy/tree/master/ci) for developer use of the

@@ -90,16 +90,16 @@ void ClientImpl::onData(Buffer::Instance& data) {
   }
 }
 
-void ClientImpl::onEvent(uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void ClientImpl::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
-      if (events & Network::ConnectionEvent::RemoteClose) {
+      if (event == Network::ConnectionEvent::RemoteClose) {
         host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
-      if (events & Network::ConnectionEvent::LocalClose) {
+      if (event == Network::ConnectionEvent::LocalClose) {
         host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
       }
     }
@@ -115,13 +115,13 @@ void ClientImpl::onEvent(uint32_t events) {
     }
 
     connect_or_op_timer_->disableTimer();
-  } else if (events & Network::ConnectionEvent::Connected) {
+  } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     ASSERT(!pending_requests_.empty());
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) && !connected_) {
+  if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
     host_->cluster().stats().upstream_cx_connect_fail_.inc();
     host_->stats().cx_connect_fail_.inc();
   }
@@ -243,9 +243,9 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
   return client->redis_client_->makeRequest(request, callbacks);
 }
 
-void InstanceImpl::ThreadLocalActiveClient::onEvent(uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     auto client_to_delete = parent_.client_map_.find(host_);
     ASSERT(client_to_delete != parent_.client_map_.end());
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));

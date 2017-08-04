@@ -61,14 +61,16 @@ TEST_F(GrpcRequestImplTest, NoError) {
   Http::LowerCaseString header_key("foo");
   std::string header_value("bar");
   EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_))
-      .WillOnce(Invoke(
-          [&](Http::HeaderMap& headers) -> void { headers.addStatic(header_key, header_value); }));
+      .WillOnce(Invoke([&](Http::HeaderMap& headers) -> void {
+        headers.addReference(header_key, header_value);
+      }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::TestHeaderMapImpl expected_request_headers{{":method", "POST"},
                                                    {":path", "/helloworld.Greeter/SayHello"},
                                                    {":authority", "fake_cluster"},
                                                    {"content-type", "application/grpc"},
+                                                   {"te", "trailers"},
                                                    {"foo", "bar"}};
 
   EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(&expected_request_headers));

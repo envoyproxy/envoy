@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
@@ -50,10 +51,10 @@ public:
 
   /**
    * Called when a connection is being destroyed.
-   * @param events supplies the network events that caused destruction.
+   * @param event supplies the network event that caused destruction.
    * @param active_streams supplies whether there are still active streams at the time of closing.
    */
-  void onConnectionDestroy(uint32_t events, bool active_streams);
+  void onConnectionDestroy(Network::ConnectionEvent event, bool active_streams);
 
 private:
   enum class Type { NotInitialized, iOS, Android, Unknown };

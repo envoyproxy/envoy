@@ -25,7 +25,7 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path) : options_(file_path) {
+  ConfigTest(const std::string& file_path) : options_(file_path, std::string()) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -33,6 +33,7 @@ public:
         .WillByDefault(Return("access_token"));
 
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
+    envoy::api::v2::Bootstrap bootstrap;
     Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config;
 
@@ -53,7 +54,7 @@ public:
         }));
 
     try {
-      main_config.initialize(*config_json, server_, *cluster_manager_factory_);
+      main_config.initialize(*config_json, bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }

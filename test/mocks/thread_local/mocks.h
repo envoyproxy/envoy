@@ -28,6 +28,7 @@ public:
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
   void shutdownThread_() {
+    shutdown_ = true;
     // Reverse order which is same as the production code.
     for (auto it = data_.rbegin(); it != data_.rend(); ++it) {
       it->reset();
@@ -40,7 +41,13 @@ public:
       parent_.data_.resize(index_ + 1);
     }
 
-    ~SlotImpl() { parent_.data_[index_].reset(); }
+    ~SlotImpl() {
+      // Do not actually clear slot data during shutdown. This mimics the production code.
+      if (!parent_.shutdown_) {
+        EXPECT_LT(index_, parent_.data_.size());
+        parent_.data_[index_].reset();
+      }
+    }
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
@@ -54,6 +61,7 @@ public:
   uint32_t current_slot_{};
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
+  bool shutdown_{};
 };
 
 } // namespace ThreadLocal

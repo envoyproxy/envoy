@@ -1,6 +1,10 @@
 #include "common/common/thread.h"
 
+#ifdef __linux__
 #include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <pthread.h>
+#endif
 
 #include <functional>
 
@@ -21,7 +25,17 @@ Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_ro
   UNREFERENCED_PARAMETER(rc);
 }
 
-int32_t Thread::currentThreadId() { return syscall(SYS_gettid); }
+int32_t Thread::currentThreadId() {
+#ifdef __linux__
+  return syscall(SYS_gettid);
+#elif defined(__APPLE__)
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+  return static_cast<int32_t>(tid);
+#else
+#error "Enable and test pthread id retrieval code for you arch in thread.cc"
+#endif
+}
 
 void Thread::join() {
   int rc = pthread_join(thread_id_, nullptr);

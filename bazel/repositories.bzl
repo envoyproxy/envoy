@@ -110,7 +110,7 @@ def envoy_api_deps(skip_targets):
         remote = REPO_LOCATIONS["envoy_api"],
         commit = "0b35f3efc31621953bc2eb7458d01d8eab984394",
     )
-    bind_targets = ["base", "cds", "eds", "health_check", "protocol", "tls_context"]
+    bind_targets = ["address", "base", "bootstrap", "cds", "eds", "health_check", "protocol", "tls_context"]
     for t in bind_targets:
         native.bind(
             name = "envoy_" + t,

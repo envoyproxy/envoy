@@ -62,7 +62,7 @@ public:
   void sendServerInitialMetadata(TestMetadata& metadata) {
     Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     for (auto& value : metadata) {
-      reply_headers->addStatic(value.first, value.second);
+      reply_headers->addReference(value.first, value.second);
     }
     EXPECT_CALL(*this, onReceiveInitialMetadata_(HeaderMapEqualRef(reply_headers.get())));
     http_callbacks_->onHeaders(std::move(reply_headers), false);
@@ -170,9 +170,10 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},
                                     {":path", "/helloworld.Greeter/SayHello"},
                                     {":authority", "test_cluster"},
-                                    {"content-type", "application/grpc"}};
+                                    {"content-type", "application/grpc"},
+                                    {"te", "trailers"}};
     for (auto& value : initial_metadata) {
-      headers.addStatic(value.first, value.second);
+      headers.addReference(value.first, value.second);
     }
 
     return headers;
@@ -184,7 +185,7 @@ public:
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
           for (auto& value : initial_metadata) {
-            headers.addStatic(value.first, value.second);
+            headers.addReference(value.first, value.second);
           }
         }));
     const auto headers = expectedHeaders(initial_metadata);
@@ -221,7 +222,7 @@ public:
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
           for (auto& value : initial_metadata) {
-            headers.addStatic(value.first, value.second);
+            headers.addReference(value.first, value.second);
           }
         }));
     const auto headers = expectedHeaders(initial_metadata);

@@ -20,8 +20,9 @@
 namespace Envoy {
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path,
+                                                       const std::string& bootstrap_path,
                                                        const Network::Address::IpVersion version) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
+  IntegrationTestServerPtr server{new IntegrationTestServer(config_path, bootstrap_path)};
   server->start(version);
   return server;
 }
@@ -74,7 +75,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
-  Server::TestOptionsImpl options(config_path_);
+  Server::TestOptionsImpl options(config_path_, bootstrap_path_);
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",

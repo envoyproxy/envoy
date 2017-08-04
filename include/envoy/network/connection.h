@@ -19,13 +19,12 @@ class Dispatcher;
 namespace Network {
 
 /**
- * Events that occur on a connection. Maybe be combined.
+ * Events that occur on a connection.
  */
-class ConnectionEvent {
-public:
-  static const uint32_t RemoteClose = 0x1;
-  static const uint32_t LocalClose = 0x2;
-  static const uint32_t Connected = 0x4;
+enum class ConnectionEvent {
+  RemoteClose,
+  LocalClose,
+  Connected,
 };
 
 /**
@@ -42,9 +41,9 @@ public:
 
   /**
    * Callback for connection events.
-   * @param events supplies the ConnectionEvent events that occurred as a bitmask.
+   * @param events supplies the ConnectionEvent that occurred.
    */
-  virtual void onEvent(uint32_t events) PURE;
+  virtual void onEvent(ConnectionEvent event) PURE;
 
   /**
    * Called when the write buffer for a connection goes over its high watermark.

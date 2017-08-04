@@ -129,7 +129,7 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
                                        Stats::Store& store, Type type)
     : FakeConnectionBase(std::move(connection_wrapper)) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
+    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this, Http::Http1Settings()));
   } else {
     codec_.reset(
         new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));
@@ -164,10 +164,10 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
   return *new_streams_.back();
 }
 
-void FakeConnectionBase::onEvent(uint32_t events) {
+void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
   std::unique_lock<std::mutex> lock(lock_);
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     disconnected_ = true;
     connection_event_.notify_one();
   }

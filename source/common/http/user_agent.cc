@@ -47,12 +47,12 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
   }
 }
 
-void UserAgent::onConnectionDestroy(uint32_t events, bool active_streams) {
+void UserAgent::onConnectionDestroy(Network::ConnectionEvent event, bool active_streams) {
   if (!stats_) {
     return;
   }
 
-  if (active_streams && (events & Network::ConnectionEvent::RemoteClose)) {
+  if (active_streams && event == Network::ConnectionEvent::RemoteClose) {
     stats_->downstream_cx_destroy_remote_active_rq_.inc();
   }
 }

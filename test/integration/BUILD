@@ -276,6 +276,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "uds_integration_test",
+    srcs = [
+        "uds_integration_test.cc",
+        "uds_integration_test.h",
+    ],
+    data = ["//test/config/integration:server_uds.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/stats:stats_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "xds_integration_test",
+    srcs = ["xds_integration_test.cc"],
+    data = ["//test/config/integration:server_xds_files"],
+    deps = [
+        ":integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "xfcc_integration_test",
     srcs = [
         "ssl_integration_test.h",
@@ -290,22 +316,5 @@ envoy_cc_test(
         ":integration_lib",
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "uds_integration_test",
-    srcs = [
-        "uds_integration_test.cc",
-        "uds_integration_test.h",
-    ],
-    data = ["//test/config/integration:server_uds.json"],
-    deps = [
-        ":integration_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/http:codec_client_lib",
-        "//source/common/stats:stats_lib",
-        "//test/test_common:environment_lib",
     ],
 )

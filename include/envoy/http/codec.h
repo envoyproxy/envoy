@@ -106,6 +106,17 @@ public:
    * @param reason supplies the reset reason.
    */
   virtual void onResetStream(StreamResetReason reason) PURE;
+
+  /**
+   * Fires when a stream, or the connection the stream is sending to, goes over its high watermark.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Fires when a stream, or the connection the stream is sending to, goes from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -132,6 +143,14 @@ public:
    * @param reason supplies the reset reason.
    */
   virtual void resetStream(StreamResetReason reason) PURE;
+
+  /**
+   * Enable/disable further data from this stream.
+   * Cessation of data may not be immediate.  For example, for HTTP/2 this may stop further flow
+   * control window updates which will result in the peer eventually stopping sending data.
+   * @param disable informs if reads should be disabled (true) or re-enabled (false).
+   */
+  virtual void readDisable(bool disable) PURE;
 };
 
 /**
@@ -145,6 +164,15 @@ public:
    * Fires when the remote indicates "go away." No new streams should be created.
    */
   virtual void onGoAway() PURE;
+};
+
+/**
+ * HTTP/1.* Codec settings
+ */
+struct Http1Settings {
+  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // traffic
+  bool allow_absolute_url_{false};
 };
 
 /**
@@ -260,6 +288,17 @@ public:
    * @return StreamEncoder& supplies the encoder to write the request into.
    */
   virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
+
+  /**
+   * Called when the underlying Network::Connection goes over its high watermark.
+   */
+  virtual void onUnderlyingConnectionAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the underlying Network::Connection goes from over its high watermark to under its
+   * low watermark.
+   */
+  virtual void onUnderlyingConnectionBelowWriteBufferLowWatermark() PURE;
 };
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
