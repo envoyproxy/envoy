@@ -15,7 +15,7 @@
 #include "common/stats/stats_impl.h"
 
 namespace Envoy {
-namespace HotRestart {
+namespace Server {
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
@@ -201,5 +201,5 @@ private:
   bool parent_terminated_{};
 };
 
-} // namespace HotRestart
+} // namespace Server
 } // namespace Envoy

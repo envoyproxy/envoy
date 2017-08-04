@@ -57,8 +57,8 @@ envoy_cc_library(
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
+        "//source/server:hot_restart_lib",
         "//source/server:options_lib",
-        "//source/common/hot_restart:hot_restart_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",
     ] + select({
@@ -74,8 +74,8 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         "//source/common/common:compiler_requirements_lib",
-        "//source/common/hot_restart:hot_restart_lib",
-        "//source/common/hot_restart:hot_restart_nop_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
     ],
 )

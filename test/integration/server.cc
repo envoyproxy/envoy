@@ -4,11 +4,12 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/hot_restart/hot_restart_nop.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
+
+#include "server/hot_restart_nop_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -74,7 +75,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
   Server::TestOptionsImpl options(config_path_);
-  HotRestart::HotRestartNopImpl restarter;
+  Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
                                       "cluster_name", "node_name");

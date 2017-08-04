@@ -1,4 +1,4 @@
-#include "common/hot_restart/hot_restart.h"
+#include "server/hot_restart_impl.h"
 
 #include <signal.h>
 #include <sys/mman.h>
@@ -21,7 +21,7 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-namespace HotRestart {
+namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
@@ -435,5 +435,5 @@ void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() { return SharedMemory::version(); }
 
-} // namespace HotRestart
+} // namespace Server
 } // namespace Envoy

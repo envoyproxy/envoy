@@ -5,7 +5,7 @@
 #include "envoy/server/hot_restart.h"
 
 namespace Envoy {
-namespace HotRestart {
+namespace Server {
 
 /**
  * No-op implementation of HotRestart.
@@ -24,5 +24,5 @@ public:
   std::string version() override { return "disabled"; }
 };
 
-} // namespace HotRestart
+} // namespace Server
 } // namespace Envoy

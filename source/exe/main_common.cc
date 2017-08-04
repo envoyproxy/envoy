@@ -3,21 +3,21 @@
 
 #include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
-#include "common/hot_restart/hot_restart_nop.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
-#ifdef ENVOY_HOT_RESTART
-#include "common/hot_restart/hot_restart.h"
-#endif
-
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
+#include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
+
+#ifdef ENVOY_HOT_RESTART
+#include "server/hot_restart_impl.h"
+#endif
 
 #include "ares.h"
 
@@ -41,9 +41,9 @@ public:
 
 int main_common(OptionsImpl& options) {
 #ifdef ENVOY_HOT_RESTART
-  std::unique_ptr<HotRestart::HotRestartImpl> restarter;
+  std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
-    restarter.reset(new HotRestart::HotRestartImpl(options));
+    restarter.reset(new Server::HotRestartImpl(options));
   } catch (Envoy::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;
@@ -53,8 +53,8 @@ int main_common(OptionsImpl& options) {
   Thread::BasicLockable& access_log_lock = restarter->accessLogLock();
   Stats::RawStatDataAllocator& stats_allocator = *restarter;
 #else
-  std::unique_ptr<HotRestart::HotRestartNopImpl> restarter;
-  restarter.reset(new HotRestart::HotRestartNopImpl());
+  std::unique_ptr<Server::HotRestartNopImpl> restarter;
+  restarter.reset(new Server::HotRestartNopImpl());
 
   Thread::MutexBasicLockable log_lock, access_log_lock;
   Stats::HeapRawStatDataAllocator stats_allocator;
