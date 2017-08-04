@@ -395,7 +395,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
         stream->waiting_for_non_informational_headers_ = true;
       }
 
-      // Fall through.
+      FALLTHRU;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
