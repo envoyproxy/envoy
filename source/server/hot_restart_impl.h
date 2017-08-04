@@ -36,7 +36,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(Server::Options& options);
+  static SharedMemory& initialize(Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -102,11 +102,11 @@ private:
 /**
  * Implementation of HotRestart built for Linux.
  */
-class HotRestartImpl : public Server::HotRestart,
+class HotRestartImpl : public HotRestart,
                        public Stats::RawStatDataAllocator,
                        Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Server::Options& options);
+  HotRestartImpl(Options& options);
 
   Thread::BasicLockable& logLock() { return log_lock_; }
   Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
@@ -186,7 +186,7 @@ private:
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
 
-  Server::Options& options_;
+  Options& options_;
   SharedMemory& shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;

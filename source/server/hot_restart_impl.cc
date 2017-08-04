@@ -27,7 +27,7 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 8;
 
-SharedMemory& SharedMemory::initialize(Server::Options& options) {
+SharedMemory& SharedMemory::initialize(Options& options) {
   int flags = O_RDWR;
   std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
@@ -88,7 +88,7 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
 
 std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeof(SharedMemory)); }
 
-HotRestartImpl::HotRestartImpl(Server::Options& options)
+HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
       access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
       init_lock_(shmem_.init_lock_) {
