@@ -35,40 +35,40 @@ std::string RandomGeneratorImpl::uuid() {
   std::string uuid;
   uuid.reserve(UUID_LENGTH);
 
-  for (unsigned i = 0; i < 4; i++) {
-    uint8_t d = rand[i];
+  for (uint8_t i = 0; i < 4; i++) {
+    const uint8_t d = rand[i];
     uuid.push_back(hex[d >> 4]);
     uuid.push_back(hex[d & 0xf]);
   }
 
   uuid.push_back('-');
 
-  for (unsigned i = 4; i < 6; i++) {
-    uint8_t d = rand[i];
+  for (uint8_t i = 4; i < 6; i++) {
+    const uint8_t d = rand[i];
     uuid.push_back(hex[d >> 4]);
     uuid.push_back(hex[d & 0xf]);
   }
 
   uuid.push_back('-');
 
-  for (unsigned i = 6; i < 8; i++) {
-    uint8_t d = rand[i];
+  for (uint8_t i = 6; i < 8; i++) {
+    const uint8_t d = rand[i];
     uuid.push_back(hex[d >> 4]);
     uuid.push_back(hex[d & 0xf]);
   }
 
   uuid.push_back('-');
 
-  for (unsigned i = 8; i < 10; i++) {
-    uint8_t d = rand[i];
+  for (uint8_t i = 8; i < 10; i++) {
+    const uint8_t d = rand[i];
     uuid.push_back(hex[d >> 4]);
     uuid.push_back(hex[d & 0xf]);
   }
 
   uuid.push_back('-');
 
-  for (unsigned i = 10; i < 16; i++) {
-    uint8_t d = rand[i];
+  for (uint8_t i = 10; i < 16; i++) {
+    const uint8_t d = rand[i];
     uuid.push_back(hex[d >> 4]);
     uuid.push_back(hex[d & 0xf]);
   }
