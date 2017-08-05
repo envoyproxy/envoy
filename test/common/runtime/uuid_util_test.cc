@@ -54,6 +54,10 @@ TEST(UUIDUtilsTest, checkDistribution) {
   for (int i = 0; i < 500000; ++i) {
     std::string uuid = random.uuid();
 
+    const char c = uuid[19];
+    ASSERT_TRUE(uuid[14] == '4'); // UUID version 4 (random)
+    ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
+
     uint16_t value;
     ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
 

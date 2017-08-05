@@ -27,10 +27,10 @@ std::string RandomGeneratorImpl::uuid() {
   // See: https://tools.ietf.org/html/rfc4122#section-4.4
   uint8_t rand[16];
   RAND_bytes(rand, 16);
-  rand[6] = (rand[6] & 0x0f) | 0x40;
-  rand[8] = (rand[8] & 0x3f) | 0x80;
+  rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
+  rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
 
-  // Convert UUID to a string representation.
+  // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
   static const char* const hex = "0123456789abcdef";
   std::string uuid;
   uuid.reserve(UUID_LENGTH);
