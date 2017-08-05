@@ -35,14 +35,6 @@ TEST(UUIDUtilsTest, mod) {
   EXPECT_EQ(7295, result);
 }
 
-TEST(UUIDUtilsTest, benchmark) {
-  Runtime::RandomGeneratorImpl random;
-
-  for (int i = 0; i < 500000; ++i) {
-    random.uuid();
-  }
-}
-
 TEST(UUIDUtilsTest, checkDistribution) {
   Runtime::RandomGeneratorImpl random;
 
@@ -68,6 +60,14 @@ TEST(UUIDUtilsTest, checkDistribution) {
   }
 
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
+}
+
+TEST(UUIDUtilsTest, benchmark) {
+  Runtime::RandomGeneratorImpl random;
+
+  for (int i = 0; i < 500000; ++i) {
+    random.uuid();
+  }
 }
 
 TEST(UUIDUtilsTest, setAndCheckTraceable) {
