@@ -9,7 +9,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/http_route_manager.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -113,9 +113,9 @@ public:
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
-   * @return HttpRouteManager& singleton for use by the entire server.
+   * @return RouteConfigProviderManager& singleton for use by the entire server.
    */
-  virtual Router::HttpRouteManager& httpRouteManager() PURE;
+  virtual Router::RouteConfigProviderManager& routeConfigProviderManager() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };

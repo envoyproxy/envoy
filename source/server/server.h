@@ -131,7 +131,9 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
-  Router::ServerHttpRouteManager& httpRouteManager() override { return *http_route_manager_; }
+  Router::ServerRouteConfigProviderManager& routeConfigProviderManager() override {
+    return *route_config_provider_manager_;
+  }
 
 private:
   void flushStats();
@@ -157,7 +159,7 @@ private:
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
-  std::unique_ptr<Router::ServerHttpRouteManager> http_route_manager_;
+  std::unique_ptr<Router::ServerRouteConfigProviderManager> route_config_provider_manager_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Stats::ScopePtr admin_scope_;

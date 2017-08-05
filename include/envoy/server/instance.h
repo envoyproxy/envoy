@@ -10,7 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/http_route_manager.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
@@ -179,7 +179,7 @@ public:
   /**
    * @return the server's http route manager.
    */
-  virtual Router::ServerHttpRouteManager& httpRouteManager() PURE;
+  virtual Router::ServerRouteConfigProviderManager& routeConfigProviderManager() PURE;
 };
 
 } // namespace Server

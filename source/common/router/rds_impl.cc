@@ -17,7 +17,7 @@ RouteConfigProviderSharedPtr
 RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& runtime,
                                 Upstream::ClusterManager& cm, Stats::Scope& scope,
                                 const std::string& stat_prefix, Init::Manager& init_manager,
-                                HttpRouteManager& http_route_manager) {
+                                RouteConfigProviderManager& route_config_provider_manager) {
   bool has_rds = config.hasObject("rds");
   bool has_route_config = config.hasObject("route_config");
   if (!(has_rds ^ has_route_config)) {
@@ -31,8 +31,8 @@ RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& run
   } else {
     Json::ObjectSharedPtr rds_config = config.getObject("rds");
     rds_config->validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-    return http_route_manager.getRouteConfigProvider(*rds_config, cm, scope, stat_prefix,
-                                                     init_manager);
+    return route_config_provider_manager.getRouteConfigProvider(*rds_config, cm, scope, stat_prefix,
+                                                                init_manager);
   }
 }
 
@@ -45,14 +45,14 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-    ThreadLocal::SlotAllocator& tls, HttpRouteManagerImpl& http_route_manager)
+    ThreadLocal::SlotAllocator& tls, RouteConfigProviderManagerImpl& route_config_provider_manager)
 
     : RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       runtime_(runtime), local_info_(local_info), tls_(tls.allocateSlot()),
       route_config_name_(config.getString("route_config_name")),
       stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}),
-      http_route_manager_(http_route_manager) {
+      route_config_provider_manager_(route_config_provider_manager) {
 
   ::Envoy::Config::Utility::checkClusterAndLocalInfo("rds", remote_cluster_name_, cm, local_info);
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
@@ -66,11 +66,11 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   onFetchComplete();
 
   // The ownership of RdsRouteConfigProviderImpl is shared among all HttpConnectionManagers that
-  // hold a shared_ptr to it. The HttpRouteManager holds weak_ptrs to the RdsRouteConfigProviders.
-  // Therefore, the map entry for the RdsRouteConfigProvider has to get cleaned by the
-  // RdsRouteConfigProvider's destructor.
-  http_route_manager_.route_config_providers_.erase(route_config_name_ + "_" +
-                                                    remote_cluster_name_);
+  // hold a shared_ptr to it. The RouteConfigProviderManager holds weak_ptrs to the
+  // RdsRouteConfigProviders. Therefore, the map entry for the RdsRouteConfigProvider has to get
+  // cleaned by the RdsRouteConfigProvider's destructor.
+  route_config_provider_manager_.route_config_providers_.erase(route_config_name_ + "_" +
+                                                               remote_cluster_name_);
 }
 
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
@@ -125,14 +125,14 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-HttpRouteManagerImpl::HttpRouteManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-                                           Runtime::RandomGenerator& random,
-                                           const LocalInfo::LocalInfo& local_info,
-                                           ThreadLocal::SlotAllocator& tls)
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
+    Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls)
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls) {}
 
-std::vector<Router::RouteConfigProviderSharedPtr> HttpRouteManagerImpl::routeConfigProviders() {
+std::vector<Router::RouteConfigProviderSharedPtr>
+RouteConfigProviderManagerImpl::routeConfigProviders() {
   std::vector<Router::RouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
@@ -141,7 +141,7 @@ std::vector<Router::RouteConfigProviderSharedPtr> HttpRouteManagerImpl::routeCon
   return ret;
 };
 
-Router::RouteConfigProviderSharedPtr HttpRouteManagerImpl::getRouteConfigProvider(
+Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteConfigProvider(
     const Json::Object& config, Upstream::ClusterManager& cm, Stats::Scope& scope,
     const std::string& stat_prefix, Init::Manager& init_manager) {
 

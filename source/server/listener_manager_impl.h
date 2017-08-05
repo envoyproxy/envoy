@@ -221,8 +221,8 @@ public:
   Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
-  Router::HttpRouteManager& httpRouteManager() override {
-    return parent_.server_.httpRouteManager();
+  Router::RouteConfigProviderManager& routeConfigProviderManager() override {
+    return parent_.server_.routeConfigProviderManager();
   }
 
   // Network::DrainDecision

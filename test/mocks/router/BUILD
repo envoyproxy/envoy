@@ -17,7 +17,7 @@ envoy_cc_mock(
         "//include/envoy/init:init_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/router:http_route_manager_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//include/envoy/router:shadow_writer_interface",

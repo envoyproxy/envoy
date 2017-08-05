@@ -85,7 +85,9 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
-  Router::ServerHttpRouteManager& httpRouteManager() override { return *http_route_manager_; }
+  Router::ServerRouteConfigProviderManager& routeConfigProviderManager() override {
+    return *route_config_provider_manager_;
+  }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
@@ -126,7 +128,7 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
-  std::unique_ptr<Router::HttpRouteManagerImpl> http_route_manager_;
+  std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
   ListenerManagerImpl listener_manager_;
 };
 

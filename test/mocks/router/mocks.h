@@ -12,8 +12,8 @@
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/router/http_route_manager.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
@@ -214,10 +214,10 @@ public:
   std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
-class MockHttpRouteManager : public ServerHttpRouteManager {
+class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {
 public:
-  MockHttpRouteManager();
-  ~MockHttpRouteManager();
+  MockRouteConfigProviderManager();
+  ~MockRouteConfigProviderManager();
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,

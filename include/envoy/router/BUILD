@@ -9,8 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "http_route_manager_interface",
-    hdrs = ["http_route_manager.h"],
+    name = "rds_interface",
+    hdrs = ["rds.h"],
+    deps = [":router_interface"],
+)
+
+envoy_cc_library(
+    name = "route_config_provider_manager_interface",
+    hdrs = ["route_config_provider_manager.h"],
     deps = [
         ":rds_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -22,12 +28,6 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
-)
-
-envoy_cc_library(
-    name = "rds_interface",
-    hdrs = ["rds.h"],
-    deps = [":router_interface"],
 )
 
 envoy_cc_library(

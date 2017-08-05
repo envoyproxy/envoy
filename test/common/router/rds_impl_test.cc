@@ -45,7 +45,7 @@ public:
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
     rds_ = RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.", init_manager_,
-                                           http_route_manager_);
+                                           route_config_provider_manager_);
     expectRequest();
     init_manager_.initialize();
   }
@@ -75,7 +75,8 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
-  HttpRouteManagerImpl http_route_manager_{runtime_, dispatcher_, random_, local_info_, tls_};
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
+                                                                local_info_, tls_};
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
@@ -91,7 +92,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, http_route_manager_),
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -110,7 +111,7 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
   local_info_.node_name_ = "";
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, http_route_manager_),
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -128,7 +129,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
   ON_CALL(cm_, get("foo_cluster")).WillByDefault(Return(nullptr));
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, http_route_manager_),
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -277,10 +278,10 @@ TEST_F(RdsImplTest, FailureArray) {
   EXPECT_EQ(1UL, store_.counter("foo.rds.update_failure").value());
 }
 
-class HttpRouteManagerImplTest : public testing::Test {
+class RouteConfigProviderManagerImplTest : public testing::Test {
 public:
-  HttpRouteManagerImplTest() {}
-  ~HttpRouteManagerImplTest() {}
+  RouteConfigProviderManagerImplTest() {}
+  ~RouteConfigProviderManagerImplTest() {}
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -290,10 +291,11 @@ public:
   Stats::IsolatedStoreImpl store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
-  HttpRouteManagerImpl http_route_manager_{runtime_, dispatcher_, random_, local_info_, tls_};
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
+                                                                local_info_, tls_};
 };
 
-TEST_F(HttpRouteManagerImplTest, Basic) {
+TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   init_manager_.initialize();
 
   std::string config_json = R"EOF(
@@ -306,13 +308,13 @@ TEST_F(HttpRouteManagerImplTest, Basic) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
 
-  // Get a RouteConfigProvider. This one should create an entry in the HttpRouteManager.
-  RouteConfigProviderSharedPtr provider =
-      http_route_manager_.getRouteConfigProvider(*config, cm_, store_, "foo_prefix", init_manager_);
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
+      *config, cm_, store_, "foo_prefix", init_manager_);
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 =
-      http_route_manager_.getRouteConfigProvider(*config, cm_, store_, "foo_prefix", init_manager_);
+  RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_.getRouteConfigProvider(
+      *config, cm_, store_, "foo_prefix", init_manager_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider, provider2);
 
@@ -326,12 +328,12 @@ TEST_F(HttpRouteManagerImplTest, Basic) {
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
 
-  RouteConfigProviderSharedPtr provider3 = http_route_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
       *config2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider);
 
   std::vector<RouteConfigProviderSharedPtr> configured_providers =
-      http_route_manager_.routeConfigProviders();
+      route_config_provider_manager_.routeConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
 
   provider.reset();
@@ -340,14 +342,14 @@ TEST_F(HttpRouteManagerImplTest, Basic) {
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider porinted at by provider3.
-  configured_providers = http_route_manager_.routeConfigProviders();
+  configured_providers = route_config_provider_manager_.routeConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
   EXPECT_EQ(provider3, configured_providers.front());
 
   provider3.reset();
   configured_providers.clear();
 
-  configured_providers = http_route_manager_.routeConfigProviders();
+  configured_providers = route_config_provider_manager_.routeConfigProviders();
   EXPECT_EQ(0UL, configured_providers.size());
 }
 

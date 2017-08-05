@@ -16,20 +16,21 @@ namespace Envoy {
 namespace Router {
 
 /**
- * The HttpRouteManager exposes the ability to get a RouteConfigProvider. This interface is exposed
- * to the Server's FactoryContext in order to allow HttpConnMans to get RouteConfigProviders.
+ * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
+ * is exposed to the Server's FactoryContext in order to allow HttpConnectionManagers to get
+ * RouteConfigProviders.
  */
-class HttpRouteManager {
+class RouteConfigProviderManager {
 public:
-  virtual ~HttpRouteManager() {}
+  virtual ~RouteConfigProviderManager() {}
 
   /**
-   * get a Router::RouteConfigProviderSharedPtr. Ownership of the RouteConfigProvider is shared by
-   * all the ConnectionManagers who own a Router::RouteConfigProviderSharedPtr. The HttpRouteManager
-   * holds weak_ptrs to the RouteConfigProviders. Clean up of the weak ptrs happen from the
-   * destructor of the RouteConfigProvider. This function creates a RouteConfigProvider is there
-   * isn't one with the same <route_config_name>_<cluster> already. Otherwise, it returns a
-   * Router::RouteConfigProviderSharedPtr created from the manager held weak_ptr.
+   * Get a RouteConfigProviderSharedPtr. Ownership of the RouteConfigProvider is shared by
+   * all the HttpConnectionManagers who own a RouteConfigProviderSharedPtr. The
+   * RouteConfigProviderManager holds weak_ptrs to the RouteConfigProviders. Clean up of the weak
+   * ptrs happen from the destructor of the RouteConfigProvider. This function creates a
+   * RouteConfigProvider if there isn't one with the same (route_config_name, cluster) already.
+   * Otherwise, it returns a RouteConfigProviderSharedPtr created from the manager held weak_ptr.
    * @param config supplies the json configuration of an RdsRouteConfigProvider.
    * @param scope supplies the scope to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
@@ -43,12 +44,12 @@ public:
 };
 
 /**
- * The ServerHttpRouteManager additionally allows listing all of the currently managed
+ * The ServerRouteConfigProviderManager additionally allows listing all of the currently managed
  * RouteConfigProviders.
  */
-class ServerHttpRouteManager : public HttpRouteManager {
+class ServerRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
-  virtual ~ServerHttpRouteManager() {}
+  virtual ~ServerRouteConfigProviderManager() {}
 
   /**
    * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
