@@ -57,7 +57,7 @@ envoy_cc_library(
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
-        ":hot_restart_lib",
+        "//source/server:hot_restart_lib",
         "//source/server:options_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",
@@ -73,26 +73,10 @@ envoy_cc_library(
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
-        ":hot_restart_lib",
         "//source/common/common:compiler_requirements_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "hot_restart_lib",
-    srcs = ["hot_restart.cc"],
-    hdrs = ["hot_restart.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:file_event_interface",
-        "//include/envoy/server:hot_restart_interface",
-        "//include/envoy/server:instance_interface",
-        "//include/envoy/server:options_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
     ],
 )
 
