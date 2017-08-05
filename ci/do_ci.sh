@@ -58,7 +58,8 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests..."
   # Due to Travis CI limits, we build and run the single fat coverage test binary rather than
   # build O(100) * O(200MB) static test binaries. This saves 20GB of disk space, see #1400.
-  NO_GCOV=1 ./test/coverage/gen_build.sh
+  cd "${ENVOY_BUILD_DIR}"
+  NO_GCOV=1 "${ENVOY_SRCDIR}"/test/coverage/gen_build.sh
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/coverage:coverage_tests \
