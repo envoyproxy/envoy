@@ -28,7 +28,7 @@ def envoy_copts(repository, test = False):
         # TCLAP command line parser needs this to support int64_t/uint64_t
         "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
         "//conditions:default": [],
-    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"])
+    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository)
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
@@ -340,9 +340,9 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     )
 
 # Selects the given values if hot restart is enabled in the current build.
-def envoy_select_hot_restart(xs):
+def envoy_select_hot_restart(xs, repository = ""):
     return select({
-        "//bazel:disable_hot_restart": [],
+        repository + "//bazel:disable_hot_restart": [],
         "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": xs,
     })
