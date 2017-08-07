@@ -472,6 +472,8 @@ private:
     // Http::DownstreamWatermarkProvider
     void addCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override {
       // This is currently expected to be called exactly once per stream, by the router filter.
+      // If there's ever a need for another filter to subscribe to watermark callbacks this can be
+      // removed.
       ASSERT(watermark_callbacks_.empty())
       watermark_callbacks_.push_back(&watermark_callbacks);
     }
