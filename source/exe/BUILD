@@ -35,6 +35,7 @@ envoy_cc_library(
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
+        "//source/server/config/http:extauth_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:grpc_web_lib",

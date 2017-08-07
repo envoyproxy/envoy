@@ -28,6 +28,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "extauth_lib",
+    srcs = ["extauth.cc"],
+    hdrs = ["extauth.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib"
+    ],
+)
+
+envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
