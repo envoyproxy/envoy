@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/server/guarddog.h"
 
 namespace Envoy {

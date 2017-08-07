@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <list>
 
 #include "envoy/common/callback.h"
