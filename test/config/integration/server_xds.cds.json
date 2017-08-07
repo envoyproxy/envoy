@@ -6,8 +6,10 @@
       "name": "cluster_1",
       "connectTimeout": { "seconds": 5 },
       "type": "EDS",
-      "edsConfig": {
-        "path": "{{ eds_json_path }}"
+      "edsClusterConfig": {
+        "edsConfig": {
+          "path": "{{ eds_json_path }}"
+        }
       },
       "lbPolicy": "ROUND_ROBIN",
       "http2ProtocolOptions": {}
