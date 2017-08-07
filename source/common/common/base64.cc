@@ -52,25 +52,26 @@ std::string Base64::decode(const std::string& input) {
   while (bytes_left > 0) {
     // Take first 6 bits from 1st converted char and first 2 bits from 2nd converted char,
     // make 8 bits char from it.
-    // Use conversion table to map char to decoded value (value is between 0 and 64).
-    unsigned char a = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])];
-    unsigned char b = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])];
+    // Use conversion table to map char to decoded value (value is between 0 and 63 inclusive for a
+    // valid character).
+    const unsigned char a = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])];
+    const unsigned char b = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])];
     if (a == 64 || b == 64) {
-      // input contains an invalid character.
+      // Input contains an invalid character.
       return EMPTY_STRING;
     }
     result.push_back(a << 2 | b >> 4);
-    unsigned char c = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])];
+    const unsigned char c = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])];
 
     // Decoded value 64 means invalid character unless we already know it is a valid padding.
     // If so, following characters are all padding.
-    // Also we should check there is no unused bits.
+    // Also we should check there are no unused bits.
     if (c == 64) {
       if (first_padding_index != cur_read + 2) {
-        // input contains an invalid character.
+        // Input contains an invalid character.
         return EMPTY_STRING;
       } else if (b & 0b1111) {
-        // there are unused bits at tail.
+        // There are unused bits at tail.
         return EMPTY_STRING;
       } else {
         return result;
@@ -79,13 +80,13 @@ std::string Base64::decode(const std::string& input) {
     // Take last 4 bits from 2nd converted char and 4 first bits from 3rd converted char.
     result.push_back(b << 4 | c >> 2);
 
-    unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
+    const unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
     if (d == 64) {
       if (first_padding_index != cur_read + 3) {
-        // input contains an invalid character.
+        // Input contains an invalid character.
         return EMPTY_STRING;
       } else if (c & 0b11) {
-        // there are unused bits at tail.
+        // There are unused bits at tail.
         return EMPTY_STRING;
       } else {
         return result;
