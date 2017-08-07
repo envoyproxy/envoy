@@ -44,9 +44,7 @@ private:
  */
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
-  PlainHeaderFormatter(const std::string& static_header_value) {
-    static_value_ = static_header_value;
-  };
+  PlainHeaderFormatter(const std::string& static_header_value): static_value_(static_header_value) {};
 
   // HeaderFormatter::format
   const std::string format(const Envoy::Http::AccessLog::RequestInfo&) const override {
@@ -54,7 +52,7 @@ public:
   };
 
 private:
-  std::string static_value_;
+  const std::string static_value_;
 };
 
 /**
