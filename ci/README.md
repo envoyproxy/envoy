@@ -78,12 +78,12 @@ While all changes to docker should eventually be upstreamed, it can be useful to
 test those changes locally before sending out a pull request.  To edit a local
 clone of upstream docker:
 
-``cd ci/build_container
-export TRAVIS_COMMIT=my_tag
-./docker_build.sh  # Wait patiently for quite some time
-cd ../..
-IMAGE_ID=my_tag 
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'``
+`cd ci/build_container  
+export TRAVIS_COMMIT=my_tag  
+./docker_build.sh  # Wait patiently for quite some time  
+cd ../..  
+IMAGE_ID=my_tag  
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'`
 
 The final call will run against your local envoy clone.
 
