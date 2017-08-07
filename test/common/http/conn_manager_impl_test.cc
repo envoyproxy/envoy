@@ -19,6 +19,7 @@
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -587,22 +588,78 @@ TEST_F(HttpConnectionManagerImplTest, RejectNonWebSocketOnWebSocketRoute) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
   setup(false, "");
 
-  ON_CALL(cluster_manager_, get(_)).WillByDefault(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
+
+  conn_manager_.reset();
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, WebSocketNoTcpConnPool) {
+TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   setup(false, "");
 
-  // MockHost::MockCreateConnectionData has a null upstream connection
-  // by default
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_)).WillOnce(Return(conn_info));
+
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
+
+  conn_manager_.reset();
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
+  setup(false, "");
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<Network::MockClientConnection>* upstream_connection_ =
+      new NiceMock<Network::MockClientConnection>();
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+
+  conn_info.connection_ = upstream_connection_;
+  conn_info.host_description_.reset(
+      new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
+                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
+      .WillByDefault(Return(true));
+
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+              finalizeRequestHeaders(_));
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
+      .WillOnce(Return(false));
+  // TODO (rshriram) figure out how to test the auto host rewrite. Need handle over headers.
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/scooby"},
+                                               {"connection", "Upgrade"},
+                                               {"upgrade", "websocket"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
+
+  conn_manager_.reset();
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
