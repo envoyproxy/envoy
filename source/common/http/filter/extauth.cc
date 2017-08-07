@@ -17,28 +17,14 @@ ExtAuth::~ExtAuth() { ASSERT(!auth_request_); }
 FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
   log().info("ExtAuth Request received; contacting auth server");
 
-  // Copy original headers as a JSON object
-  std::string json("{");
-  headers.iterate(
-      [](const HeaderEntry& header, void* ctx) -> void {
-        std::string* jsonPtr = static_cast<std::string*>(ctx);
-        std::string key(header.key().c_str());
-        std::string value(header.value().c_str());
-        // TODO(ark3): Ensure that key and value are sane so generated JSON is valid
-        *jsonPtr += "\n \"" + key + "\": \"" + value + "\",";
-      },
-      &json);
-  std::string request_body = json.substr(0, json.size() - 1) + "\n}"; // Drop trailing comma
-
   // Request external authentication
   auth_complete_ = false;
-  MessagePtr request(new RequestMessageImpl());
-  request->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
-  request->headers().insertPath().value(std::string("/ambassador/auth"));
+  MessagePtr request(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
+  // request->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+  // request->headers().insertPath().value(std::string("/ambassador/auth"));
   request->headers().insertHost().value(config_->cluster_); // cluster name is Host: header value!
-  request->headers().insertContentType().value(std::string("application/json"));
-  request->headers().insertContentLength().value(request_body.size());
-  request->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
+  request->headers().insertContentLength().value(uint64_t(0));
+  // request->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
   auth_request_ =
       config_->cm_.httpAsyncClientForCluster(config_->cluster_)
           .send(std::move(request), *this, Optional<std::chrono::milliseconds>(config_->timeout_));
