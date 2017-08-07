@@ -81,11 +81,9 @@ build_container.sh locally and then run :
 
 ```bash
 cd ci/build_container
-export TRAVIS_COMMIT=my_tag
-./docker_build.sh  # Wait patiently for quite some time
+TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
 cd ../..
-IMAGE_ID=my_tag
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
+IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
 ```
 
 The final call will run against your local copy of the build image.
