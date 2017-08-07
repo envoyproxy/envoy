@@ -59,8 +59,8 @@ public:
   }
 
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-				    Outlier::EventLoggerSharedPtr outlier_event_logger,
-				    bool added_via_api) override {
+                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                    bool added_via_api) override {
     return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
@@ -88,8 +88,8 @@ public:
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-				Outlier::EventLoggerSharedPtr outlier_event_logger,
-				bool added_via_api));
+                                Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -297,7 +297,8 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
       "name": "cluster_1",
       "connect_timeout_ms": 250,
       "type": "static",
-      "lb_type": "original_dst_lb"
+      "lb_type": "original_dst_lb",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     }]
   }
   )EOF";
@@ -590,7 +591,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));

@@ -146,6 +146,7 @@ envoy_cc_test(
     name = "original_dst_cluster_test",
     srcs = ["original_dst_cluster_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:original_dst_cluster_lib",

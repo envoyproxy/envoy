@@ -9,6 +9,7 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -49,9 +50,8 @@ public:
   OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
 
   void setup(const std::string& json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    cluster_.reset(new OriginalDstCluster(*config, runtime_, stats_store_, ssl_context_manager_,
-                                          dispatcher_, false));
+    cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
+                                          ssl_context_manager_, dispatcher_, false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
@@ -69,7 +69,7 @@ public:
   Event::MockTimer* cleanup_timer_;
 };
 
-TEST_F(OriginalDstClusterTest, BadConfig) {
+TEST(OriginalDstClusterConfigTest, BadConfig) {
   std::string json = R"EOF(
   {
     "name": "name",
@@ -80,7 +80,21 @@ TEST_F(OriginalDstClusterTest, BadConfig) {
   }
   )EOF"; // Help Emacs balance quotation marks: "
 
-  EXPECT_THROW(setup(json), EnvoyException);
+  EXPECT_THROW(parseClusterFromJson(json), EnvoyException);
+}
+
+TEST(OriginalDstClusterConfigTest, GoodConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "original_dst",
+    "lb_type": "original_dst_lb",
+    "cleanup_interval_ms": 1000
+  }
+  )EOF"; // Help Emacs balance quotation marks: "
+
+  EXPECT_TRUE(parseClusterFromJson(json).has_cleanup_interval());
 }
 
 TEST_F(OriginalDstClusterTest, CleanupInterval) {

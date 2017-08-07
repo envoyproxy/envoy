@@ -50,8 +50,8 @@ public:
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-				    Outlier::EventLoggerSharedPtr outlier_event_logger,
-				    bool added_via_api) override;
+                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                    bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
                       const Optional<SdsConfig>& sds_config, ClusterManager& cm) override;
 

@@ -1423,6 +1423,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["v4_only", "v6_only", "auto"]
       },
+      "cleanup_interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
       "outlier_detection" : {
         "type" : "object",
         "properties" : {

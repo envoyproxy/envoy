@@ -7,6 +7,8 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -95,17 +97,14 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
   return nullptr;
 }
 
-OriginalDstCluster::OriginalDstCluster(const Json::Object& config, Runtime::Loader& runtime,
-                                       Stats::Store& stats,
+OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
+                                       Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager,
                                        Event::Dispatcher& dispatcher, bool added_via_api)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager, added_via_api),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
-                                   config.getInteger("cleanup_interval_ms", 5000))),
+                                   PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {
-  if (config.hasObject("hosts")) {
-    throw EnvoyException("original_dst clusters must have no hosts configured");
-  }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }

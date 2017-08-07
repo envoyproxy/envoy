@@ -22,9 +22,9 @@ namespace Upstream {
  */
 class OriginalDstCluster : public ClusterImplBase {
 public:
-  OriginalDstCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                     Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& dispatcher,
-                     bool added_via_api);
+  OriginalDstCluster(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                     Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}
