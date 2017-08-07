@@ -8,7 +8,7 @@ apt-get install -y wget software-properties-common make cmake git python python-
   bc libtool automake zip time golang g++ gdb strace
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
 apt-get update
 apt-get install -y clang-5.0 clang-format-5.0
 # Bazel and related dependencies.
