@@ -134,6 +134,16 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
   return std::make_shared<Address::Ipv4Instance>(&sa4);
 }
 
+Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Address::Ip* ip) {
+  Address::InstanceConstSharedPtr addr;
+  if (ip->version() == Address::IpVersion::v4) {
+    addr.reset(new Address::Ipv4Instance(ip->addressAsString(), ip->port()));
+  } else {
+    addr.reset(new Address::Ipv6Instance(ip->addressAsString(), ip->port()));
+  }
+  return addr;
+}
+
 Address::InstanceConstSharedPtr
 Utility::fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address) {
   switch (resolved_address.address_case()) {

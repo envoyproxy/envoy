@@ -58,14 +58,8 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
       // Add a new host
       const Network::Address::Ip* dst_ip = dst_addr.ip();
       if (dst_ip) {
-        Network::Address::InstanceConstSharedPtr host_ip_port;
-        if (dst_ip->version() == Network::Address::IpVersion::v4) {
-          host_ip_port.reset(
-              new Network::Address::Ipv4Instance(dst_ip->addressAsString(), dst_ip->port()));
-        } else {
-          host_ip_port.reset(
-              new Network::Address::Ipv6Instance(dst_ip->addressAsString(), dst_ip->port()));
-        }
+        Network::Address::InstanceConstSharedPtr host_ip_port(
+            Network::Utility::copyInternetAddressAndPort(dst_ip));
         // Create a host we can use immediately.
         host.reset(new HostImpl(info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
                                 false, 1, ""));
