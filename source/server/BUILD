@@ -208,6 +208,7 @@ envoy_cc_library(
         "//source/common/api:api_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
+        "//source/common/local_info:local_info_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",

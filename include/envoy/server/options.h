@@ -108,6 +108,21 @@ public:
    * @return std::chrono::milliseconds the duration in msec between log flushes.
    */
   virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;
+
+  /**
+   * @return const std::string& the server's cluster.
+   */
+  virtual const std::string& serviceClusterName() PURE;
+
+  /**
+   * @return const std::string& the server's node identification.
+   */
+  virtual const std::string& serviceNodeName() PURE;
+
+  /**
+   * @return const std::string& the server's zone.
+   */
+  virtual const std::string& serviceZone() PURE;
 };
 
 } // namespace Server
