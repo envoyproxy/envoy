@@ -34,6 +34,7 @@ struct ExtAuthConfig {
   ExtAuthStats stats_;
   std::string cluster_;
   std::chrono::milliseconds timeout_;
+  std::string path_prefix_;
 };
 
 typedef std::shared_ptr<const ExtAuthConfig> ExtAuthConfigConstSharedPtr;

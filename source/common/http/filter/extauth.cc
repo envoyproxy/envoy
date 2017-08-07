@@ -8,7 +8,8 @@
 namespace Envoy {
 namespace Http {
 
-static LowerCaseString header_to_add(std::string("x-ark3-stuff"));
+static LowerCaseString header_to_add(std::string("x-ambassador-calltype"));
+static LowerCaseString value_to_add(std::string("extauth-request"));
 
 ExtAuth::ExtAuth(ExtAuthConfigConstSharedPtr config) : config_(config) {}
 
@@ -20,10 +21,22 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
   // Request external authentication
   auth_complete_ = false;
   MessagePtr request(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
+
+  if (!config_->path_prefix_.empty()) {
+    std::string path = request->headers().insertPath().value().c_str();
+
+    path = config_->path_prefix_ + path;
+
+    request->headers().insertPath().value(path);
+  }
+
   // request->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
   // request->headers().insertPath().value(std::string("/ambassador/auth"));
   request->headers().insertHost().value(config_->cluster_); // cluster name is Host: header value!
   request->headers().insertContentLength().value(uint64_t(0));
+
+  request->headers().addReference(header_to_add, value_to_add.get());
+
   // request->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
   auth_request_ =
       config_->cm_.httpAsyncClientForCluster(config_->cluster_)
