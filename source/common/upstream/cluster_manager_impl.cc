@@ -13,11 +13,13 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/config/cds_json.h"
 #include "common/config/utility.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -153,9 +155,47 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
-ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                                       Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
-                                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+void ClusterManagerImpl::initializeClustersFromV1Json(const Json::Object& config) {
+  envoy::api::v2::ConfigSource cds_config;
+  if (config.hasObject("cds")) {
+    envoy::api::v2::Cluster cds_cluster;
+    Config::CdsJson::translateCluster(*config.getObject("cds")->getObject("cluster"), sds_config_,
+                                      cds_cluster);
+    loadCluster(cds_cluster, false);
+    Config::Utility::translateCdsConfig(*config.getObject("cds"), cds_config);
+    // We can now potentially create the CDS API once the backing cluster exists.
+    cds_api_ = factory_.createCds(cds_config, sds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
+
+  for (const Json::ObjectSharedPtr& cluster_config : config.getObjectArray("clusters")) {
+    envoy::api::v2::Cluster cluster;
+    Config::CdsJson::translateCluster(*cluster_config, sds_config_, cluster);
+    loadCluster(cluster, false);
+  }
+}
+
+void ClusterManagerImpl::initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap) {
+  for (const auto& cluster : bootstrap.bootstrap_clusters()) {
+    loadCluster(cluster, false);
+  }
+
+  // We can now potentially create the CDS API once the backing cluster exists.
+  if (bootstrap.has_cds_config()) {
+    cds_api_ = factory_.createCds(bootstrap.cds_config(), sds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
+}
+
+ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
+                                       const envoy::api::v2::Bootstrap& bootstrap,
+                                       ClusterManagerFactory& factory, Stats::Store& stats,
+                                       ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                                       Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
@@ -174,7 +214,10 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   }
 
   if (config.hasObject("sds")) {
-    loadCluster(*config.getObject("sds")->getObject("cluster"), false);
+    envoy::api::v2::Cluster sds_cluster;
+    Config::CdsJson::translateCluster(*config.getObject("sds")->getObject("cluster"), sds_config_,
+                                      sds_cluster);
+    loadCluster(sds_cluster, false);
 
     SdsConfig sds_config{
         config.getObject("sds")->getObject("cluster")->getString("name"),
@@ -183,16 +226,13 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     sds_config_.value(sds_config);
   }
 
-  if (config.hasObject("cds")) {
-    loadCluster(*config.getObject("cds")->getObject("cluster"), false);
-  }
-
-  // We can now potentially create the CDS API once the backing cluster exists.
-  cds_api_ = factory_.createCds(config, *this);
-  init_helper_.setCds(cds_api_.get());
-
-  for (const Json::ObjectSharedPtr& cluster : config.getObjectArray("clusters")) {
-    loadCluster(*cluster, false);
+  if (bootstrap.has_cds_config() || !bootstrap.bootstrap_clusters().empty()) {
+    initializeClustersFromV2Proto(bootstrap);
+  } else {
+    // TODO(htuch): Make this similar to the v1 -> v2 translation elsewhere,
+    // convert the JSON to envoy::api::v2::Bootstrap and use initializeClustersFromV2Proto()
+    // instead.
+    initializeClustersFromV1Json(config);
   }
 
   Optional<std::string> local_cluster_name;
@@ -235,14 +275,14 @@ void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
   postThreadLocalClusterUpdate(cluster, cluster.hosts(), std::vector<HostSharedPtr>{});
 }
 
-bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_config) {
+bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
-  const std::string cluster_name = new_config.getString("name");
+  const std::string cluster_name = cluster.name();
   auto existing_cluster = primary_clusters_.find(cluster_name);
   if (existing_cluster != primary_clusters_.end() &&
       (!existing_cluster->second.added_via_api_ ||
-       existing_cluster->second.config_hash_ == new_config.hash())) {
+       existing_cluster->second.config_hash_ == MessageUtil::hash(cluster))) {
     return false;
   }
 
@@ -250,7 +290,7 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
     init_helper_.removeCluster(*existing_cluster->second.cluster_);
   }
 
-  loadCluster(new_config, true);
+  loadCluster(cluster, true);
   ClusterInfoConstSharedPtr new_cluster = primary_clusters_.at(cluster_name).cluster_->info();
   ENVOY_LOG(info, "add/update cluster {}", cluster_name);
   tls_->runOnAllThreads([this, new_cluster]() -> void {
@@ -294,9 +334,9 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
   return true;
 }
 
-void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via_api) {
+void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api) {
   ClusterSharedPtr new_cluster =
-      factory_.clusterFromJson(cluster, *this, sds_config_, outlier_event_logger_, added_via_api);
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   init_helper_.addCluster(*new_cluster);
   if (!added_via_api) {
@@ -319,7 +359,7 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
   size_t num_erased = primary_clusters_.erase(primary_cluster_reference.info()->name());
   primary_clusters_.emplace(
       primary_cluster_reference.info()->name(),
-      PrimaryClusterData{cluster.hash(), added_via_api, std::move(new_cluster)});
+      PrimaryClusterData{MessageUtil::hash(cluster), added_via_api, std::move(new_cluster)});
 
   cm_stats_.total_clusters_.set(primary_clusters_.size());
   if (num_erased) {
@@ -573,11 +613,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromJson(
-    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
-  return ClusterManagerPtr{
-      new ClusterManagerImpl(config, *this, stats, tls, runtime, random, local_info, log_manager)};
+  return ClusterManagerPtr{new ClusterManagerImpl(config, bootstrap, *this, stats, tls, runtime,
+                                                  random, local_info, log_manager)};
 }
 
 Http::ConnectionPool::InstancePtr
@@ -593,20 +633,19 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostC
   }
 }
 
-ClusterSharedPtr ProdClusterManagerFactory::clusterFromJson(
-    const Json::Object& cluster, ClusterManager& cm, const Optional<SdsConfig>& sds_config,
+ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
+    const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  Optional<envoy::api::v2::ConfigSource> eds_config((envoy::api::v2::ConfigSource()));
-  if (sds_config.valid()) {
-    Config::Utility::sdsConfigToEdsConfig(sds_config.value(), eds_config.value());
-  }
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, primary_dispatcher_, eds_config, local_info_,
+                                 runtime_, random_, primary_dispatcher_, local_info_,
                                  outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, ClusterManager& cm) {
-  return CdsApiImpl::create(config, cm, primary_dispatcher_, random_, local_info_, stats_);
+CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
+                                               const Optional<SdsConfig>& sds_config,
+                                               ClusterManager& cm) {
+  return CdsApiImpl::create(cds_config, sds_config, cm, primary_dispatcher_, random_, local_info_,
+                            stats_);
 }
 
 } // namespace Upstream

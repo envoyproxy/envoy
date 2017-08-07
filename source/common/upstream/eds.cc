@@ -12,16 +12,18 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                               const envoy::api::v2::ConfigSource& eds_config,
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
-    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager, added_via_api),
-      local_info_(local_info), cluster_name_(config.getString("service_name")) {
+    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
+      local_info_(local_info), cluster_name_(cluster.eds_cluster_config().service_name().empty()
+                                                 ? cluster.name()
+                                                 : cluster.eds_cluster_config().service_name()) {
   envoy::api::v2::Node node;
   Config::Utility::localInfoToNode(local_info, node);
+  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
       eds_config, node, dispatcher, cm, random, info_->statsScope(),
@@ -43,7 +45,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   const auto& cluster_load_assignment = resources[0];
   if (ProtobufTypes::FromString(cluster_load_assignment.cluster_name()) != cluster_name_) {
     throw EnvoyException(
-        fmt::format("Unexpected EDS cluster: {}",
+        fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                     ProtobufTypes::FromString(cluster_load_assignment.cluster_name())));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
@@ -54,12 +56,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                                           Config::MetadataFilters::get().ENVOY_LB,
                                                           Config::MetadataEnvoyLbKeys::get().CANARY)
                               .bool_value();
-      new_hosts.emplace_back(
-          new HostImpl(info_, "",
-                       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
-                           lb_endpoint.endpoint().address().socket_address().ip_address(),
-                           lb_endpoint.endpoint().address().socket_address().port().value())},
-                       canary, lb_endpoint.load_balancing_weight().value(), zone));
+      new_hosts.emplace_back(new HostImpl(
+          info_, "", Network::Utility::fromProtoResolvedAddress(lb_endpoint.endpoint().address()),
+          canary, lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

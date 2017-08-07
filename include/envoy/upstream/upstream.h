@@ -210,6 +210,8 @@ public:
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_flow_control_paused_reading_total)                                              \
   COUNTER(upstream_flow_control_resumed_reading_total)                                             \
+  COUNTER(upstream_flow_control_backed_up_total)                                                   \
+  COUNTER(upstream_flow_control_drained_total)                                                     \
   GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_healthy)                                                                      \

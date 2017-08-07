@@ -87,9 +87,9 @@ protected:
     uint64_t bytes_processed_;
   };
 
-  virtual void closeSocket(uint32_t close_type);
+  virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
-  void raiseEvents(uint32_t events);
+  void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
     return read_buffer_limit_ > 0 && read_buffer_->length() >= read_buffer_limit_;

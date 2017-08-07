@@ -165,7 +165,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);
 
-  upstream_connection->raiseEvents(Network::ConnectionEvent::Connected);
+  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connection, write(BufferEqual(&buffer)));

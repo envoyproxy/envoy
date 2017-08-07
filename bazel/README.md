@@ -26,12 +26,18 @@ up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+On Ubuntu, run the following commands:
 ```
-On Ubuntu Machine, run the following commands:
  apt-get install libtoolize
  apt-get install cmake
  apt-get install realpath
 ```
+
+On OS X, you'll need to install realpath. This can be accomplished via Homebrew:
+```
+brew install coreutils # for realpath
+```
+
 3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
@@ -42,7 +48,7 @@ and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used
 Bazel can also be built with the Docker image used for CI, by installing Docker and executing:
 
 ```
-./ci/run_envoy_docker.sh ./ci/do_ci.sh bazel.fastbuild
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 See also the [documentation](https://github.com/lyft/envoy/tree/master/ci) for developer use of the
@@ -189,7 +195,6 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
-
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer
@@ -223,6 +228,11 @@ remove log statements of lower importance during compilation to enhance performa
 ```
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
+
+## Hot Restart
+
+Hot restart can be disabled in any build by specifying `--define=hot_restart=disabled`
+on the Bazel command line.
 
 
 # Release builds

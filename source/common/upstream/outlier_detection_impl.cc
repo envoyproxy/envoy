@@ -11,6 +11,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
+#include "common/protobuf/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -18,14 +19,12 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
-DetectorSharedPtr DetectorImplFactory::createForCluster(Cluster& cluster,
-                                                        const Json::Object& cluster_config,
-                                                        Event::Dispatcher& dispatcher,
-                                                        Runtime::Loader& runtime,
-                                                        EventLoggerSharedPtr event_logger) {
-  if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorImpl::create(cluster, *cluster_config.getObject("outlier_detection"), dispatcher,
-                                runtime, ProdMonotonicTimeSource::instance_, event_logger);
+DetectorSharedPtr DetectorImplFactory::createForCluster(
+    Cluster& cluster, const envoy::api::v2::Cluster& cluster_config, Event::Dispatcher& dispatcher,
+    Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
+  if (cluster_config.has_outlier_detection()) {
+    return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
+                                ProdMonotonicTimeSource::instance_, event_logger);
   } else {
     return nullptr;
   }
@@ -66,28 +65,30 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-DetectorConfig::DetectorConfig(const Json::Object& json_config)
-    : interval_ms_(static_cast<uint64_t>(json_config.getInteger("interval_ms", 10000))),
+DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config)
+    : interval_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, 10000))),
       base_ejection_time_ms_(
-          static_cast<uint64_t>(json_config.getInteger("base_ejection_time_ms", 30000))),
-      consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
+          static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, base_ejection_time, 30000))),
+      consecutive_5xx_(
+          static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_5xx, 5))),
       max_ejection_percent_(
-          static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
-      success_rate_minimum_hosts_(
-          static_cast<uint64_t>(json_config.getInteger("success_rate_minimum_hosts", 5))),
-      success_rate_request_volume_(
-          static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
-      success_rate_stdev_factor_(
-          static_cast<uint64_t>(json_config.getInteger("success_rate_stdev_factor", 1900))),
-      enforcing_consecutive_5xx_(
-          static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
-      enforcing_success_rate_(
-          static_cast<uint64_t>(json_config.getInteger("enforcing_success_rate", 100))) {}
+          static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_ejection_percent, 10))),
+      success_rate_minimum_hosts_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_minimum_hosts, 5))),
+      success_rate_request_volume_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_request_volume, 100))),
+      success_rate_stdev_factor_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_stdev_factor, 1900))),
+      enforcing_consecutive_5xx_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_5xx, 100))),
+      enforcing_success_rate_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))) {}
 
-DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
+DetectorImpl::DetectorImpl(const Cluster& cluster,
+                           const envoy::api::v2::Cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger)
-    : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
+    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
@@ -103,11 +104,12 @@ DetectorImpl::~DetectorImpl() {
 }
 
 std::shared_ptr<DetectorImpl>
-DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
+DetectorImpl::create(const Cluster& cluster,
+                     const envoy::api::v2::Cluster::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, json_config, dispatcher, runtime, time_source, event_logger));
+      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
   return detector;
 }

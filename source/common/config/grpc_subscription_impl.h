@@ -97,6 +97,8 @@ public:
       callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(ProtobufTypes::FromString(message->version_info()));
       stats_.update_success_.inc();
+      ENVOY_LOG(debug, "gRPC config update accepted: {}",
+                ProtobufTypes::FromString(message->DebugString()));
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "gRPC config update rejected: {}", e.what());
       stats_.update_rejected_.inc();

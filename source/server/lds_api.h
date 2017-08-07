@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/init/init.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/stats_macros.h"

@@ -1,6 +1,10 @@
 #include "server/config_validation/server.h"
 
+#include "common/protobuf/utility.h"
+
 #include "server/configuration_impl.h"
+
+#include "api/bootstrap.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -50,6 +54,11 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  envoy::api::v2::Bootstrap bootstrap;
+  if (!options.bootstrapPath().empty()) {
+    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  }
+
   Configuration::InitialImpl initial_config(*config_json);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
@@ -60,7 +69,7 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
+  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
 
   clusterManager().setInitializedCb(
       [this]() -> void { init_manager_.initialize([]() -> void {}); });

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/config/subscription.h"
 
 #include "common/config/filesystem_subscription_impl.h"

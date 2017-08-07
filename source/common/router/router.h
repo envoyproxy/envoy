@@ -168,6 +168,16 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {
+      // Have the connection manager disable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
+      parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      // Have the connection manager enable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
+      parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,

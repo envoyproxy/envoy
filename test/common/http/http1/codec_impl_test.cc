@@ -28,12 +28,58 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public ::testing::Test {
 public:
-  Http1ServerConnectionImplTest() : codec_(new ServerConnectionImpl(connection_, callbacks_)) {}
+  Http1ServerConnectionImplTest()
+      : codec_(new ServerConnectionImpl(connection_, callbacks_, codec_settings_)) {}
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
+  NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
+
+  void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
+                         TestHeaderMapImpl& expected_headers);
+  void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer);
 };
+
+void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
+                                              Buffer::OwnedImpl& buffer) {
+  InSequence sequence;
+
+  std::string output;
+  ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
+
+  if (allow_absolute_url) {
+    codec_settings_.allow_absolute_url_ = allow_absolute_url;
+    codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+  }
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
+  EXPECT_EQ(p, codec_->protocol());
+}
+
+void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_absolute_url,
+                                                      Buffer::OwnedImpl& buffer,
+                                                      TestHeaderMapImpl& expected_headers) {
+  InSequence sequence;
+
+  // Make a new 'codec' with the right settings
+  if (allow_absolute_url) {
+    codec_settings_.allow_absolute_url_ = allow_absolute_url;
+    codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+  }
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(p, codec_->protocol());
+}
 
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   InSequence sequence;
@@ -67,6 +113,77 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
+  TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+  expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foobar HTTP/1.0\r\n\r\n");
+  expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "bah"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET /foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
+  // Invalid because www.somewhere.com is not an absolute path nor an absolute url
+  Buffer::OwnedImpl buffer("GET www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathBad) {
+  Buffer::OwnedImpl buffer("GET * HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePortTooLarge) {
+  Buffer::OwnedImpl buffer("GET http://foobar.com:1000000 HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11RelativeOnly) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "bah"}, {":path", "http://www.somewhere.com/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, false, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11Options) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "*"}, {":method", "OPTIONS"}};
+  Buffer::OwnedImpl buffer("OPTIONS * HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {

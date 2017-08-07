@@ -1,5 +1,98 @@
 {
   "listeners": [
+ {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http1",
+        "drain_timeout_ms": 5000,
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1",
+                  "rate_limits": [
+                    {
+                      "actions": [
+                        {"type": "destination_cluster"}
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": false, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "foo"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  },
   {
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
@@ -8,6 +101,9 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
+        "http1_settings": {
+            "allow_absolute_url": true
+        },
         "drain_timeout_ms": 5000,
         "access_log": [
         {

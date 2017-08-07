@@ -41,7 +41,7 @@ private:
   std::string getUriSanFromCertificate(X509* cert);
 
   // Network::ConnectionImpl
-  void closeSocket(uint32_t close_type) override;
+  void closeSocket(Network::ConnectionEvent close_type) override;
   IoResult doReadFromSocket() override;
   IoResult doWriteToSocket() override;
   void onConnected() override;

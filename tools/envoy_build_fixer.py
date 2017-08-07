@@ -19,7 +19,9 @@ def FixBuild(path):
     seen_epkg = False
     for line in f:
       if line.startswith('package(') and not path.endswith(
-          'bazel/BUILD') and not path.endswith('ci/prebuilt/BUILD'):
+          'bazel/BUILD') and not path.endswith(
+          'ci/prebuilt/BUILD') and not path.endswith(
+          'bazel/osx/BUILD') and not path.endswith('bazel/osx/crosstool/BUILD'):
         continue
       if in_load == False and line.startswith('load('):
         in_load = True

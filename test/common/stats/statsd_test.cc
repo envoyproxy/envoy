@@ -75,7 +75,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   sink_->endFlush();
 
   // Test a disconnect. We should connect again.
-  connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n")));

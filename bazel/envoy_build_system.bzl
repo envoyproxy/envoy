@@ -24,6 +24,47 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+    }) + select({
+        # TCLAP command line parser needs this to support int64_t/uint64_t
+        "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
+        "//conditions:default": [],
+    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository)
+
+# Compute the final linkopts based on various options.
+def envoy_linkopts():
+    return select({
+        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
+        # Further, the system library transitively links common libraries (e.g., pthread).
+        # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
+        # The file could should contain the current git SHA (or enough placeholder data to allow
+        # it to be rewritten by tools/git_sha_rewriter.py).
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": [
+            "-pthread",
+            "-lrt",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
+            "-static-libstdc++",
+            "-static-libgcc",
+        ],
+    })
+
+# Compute the test linkopts based on various options.
+def envoy_test_linkopts():
+    return select({
+        "@bazel_tools//tools/osx:darwin": [],
+
+        # TODO(mattklein123): It's not great that we universally link against the following libs.
+        # In particular, -latomic is not needed on all platforms. Make this more granular.
+        "//conditions:default": ["-pthread", "-latomic"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
@@ -72,7 +113,8 @@ def envoy_cc_library(name,
                      repository = "",
                      linkstamp = None,
                      tags = [],
-                     deps = []):
+                     deps = [],
+                     strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     native.cc_library(
@@ -90,7 +132,8 @@ def envoy_cc_library(name,
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = linkstamp,
-    )
+        strip_include_prefix = strip_include_prefix,
+   )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
@@ -125,22 +168,7 @@ def envoy_cc_binary(name,
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository),
-        linkopts = [
-            "-pthread",
-            "-lrt",
-            # Force MD5 hash in build. This is part of the workaround for
-            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
-            # does this by itself prior to
-            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
-            # Ironically, forcing it here so that in future releases we will
-            # have the same behavior. When everyone is using an updated version
-            # of Bazel, we can use linkopts to set the git SHA1 directly in the
-            # --build-id and avoid doing the following.
-            '-Wl,--build-id=md5',
-            '-Wl,--hash-style=gnu',
-            "-static-libstdc++",
-            "-static-libgcc",
-        ],
+        linkopts = envoy_linkopts(),
         testonly = testonly,
         linkstatic = 1,
         visibility = visibility,
@@ -177,9 +205,7 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
-        # TODO(mattklein123): It's not great that we universally link against the following libs.
-        # In particular, -latomic is not needed on all platforms. Make this more granular.
-        linkopts = ["-pthread", "-latomic"],
+        linkopts = envoy_test_linkopts(),
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
@@ -241,7 +267,7 @@ def envoy_sh_test(name,
       name = name + "_gen_test_runner",
       srcs = srcs,
       outs = [test_runner_cc],
-      cmd = "$(location //bazel:gen_sh_test_runner.sh) $(location " + srcs[0] + ") >> $@",
+      cmd = "$(location //bazel:gen_sh_test_runner.sh) $(SRCS) >> $@",
       tools = ["//bazel:gen_sh_test_runner.sh"],
   )
   envoy_cc_test_library(
@@ -255,7 +281,7 @@ def envoy_sh_test(name,
       name = name,
       srcs = ["//bazel:sh_test_wrapper.sh"],
       data = srcs + data,
-      args = ["$(location " + srcs[0] + ")"],
+      args = srcs,
       **kargs
   )
 
@@ -312,3 +338,11 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         cmd = cmd,
         tools = ["//external:protoc"],
     )
+
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_hot_restart(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_hot_restart": [],
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": xs,
+    })

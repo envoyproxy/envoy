@@ -1,5 +1,7 @@
 #include "server/lds_api.h"
 
+#include <functional>
+
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
@@ -30,7 +32,7 @@ void LdsApi::initialize(std::function<void()> callback) {
 void LdsApi::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "lds: starting request");
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/listeners/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
 }

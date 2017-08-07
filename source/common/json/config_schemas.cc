@@ -264,6 +264,17 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["no_compression"]
       },
+      "http1_settings": {
+        "type": "object",
+        "properties": {
+          "allow_absolute_url": {
+            "type": "boolean"
+          },
+          "allow_connect": {
+            "type": "boolean"
+          }
+        }
+      },
       "http2_settings" : {
         "type" : "object",
         "properties" : {
@@ -1176,6 +1187,10 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
+      "watchdog_miss_timeout_ms" : {"type" : "integer"},
+      "watchdog_megamiss_timeout_ms" : {"type" : "integer"},
+      "watchdog_kill_timeout_ms" : {"type" : "integer"},
+      "watchdog_multikill_timeout_ms" : {"type" : "integer"},
       "tracing" : {
         "type" : "object",
         "properties" : {

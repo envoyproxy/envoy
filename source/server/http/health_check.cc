@@ -118,7 +118,9 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
     }
 
-    headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
+    // Following setReference() is safe because local info is constant for the life of the server.
+    headers.insertEnvoyUpstreamHealthCheckedCluster().value().setReference(
+        context_.localInfo().clusterName());
   }
 
   return Http::FilterHeadersStatus::Continue;

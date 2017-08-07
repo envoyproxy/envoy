@@ -14,6 +14,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -24,16 +25,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
-
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
+namespace {
 
-static std::list<std::string> hostListToAddresses(const std::vector<HostSharedPtr>& hosts) {
+std::list<std::string> hostListToAddresses(const std::vector<HostSharedPtr>& hosts) {
   std::list<std::string> addresses;
   for (const HostSharedPtr& host : hosts) {
     addresses.push_back(host->address()->asString());
@@ -106,14 +107,13 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   NiceMock<Runtime::MockLoader> runtime;
   ReadyWatcher initialized;
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "strict_dns",
-  )EOF";
-  json += std::get<0>(GetParam());
-  json += R"EOF(
+  )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}]
   }
@@ -125,9 +125,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher, false);
+  StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
+                               dns_resolver, dispatcher, false);
   cluster.setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.hosts().size());
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
@@ -144,7 +143,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   ResolverData resolver2(*dns_resolver, dispatcher);
   ResolverData resolver1(*dns_resolver, dispatcher);
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "name",
     "connect_timeout_ms": 250,
@@ -172,9 +171,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher, false);
+  StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
+                               dns_resolver, dispatcher, false);
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(57U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
@@ -306,7 +304,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "staticcluster",
     "connect_timeout_ms": 250,
@@ -316,8 +314,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager, false);
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, false);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ("", cluster.hosts()[0]->hostname());
   EXPECT_FALSE(cluster.info()->addedViaApi());
@@ -327,7 +324,7 @@ TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "staticcluster",
     "connect_timeout_ms": 250,
@@ -337,8 +334,7 @@ TEST(StaticClusterImplTest, RingHash) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager, true);
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, true);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
@@ -348,7 +344,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -359,8 +355,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager, false);
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, false);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
@@ -389,7 +384,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -400,8 +395,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager, false);
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, false);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
@@ -447,7 +441,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -458,8 +452,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager, false);
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, false);
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
@@ -484,7 +477,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "addressportconfig",
     "connect_timeout_ms": 250,
@@ -495,13 +488,13 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager, false),
-               EnvoyException);
+  EXPECT_THROW(
+      StaticClusterImpl(parseClusterFromJson(json), runtime, stats, ssl_context_manager, false),
+      EnvoyException);
 }
 
 TEST(ClusterDefinitionTest, BadClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "cluster_1",
     "connect_timeout_ms": 250,
@@ -517,7 +510,7 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
 }
 
 TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "name": "cluster_1",
     "connect_timeout_ms": 250,
@@ -532,5 +525,6 @@ TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

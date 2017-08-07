@@ -9,6 +9,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -34,6 +35,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 // The tests in this file are split between testing with real clusters and some with mock clusters.
 // By default we setup to call the real cluster creation function. Individual tests can override
@@ -41,16 +43,13 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() {
-    ON_CALL(*this, clusterFromJson_(_, _, _, _, _))
-        .WillByDefault(Invoke([&](const Json::Object& cluster, ClusterManager& cm,
-                                  const Optional<SdsConfig>& sds_config,
+    ON_CALL(*this, clusterFromProto_(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   bool added_via_api) -> ClusterSharedPtr {
-          UNREFERENCED_PARAMETER(sds_config);
-          Optional<envoy::api::v2::ConfigSource> eds_config;
-          return ClusterImplBase::create(
-              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-              dispatcher_, eds_config, local_info_, outlier_event_logger, added_via_api);
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         local_info_, outlier_event_logger, added_via_api);
         }));
   }
 
@@ -59,18 +58,19 @@ public:
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
-  ClusterSharedPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
-                                   const Optional<SdsConfig>& sds_config,
-                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                   bool added_via_api) override {
-    return clusterFromJson_(cluster, cm, sds_config, outlier_event_logger, added_via_api);
+  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+				    Outlier::EventLoggerSharedPtr outlier_event_logger,
+				    bool added_via_api) override {
+    return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
-  CdsApiPtr createCds(const Json::Object&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&, const Optional<SdsConfig>&,
+                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
+  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config,
+                                           const envoy::api::v2::Bootstrap&, Stats::Store& stats,
                                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random,
                                            const LocalInfo::LocalInfo& local_info,
@@ -86,11 +86,10 @@ public:
                                const LocalInfo::LocalInfo& local_info,
                                AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD5(clusterFromJson_,
-               ClusterSharedPtr(const Json::Object& cluster, ClusterManager& cm,
-                                const Optional<SdsConfig>& sds_config,
-                                Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                bool added_via_api));
+  MOCK_METHOD4(clusterFromProto_,
+               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+				Outlier::EventLoggerSharedPtr outlier_event_logger,
+				bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -106,10 +105,14 @@ public:
 
 class ClusterManagerImplTest : public testing::Test {
 public:
+  void createWithBootstrap(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap) {
+    cluster_manager_.reset(new ClusterManagerImpl(
+        config, bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
+        factory_.random_, factory_.local_info_, log_manager_));
+  }
+
   void create(const Json::Object& config) {
-    cluster_manager_.reset(new ClusterManagerImpl(config, factory_, factory_.stats_, factory_.tls_,
-                                                  factory_.runtime_, factory_.random_,
-                                                  factory_.local_info_, log_manager_));
+    createWithBootstrap(config, envoy::api::v2::Bootstrap());
   }
 
   NiceMock<TestClusterManagerFactory> factory_;
@@ -133,18 +136,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "sds",
-      "lb_type": "round_robin"
-    }]
-  }
-  )EOF";
-
+  const std::string json = fmt::sprintf("{%s}", clustersJson({defaultSdsClusterJson("cluster_1")}));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
@@ -167,26 +159,14 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(
+      R"EOF(
   {
     "local_cluster_name": "new_cluster",
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_2",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    }]
+    %s
   }
-  )EOF";
+  )EOF",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
@@ -208,33 +188,15 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(
+      R"EOF(
   {
     "local_cluster_name": "new_cluster",
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_2",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    },
-    {
-      "name": "new_cluster",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
-    }]
+    %s
   }
-  )EOF";
+  )EOF",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
+                    defaultStaticClusterJson("new_cluster")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -246,26 +208,9 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    },
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
-
+  const std::string json = fmt::sprintf(
+      "{%s}",
+      clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
@@ -400,18 +345,8 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -452,18 +387,8 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "static",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-    }]
-  }
-  )EOF";
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
@@ -482,23 +407,42 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ(3U, cluster.info().use_count());
 }
 
-TEST_F(ClusterManagerImplTest, InitializeOrder) {
+// Validate that the v2 envoy::api::v2::Bootstrap overrides JSON config.
+TEST_F(ClusterManagerImplTest, CdsBootstrap) {
   const std::string json = R"EOF(
   {
-    "cds": {
-      "cluster": {
-        "fake": ""
-      }
-    },
     "clusters": [
     {
-      "fake": ""
-    },
-    {
-      "fake": ""
+      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
     }]
   }
   )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
+                            "#/properties/name\n Schema violation: maxLength\n Offending "
+                            "document key: #/name");
+
+  envoy::api::v2::Bootstrap cds_config_bootstrap;
+  cds_config_bootstrap.mutable_cds_config();
+  createWithBootstrap(*loader, cds_config_bootstrap);
+
+  envoy::api::v2::Bootstrap clusters_bootstrap;
+  clusters_bootstrap.mutable_bootstrap_clusters()->Add()->CopyFrom(defaultStaticCluster("foo"));
+  createWithBootstrap(*loader, clusters_bootstrap);
+}
+
+TEST_F(ClusterManagerImplTest, InitializeOrder) {
+  const std::string json = fmt::sprintf(
+      R"EOF(
+  {
+    "cds": {"cluster": %s},
+    %s
+  }
+  )EOF",
+      defaultStaticClusterJson("cds_cluster"),
+      clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
 
   MockCdsApi* cds = new MockCdsApi();
   std::shared_ptr<MockCluster> cds_cluster(new NiceMock<MockCluster>());
@@ -510,15 +454,15 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cds_cluster));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cds_cluster, initialize());
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
   EXPECT_CALL(*cds, setInitializedCb(_));
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
@@ -542,39 +486,18 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   std::shared_ptr<MockCluster> cluster5(new NiceMock<MockCluster>());
   cluster5->info_->name_ = "cluster5";
 
-  const std::string json_api_1 = R"EOF(
-  {
-    "name": "cluster3"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api_1);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster3));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster3"));
 
-  const std::string json_api_2 = R"EOF(
-  {
-    "name": "cluster4"
-  }
-  )EOF";
-
-  loader_api = Json::Factory::loadFromString(json_api_2);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster4));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize());
-  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster4"));
 
-  const std::string json_api_3 = R"EOF(
-  {
-    "name": "cluster5"
-  }
-  )EOF";
-
-  loader_api = Json::Factory::loadFromString(json_api_3);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster5));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster5"));
 
   cds->initialized_callback_();
 
@@ -601,18 +524,17 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   InSequence s;
 
   // Setup a cluster manager with a static local cluster.
-  const std::string json = R"EOF(
+  const std::string json = fmt::sprintf(R"EOF(
   {
     "local_cluster_name": "foo",
-    "clusters": [
-      {"name": "fake"}
-    ]
+    %s
   }
-  )EOF";
+  )EOF",
+                                        clustersJson({defaultStaticClusterJson("fake")}));
 
   std::shared_ptr<MockCluster> foo(new NiceMock<MockCluster>());
   foo->info_->name_ = "foo";
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, false)).WillOnce(Return(foo));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, false)).WillOnce(Return(foo));
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize());
 
@@ -622,19 +544,12 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
   // cluster in its load balancer.
-  const std::string json_api_1 = R"EOF(
-  {
-    "name": "cluster1"
-  }
-  )EOF";
-
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "cluster1";
-  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api_1);
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, true)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
-  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster1"));
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -674,48 +589,29 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  const std::string json_api = R"EOF(
-  {
-    "name": "fake_cluster"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize());
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
+  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 
-  // Now try to update again but with the same hash (different white space).
-  const std::string json_api_2 = R"EOF(
-  {
-      "name":   "fake_cluster"
-  }
-  )EOF";
-
-  loader_api = Json::Factory::loadFromString(json_api_2);
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
+  // Now try to update again but with the same hash.
+  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   // Now do it again with a different hash.
-  const std::string json_api_3 = R"EOF(
-  {
-      "name":   "fake_cluster",
-      "blah": ""
-  }
-  )EOF";
+  auto update_cluster = defaultStaticCluster("fake_cluster");
+  update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
-  loader_api = Json::Factory::loadFromString(json_api_3);
   std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
   cluster2->hosts_ = {HostSharedPtr{new HostImpl(
       cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster2));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
+  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(update_cluster));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -746,18 +642,11 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "fake": ""
-    }]
-  }
-  )EOF";
-
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
 
@@ -770,14 +659,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  const std::string json_api = R"EOF(
-  {
-    "name": "fake_cluster"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
+  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));
@@ -1036,5 +918,6 @@ TEST(ClusterManagerInitHelper, RemoveClusterWithinInitLoop) {
   init_helper.onStaticLoadComplete();
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

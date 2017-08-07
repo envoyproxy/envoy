@@ -115,7 +115,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
     ENVOY_CONN_LOG(debug, "handshake complete", *this);
     handshake_complete_ = true;
     ctx_.logHandshake(ssl_.get());
-    raiseEvents(Network::ConnectionEvent::Connected);
+    raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
     return state() == State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;
@@ -298,7 +298,7 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Co
 
 void ClientConnectionImpl::connect() { doConnect(); }
 
-void ConnectionImpl::closeSocket(uint32_t close_type) {
+void ConnectionImpl::closeSocket(Network::ConnectionEvent close_type) {
   if (handshake_complete_ && state() != State::Closed) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point

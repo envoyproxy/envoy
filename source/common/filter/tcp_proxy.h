@@ -114,7 +114,7 @@ private:
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
@@ -127,7 +127,7 @@ private:
     UpstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onUpstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
@@ -143,9 +143,9 @@ private:
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
-  void onDownstreamEvent(uint32_t event);
+  void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data);
-  void onUpstreamEvent(uint32_t event);
+  void onUpstreamEvent(Network::ConnectionEvent event);
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;

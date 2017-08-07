@@ -86,7 +86,7 @@ protected:
   ListenerImplTest()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getSomeLoopbackAddress(version_), Address::SocketType::Stream)) {}
+            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
@@ -97,7 +97,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
 TEST_P(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
@@ -138,7 +138,7 @@ TEST_P(ListenerImplTest, NormalRedirect) {
 TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(Network::Test::getAnyAddress(version_), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
@@ -192,7 +192,7 @@ TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
                                       .per_connection_buffer_limit_bytes_ = 0});
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
-      *Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(local_dst_address);
   client_connection->connect();
@@ -229,7 +229,7 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
                                       .per_connection_buffer_limit_bytes_ = 0});
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
-      *Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(local_dst_address);
   client_connection->connect();
@@ -254,7 +254,7 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
 TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), true);
   Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
@@ -306,7 +306,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
                                       .per_connection_buffer_limit_bytes_ = 0});
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
-      *Network::Test::getSomeLoopbackAddress(version_), socket.localAddress()->ip()->port());
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(local_dst_address);
   client_connection->connect();

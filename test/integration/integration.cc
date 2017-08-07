@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,14 @@ using testing::Invoke;
 using testing::_;
 
 namespace Envoy {
+
+namespace {
+std::string normalizeDate(const std::string& s) {
+  const std::regex date_regex("date:[^\r]+");
+  return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
+}
+} // namespace
+
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -171,11 +180,11 @@ void IntegrationCodecClient::waitForDisconnect() {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::Connected) {
+void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
     parent_.connection_->dispatcher().exit();
-  } else if (events & Network::ConnectionEvent::RemoteClose) {
+  } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }
@@ -237,8 +246,8 @@ void IntegrationTcpClient::write(const std::string& data) {
   }
 }
 
-void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events == Network::ConnectionEvent::RemoteClose) {
+void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }
@@ -311,11 +320,31 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
 
+void BaseIntegrationTest::createApiTestServer(const std::string& json_path,
+                                              const ApiFilesystemConfig& api_filesystem_config,
+                                              const std::vector<std::string>& port_names) {
+  if (api_filesystem_config.bootstrap_path_.empty()) {
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), std::string(),
+        version_);
+  } else {
+    const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.eds_path_, port_map_, version_);
+    const std::string cds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.cds_path_, {{"eds_json_path", eds_path}}, port_map_, version_);
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_),
+        TestEnvironment::temporaryFileSubstitute(api_filesystem_config.bootstrap_path_,
+                                                 {{"cds_json_path", cds_path}}, port_map_,
+                                                 version_),
+        version_);
+  }
+  registerTestServerPorts(port_names);
+}
+
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
-  registerTestServerPorts(port_names);
+  createApiTestServer(json_path, ApiFilesystemConfig(), port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
@@ -921,6 +950,59 @@ void BaseIntegrationTest::testNoHost() {
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
+}
+
+void BaseIntegrationTest::testAbsolutePath() {
+  Buffer::OwnedImpl buffer("GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http_forward"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection.run();
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void BaseIntegrationTest::testAllowAbsoluteSameRelative() {
+  // Ensure that relative urls behave the same with allow_absolute_url enabled and without
+  testEquivalent("GET /foo/bar HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testConnect() {
+  // Ensure that connect behaves the same with allow_absolute_url enabled and without
+  testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testEquivalent(const std::string& request) {
+  Buffer::OwnedImpl buffer1(request);
+  std::string response1;
+  RawConnectionDriver connection1(
+      lookupPort("http"), buffer1,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response1.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection1.run();
+
+  Buffer::OwnedImpl buffer2(request);
+  std::string response2;
+  RawConnectionDriver connection2(
+      lookupPort("http_forward"), buffer2,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response2.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection2.run();
+
+  EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
 void BaseIntegrationTest::testBadPath() {

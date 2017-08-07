@@ -7,8 +7,8 @@
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/config/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "api/base.pb.h"
 
@@ -53,21 +53,14 @@ private:
     stats_.update_attempt_.inc();
     bool config_update_available = false;
     try {
-      const std::string json = Filesystem::fileReadToEnd(path_);
       envoy::api::v2::DiscoveryResponse message;
-      const auto status =
-          Protobuf::util::JsonStringToMessage(ProtobufTypes::ToString(json), &message);
-      if (!status.ok()) {
-        callbacks_->onConfigUpdateFailed(nullptr);
-        ENVOY_LOG(warn, "Filesystem config JSON conversion error: {}",
-                  ProtobufTypes::FromString(status.ToString()));
-        stats_.update_failure_.inc();
-        return;
-      }
+      MessageUtil::loadFromFile(path_, message);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources);
       stats_.update_success_.inc();
+      ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
+                ProtobufTypes::FromString(message.DebugString()));
       // TODO(htuch): Add some notion of current version for every API in stats/admin.
     } catch (const EnvoyException& e) {
       if (config_update_available) {

@@ -3,12 +3,13 @@
 #include <string>
 
 #include "envoy/http/header_map.h"
-#include "envoy/server/hot_restart.h"
 
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
+
+#include "server/hot_restart_nop_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -17,26 +18,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Server {
-
-class TestHotRestart : public HotRestart {
-public:
-  // Server::HotRestart
-  void drainParentListeners() override {}
-  int duplicateParentListenSocket(const std::string&) override { return -1; }
-  void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
-  void initialize(Event::Dispatcher&, Server::Instance&) override {}
-  void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
-  void terminateParent() override {}
-  void shutdown() override {}
-  std::string version() override { return "1"; }
-};
-
-} // namespace Server
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path,
+                                                       const std::string& bootstrap_path,
                                                        const Network::Address::IpVersion version) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
+  IntegrationTestServerPtr server{new IntegrationTestServer(config_path, bootstrap_path)};
   server->start(version);
   return server;
 }
@@ -89,8 +75,8 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
-  Server::TestOptionsImpl options(config_path_);
-  Server::TestHotRestart restarter;
+  Server::TestOptionsImpl options(config_path_, bootstrap_path_);
+  Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
                                       "cluster_name", "node_name");

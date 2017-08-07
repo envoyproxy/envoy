@@ -11,6 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
+    external_deps = [
+        "envoy_bootstrap",
+        "envoy_cds",
+    ],
     deps = [
         ":load_balancer_interface",
         ":thread_local_cluster_interface",

@@ -33,11 +33,12 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-void MainImpl::initialize(const Json::Object& json, Instance& server,
+void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
+                          Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   cluster_manager_ = cluster_manager_factory.clusterManagerFromJson(
-      *json.getObject("cluster_manager"), server.stats(), server.threadLocal(), server.runtime(),
-      server.random(), server.localInfo(), server.accessLogManager());
+      *json.getObject("cluster_manager"), bootstrap, server.stats(), server.threadLocal(),
+      server.runtime(), server.random(), server.localInfo(), server.accessLogManager());
 
   std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());

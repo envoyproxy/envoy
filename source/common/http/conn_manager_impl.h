@@ -58,6 +58,8 @@ namespace Http {
   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
+  COUNTER(downstream_flow_control_paused_reading_total)                                            \
+  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
@@ -278,7 +280,8 @@ public:
   StreamDecoder& newStream(StreamEncoder& response_encoder) override;
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  // TODO(alyssawilk) disable upstream reads.
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -354,6 +357,8 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void onDecoderFilterAboveWriteBufferHighWatermark() override;
+    void onDecoderFilterBelowWriteBufferLowWatermark() override;
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -384,6 +389,9 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data) override;
+    // TODO(alysawilk) disable reads from upstream.
+    void onEncoderFilterAboveWriteBufferHighWatermark() override {}
+    void onEncoderFilterBelowWriteBufferLowWatermark() override {}
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
@@ -428,6 +436,9 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
+    // TODO(alyssawilk) disable upstream reads.
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // Http::StreamDecoder
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

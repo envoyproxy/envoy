@@ -180,8 +180,9 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
  */
 class ClusterInfoImpl : public ClusterInfo {
 public:
-  ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+  ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
 
@@ -204,17 +205,18 @@ public:
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
+    ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name);
-    ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name, const std::string& priority);
+    ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                                const std::string& cluster_name,
+                                const envoy::api::v2::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 
     Managers managers_;
   };
 
-  static uint64_t parseFeatures(const Json::Object& config);
+  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
 
   Runtime::Loader& runtime_;
   const std::string name_;
@@ -240,12 +242,11 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr create(const Json::Object& cluster, ClusterManager& cm,
+  static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                  Stats::Store& stats, ThreadLocal::Instance& tls,
                                  Network::DnsResolverSharedPtr dns_resolver,
                                  Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                 const Optional<envoy::api::v2::ConfigSource>& eds_config,
                                  const LocalInfo::LocalInfo& local_info,
                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
                                  bool added_via_api);
@@ -268,8 +269,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
 
 protected:
-  ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+  ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
@@ -296,8 +298,9 @@ private:
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                    bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -338,8 +341,8 @@ protected:
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager,
+  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                       Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher,
                        bool added_via_api);
 
