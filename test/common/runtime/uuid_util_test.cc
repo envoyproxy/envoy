@@ -62,7 +62,7 @@ TEST(UUIDUtilsTest, checkDistribution) {
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
 }
 
-TEST(UUIDUtilsTest, benchmark) {
+TEST(UUIDUtilsTest, DISABLED_benchmark) {
   Runtime::RandomGeneratorImpl random;
 
   for (int i = 0; i < 500000; ++i) {
