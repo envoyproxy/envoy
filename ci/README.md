@@ -77,7 +77,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 While all changes to the build image should eventually be upstreamed, it can be useful to
 test those changes locally before sending out a pull request.  To experiment
 with a local clone of the upstream build image you can make changes to files such as
-build_container.sh locally and then run :
+build_container.sh locally and then run:
 
 ```bash
 cd ci/build_container
