@@ -11,6 +11,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -26,7 +27,9 @@ std::string RandomGeneratorImpl::uuid() {
   // Create UUID from Truly Random or Pseudo-Random Numbers.
   // See: https://tools.ietf.org/html/rfc4122#section-4.4
   uint8_t rand[16];
-  RAND_bytes(rand, 16);
+  int rc = RAND_bytes(rand, 16);
+  ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
   rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
   rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
 
