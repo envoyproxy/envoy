@@ -72,6 +72,12 @@
                 {
                   "prefix": "/test/",
                   "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
+                  "cluster": "cluster_1",
+                  "use_websocket" : true
                 }
               ]
             }
@@ -171,6 +177,7 @@
                 },
                 {
                   "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
                   "cluster": "cluster_1",
                   "use_websocket" : true
                 }
@@ -269,6 +276,7 @@
                 },
                 {
                   "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
                   "cluster": "cluster_1",
                   "use_websocket" : true
                 }
