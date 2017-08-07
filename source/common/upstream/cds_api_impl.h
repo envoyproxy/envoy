@@ -44,7 +44,6 @@ private:
 
   ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
-  envoy::api::v2::Node node_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
 };
