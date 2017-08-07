@@ -32,6 +32,7 @@ class RandomGeneratorImpl : public RandomGenerator {
 public:
   // Runtime::RandomGenerator
   uint64_t random() override { return threadLocalGenerator()(); }
+  void random_bytes(uint8_t* out, size_t out_len) override;
   std::string uuid() override;
 
   static const size_t UUID_LENGTH;

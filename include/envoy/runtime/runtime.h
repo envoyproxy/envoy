@@ -22,6 +22,13 @@ public:
   virtual uint64_t random() PURE;
 
   /**
+   * Writes out_len bytes of random data to out.
+   * @param out supplies output buffer.
+   * @param out_len supplies number of requested bytes / length of the output buffer.
+   */
+  virtual void random_bytes(uint8_t* out, size_t out_len) PURE;
+
+  /**
    * @return std::string containing uuid4 of 36 char length.
    * for example, 7c25513b-0466-4558-a64c-12c6704f37ed
    */
