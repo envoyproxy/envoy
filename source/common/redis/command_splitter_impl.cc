@@ -125,7 +125,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
   }
   case RespType::Error: {
     error_count_++;
-    // fall through
+    FALLTHRU;
   }
   case RespType::BulkString: {
     pending_response_->asArray()[index].asString().swap(value->asString());
@@ -193,7 +193,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
     if (value->asString() == "OK") {
       break;
     }
-    // else fall through
+    FALLTHRU;
   }
   default: {
     error_count_++;

@@ -1,5 +1,7 @@
 #include "server/worker_impl.h"
 
+#include <functional>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"

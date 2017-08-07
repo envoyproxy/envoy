@@ -11,6 +11,15 @@ travis lint .travis.yml --skip-completion-check
 # Where the Envoy build takes place.
 export ENVOY_BUILD_DIR=/tmp/envoy-docker-build
 
+function finish {
+  echo "disk space at end of build:"
+  df -h
+}
+trap finish EXIT
+
+echo "disk space at beginning of build:"
+df -h
+
 # Do a build matrix with different types of builds docs, coverage, bazel.release, etc.
 if [ "$TEST_TYPE" == "docs" ]
 then
