@@ -21,7 +21,7 @@ public:
  * A concrete implementation of a singleton registration. All singletons are referenced by name
  * and must be statically registered ahead of time. This can be done like so:
  *
- * static const char foo_singleton_name[] = "foo_singleton";
+ * static constexpr char foo_singleton_name[] = "foo_singleton";
  * static Registry::RegisterFactory<Singleton::RegistrationImpl<foo_singleton_name>,
  *                                  Singleton::Registration>
  *     date_provider_singleton_registered_;

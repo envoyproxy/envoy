@@ -17,7 +17,7 @@ TEST(SingletonManagerImplTest, NotRegistered) {
                             "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
-static const char test_singleton_name[] = "test_singleton";
+static constexpr char test_singleton_name[] = "test_singleton";
 static Registry::RegisterFactory<Singleton::RegistrationImpl<test_singleton_name>,
                                  Singleton::Registration>
     test_singleton_registered_;

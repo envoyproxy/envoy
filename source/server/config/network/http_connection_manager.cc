@@ -28,7 +28,7 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-static const char date_provider_singleton_name[] = "date_provider_singleton";
+static constexpr char date_provider_singleton_name[] = "date_provider_singleton";
 static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singleton_name>,
                                  Singleton::Registration>
     date_provider_singleton_registered_;
