@@ -117,9 +117,10 @@ void OriginalDstCluster::cleanup() {
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set) {
-    if (host->used(false)) { // Marks as unused, returns if was used before.
+    if (host->used()) {
       ENVOY_LOG(debug, "Keeping active host {}.", host->address()->asString());
       new_hosts->emplace_back(host);
+      host->used(false); // Mark to be removed during the next round.
     } else {
       ENVOY_LOG(debug, "Removing stale host {}.", host->address()->asString());
       to_be_removed.emplace_back(host);

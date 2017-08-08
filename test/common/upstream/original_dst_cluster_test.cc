@@ -229,14 +229,14 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // Make host time out, no membership changes happen on the first timeout.
   ASSERT_EQ(1UL, cluster_->hosts().size());
-  EXPECT_EQ(true, cluster_->hosts()[0]->used(true));
+  EXPECT_EQ(true, cluster_->hosts()[0]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   cleanup_timer_->callback_();
   EXPECT_EQ(cluster_hosts, cluster_->hosts()); // hosts vector remains the same
 
   // host gets removed on the 2nd timeout.
   ASSERT_EQ(1UL, cluster_->hosts().size());
-  EXPECT_EQ(false, cluster_->hosts()[0]->used(false));
+  EXPECT_EQ(false, cluster_->hosts()[0]->used());
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   EXPECT_CALL(membership_updated_, ready());
@@ -324,16 +324,16 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   // Make hosts time out, no membership changes happen on the first timeout.
   ASSERT_EQ(2UL, cluster_->hosts().size());
-  EXPECT_EQ(true, cluster_->hosts()[0]->used(true));
-  EXPECT_EQ(true, cluster_->hosts()[1]->used(true));
+  EXPECT_EQ(true, cluster_->hosts()[0]->used());
+  EXPECT_EQ(true, cluster_->hosts()[1]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   cleanup_timer_->callback_();
   EXPECT_EQ(cluster_hosts, cluster_->hosts()); // hosts vector remains the same
 
   // both hosts get removed on the 2nd timeout.
   ASSERT_EQ(2UL, cluster_->hosts().size());
-  EXPECT_EQ(false, cluster_->hosts()[0]->used(false));
-  EXPECT_EQ(false, cluster_->hosts()[1]->used(false));
+  EXPECT_EQ(false, cluster_->hosts()[0]->used());
+  EXPECT_EQ(false, cluster_->hosts()[1]->used());
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   EXPECT_CALL(membership_updated_, ready());

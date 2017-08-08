@@ -97,10 +97,14 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @param new_used supplies the new value to be stored.
-   * @return the old value of host being in use.
+   * @return the current boolean value of host being in use.
    */
-  virtual bool used(bool new_used) PURE;
+  virtual bool used() const PURE;
+
+  /**
+   * @param new_used supplies the new value of host being in use to be stored.
+   */
+  virtual void used(bool new_used) PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;

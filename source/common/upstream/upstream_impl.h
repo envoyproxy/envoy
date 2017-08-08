@@ -100,11 +100,8 @@ public:
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
-  bool used(bool new_used) override {
-    bool ret = used_;
-    used_ = new_used;
-    return ret;
-  }
+  bool used() const override { return used_; }
+  void used(bool new_used) override { used_ = new_used; }
 
 protected:
   static Network::ClientConnectionPtr
