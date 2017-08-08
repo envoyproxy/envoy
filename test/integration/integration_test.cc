@@ -182,10 +182,6 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->waitForData(234); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
   });
-  fake_upstream_connection->close();
-  // Force destruction of conn_manager_impl
-  fake_upstream_connection.reset();
-  EXPECT_EQ(0, test_server_->gauge("http.router.downstream_cx_websocket_active")->value());
 }
 
 TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
@@ -218,9 +214,6 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
        [&]() -> void { tcp_client->waitForDisconnect(); }});
 
   EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
-
-  tcp_client->close();
-  EXPECT_EQ(0, test_server_->gauge("http.router.downstream_cx_websocket_active")->value());
 }
 
 TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
