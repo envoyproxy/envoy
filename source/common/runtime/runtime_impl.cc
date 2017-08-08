@@ -11,9 +11,11 @@
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
+#include "openssl/rand.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -22,22 +24,59 @@ namespace Runtime {
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 std::string RandomGeneratorImpl::uuid() {
-  int fd = open("/proc/sys/kernel/random/uuid", O_RDONLY);
-  if (-1 == fd) {
-    throw EnvoyException(fmt::format("unable to open uuid, errno: {}", strerror(errno)));
+  // Create UUID from Truly Random or Pseudo-Random Numbers.
+  // See: https://tools.ietf.org/html/rfc4122#section-4.4
+  uint8_t rand[16];
+  int rc = RAND_bytes(rand, 16);
+  ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
+  rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
+  rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
+
+  // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
+  static const char* const hex = "0123456789abcdef";
+  std::string uuid;
+  uuid.reserve(UUID_LENGTH);
+
+  for (uint8_t i = 0; i < 4; i++) {
+    const uint8_t d = rand[i];
+    uuid.push_back(hex[d >> 4]);
+    uuid.push_back(hex[d & 0x0f]);
   }
 
-  char generated_uuid[UUID_LENGTH + 1];
-  ssize_t bytes_read = read(fd, generated_uuid, UUID_LENGTH);
-  close(fd);
-  generated_uuid[UUID_LENGTH] = '\0';
+  uuid.push_back('-');
 
-  if (bytes_read != UUID_LENGTH) {
-    throw EnvoyException(fmt::format("cannot read the uuid: bytes read - {}, bytes expected - {}",
-                                     bytes_read, UUID_LENGTH));
+  for (uint8_t i = 4; i < 6; i++) {
+    const uint8_t d = rand[i];
+    uuid.push_back(hex[d >> 4]);
+    uuid.push_back(hex[d & 0x0f]);
   }
 
-  return std::string(generated_uuid);
+  uuid.push_back('-');
+
+  for (uint8_t i = 6; i < 8; i++) {
+    const uint8_t d = rand[i];
+    uuid.push_back(hex[d >> 4]);
+    uuid.push_back(hex[d & 0x0f]);
+  }
+
+  uuid.push_back('-');
+
+  for (uint8_t i = 8; i < 10; i++) {
+    const uint8_t d = rand[i];
+    uuid.push_back(hex[d >> 4]);
+    uuid.push_back(hex[d & 0x0f]);
+  }
+
+  uuid.push_back('-');
+
+  for (uint8_t i = 10; i < 16; i++) {
+    const uint8_t d = rand[i];
+    uuid.push_back(hex[d >> 4]);
+    uuid.push_back(hex[d & 0x0f]);
+  }
+
+  return uuid;
 }
 
 SnapshotImpl::SnapshotImpl(const std::string& root_path, const std::string& override_path,

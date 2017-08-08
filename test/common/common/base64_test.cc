@@ -39,9 +39,9 @@ TEST(Base64Test, Decode) {
   EXPECT_EQ("", Base64::decode(""));
   EXPECT_EQ("foo", Base64::decode("Zm9v"));
   EXPECT_EQ("fo", Base64::decode("Zm8="));
+  EXPECT_EQ("f", Base64::decode("Zg=="));
   EXPECT_EQ("foobar", Base64::decode("Zm9vYmFy"));
   EXPECT_EQ("foob", Base64::decode("Zm9vYg=="));
-  EXPECT_EQ("", Base64::decode("123"));
 
   {
     const char* test_string = "\0\1\2\3\b\n\t";
@@ -72,6 +72,19 @@ TEST(Base64Test, Decode) {
     std::string decoded = Base64::decode(test_string);
     EXPECT_EQ(test_string, Base64::encode(decoded.c_str(), decoded.length()));
   }
+}
+
+TEST(Base64Test, DecodeFailure) {
+  EXPECT_EQ("", Base64::decode("==Zg"));
+  EXPECT_EQ("", Base64::decode("=Zm8"));
+  EXPECT_EQ("", Base64::decode("Zm=8"));
+  EXPECT_EQ("", Base64::decode("Zg=A"));
+  EXPECT_EQ("", Base64::decode("Zh==")); // 011001 100001 <- unused bit at tail
+  EXPECT_EQ("", Base64::decode("Zm9=")); // 011001 100110 111101 <- unused bit at tail
+  EXPECT_EQ("", Base64::decode("Zg.."));
+  EXPECT_EQ("", Base64::decode("..Zg"));
+  EXPECT_EQ("", Base64::decode("A==="));
+  EXPECT_EQ("", Base64::decode("123"));
 }
 
 TEST(Base64Test, MultiSlicesBufferEncode) {

@@ -22,6 +22,16 @@ exports_files([
 ])
 
 filegroup(
+    name = "server_xds_files",
+    srcs = [
+        "server_xds.bootstrap.json",
+        "server_xds.cds.json",
+        "server_xds.eds.json",
+        "server_xds.json",
+    ],
+)
+
+filegroup(
     name = "server_config_files",
     srcs = [
         "server.json",

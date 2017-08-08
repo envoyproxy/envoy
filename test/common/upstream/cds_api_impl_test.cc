@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/cds_api_impl.h"
@@ -31,16 +32,17 @@ public:
   void setup() {
     const std::string config_json = R"EOF(
     {
-      "cds": {
-        "cluster": {
-          "name": "foo_cluster"
-        }
+      "cluster": {
+        "name": "foo_cluster"
       }
     }
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    cds_ = CdsApiImpl::create(*config, sds_config_, cm_, dispatcher_, random_, local_info_, store_);
+    envoy::api::v2::ConfigSource cds_config;
+    Config::Utility::translateCdsConfig(*config, cds_config);
+    cds_ =
+        CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -94,10 +96,8 @@ public:
 TEST_F(CdsApiImplTest, InvalidOptions) {
   const std::string config_json = R"EOF(
   {
-    "cds": {
-      "cluster": {
-        "name": "foo_cluster"
-      }
+    "cluster": {
+      "name": "foo_cluster"
     }
   }
   )EOF";
@@ -105,8 +105,10 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
+  envoy::api::v2::ConfigSource cds_config;
+  Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(
-      CdsApiImpl::create(*config, sds_config_, cm_, dispatcher_, random_, local_info_, store_),
+      CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_),
       EnvoyException);
 }
 

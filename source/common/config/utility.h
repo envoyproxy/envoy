@@ -68,13 +68,6 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Convert LocalInfo::LocalInfo to v2 envoy::api::v2::Node identifier.
-   * @param local_info source LocalInfo::LocalInfo.
-   * @param node destination envoy::api::Node.
-   */
-  static void localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node);
-
-  /**
    * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
    * @param sds_config source v1 SdsConfig.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.

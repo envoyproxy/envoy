@@ -1,4 +1,5 @@
 #include <fstream>
+#include <functional>
 
 #include "common/buffer/buffer_impl.h"
 #include "common/filesystem/filesystem_impl.h"

@@ -831,5 +831,18 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+  stream->sendHeaders(headers, false);
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
 } // namespace Http
 } // namespace Envoy

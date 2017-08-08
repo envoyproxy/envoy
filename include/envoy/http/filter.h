@@ -198,6 +198,22 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times.  Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -297,6 +313,16 @@ public:
    * It is an error to call this method in any other case.
    */
   virtual void addEncodedData(Buffer::Instance& data) PURE;
+
+  /**
+   * Called when an encoder filter goes over its high watermark.
+   */
+  virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**

@@ -64,9 +64,8 @@ public:
     return ClusterPtr{clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api)};
   }
 
-  CdsApiPtr createCds(const Json::Object&, const Optional<SdsConfig>& sds_config,
+  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&, const Optional<SdsConfig>&,
                       ClusterManager&) override {
-    UNREFERENCED_PARAMETER(sds_config);
     return CdsApiPtr{createCds_()};
   }
 
@@ -105,11 +104,14 @@ public:
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  void create(const Json::Object& config) {
-    envoy::api::v2::Bootstrap bootstrap;
+  void createWithBootstrap(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         config, bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.random_, factory_.local_info_, log_manager_));
+  }
+
+  void create(const Json::Object& config) {
+    createWithBootstrap(config, envoy::api::v2::Bootstrap());
   }
 
   NiceMock<TestClusterManagerFactory> factory_;
@@ -364,6 +366,32 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
   EXPECT_EQ(3U, cluster.info().use_count());
+}
+
+// Validate that the v2 envoy::api::v2::Bootstrap overrides JSON config.
+TEST_F(ClusterManagerImplTest, CdsBootstrap) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
+                            "#/properties/name\n Schema violation: maxLength\n Offending "
+                            "document key: #/name");
+
+  envoy::api::v2::Bootstrap cds_config_bootstrap;
+  cds_config_bootstrap.mutable_cds_config();
+  createWithBootstrap(*loader, cds_config_bootstrap);
+
+  envoy::api::v2::Bootstrap clusters_bootstrap;
+  clusters_bootstrap.mutable_bootstrap_clusters()->Add()->CopyFrom(defaultStaticCluster("foo"));
+  createWithBootstrap(*loader, clusters_bootstrap);
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {

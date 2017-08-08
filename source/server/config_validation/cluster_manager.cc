@@ -19,11 +19,11 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromJson(
                                                         runtime, random, local_info, log_manager)};
 }
 
-CdsApiPtr ValidationClusterManagerFactory::createCds(const Json::Object& config,
+CdsApiPtr ValidationClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
                                                      const Optional<SdsConfig>& sds_config,
                                                      ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(config, sds_config, cm);
+  ProdClusterManagerFactory::createCds(cds_config, sds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }
