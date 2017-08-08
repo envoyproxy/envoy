@@ -141,7 +141,7 @@ ClusterPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, Clust
                                             selected_dns_resolver, tls, dispatcher, added_via_api));
     break;
   case envoy::api::v2::Cluster::EDS:
-    if (!cluster.has_eds_config()) {
+    if (!cluster.has_eds_cluster_config()) {
       throw EnvoyException("cannot create an sds cluster without an sds config");
     }
 

@@ -150,6 +150,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
 
     static const NullRateLimitPolicy rate_limit_policy_;

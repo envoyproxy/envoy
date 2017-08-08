@@ -18,15 +18,14 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
-      local_info_(local_info),
-      cluster_name_(cluster.has_deprecated_v1() ? cluster.deprecated_v1().service_name()
-                                                : cluster.name()) {
-  envoy::api::v2::Node node;
-  Config::Utility::localInfoToNode(local_info, node);
-  const auto& eds_config = cluster.eds_config();
+      local_info_(local_info), cluster_name_(cluster.eds_cluster_config().service_name().empty()
+                                                 ? cluster.name()
+                                                 : cluster.eds_cluster_config().service_name()) {
+  Config::Utility::checkLocalInfo("eds", local_info);
+  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
-      eds_config, node, dispatcher, cm, random, info_->statsScope(),
+      eds_config, local_info.node(), dispatcher, cm, random, info_->statsScope(),
       [this, &eds_config, &cm, &dispatcher,
        &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
         return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);

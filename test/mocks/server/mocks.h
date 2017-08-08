@@ -55,10 +55,16 @@ public:
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(mode, Mode());
+  MOCK_METHOD0(serviceClusterName, const std::string&());
+  MOCK_METHOD0(serviceNodeName, const std::string&());
+  MOCK_METHOD0(serviceZone, const std::string&());
 
   std::string config_path_;
   std::string bootstrap_path_;
   std::string admin_address_path_;
+  std::string service_cluster_name_;
+  std::string service_node_name_;
+  std::string service_zone_name_;
 };
 
 class MockAdmin : public Admin {

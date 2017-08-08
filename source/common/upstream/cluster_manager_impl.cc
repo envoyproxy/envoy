@@ -182,8 +182,12 @@ void ClusterManagerImpl::initializeClustersFromV2Proto(const envoy::api::v2::Boo
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  cds_api_ = factory_.createCds(bootstrap.cds_config(), sds_config_, *this);
-  init_helper_.setCds(cds_api_.get());
+  if (bootstrap.has_cds_config()) {
+    cds_api_ = factory_.createCds(bootstrap.cds_config(), sds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
 }
 
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
@@ -221,7 +225,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
     sds_config_.value(sds_config);
   }
 
-  if (bootstrap.has_cds_config()) {
+  if (bootstrap.has_cds_config() || !bootstrap.bootstrap_clusters().empty()) {
     initializeClustersFromV2Proto(bootstrap);
   } else {
     // TODO(htuch): Make this similar to the v1 -> v2 translation elsewhere,

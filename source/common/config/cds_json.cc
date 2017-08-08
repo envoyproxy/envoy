@@ -117,8 +117,9 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   } else {
     ASSERT(string_type == "sds");
     cluster.set_type(envoy::api::v2::Cluster::EDS);
-    Utility::sdsConfigToEdsConfig(sds_config.value(), *cluster.mutable_eds_config());
-    cluster.mutable_deprecated_v1()->set_service_name(json_cluster.getString("service_name", ""));
+    auto* eds_cluster_config = cluster.mutable_eds_cluster_config();
+    Utility::sdsConfigToEdsConfig(sds_config.value(), *eds_cluster_config->mutable_eds_config());
+    eds_cluster_config->set_service_name(json_cluster.getString("service_name", ""));
   }
 
   JSON_UTIL_SET_DURATION(json_cluster, cluster, connect_timeout);
