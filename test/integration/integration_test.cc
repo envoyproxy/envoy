@@ -150,6 +150,72 @@ TEST_P(IntegrationTest, OverlyLongHeaders) {
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
+TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+  // WebSocket upgrade, send some data and disconnect downstream
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                                      "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  executeActions({
+      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
+      // Send websocket upgrade request
+      // The request path gets rewritten from /websocket/test to /websocket.
+      // The size of headers received by the destination is 225 bytes.
+      [&]() -> void { tcp_client->write(upgrade_req_str); },
+      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
+      [&]() -> void { fake_upstream_connection->waitForData(225); },
+      // Accept websocket upgrade request
+      [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
+      [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
+      // Standard TCP proxy semantics post upgrade
+      [&]() -> void { tcp_client->write("hello"); },
+      // datalen = 225 + strlen(hello)
+      [&]() -> void { fake_upstream_connection->waitForData(230); },
+      [&]() -> void { fake_upstream_connection->write("world"); },
+      [&]() -> void { tcp_client->waitForData(upgrade_resp_str + "world"); },
+      [&]() -> void { tcp_client->write("bye!"); },
+      // downstream disconnect
+      [&]() -> void { tcp_client->close(); },
+      // datalen = 225 + strlen(hello) + strlen(bye!)
+      [&]() -> void { fake_upstream_connection->waitForData(234); },
+      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+  });
+}
+
+TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
+  // WebSocket upgrade, send some data and disconnect upstream
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                                      "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  executeActions(
+      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
+       // Send websocket upgrade request
+       [&]() -> void { tcp_client->write(upgrade_req_str); },
+       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
+       // The request path gets rewritten from /websocket/test to /websocket.
+       // The size of headers received by the destination is 225 bytes.
+       [&]() -> void { fake_upstream_connection->waitForData(225); },
+       // Accept websocket upgrade request
+       [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
+       [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
+       // Standard TCP proxy semantics post upgrade
+       [&]() -> void { tcp_client->write("hello"); },
+       // datalen = 225 + strlen(hello)
+       [&]() -> void { fake_upstream_connection->waitForData(230); },
+       [&]() -> void { fake_upstream_connection->write("world"); },
+       // upstream disconnect
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+       [&]() -> void { tcp_client->waitForDisconnect(); }});
+
+  EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
+}
+
 TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;

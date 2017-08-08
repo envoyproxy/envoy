@@ -140,6 +140,13 @@ void TcpProxy::readDisableUpstream(bool disable) {
 
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
+  // The WsHandlerImpl class uses TCP Proxy code with a null config.
+  // TODO (alyssawilk) make sure that HTTP conn man tracks the same
+  // flow control stuff, so that we get these stats for WebSockets/HTTP.
+  if (!config_) {
+    return;
+  }
+
   if (disable) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
   } else {
@@ -176,7 +183,7 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
-  const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
+  const std::string& cluster_name = getUpstreamCluster();
 
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
@@ -184,15 +191,17 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
-    config_->stats().downstream_cx_no_route_.inc();
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    if (config_) {
+      config_->stats().downstream_cx_no_route_.inc();
+    }
+    onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
   Upstream::Host::CreateConnectionData conn_info =
@@ -201,11 +210,12 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
-  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
 
+  onUpstreamHostReady();
+  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
   upstream_connection_->setBufferStats(
@@ -237,7 +247,7 @@ void TcpProxy::onConnectTimeout() {
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
 
   // This will close the upstream connection as well.
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  onConnectTimeoutError();
 }
 
 Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
@@ -279,9 +289,10 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
     }
 
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    onConnectionFailure();
   } else if (event == Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
+    onConnectionSuccess();
   }
 
   if (connect_timeout_timer_) {

@@ -207,6 +207,7 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+  bool useWebSocket() const override { return use_websocket_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -263,6 +264,7 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
+    bool useWebSocket() const override { return parent_->useWebSocket(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -312,6 +314,7 @@ private:
 
   const VirtualHostImpl& vhost_;
   const bool auto_host_rewrite_;
+  const bool use_websocket_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const std::chrono::milliseconds timeout_;

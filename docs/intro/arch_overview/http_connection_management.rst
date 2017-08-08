@@ -19,7 +19,7 @@ HTTP connection manager :ref:`configuration <config_http_conn_man>`.
 HTTP protocols
 --------------
 
-Envoy’s HTTP connection manager has native support for both HTTP/1.1 and HTTP/2. It does not support
+Envoy’s HTTP connection manager has native support for HTTP/1.1, WebSockets, and HTTP/2. It does not support
 SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy.
 Internally, HTTP/2 terminology is used to describe system components. For example, an HTTP request
 and response take place on a *stream*. A codec API is used to translate from different wire

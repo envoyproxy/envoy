@@ -12,6 +12,7 @@
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -26,6 +27,7 @@
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
+#include "common/http/websocket/ws_handler_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -39,6 +41,7 @@ namespace Http {
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_ssl_total)                                                                 \
   COUNTER(downstream_cx_http1_total)                                                               \
+  COUNTER(downstream_cx_websocket_total)                                                           \
   COUNTER(downstream_cx_http2_total)                                                               \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_remote)                                                            \
@@ -49,6 +52,7 @@ namespace Http {
   GAUGE  (downstream_cx_active)                                                                    \
   GAUGE  (downstream_cx_ssl_active)                                                                \
   GAUGE  (downstream_cx_http1_active)                                                              \
+  GAUGE  (downstream_cx_websocket_active)                                                          \
   GAUGE  (downstream_cx_http2_active)                                                              \
   COUNTER(downstream_cx_protocol_error)                                                            \
   TIMER  (downstream_cx_length_ms)                                                                 \
@@ -68,6 +72,8 @@ namespace Http {
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_non_relative_path)                                                         \
+  COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
+  COUNTER(downstream_rq_non_ws_on_ws_route)                                                        \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
@@ -259,7 +265,8 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
-                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
+                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                        Upstream::ClusterManager& cluster_manager);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -411,6 +418,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
+                        public WsHandlerCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -457,6 +465,11 @@ private:
       addStreamEncoderFilterWorker(filter, true);
     }
     void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
+
+    // Http::WsHandlerCallbacks
+    void sendHeadersOnlyResponse(HeaderMap& headers) override {
+      encodeHeaders(nullptr, headers, true);
+    }
 
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
@@ -531,6 +544,8 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
+  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
@@ -548,6 +563,8 @@ private:
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
+  Upstream::ClusterManager& cluster_manager_;
+  WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

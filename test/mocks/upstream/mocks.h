@@ -93,7 +93,7 @@ public:
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
                                                LoadBalancerContext* context) override {
     MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
-    return {Network::ClientConnectionPtr{data.connection_}, data.host_};
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
   // Upstream::ClusterManager

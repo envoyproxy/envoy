@@ -86,7 +86,7 @@ class MockHost : public Host {
 public:
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    HostConstSharedPtr host_;
+    HostDescriptionConstSharedPtr host_description_{};
   };
 
   MockHost();
@@ -94,7 +94,7 @@ public:
 
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override {
     MockCreateConnectionData data = createConnection_(dispatcher);
-    return {Network::ClientConnectionPtr{data.connection_}, data.host_};
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
   void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
