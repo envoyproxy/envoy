@@ -12,8 +12,8 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager {
 public:
-  InstancePtr get(const std::string& name) override;
-  void set(const std::string& name, InstancePtr singleton) override;
+  InstancePtr get(const std::string& name, SingletonFactoryCb cb) override;
+  //void set(const std::string& name, InstancePtr singleton) override;
 
 private:
   void verifyRegistration(const std::string& name);

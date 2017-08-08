@@ -42,20 +42,25 @@ public:
   virtual ~Manager() {}
 
   /**
+   * fixfix
+   */
+  typedef std::function<InstancePtr()> SingletonFactoryCb;
+
+  /**
    * This is a helper on top of get() that casts the object stored to the specified type. No type
    * information is specified explicitly in code so dynamic_cast provides some level of protection
    * via RTTI.
    */
-  template <class T> std::shared_ptr<T> getTyped(const std::string& name) {
-    return std::dynamic_pointer_cast<T>(get(name));
+  template <class T> std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb) {
+    return std::dynamic_pointer_cast<T>(get(name, cb));
   }
 
   /**
-   * Get a singleton.
+   * Get a singleton. fixfix
    * @param name supplies the singleton name. Must be registered via RegistrationImpl.
    * @return InstancePtr the singleton.
    */
-  virtual InstancePtr get(const std::string& name) PURE;
+  virtual InstancePtr get(const std::string& name, SingletonFactoryCb) PURE;
 
   /**
    * Set a singleton.
@@ -65,7 +70,7 @@ public:
    *        singletons must check for validity and create a new singleton if needed. It must also
    *        store the shared_ptr for as long as the singleton is needed.
    */
-  virtual void set(const std::string& name, InstancePtr singleton) PURE;
+  //virtual void set(const std::string& name, InstancePtr singleton) PURE;
 };
 
 typedef std::unique_ptr<Manager> ManagerPtr;
