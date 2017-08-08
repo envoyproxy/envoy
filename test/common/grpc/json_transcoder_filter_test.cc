@@ -182,8 +182,6 @@ public:
   GrpcJsonTranscoderFilterTest() : config_(*bookstoreJson()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
-    filter_.provideWatermarkCallbacks(mock_provider);
   }
 
   const Json::ObjectSharedPtr bookstoreJson() {

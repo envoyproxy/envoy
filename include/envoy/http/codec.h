@@ -276,20 +276,6 @@ public:
 };
 
 /**
- * An interface for entities providing notification of downstream buffer overflow
- */
-class DownstreamWatermarkProvider {
-public:
-  virtual ~DownstreamWatermarkProvider() {}
-
-  /**
-   * Add watermark callbacks.
-   * @param callbacks supplies the callbacks to fire on downstream watermark events.
-   */
-  virtual void addCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
-};
-
-/**
  * Callbacks for server connections.
  */
 class ServerConnectionCallbacks : public virtual ConnectionCallbacks {

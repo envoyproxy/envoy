@@ -56,10 +56,6 @@ public:
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
 
-    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
-    EXPECT_CALL(mock_provider, addCallbacks(_));
-    router_.provideWatermarkCallbacks(mock_provider);
-
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
   }

@@ -37,8 +37,6 @@ public:
   GrpcWebFilterTest() : filter_(cm_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    testing::StrictMock<Http::MockDownstreamWatermarkProvider> mock_provider;
-    filter_.provideWatermarkCallbacks(mock_provider);
   }
 
   ~GrpcWebFilterTest() override { filter_.onDestroy(); }

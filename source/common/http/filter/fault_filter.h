@@ -81,7 +81,6 @@ public:
   ~FaultFilter();
 
   // Http::StreamFilterBase
-  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider&) override {}
   void onDestroy() override;
 
   // Http::StreamDecoderFilter

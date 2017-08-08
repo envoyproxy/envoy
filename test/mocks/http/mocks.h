@@ -242,6 +242,7 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -293,7 +294,6 @@ public:
   ~MockStreamDecoderFilter();
 
   // Http::StreamFilterBase
-  MOCK_METHOD1(provideWatermarkCallbacks, void(Http::DownstreamWatermarkProvider&));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::StreamDecoderFilter
@@ -311,7 +311,6 @@ public:
   ~MockStreamEncoderFilter();
 
   // Http::StreamFilterBase
-  MOCK_METHOD1(provideWatermarkCallbacks, void(Http::DownstreamWatermarkProvider&));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::MockStreamEncoderFilter
@@ -329,7 +328,6 @@ public:
   ~MockStreamFilter();
 
   // Http::StreamFilterBase
-  MOCK_METHOD1(provideWatermarkCallbacks, void(Http::DownstreamWatermarkProvider&));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::StreamDecoderFilter
@@ -436,11 +434,6 @@ class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {
 public:
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
-};
-
-class MockDownstreamWatermarkProvider : public DownstreamWatermarkProvider {
-public:
-  MOCK_METHOD1(addCallbacks, void(DownstreamWatermarkCallbacks&));
 };
 
 } // namespace Http

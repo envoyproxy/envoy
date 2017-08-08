@@ -214,6 +214,12 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * This routine can be called by a filter to subscribe to watermark events on the downstream
+   * stream and downstream connection.
+   */
+  virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**
@@ -222,12 +228,6 @@ public:
 class StreamFilterBase {
 public:
   virtual ~StreamFilterBase() {}
-
-  /**
-   * This routine is called on filter creation, allowing filters to subscribe to watermark events
-   * on the downstream stream and downstream connection.
-   */
-  virtual void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider& provider) PURE;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream

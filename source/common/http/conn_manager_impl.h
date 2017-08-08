@@ -367,6 +367,14 @@ private:
     void encodeTrailers(HeaderMapPtr&& trailers) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
+    void
+    addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override {
+      // Sanity check this is called exactly once per stream, by the router filter.
+      // If there's ever a need for another filter to subscribe to watermark callbacks this can be
+      // removed.
+      ASSERT(parent_.watermark_callbacks_.empty())
+      parent_.watermark_callbacks_.push_back(&watermark_callbacks);
+    }
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -418,8 +426,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::Config,
-                        public DownstreamWatermarkProvider {
+                        public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -468,15 +475,6 @@ private:
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
-
-    // Http::DownstreamWatermarkProvider
-    void addCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override {
-      // This is currently expected to be called exactly once per stream, by the router filter.
-      // If there's ever a need for another filter to subscribe to watermark callbacks this can be
-      // removed.
-      ASSERT(watermark_callbacks_.empty())
-      watermark_callbacks_.push_back(&watermark_callbacks);
-    }
 
     // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.

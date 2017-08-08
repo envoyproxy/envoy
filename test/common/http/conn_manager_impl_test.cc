@@ -123,11 +123,6 @@ public:
 
     for (int i = 0; i < num_decoder_filters; i++) {
       EXPECT_CALL(*decoder_filters_[i], setDecoderFilterCallbacks(_));
-      EXPECT_CALL(*decoder_filters_[i], provideWatermarkCallbacks(_))
-          .WillOnce(Invoke([&](Http::DownstreamWatermarkProvider& provider) -> void {
-            watermark_callback_provider_ = &provider;
-          }));
-      ;
     }
 
     for (int i = 0; i < num_encoder_filters; i++) {
@@ -230,7 +225,6 @@ public:
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_;
   MockStream stream_;
-  Http::DownstreamWatermarkProvider* watermark_callback_provider_{nullptr};
   Http::StreamCallbacks* stream_callbacks_{nullptr};
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
@@ -319,7 +313,6 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
         callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, provideWatermarkCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
@@ -1047,10 +1040,11 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   // The connection manger will outlive callbacks but never reference them once deleted.
   MockDownstreamWatermarkCallbacks callbacks;
 
-  ASSERT(watermark_callback_provider_ != nullptr);
+  ASSERT_NE(0, decoder_filters_.size());
+  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
   // propogated.
-  watermark_callback_provider_->addCallbacks(callbacks);
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   conn_manager_->onAboveWriteBufferHighWatermark();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());

@@ -116,10 +116,6 @@ public:
   ~Filter();
 
   // Http::StreamFilterBase
-  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider& provider) override {
-    // Have the connection manager inform the router when the downstream buffers are overrun.
-    provider.addCallbacks(*this);
-  }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -128,6 +124,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+    // Have the connection manager inform the router when the downstream buffers are overrun.
+    callbacks.addDownstreamWatermarkCallbacks(*this);
   }
 
   // Http::DownstreamWatermarkCallbacks

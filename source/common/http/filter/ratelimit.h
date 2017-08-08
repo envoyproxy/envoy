@@ -80,7 +80,6 @@ public:
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
-  void provideWatermarkCallbacks(Http::DownstreamWatermarkProvider&) override {}
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
