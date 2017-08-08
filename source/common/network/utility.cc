@@ -135,13 +135,10 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
 }
 
 Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Address::Ip* ip) {
-  Address::InstanceConstSharedPtr addr;
   if (ip->version() == Address::IpVersion::v4) {
-    addr.reset(new Address::Ipv4Instance(ip->addressAsString(), ip->port()));
-  } else {
-    addr.reset(new Address::Ipv6Instance(ip->addressAsString(), ip->port()));
+    return std::make_shared<Address::Ipv4Instance>(ip->addressAsString(), ip->port());
   }
-  return addr;
+  return std::make_shared<Address::Ipv6Instance>(ip->addressAsString(), ip->port());
 }
 
 Address::InstanceConstSharedPtr
