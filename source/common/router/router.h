@@ -106,7 +106,8 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
-               public Upstream::LoadBalancerContext {
+               public Upstream::LoadBalancerContext,
+               public Http::DownstreamWatermarkCallbacks {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
@@ -123,7 +124,13 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+    // Have the connection manager inform the router when the downstream buffers are overrun.
+    callbacks.addDownstreamWatermarkCallbacks(*this);
   }
+
+  // Http::DownstreamWatermarkCallbacks
+  void onBelowWriteBufferLowWatermark() override;
+  void onAboveWriteBufferHighWatermark() override;
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> hashKey() const override {

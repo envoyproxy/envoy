@@ -288,9 +288,17 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
-  // TODO(alyssawilk) disable upstream reads.
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  // Pass connection watermark events on to all the streams associated with that connection.
+  void onAboveWriteBufferHighWatermark() override {
+    for (ActiveStreamPtr& stream : streams_) {
+      stream->callHighWatermarkCallbacks();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    for (ActiveStreamPtr& stream : streams_) {
+      stream->callLowWatermarkCallbacks();
+    }
+  }
 
 private:
   struct ActiveStream;
@@ -366,6 +374,14 @@ private:
     void encodeTrailers(HeaderMapPtr&& trailers) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
+    void
+    addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override {
+      // Sanity check this is called exactly once per stream, by the router filter.
+      // If there's ever a need for another filter to subscribe to watermark callbacks this can be
+      // removed.
+      ASSERT(parent_.watermark_callbacks_.empty())
+      parent_.watermark_callbacks_.push_back(&watermark_callbacks);
+    }
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -396,9 +412,8 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data) override;
-    // TODO(alysawilk) disable reads from upstream.
-    void onEncoderFilterAboveWriteBufferHighWatermark() override {}
-    void onEncoderFilterBelowWriteBufferLowWatermark() override {}
+    void onEncoderFilterAboveWriteBufferHighWatermark() override;
+    void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
@@ -444,9 +459,8 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
-    // TODO(alyssawilk) disable upstream reads.
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -474,6 +488,11 @@ private:
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+
+    // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
+    // events for this stream and the downstream connection to the router filter.
+    void callHighWatermarkCallbacks();
+    void callLowWatermarkCallbacks();
 
     /**
      * Flags that keep track of which filter calls are currently in progress.
@@ -518,6 +537,7 @@ private:
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
+    std::vector<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

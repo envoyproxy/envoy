@@ -882,6 +882,16 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
   connection_manager_.doDeferredStreamDestroy(*this);
 }
 
+void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to downstream stream watermark.", *this);
+  callHighWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to downstream stream watermark.", *this);
+  callLowWatermarkCallbacks();
+}
+
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
@@ -889,6 +899,18 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
 const std::vector<Http::LowerCaseString>&
 ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
   return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+}
+
+void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
+  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
+    callbacks->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
+  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
+    callbacks->onBelowWriteBufferLowWatermark();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
@@ -1054,6 +1076,18 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
   return parent_.addEncodedData(*this, data);
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_);
+  parent_.callHighWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_);
+  parent_.callLowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }

@@ -20,6 +20,7 @@ public:
   GrpcWebFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
   virtual ~GrpcWebFilter(){};
 
+  // Http::StreamFilterBase
   void onDestroy() override{};
 
   // Implements StreamDecoderFilter.

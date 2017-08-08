@@ -200,6 +200,7 @@ private:
   void encodeTrailers(HeaderMapPtr&& trailers) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
