@@ -244,6 +244,11 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
+   * @return bool true if this route should use WebSockets.
+   */
+  virtual bool useWebSocket() const PURE;
+
+  /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated
    *         with the route
    */
