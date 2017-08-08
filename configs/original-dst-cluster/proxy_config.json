@@ -36,7 +36,7 @@
     "cluster_manager": {
         "clusters": [{
             "name": "cluster1",
-            "connect_timeout_ms": 1250,
+            "connect_timeout_ms": 6000,
             "type": "original_dst",
             "lb_type": "original_dst_lb"
         }]
