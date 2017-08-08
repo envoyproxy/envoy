@@ -97,7 +97,8 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @return the old value of host being in use and set the value to 'new_used'.
+   * @param new_used supplies the new value to be stored.
+   * @return the old value of host being in use.
    */
   virtual bool used(bool new_used) PURE;
 };
