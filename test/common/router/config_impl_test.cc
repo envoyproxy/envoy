@@ -518,7 +518,7 @@ TEST(RouteMatcherTest, Priority) {
         }
       ],
       "virtual_clusters": [
-        {"pattern": "^/bar$", "method": "POST", "name": "foo", "priority": "high"}]
+        {"pattern": "^/bar$", "method": "POST", "name": "foo"}]
     }
   ]
 }
@@ -535,18 +535,6 @@ TEST(RouteMatcherTest, Priority) {
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->priority());
   EXPECT_EQ(Upstream::ResourcePriority::Default,
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->priority());
-
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "POST");
-    EXPECT_EQ(Upstream::ResourcePriority::High,
-              config.route(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
-  }
-
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
-    EXPECT_EQ(Upstream::ResourcePriority::Default,
-              config.route(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
-  }
 }
 
 TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {

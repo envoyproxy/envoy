@@ -215,7 +215,6 @@ private:
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
-  Upstream::ResourcePriority finalPriority();
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   void onRequestComplete();

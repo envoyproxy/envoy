@@ -130,11 +130,6 @@ public:
    * @return the name of the virtual cluster.
    */
   virtual const std::string& name() const PURE;
-
-  /**
-   * @return the priority of the virtual cluster.
-   */
-  virtual Upstream::ResourcePriority priority() const PURE;
 };
 
 class RateLimitPolicy;

@@ -91,20 +91,15 @@ private:
 
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
-    Upstream::ResourcePriority priority() const override { return priority_; }
 
     std::regex pattern_;
     Optional<std::string> method_;
     std::string name_;
-    Upstream::ResourcePriority priority_;
   };
 
   struct CatchAllVirtualCluster : public VirtualCluster {
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
-    Upstream::ResourcePriority priority() const override {
-      return Upstream::ResourcePriority::Default;
-    }
 
     std::string name_{"other"};
   };
