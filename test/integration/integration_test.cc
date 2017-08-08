@@ -183,6 +183,8 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
   });
   fake_upstream_connection->close();
+  // Force destruction of conn_manager_impl
+  fake_upstream_connection.reset();
   EXPECT_EQ(0, test_server_->gauge("http.router.downstream_cx_websocket_active")->value());
 }
 
