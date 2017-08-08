@@ -85,7 +85,8 @@ public:
    * Returns both a connection and the host that backs the connection. Both can be nullptr if there
    * is no host available in the cluster.
    */
-  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) PURE;
+  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                                       LoadBalancerContext* context) PURE;
 
   /**
    * Returns a client that can be used to make async HTTP calls against the given cluster. The
@@ -168,9 +169,10 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual ClusterPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                      Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                      bool added_via_api) PURE;
+  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
+                                            ClusterManager& cm,
+                                            Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                            bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.

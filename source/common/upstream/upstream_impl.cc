@@ -28,6 +28,7 @@
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
+#include "common/upstream/original_dst_cluster.h"
 
 #include "spdlog/spdlog.h"
 
@@ -91,6 +92,13 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime:
   case envoy::api::v2::Cluster::RING_HASH:
     lb_type_ = LoadBalancerType::RingHash;
     break;
+  case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
+    if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
+      throw EnvoyException(fmt::format(
+          "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'"));
+    }
+    lb_type_ = LoadBalancerType::OriginalDst;
+    break;
   default:
     NOT_REACHED;
   }
@@ -99,15 +107,15 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime:
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
     new std::vector<std::vector<HostSharedPtr>>()};
 
-ClusterPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                   Stats::Store& stats, ThreadLocal::Instance& tls,
-                                   Network::DnsResolverSharedPtr dns_resolver,
-                                   Ssl::ContextManager& ssl_context_manager,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                   Event::Dispatcher& dispatcher,
-                                   const LocalInfo::LocalInfo& local_info,
-                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                   bool added_via_api) {
+ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                         Stats::Store& stats, ThreadLocal::Instance& tls,
+                                         Network::DnsResolverSharedPtr dns_resolver,
+                                         Ssl::ContextManager& ssl_context_manager,
+                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                         Event::Dispatcher& dispatcher,
+                                         const LocalInfo::LocalInfo& local_info,
+                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                         bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -139,6 +147,14 @@ ClusterPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, Clust
   case envoy::api::v2::Cluster::LOGICAL_DNS:
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
                                             selected_dns_resolver, tls, dispatcher, added_via_api));
+    break;
+  case envoy::api::v2::Cluster::ORIGINAL_DST:
+    if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
+      throw EnvoyException(fmt::format(
+          "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
+    }
+    new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager,
+                                             dispatcher, added_via_api));
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {

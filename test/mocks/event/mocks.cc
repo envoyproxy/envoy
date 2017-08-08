@@ -25,6 +25,9 @@ MockDispatcher::~MockDispatcher() {}
 
 MockTimer::MockTimer() {}
 
+// Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
+// createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
+// allocated and must not be deleted by it's creator.
 MockTimer::MockTimer(MockDispatcher* dispatcher) {
   EXPECT_CALL(*dispatcher, createTimer_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))

@@ -24,6 +24,7 @@
 
 using testing::InSequence;
 using testing::Invoke;
+using testing::Mock;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Return;
@@ -45,11 +46,10 @@ public:
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                  bool added_via_api) -> Cluster* {
+                                  bool added_via_api) -> ClusterSharedPtr {
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         local_info_, outlier_event_logger, added_via_api)
-              .release();
+                                         local_info_, outlier_event_logger, added_via_api);
         }));
   }
 
@@ -58,10 +58,10 @@ public:
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
-  ClusterPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                              Outlier::EventLoggerSharedPtr outlier_event_logger,
-                              bool added_via_api) override {
-    return ClusterPtr{clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api)};
+  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                    Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                    bool added_via_api) override {
+    return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
   CdsApiPtr createCds(const envoy::api::v2::ConfigSource&, const Optional<SdsConfig>&,
@@ -87,8 +87,9 @@ public:
                                AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
-               Cluster*(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                        Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -269,6 +270,45 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
                             "key: #/name");
 }
 
+TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "original_dst",
+      "lb_type": "round_robin"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(
+      create(*loader), EnvoyException,
+      "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
+}
+
+TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "original_dst_lb",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(
+      create(*loader), EnvoyException,
+      "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string json = R"EOF(
   {
@@ -314,7 +354,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr,
             cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default, nullptr));
-  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
+  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
   factory_.tls_.shutdownThread();
 }
@@ -342,7 +382,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_)).WillOnce(Return(connection));
-  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1");
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
   factory_.tls_.shutdownThread();
 }
@@ -406,10 +446,10 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
 
   MockCdsApi* cds = new MockCdsApi();
-  MockCluster* cds_cluster = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cds_cluster(new NiceMock<MockCluster>());
   cds_cluster->info_->name_ = "cds_cluster";
-  MockCluster* cluster1 = new NiceMock<MockCluster>();
-  MockCluster* cluster2 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
   cluster2->info_->name_ = "fake_cluster2";
   cluster2->info_->lb_type_ = LoadBalancerType::RingHash;
 
@@ -440,11 +480,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cluster2->initialize_callback_();
 
   // This part tests CDS init.
-  MockCluster* cluster3 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster3(new NiceMock<MockCluster>());
   cluster3->info_->name_ = "cluster3";
-  MockCluster* cluster4 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster4(new NiceMock<MockCluster>());
   cluster4->info_->name_ = "cluster4";
-  MockCluster* cluster5 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster5(new NiceMock<MockCluster>());
   cluster5->info_->name_ = "cluster5";
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
@@ -472,6 +512,13 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cluster3->initialize_callback_();
 
   factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
 }
 
 TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
@@ -486,7 +533,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   )EOF",
                                         clustersJson({defaultStaticClusterJson("fake")}));
 
-  MockCluster* foo = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> foo(new NiceMock<MockCluster>());
   foo->info_->name_ = "foo";
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, false)).WillOnce(Return(foo));
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
@@ -498,7 +545,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
   // cluster in its load balancer.
-  MockCluster* cluster1 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "cluster1";
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
@@ -523,6 +570,9 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   foo->runCallbacks(foo->hosts_, {});
 
   factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(foo.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
@@ -540,7 +590,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  MockCluster* cluster1 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize());
@@ -556,7 +606,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   auto update_cluster = defaultStaticCluster("fake_cluster");
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
-  MockCluster* cluster2 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
   cluster2->hosts_ = {HostSharedPtr{new HostImpl(
       cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
@@ -587,12 +637,15 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_removed").value());
   EXPECT_EQ(0UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
 TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
-  MockCluster* cluster1 = new NiceMock<MockCluster>();
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
@@ -613,6 +666,8 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));
 
   factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
@@ -646,7 +701,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",
                                                               ResourcePriority::Default, nullptr));
-  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1", nullptr).connection_);
   EXPECT_EQ(2UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   // Set up for an initialize callback.
@@ -707,6 +762,39 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  factory_.tls_.shutdownThread();
+}
+
+TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "original_dst",
+      "lb_type": "original_dst_lb"
+    }]
+  }
+  )EOF"; // "
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  create(*loader);
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Test for no hosts returning the correct values before we have hosts.
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1",
+                                                              ResourcePriority::Default, nullptr));
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1", nullptr).connection_);
+  EXPECT_EQ(2UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   factory_.tls_.shutdownThread();
 }

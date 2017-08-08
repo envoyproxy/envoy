@@ -95,6 +95,16 @@ public:
    * Set the current load balancing weight of the host, in the range 1-100.
    */
   virtual void weight(uint32_t new_weight) PURE;
+
+  /**
+   * @return the current boolean value of host being in use.
+   */
+  virtual bool used() const PURE;
+
+  /**
+   * @param new_used supplies the new value of host being in use to be stored.
+   */
+  virtual void used(bool new_used) PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
@@ -352,7 +362,7 @@ public:
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
-typedef std::unique_ptr<Cluster> ClusterPtr;
+typedef std::shared_ptr<Cluster> ClusterSharedPtr;
 
 } // namespace Upstream
 } // namespace Envoy

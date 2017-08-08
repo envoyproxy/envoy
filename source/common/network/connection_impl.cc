@@ -56,13 +56,15 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
-                               Address::InstanceConstSharedPtr local_address)
+                               Address::InstanceConstSharedPtr local_address,
+                               bool using_original_dst)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
       write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
                     [this]() -> void { this->onLowWatermark(); },
                     [this]() -> void { this->onHighWatermark(); }),
-      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
+      using_original_dst_(using_original_dst) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -516,7 +518,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address)) {}
+                     getNullLocalAddress(*address), false) {}
 
 } // namespace Network
 } // namespace Envoy
