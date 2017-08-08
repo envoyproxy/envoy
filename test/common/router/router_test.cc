@@ -113,7 +113,8 @@ TEST_F(RouterTest, ClusterNotFound) {
 }
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
-  callbacks_.route_->route_entry_.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
+  ON_CALL(callbacks_.route_->route_entry_, priority())
+      .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, &router_));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))

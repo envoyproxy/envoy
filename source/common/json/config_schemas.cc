@@ -541,8 +541,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "properties" : {
           "pattern" : {"type" : "string"},
           "string" : {"type" : "string"},
-          "method" : {"type" : "string"},
-          "priority" : {"type" : "string"}
+          "method" : {"type" : "string"}
         },
         "required" : ["pattern", "name"],
         "additionalProperties" : false

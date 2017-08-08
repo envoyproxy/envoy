@@ -488,7 +488,6 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 
   pattern_ = std::regex{virtual_cluster.getString("pattern"), std::regex::optimize};
   name_ = virtual_cluster.getString("name");
-  priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
