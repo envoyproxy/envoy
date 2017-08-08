@@ -200,6 +200,8 @@ public:
   }
 
   Stats::GaugeSharedPtr gauge(const std::string& name) {
+    // When using the thread local store, only gauges() is thread safe. This also allows us
+    // to test if a gauge exists at all versus just defaulting to zero.
     return TestUtility::findGauge(*stat_store_, name);
   }
 
