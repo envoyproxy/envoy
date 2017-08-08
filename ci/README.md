@@ -71,3 +71,20 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
 * `check_format`&mdash; run `clang-format` 5.0 and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` 5.0 and `buildifier` on entire source tree.
+
+# Testing changes to the build image as a developer
+
+While all changes to the build image should eventually be upstreamed, it can be useful to
+test those changes locally before sending out a pull request.  To experiment
+with a local clone of the upstream build image you can make changes to files such as
+build_container.sh locally and then run:
+
+```bash
+cd ci/build_container
+TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
+cd ../..
+IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
+```
+
+The final call will run against your local copy of the build image.
+

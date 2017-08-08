@@ -92,9 +92,10 @@ public:
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
-  InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+  InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+               TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               const LocalInfo::LocalInfo& local_info, ThreadLocal::Instance& tls);
+               ThreadLocal::Instance& tls);
 
   ~InstanceImpl() override;
 
@@ -131,11 +132,12 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
 private:
   void flushStats();
-  void initialize(Options& options, ComponentFactory& component_factory);
+  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
   void initializeStatSinks();
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
@@ -167,7 +169,7 @@ private:
   Event::SignalEventPtr sig_hup_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  const LocalInfo::LocalInfo& local_info_;
+  LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;

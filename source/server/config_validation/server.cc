@@ -1,5 +1,6 @@
 #include "server/config_validation/server.h"
 
+#include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 
@@ -10,13 +11,14 @@
 namespace Envoy {
 namespace Server {
 
-bool validateConfig(Options& options, ComponentFactory& component_factory,
-                    const LocalInfo::LocalInfo& local_info) {
+bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                    ComponentFactory& component_factory) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   try {
-    ValidationInstance server(options, stats_store, access_log_lock, component_factory, local_info);
+    ValidationInstance server(options, local_address, stats_store, access_log_lock,
+                              component_factory);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -25,17 +27,18 @@ bool validateConfig(Options& options, ComponentFactory& component_factory,
   }
 }
 
-ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
+ValidationInstance::ValidationInstance(Options& options,
+                                       Network::Address::InstanceConstSharedPtr local_address,
+                                       Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
-                                       ComponentFactory& component_factory,
-                                       const LocalInfo::LocalInfo& local_info)
+                                       ComponentFactory& component_factory)
     : options_(options), stats_store_(store),
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
-      local_info_(local_info), access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
       listener_manager_(*this, *this, *this) {
   try {
-    initialize(options, component_factory);
+    initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
@@ -44,7 +47,9 @@ ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImp
   }
 }
 
-void ValidationInstance::initialize(Options& options, ComponentFactory& component_factory) {
+void ValidationInstance::initialize(Options& options,
+                                    Network::Address::InstanceConstSharedPtr local_address,
+                                    ComponentFactory& component_factory) {
   // See comments on InstanceImpl::initialize() for the overall flow here.
   //
   // For validation, we only do a subset of normal server initialization: everything that could fail
@@ -59,6 +64,10 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   if (!options.bootstrapPath().empty()) {
     MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
   }
+
+  local_info_.reset(
+      new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
+                                   options.serviceClusterName(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(*config_json);
   thread_local_.registerThread(*dispatcher_, true);

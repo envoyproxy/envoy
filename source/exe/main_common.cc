@@ -3,7 +3,6 @@
 
 #include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
-#include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
@@ -62,17 +61,14 @@ int main_common(OptionsImpl& options) {
 
   Event::Libevent::Global::initialize();
   Server::ProdComponentFactory component_factory;
-  LocalInfo::LocalInfoImpl local_info(
-      Network::Utility::getLocalAddress(options.localAddressIpVersion()), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
-
+  auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
   switch (options.mode()) {
   case Server::Mode::Serve:
     break;
   case Server::Mode::Validate:
     Thread::MutexBasicLockable log_lock;
     Logger::Registry::initialize(options.logLevel(), log_lock);
-    return Server::validateConfig(options, component_factory, local_info) ? 0 : 1;
+    return Server::validateConfig(options, local_address, component_factory) ? 0 : 1;
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
@@ -81,8 +77,8 @@ int main_common(OptionsImpl& options) {
   DefaultTestHooks default_test_hooks;
   ThreadLocal::InstanceImpl tls;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
-  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store, access_log_lock,
-                              component_factory, local_info, tls);
+  Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
+                              access_log_lock, component_factory, tls);
   server.run();
   ares_library_cleanup();
   return 0;
