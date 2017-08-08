@@ -80,16 +80,11 @@ headers <config_http_filters_router_headers>`. The following configurations are 
 Priority routing
 ----------------
 
-Envoy supports priority routing both at the :ref:`route <config_http_conn_man_route_table_route>`
-and the :ref:`virtual cluster <config_http_conn_man_route_table_vcluster>` level. The current
-priority implementation uses different :ref:`connection pool <arch_overview_conn_pool>` and
-:ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` settings for each priority
-level. This means that even for HTTP/2 requests, two physical connections will be used to an
-upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
+Envoy supports priority routing at the :ref:`route <config_http_conn_man_route_table_route>` level.
+The current priority implementation uses different :ref:`connection pool <arch_overview_conn_pool>`
+and :ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` settings for each
+priority level. This means that even for HTTP/2 requests, two physical connections will be used to
+an upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
 connection.
-
-Note that if a route matches a virtual cluster, the virtual cluster priority is used. This feature
-is useful for splitting circuit breaking limits between different traffic priorities such that low
-priority traffic does not starve higher priority traffic.
 
 The currently supported priorities are *default* and *high*.
