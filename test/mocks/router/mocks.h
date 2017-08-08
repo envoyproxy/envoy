@@ -114,10 +114,8 @@ class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
   const std::string& name() const override { return name_; }
-  Upstream::ResourcePriority priority() const override { return priority_; }
 
   std::string name_{"fake_virtual_cluster"};
-  Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -160,6 +158,7 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
 

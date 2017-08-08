@@ -10,6 +10,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -86,7 +87,7 @@ typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
  * connection using the defined load balancing proxy for the configured cluster. All data will
  * be proxied back and forth between the two connections.
  */
-class TcpProxy : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class TcpProxy : public Network::ReadFilter, protected Logger::Loggable<Logger::Id::filter> {
 public:
   TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~TcpProxy();
@@ -101,7 +102,7 @@ public:
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
 
-private:
+protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
@@ -132,6 +133,26 @@ private:
     TcpProxy& parent_;
     bool on_high_watermark_called_{false};
   };
+
+  // Callbacks for different error and success states during connection establishment
+  virtual const std::string& getUpstreamCluster() {
+    return config_->getRouteFromEntries(read_callbacks_->connection());
+  }
+
+  virtual void onInitFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  virtual void onConnectTimeoutError() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  virtual void onConnectionFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+
+  virtual void onConnectionSuccess() {}
+  virtual void onUpstreamHostReady() {}
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();

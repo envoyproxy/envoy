@@ -242,6 +242,7 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -428,6 +429,13 @@ public:
   MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterSharedPtr filter));
   MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstanceSharedPtr handler));
 };
+
+class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {
+public:
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
+};
+
 } // namespace Http
 
 namespace Http {

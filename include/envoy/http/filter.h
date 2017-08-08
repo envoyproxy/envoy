@@ -214,6 +214,12 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * This routine can be called by a filter to subscribe to watermark events on the downstream
+   * stream and downstream connection.
+   */
+  virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**

@@ -130,11 +130,6 @@ public:
    * @return the name of the virtual cluster.
    */
   virtual const std::string& name() const PURE;
-
-  /**
-   * @return the priority of the virtual cluster.
-   */
-  virtual Upstream::ResourcePriority priority() const PURE;
 };
 
 class RateLimitPolicy;
@@ -242,6 +237,11 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return bool true if this route should use WebSockets.
+   */
+  virtual bool useWebSocket() const PURE;
 
   /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated

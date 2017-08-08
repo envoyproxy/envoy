@@ -541,8 +541,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "properties" : {
           "pattern" : {"type" : "string"},
           "string" : {"type" : "string"},
-          "method" : {"type" : "string"},
-          "priority" : {"type" : "string"}
+          "method" : {"type" : "string"}
         },
         "required" : ["pattern", "name"],
         "additionalProperties" : false
@@ -622,6 +621,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "prefix_rewrite" : {"type" : "string"},
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
+      "use_websocket" : {"type" : "boolean"},
       "case_sensitive" : {"type" : "boolean"},
       "timeout_ms" : {"type" : "integer"},
       "runtime" : {
