@@ -593,10 +593,6 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
-
-  conn_manager_.reset();
-  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
-  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
@@ -609,10 +605,6 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
-
-  conn_manager_.reset();
-  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
-  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
@@ -656,10 +648,6 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
-
-  conn_manager_.reset();
-  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
-  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
