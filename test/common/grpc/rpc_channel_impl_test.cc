@@ -70,6 +70,7 @@ TEST_F(GrpcRequestImplTest, NoError) {
                                                    {":path", "/helloworld.Greeter/SayHello"},
                                                    {":authority", "fake_cluster"},
                                                    {"content-type", "application/grpc"},
+                                                   {"te", "trailers"},
                                                    {"foo", "bar"}};
 
   EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(&expected_request_headers));

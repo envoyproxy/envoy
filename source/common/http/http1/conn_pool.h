@@ -57,6 +57,8 @@ protected:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ActiveClient& parent_;
     bool encode_complete_{};
@@ -112,7 +114,7 @@ protected:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   void checkForDrained();
   void createNewConnection();
-  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent events);
+  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);

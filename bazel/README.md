@@ -48,7 +48,7 @@ and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used
 Bazel can also be built with the Docker image used for CI, by installing Docker and executing:
 
 ```
-./ci/run_envoy_docker.sh ./ci/do_ci.sh bazel.fastbuild
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 See also the [documentation](https://github.com/lyft/envoy/tree/master/ci) for developer use of the
@@ -195,7 +195,6 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 bazel build -c opt //source/exe:envoy-static
 ```
 
-
 ## Sanitizers
 
 To build and run tests with the gcc compiler's [address sanitizer
@@ -229,6 +228,11 @@ remove log statements of lower importance during compilation to enhance performa
 ```
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
+
+## Hot Restart
+
+Hot restart can be disabled in any build by specifying `--define=hot_restart=disabled`
+on the Bazel command line.
 
 
 # Release builds

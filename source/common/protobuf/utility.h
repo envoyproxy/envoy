@@ -50,6 +50,8 @@ public:
   static std::size_t hash(const Protobuf::Message& message) {
     return std::hash<std::string>{}(message.SerializeAsString());
   }
+
+  static void loadFromFile(const std::string& path, Protobuf::Message& message);
 };
 
 } // namespace Envoy

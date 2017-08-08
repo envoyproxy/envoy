@@ -12,27 +12,29 @@ ValidationClusterManagerFactory::ValidationClusterManagerFactory(
                                 primary_dispatcher, local_info) {}
 
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromJson(
-    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
-  return ClusterManagerPtr{new ValidationClusterManager(config, *this, stats, tls, runtime, random,
-                                                        local_info, log_manager)};
+  return ClusterManagerPtr{new ValidationClusterManager(config, bootstrap, *this, stats, tls,
+                                                        runtime, random, local_info, log_manager)};
 }
 
-CdsApiPtr ValidationClusterManagerFactory::createCds(const Json::Object& config,
+CdsApiPtr ValidationClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
                                                      const Optional<SdsConfig>& sds_config,
                                                      ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(config, sds_config, cm);
+  ProdClusterManagerFactory::createCds(cds_config, sds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }
 
 ValidationClusterManager::ValidationClusterManager(
-    const Json::Object& config, ClusterManagerFactory& factory, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
+    ClusterManagerFactory& factory, Stats::Store& stats, ThreadLocal::Instance& tls,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager)
-    : ClusterManagerImpl(config, factory, stats, tls, runtime, random, local_info, log_manager) {}
+    : ClusterManagerImpl(config, bootstrap, factory, stats, tls, runtime, random, local_info,
+                         log_manager) {}
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,

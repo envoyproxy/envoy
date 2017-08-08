@@ -39,12 +39,14 @@ namespace Server {
 class MockOptions : public Options {
 public:
   MockOptions() : MockOptions(std::string()) {}
-  MockOptions(const std::string& path);
+  MockOptions(const std::string& config_path) : MockOptions(config_path, std::string()) {}
+  MockOptions(const std::string& config_path, const std::string& boostrap_path);
   ~MockOptions();
 
   MOCK_METHOD0(baseId, uint64_t());
   MOCK_METHOD0(concurrency, uint32_t());
   MOCK_METHOD0(configPath, const std::string&());
+  MOCK_METHOD0(bootstrapPath, const std::string&());
   MOCK_METHOD0(adminAddressPath, const std::string&());
   MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
@@ -53,9 +55,16 @@ public:
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(mode, Mode());
+  MOCK_METHOD0(serviceClusterName, const std::string&());
+  MOCK_METHOD0(serviceNodeName, const std::string&());
+  MOCK_METHOD0(serviceZone, const std::string&());
 
   std::string config_path_;
+  std::string bootstrap_path_;
   std::string admin_address_path_;
+  std::string service_cluster_name_;
+  std::string service_node_name_;
+  std::string service_zone_name_;
 };
 
 class MockAdmin : public Admin {

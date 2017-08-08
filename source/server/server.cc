@@ -16,8 +16,10 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -27,13 +29,15 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
+#include "api/bootstrap.pb.h"
+
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
-                           Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           const LocalInfo::LocalInfo& local_info, ThreadLocal::Instance& tls)
+InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                           TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           ComponentFactory& component_factory, ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_),
       stats_store_(store), server_stats_{ALL_SERVER_STATS(
@@ -42,7 +46,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
       dispatcher_(api_->allocateDispatcher()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
-      dns_resolver_(dispatcher_->createDnsResolver({})), local_info_(local_info),
+      dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
   failHealthcheck(false);
@@ -57,10 +61,13 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   drain_manager_ = component_factory.createDrainManager(*this);
 
   try {
-    initialize(options, component_factory);
+    initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
+              options.configPath() +
+                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
               e.what());
+    thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
     exit(1);
   }
@@ -135,12 +142,24 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_.live_.value() == 0; }
 
-void InstanceImpl::initialize(Options& options, ComponentFactory& component_factory) {
+void InstanceImpl::initialize(Options& options,
+                              Network::Address::InstanceConstSharedPtr local_address,
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(warn, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  envoy::api::v2::Bootstrap bootstrap;
+  if (!options.bootstrapPath().empty()) {
+    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  }
+  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+
+  local_info_.reset(
+      new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
+                                   options.serviceClusterName(), options.serviceNodeName()));
+
   Configuration::InitialImpl initial_config(*config_json);
   ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
 
@@ -184,7 +203,7 @@ void InstanceImpl::initialize(Options& options, ComponentFactory& component_fact
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
+  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
 
   // Setup signals.
   sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
@@ -263,7 +282,7 @@ void InstanceImpl::initializeStatSinks() {
   if (config_->statsdTcpClusterName().valid()) {
     ENVOY_LOG(info, "statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(
-        new Stats::Statsd::TcpStatsdSink(local_info_, config_->statsdTcpClusterName().value(),
+        new Stats::Statsd::TcpStatsdSink(*local_info_, config_->statsdTcpClusterName().value(),
                                          thread_local_, config_->clusterManager(), stats_store_));
     stats_store_.addSink(*stat_sinks_.back());
   }

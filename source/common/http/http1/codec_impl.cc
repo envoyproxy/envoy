@@ -363,8 +363,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
-                                           ServerConnectionCallbacks& callbacks)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks) {}
+                                           ServerConnectionCallbacks& callbacks,
+                                           Http1Settings settings)
+    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -376,16 +377,88 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
+void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
+  HeaderString path(Headers::get().Path);
+
+  bool is_connect = (method == HTTP_CONNECT);
+
+  // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
+  if (active_request_->request_url_.c_str()[0] == '/' ||
+      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  // If absolute_urls and/or connect are not going be handled, copy the url and return.
+  // This forces the behavior to be backwards compatible with the old codec behavior.
+  if (!codec_settings_.allow_absolute_url_) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  if (is_connect) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  int result = http_parser_parse_url(active_request_->request_url_.buffer(),
+                                     active_request_->request_url_.size(), is_connect, &u);
+
+  if (result != 0) {
+    sendProtocolError();
+    throw CodecProtocolException(
+        "http/1.1 protocol error: invalid url in request line, parsed invalid");
+  } else {
+    if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
+      // RFC7230#5.7
+      // When a proxy receives a request with an absolute-form of
+      // request-target, the proxy MUST ignore the received Host header field
+      // (if any) and instead replace it with the host information of the
+      // request-target.  A proxy that forwards such a request MUST generate a
+      // new Host field-value based on the received request-target rather than
+      // forward the received Host field-value.
+
+      // Insert the host header, this will later be converted to :authority
+      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
+                           u.field_data[UF_HOST].len);
+
+      headers.insertHost().value(new_host);
+
+      // RFC allows the absolute-uri to not end in /, but the absolute path form
+      // must start with /
+      if ((u.field_set & UF_PATH) == UF_PATH && u.field_data[UF_PATH].len > 0) {
+        HeaderString new_path;
+        new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
+                         active_request_->request_url_.size() - u.field_data[UF_PATH].off);
+        headers.addViaMove(std::move(path), std::move(new_path));
+      } else {
+        HeaderString new_path;
+        new_path.setCopy("/", 1);
+        headers.addViaMove(std::move(path), std::move(new_path));
+      }
+
+      active_request_->request_url_.clear();
+      return;
+    }
+    sendProtocolError();
+    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
+  }
+}
+
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    HeaderString path(Headers::get().Path);
-    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
+    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+
+    // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
+    // CONNECT
+    handlePath(*headers, parser_.method);
     ASSERT(active_request_->request_url_.empty());
 
-    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
     headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since higher layers are never going to do anything other

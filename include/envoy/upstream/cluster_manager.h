@@ -16,6 +16,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
+#include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
 
 namespace Envoy {
@@ -148,13 +149,14 @@ public:
 
   /**
    * Allocate a cluster manager from configuration JSON.
+   * TODO(htuch): Once bootstrap is sufficiently capable, switch to a translation from the JSON v1
+   * cluster manager config -> v2 proto and drop the config parameter.
    */
-  virtual ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
-                                                   ThreadLocal::Instance& tls,
-                                                   Runtime::Loader& runtime,
-                                                   Runtime::RandomGenerator& random,
-                                                   const LocalInfo::LocalInfo& local_info,
-                                                   AccessLog::AccessLogManager& log_manager) PURE;
+  virtual ClusterManagerPtr
+  clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
+                         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager) PURE;
 
   /**
    * Allocate an HTTP connection pool.
@@ -171,10 +173,10 @@ public:
                                       bool added_via_api) PURE;
 
   /**
-   * Create a CDS API provider from configuration JSON.
+   * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const Json::Object& config, const Optional<SdsConfig>& sds_config,
-                              ClusterManager& cm) PURE;
+  virtual CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
+                              const Optional<SdsConfig>& sds_config, ClusterManager& cm) PURE;
 };
 
 } // namespace Upstream

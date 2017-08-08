@@ -140,6 +140,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
   message->headers().insertHost().value(upstream_cluster);
   message->headers().insertContentType().value().setReference(Common::GRPC_CONTENT_TYPE);
+  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
   return message;
 }

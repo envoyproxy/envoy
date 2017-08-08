@@ -6,7 +6,9 @@ HTTP routing
 Envoy includes an HTTP :ref:`router filter <config_http_filters_router>` which can be installed to
 perform advanced routing tasks. This is useful both for handling edge traffic (traditional reverse
 proxy request handling) as well as for building a service to service Envoy mesh (typically via
-routing on the host/authority HTTP header to reach a particular upstream service cluster). At a high
+routing on the host/authority HTTP header to reach a particular upstream service cluster). Envoy
+also has the ability to be configured as forward proxy. In the forward proxy configuration, mesh
+clients can participate by appropriately configuring their http proxy to be an Envoy. At a high
 level the router takes an incoming HTTP request, matches it to an upstream cluster, acquires a
 :ref:`connection pool <arch_overview_conn_pool>` to a host in the upstream cluster, and forwards the
 request. The router filter supports the following features:
@@ -43,6 +45,7 @@ request. The router filter supports the following features:
   clusters can use regex matching.
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
 * :ref:`Hash policy <config_http_conn_man_route_table_hash_policy>` based routing.
+* :ref:`Absolute urls <config_http_conn_man_http1_settings>` are supported for non-tls forward proxies.
 
 Route table
 -----------

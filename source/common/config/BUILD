@@ -49,8 +49,8 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

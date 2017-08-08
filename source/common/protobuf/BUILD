@@ -22,5 +22,6 @@ envoy_cc_library(
     deps = [
         ":protobuf",
         "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
     ],
 )

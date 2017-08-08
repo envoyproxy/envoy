@@ -68,19 +68,20 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Convert LocalInfo::LocalInfo to v2 envoy::api::v2::Node identifier.
-   * @param local_info source LocalInfo::LocalInfo.
-   * @param node destination envoy::api::Node.
-   */
-  static void localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node);
-
-  /**
    * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
    * @param sds_config source v1 SdsConfig.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
    */
   static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
                                    envoy::api::v2::ConfigSource& eds_config);
+
+  /**
+   * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.
+   * @param json_config source v1 CDS JSON config.
+   * @param cds_config destination v2 CDS envoy::api::v2::ConfigSource.
+   */
+  static void translateCdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& cds_config);
 
   /**
    * Generate a SubscriptionStats object from stats scope.

@@ -151,8 +151,7 @@ public:
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
-                                        public Http::StreamCallbacks,
-                                        public Network::ConnectionCallbacks {
+                                        public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, HostSharedPtr host);
     ~HttpActiveHealthCheckSession();
 
@@ -174,12 +173,24 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
-
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+    void onEvent(Network::ConnectionEvent event);
+
+    class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
+    public:
+      ConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Network::ConnectionCallbacks
+      void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
+      void onAboveWriteBufferHighWatermark() override {}
+      void onBelowWriteBufferLowWatermark() override {}
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
+    ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::StreamEncoder* request_encoder_{};

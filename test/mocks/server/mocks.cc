@@ -15,10 +15,14 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-MockOptions::MockOptions(const std::string& config_path)
-    : config_path_(config_path), admin_address_path_("") {
+MockOptions::MockOptions(const std::string& config_path, const std::string& bootstrap_path)
+    : config_path_(config_path), bootstrap_path_(bootstrap_path), admin_address_path_("") {
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, bootstrapPath()).WillByDefault(ReturnRef(bootstrap_path_));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
+  ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
+  ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
+  ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
 }
 MockOptions::~MockOptions() {}
 

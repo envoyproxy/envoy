@@ -40,14 +40,6 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   }
 }
 
-void Utility::localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node) {
-  checkLocalInfo("envoy::api::v2::Node", local_info);
-  node.set_id(local_info.nodeName());
-  node.mutable_locality()->set_zone(local_info.zoneName());
-  (*node.mutable_metadata()->mutable_fields())["cluster"].set_string_value(
-      local_info.clusterName());
-}
-
 std::chrono::milliseconds
 Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source) {
   return std::chrono::milliseconds(
@@ -61,6 +53,16 @@ void Utility::sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
   api_config_source->add_cluster_name(sds_config.sds_cluster_name_);
   api_config_source->mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(sds_config.refresh_delay_.count()));
+}
+
+void Utility::translateCdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& cds_config) {
+  auto* api_config_source = cds_config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  api_config_source->add_cluster_name(json_config.getObject("cluster")->getString("name"));
+  api_config_source->mutable_refresh_delay()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(
+          json_config.getInteger("refresh_delay_ms", 30000)));
 }
 
 } // namespace Config
