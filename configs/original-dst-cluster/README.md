@@ -29,7 +29,7 @@ Build Envoy with debug options, so that the behavior can be better
 observed from the logs:
 
 ```
-bazel build --verbose_failures //source/exe:envoy-static -c dbg
+bazel build //source/exe:envoy-static -c dbg
 ```
 
 Then you should run Envoy with the provided example configuration:
