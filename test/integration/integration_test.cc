@@ -182,6 +182,7 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
       [&]() -> void { fake_upstream_connection->waitForData(234); },
       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
   });
+  fake_upstream_connection->close();
   EXPECT_EQ(0, test_server_->gauge("http.router.downstream_cx_websocket_active")->value());
 }
 
