@@ -72,7 +72,7 @@ public:
    * @param Address::Ip* to be copied to the new instance.
    * @return pointer to the Instance.
    */
-  static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip* ip);
+  static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip& ip);
 
   /**
    * Create a new Intance from an internet host address (IPv4 or IPv6) and port.
