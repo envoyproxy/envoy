@@ -23,6 +23,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 
 #include "spdlog/spdlog.h"
@@ -334,7 +335,7 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
 }
 
 void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api) {
-  ClusterPtr new_cluster =
+  ClusterSharedPtr new_cluster =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
   init_helper_.addCluster(*new_cluster);
@@ -413,7 +414,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
   });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
+                                                                 LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -421,7 +423,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
     throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 
-  HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(nullptr);
+  HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
     return logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
   } else {
@@ -565,6 +567,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                                        parent.parent_.random_));
     break;
   }
+  case LoadBalancerType::OriginalDst: {
+    lb_.reset(new OriginalDstCluster::LoadBalancer(
+        host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
+    break;
+  }
   }
 
   host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
@@ -626,7 +633,7 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostC
   }
 }
 
-ClusterPtr ProdClusterManagerFactory::clusterFromProto(
+ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,

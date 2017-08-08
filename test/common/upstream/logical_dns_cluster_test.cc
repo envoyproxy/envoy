@@ -56,7 +56,7 @@ public:
   Network::DnsResolver::ResolveCb dns_callback_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
-  std::unique_ptr<LogicalDnsCluster> cluster_;
+  std::shared_ptr<LogicalDnsCluster> cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;

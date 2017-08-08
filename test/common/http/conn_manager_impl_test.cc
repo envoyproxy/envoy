@@ -637,7 +637,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   setup(false, "");
 
   Upstream::MockHost::MockCreateConnectionData conn_info;
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_, _)).WillOnce(Return(conn_info));
 
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
@@ -662,7 +662,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
   conn_info.host_description_.reset(
       new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
                              Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
       .WillByDefault(Return(true));

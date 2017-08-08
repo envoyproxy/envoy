@@ -204,7 +204,8 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
-  Upstream::Host::CreateConnectionData conn_info = cluster_manager_.tcpConnForCluster(cluster_name);
+  Upstream::Host::CreateConnectionData conn_info =
+      cluster_manager_.tcpConnForCluster(cluster_name, this);
 
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);

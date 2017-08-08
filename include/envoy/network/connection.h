@@ -183,6 +183,12 @@ public:
    * Get the value set with setBufferLimits.
    */
   virtual uint32_t bufferLimit() const PURE;
+
+  /**
+   * @return boolean telling if the connection's local address is an original destination address,
+   * rather than the listener's address.
+   */
+  virtual bool usingOriginalDst() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

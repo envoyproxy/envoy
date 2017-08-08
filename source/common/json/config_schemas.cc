@@ -1330,7 +1330,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "type" : {
         "type" : "string",
-        "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+        "enum" : ["static", "strict_dns", "logical_dns", "sds", "original_dst"]
       },
       "connect_timeout_ms" : {
         "type" : "integer",
@@ -1344,7 +1344,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "lb_type" : {
         "type" : "string",
-        "enum" : ["round_robin", "least_request", "random", "ring_hash"]
+        "enum" : ["round_robin", "least_request", "random", "ring_hash", "original_dst_lb"]
       },
       "hosts" : {
         "type" : "array",
@@ -1422,6 +1422,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "dns_lookup_family" : {
         "type" : "string",
         "enum" : ["v4_only", "v6_only", "auto"]
+      },
+      "cleanup_interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       },
       "outlier_detection" : {
         "type" : "object",

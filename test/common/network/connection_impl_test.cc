@@ -68,7 +68,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
   EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
                               Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                              Network::Test::getCanonicalLoopbackAddress(GetParam())),
+                              Network::Test::getCanonicalLoopbackAddress(GetParam()), false),
                ".*assert failure: fd_ != -1.*");
 }
 
