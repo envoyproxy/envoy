@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/runtime/runtime.h"
 
+#include "gmock/gmock.h"
+
+namespace Envoy {
 namespace Runtime {
 
 class MockRandomGenerator : public RandomGenerator {
@@ -34,4 +40,5 @@ public:
   testing::NiceMock<MockSnapshot> snapshot_;
 };
 
-} // Runtime
+} // namespace Runtime
+} // namespace Envoy

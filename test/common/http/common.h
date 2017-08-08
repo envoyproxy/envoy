@@ -1,13 +1,16 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/http/conn_pool.h"
 
 #include "common/http/codec_client.h"
 
 #include "test/mocks/common.h"
 
+namespace Envoy {
 /**
- * A fake CodecClient that 1) allows a mock codec to be passed in and 2) Allows or a destroy
+ * A fake CodecClient that 1) allows a mock codec to be passed in and 2) Allows for a destroy
  * callback.
  */
 class CodecClientForTest : public Http::CodecClient {
@@ -15,8 +18,8 @@ public:
   typedef std::function<void(CodecClient*)> DestroyCb;
 
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, const Http::CodecClientStats& stats)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), stats),
+                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
+      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
@@ -36,14 +39,15 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionPtr host) override {
+  void onPoolReady(Http::StreamEncoder& encoder,
+                   Upstream::HostDescriptionConstSharedPtr host) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
   }
 
   void onPoolFailure(Http::ConnectionPool::PoolFailureReason,
-                     Upstream::HostDescriptionPtr host) override {
+                     Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     pool_failure_.ready();
   }
@@ -51,7 +55,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
   Http::StreamEncoder* outer_encoder_{};
-  Upstream::HostDescriptionPtr host_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 };
 
 /**
@@ -61,3 +65,4 @@ class HttpTestUtility {
 public:
   static void addDefaultHeaders(Http::HeaderMap& headers);
 };
+} // namespace Envoy

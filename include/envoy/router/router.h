@@ -1,10 +1,19 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/resource_manager.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -28,13 +37,21 @@ public:
 class RetryPolicy {
 public:
   // clang-format off
-  static const uint32_t RETRY_ON_5XX             = 0x1;
-  static const uint32_t RETRY_ON_CONNECT_FAILURE = 0x2;
-  static const uint32_t RETRY_ON_RETRIABLE_4XX   = 0x4;
-  static const uint32_t RETRY_ON_REFUSED_STREAM  = 0x8;
+  static const uint32_t RETRY_ON_5XX                     = 0x1;
+  static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x2;
+  static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x4;
+  static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x8;
+  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x10;
+  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x20;
+  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x40;
   // clang-format on
 
   virtual ~RetryPolicy() {}
+
+  /**
+   * @return std::chrono::milliseconds timeout per retry attempt.
+   */
+  virtual std::chrono::milliseconds perTryTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.
@@ -80,24 +97,6 @@ public:
 typedef std::unique_ptr<RetryState> RetryStatePtr;
 
 /**
- * Per route policy for rate limiting.
- */
-class RateLimitPolicy {
-public:
-  virtual ~RateLimitPolicy() {}
-
-  /**
-   * @return whether the global rate limiting service should be called for the owning route.
-   */
-  virtual bool doGlobalLimiting() const PURE;
-
-  /**
-   * @return the route key, if it exists.
-   */
-  virtual const std::string& routeKey() const PURE;
-};
-
-/**
  * Per route policy for request shadowing.
  */
 class ShadowPolicy {
@@ -138,6 +137,43 @@ public:
   virtual Upstream::ResourcePriority priority() const PURE;
 };
 
+class RateLimitPolicy;
+
+/**
+ * Virtual host defintion.
+ */
+class VirtualHost {
+public:
+  virtual ~VirtualHost() {}
+
+  /**
+   * @return const std::string& the name of the virtual host.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
+   * @return const RateLimitPolicy& the rate limit policy for the virtual host.
+   */
+  virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+};
+
+/**
+ * Route hash policy. I.e., if using a hashing load balancer, how the route should be hashed onto
+ * an upstream host.
+ */
+class HashPolicy {
+public:
+  virtual ~HashPolicy() {}
+
+  /**
+   * @return Optional<uint64_t> an optional hash value to route on given a set of HTTP headers.
+   *         A hash value might not be returned if for example the specified HTTP header does not
+   *         exist. In the future we might add additional support for hashing on origin address,
+   *         etc.
+   */
+  virtual Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const PURE;
+};
+
 /**
  * An individual resolved route entry.
  */
@@ -157,6 +193,11 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
+   * @return const HashPolicy* the optional hash policy for the route.
+   */
+  virtual const HashPolicy* hashPolicy() const PURE;
 
   /**
    * @return the priority of the route.
@@ -193,10 +234,51 @@ public:
   virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 
   /**
-   * @return const std::string& the virtual host that owns the route.
+   * @return const VirtualHost& the virtual host that owns the route.
    */
-  virtual const std::string& virtualHostName() const PURE;
+  virtual const VirtualHost& virtualHost() const PURE;
+
+  /**
+   * @return bool true if the :authority header should be overwritten with the upstream hostname.
+   */
+  virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return bool true if this route should use WebSockets.
+   */
+  virtual bool useWebSocket() const PURE;
+
+  /**
+   * @return const std::multimap<std::string, std::string> the opaque configuration associated
+   *         with the route
+   */
+  virtual const std::multimap<std::string, std::string>& opaqueConfig() const PURE;
+
+  /**
+   * @return bool true if the virtual host rate limits should be included.
+   */
+  virtual bool includeVirtualHostRateLimits() const PURE;
 };
+
+/**
+ * An interface that holds a RedirectEntry or a RouteEntry for a request.
+ */
+class Route {
+public:
+  virtual ~Route() {}
+
+  /**
+   * @return the redirect entry or nullptr if there is no redirect needed for the request.
+   */
+  virtual const RedirectEntry* redirectEntry() const PURE;
+
+  /**
+   * @return the route entry or nullptr if there is no matching route for the request.
+   */
+  virtual const RouteEntry* routeEntry() const PURE;
+};
+
+typedef std::shared_ptr<const Route> RouteConstSharedPtr;
 
 /**
  * The router configuration.
@@ -206,25 +288,15 @@ public:
   virtual ~Config() {}
 
   /**
-   * Based on the incoming HTTP request headers, determine whether a redirect should take place.
-   * @param headers supplies the request headers.
-   * @param random_value supplies the random seed to use if a runtime choice is required. This
-   *        allows stable choices between calls if desired.
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
-   */
-  virtual const RedirectEntry* redirectRequest(const Http::HeaderMap& headers,
-                                               uint64_t random_value) const PURE;
-
-  /**
-   * Based on the incoming HTTP request headers, choose the target route to send the remainder
-   * of the request to.
+   * Based on the incoming HTTP request headers, determine the target route (containing either a
+   * route entry or a redirect entry) for the request.
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual const RouteEntry* routeForRequest(const Http::HeaderMap& headers,
-                                            uint64_t random_value) const PURE;
+  virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                                    uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal
@@ -244,32 +316,16 @@ public:
    * router.
    */
   virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
-};
-
-typedef std::unique_ptr<Config> ConfigPtr;
-
-/**
- * An interface into the config that removes the random value parameters. An implementation is
- * expected to pass the same random_value for all wrapped calls.
- */
-class StableRouteTable {
-public:
-  virtual ~StableRouteTable() {}
 
   /**
-   * Based on the incoming HTTP request headers, determine whether a redirect should take place.
-   * @param headers supplies the request headers.
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
+   * Return whether the configuration makes use of runtime or not. Callers can use this to
+   * determine whether they should use a fast or slow source of randomness when calling route
+   * functions.
    */
-  virtual const RedirectEntry* redirectRequest(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * Based on the incoming HTTP request headers, choose the target route to send the remainder
-   * of the request to.
-   * @param headers supplies the request headers.
-   * @return the route or nullptr if there is no matching route for the request.
-   */
-  virtual const RouteEntry* routeForRequest(const Http::HeaderMap& headers) const PURE;
+  virtual bool usesRuntime() const PURE;
 };
 
-} // Router
+typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
+
+} // namespace Router
+} // namespace Envoy

@@ -1,5 +1,11 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
+
+#include "test/test_common/printers.h"
+
+namespace Envoy {
 namespace Http {
 /**
  * Pretty print const HeaderMapImpl&
@@ -14,7 +20,7 @@ class HeaderMap;
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 void PrintTo(const HeaderMap& headers, std::ostream* os);
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os);
-}
+} // namespace Http
 
 namespace Buffer {
 /**
@@ -28,4 +34,15 @@ void PrintTo(const Instance& buffer, std::ostream* os);
  */
 class OwnedImpl;
 void PrintTo(const OwnedImpl& buffer, std::ostream* os);
-}
+} // namespace Buffer
+
+namespace Redis {
+/**
+ * Pretty print const RespValue& value
+ */
+class RespValue;
+typedef std::unique_ptr<RespValue> RespValuePtr;
+void PrintTo(const RespValue& value, std::ostream* os);
+void PrintTo(const RespValuePtr& value, std::ostream* os);
+} // namespace Redis
+} // namespace Envoy

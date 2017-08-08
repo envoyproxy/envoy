@@ -1,8 +1,13 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/outlier_detection.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -14,6 +19,7 @@ namespace Upstream {
   GAUGE  (cx_active)                                                                               \
   COUNTER(cx_connect_fail)                                                                         \
   COUNTER(rq_total)                                                                                \
+  COUNTER(rq_timeout)                                                                              \
   GAUGE  (rq_active)
 // clang-format on
 
@@ -24,7 +30,7 @@ struct HostStats {
   ALL_HOST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class Cluster;
+class ClusterInfo;
 
 /**
  * A description of an upstream host.
@@ -41,17 +47,23 @@ public:
   /**
    * @return the cluster the host is a member of.
    */
-  virtual const Cluster& cluster() const PURE;
+  virtual const ClusterInfo& cluster() const PURE;
 
   /**
    * @return the host's outlier detection sink.
    */
-  virtual OutlierDetectorHostSink& outlierDetector() const PURE;
+  virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
 
   /**
-   * @return the URL used to connect to the host.
+   * @return the hostname associated with the host if any.
+   * Empty string "" indicates that hostname is not a DNS name.
    */
-  virtual const std::string& url() const PURE;
+  virtual const std::string& hostname() const PURE;
+
+  /**
+   * @return the address used to connect to the host.
+   */
+  virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
    * @return host specific stats.
@@ -64,6 +76,7 @@ public:
   virtual const std::string& zone() const PURE;
 };
 
-typedef std::shared_ptr<const HostDescription> HostDescriptionPtr;
+typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 } // Upstream
+} // namespace Envoy

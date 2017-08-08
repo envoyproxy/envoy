@@ -1,24 +1,35 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/buffer_impl.h"
+
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
 /**
  * This is a simple UDP localhost writer for statsd messages.
  */
-class Writer {
+class Writer : public ThreadLocal::ThreadLocalObject {
 public:
-  Writer(uint32_t port);
+  Writer(Network::Address::InstanceConstSharedPtr address);
   ~Writer();
 
   void writeCounter(const std::string& name, uint64_t increment);
   void writeGauge(const std::string& name, uint64_t value);
   void writeTimer(const std::string& name, const std::chrono::milliseconds& ms);
+
+  // Called in unit test to validate address.
+  int getFdForTests() const { return fd_; };
 
 private:
   void send(const std::string& message);
@@ -27,28 +38,28 @@ private:
 };
 
 /**
- * Implementation of Sink that writes to a local UDP statsd port.
+ * Implementation of Sink that writes to a UDP statsd address.
  */
 class UdpStatsdSink : public Sink {
 public:
-  UdpStatsdSink(uint32_t port) : port_(port) {}
+  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address);
 
   // Stats::Sink
+  void beginFlush() override {}
   void flushCounter(const std::string& name, uint64_t delta) override;
   void flushGauge(const std::string& name, uint64_t value) override;
+  void endFlush() override {}
   void onHistogramComplete(const std::string& name, uint64_t value) override {
     // For statsd histograms are just timers.
     onTimespanComplete(name, std::chrono::milliseconds(value));
   }
   void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) override;
+  // Called in unit test to validate writer construction and address.
+  int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
 
 private:
-  Writer& writer() {
-    static thread_local Statsd::Writer writer_(port_);
-    return writer_;
-  }
-
-  uint32_t port_;
+  ThreadLocal::SlotPtr tls_;
+  Network::Address::InstanceConstSharedPtr server_address_;
 };
 
 /**
@@ -56,18 +67,22 @@ private:
  */
 class TcpStatsdSink : public Sink {
 public:
-  TcpStatsdSink(const std::string& stat_cluster, const std::string& stat_host,
-                const std::string& cluster_name, ThreadLocal::Instance& tls,
-                Upstream::ClusterManager& cluster_manager);
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope);
 
   // Stats::Sink
+  void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
+
   void flushCounter(const std::string& name, uint64_t delta) override {
-    tls_.getTyped<TlsSink>(tls_slot_).flushCounter(name, delta);
+    tls_->getTyped<TlsSink>().flushCounter(name, delta);
   }
 
   void flushGauge(const std::string& name, uint64_t value) override {
-    tls_.getTyped<TlsSink>(tls_slot_).flushGauge(name, value);
+    tls_->getTyped<TlsSink>().flushGauge(name, value);
   }
+
+  void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 
   void onHistogramComplete(const std::string& name, uint64_t value) override {
     // For statsd histograms are just timers.
@@ -75,7 +90,7 @@ public:
   }
 
   void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) override {
-    tls_.getTyped<TlsSink>(tls_slot_).onTimespanComplete(name, ms);
+    tls_->getTyped<TlsSink>().onTimespanComplete(name, ms);
   }
 
 private:
@@ -83,31 +98,44 @@ private:
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink();
 
+    void beginFlush(bool expect_empty_buffer);
+    void checkSize();
+    void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
+    void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
-    void write(const std::string& stat);
-
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override;
+    uint64_t usedBuffer();
+    void write(Buffer::Instance& buffer);
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     TcpStatsdSink& parent_;
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
-    bool shutdown_{};
+    Buffer::OwnedImpl buffer_;
+    Buffer::RawSlice current_buffer_slice_;
+    char* current_slice_mem_{};
   };
 
-  std::string stat_cluster_;
-  std::string stat_host_;
-  std::string cluster_name_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  // Somewhat arbitrary 16MiB limit for buffered stats.
+  static constexpr uint32_t MAX_BUFFERED_STATS_BYTES = (1024 * 1024 * 16);
+
+  // 16KiB intermediate buffer for flushing.
+  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
+
+  // Prefix for all flushed stats.
+  static char STAT_PREFIX[];
+
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  ThreadLocal::SlotPtr tls_;
   Upstream::ClusterManager& cluster_manager_;
+  Stats::Counter& cx_overflow_stat_;
 };
 
-} // Statsd
-} // Stats
+} // namespace Statsd
+} // namespace Stats
+} // namespace Envoy

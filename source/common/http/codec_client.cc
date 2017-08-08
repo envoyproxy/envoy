@@ -1,4 +1,6 @@
-#include "codec_client.h"
+#include "common/http/codec_client.h"
+
+#include <cstdint>
 
 #include "common/common/enum_to_int.h"
 #include "common/http/exception.h"
@@ -6,16 +8,17 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 
+namespace Envoy {
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-                         const CodecClientStats& stats)
-    : type_(type), connection_(std::move(connection)), stats_(stats) {
+                         Upstream::HostDescriptionConstSharedPtr host)
+    : type_(type), connection_(std::move(connection)), host_(host) {
 
   connection_->addConnectionCallbacks(*this);
-  connection_->addReadFilter(Network::ReadFilterPtr{new CodecReadFilter(*this)});
+  connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  conn_log_info("connecting", *connection_);
+  ENVOY_CONN_LOG(info, "connecting", *connection_);
   connection_->connect();
 
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -34,31 +37,34 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   }
 }
 
-Http::StreamEncoder& CodecClient::newStream(Http::StreamDecoder& response_decoder) {
-  ActiveRequestPtr request(new ActiveRequest(*this));
-  request->decoder_wrapper_.reset(new ResponseDecoderWrapper(response_decoder, *request));
-  request->encoder_ = &codec_->newStream(*request->decoder_wrapper_);
+StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
+  ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
+  request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   request->moveIntoList(std::move(request), active_requests_);
   return *active_requests_.front()->encoder_;
 }
 
-void CodecClient::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::Connected) {
-    conn_log_debug("connected", *connection_);
+void CodecClient::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
   }
 
+  if (event == Network::ConnectionEvent::RemoteClose) {
+    remote_closed_ = true;
+  }
+
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (type_ == Type::HTTP1 && (events & Network::ConnectionEvent::RemoteClose) &&
+  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
-    conn_log_debug("disconnect. resetting {} pending requests", *connection_,
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
@@ -70,7 +76,7 @@ void CodecClient::onEvent(uint32_t events) {
 }
 
 void CodecClient::responseDecodeComplete(ActiveRequest& request) {
-  conn_log_debug("response complete", *connection_);
+  ENVOY_CONN_LOG(debug, "response complete", *connection_);
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
@@ -79,8 +85,8 @@ void CodecClient::responseDecodeComplete(ActiveRequest& request) {
   request.encoder_->getStream().removeCallbacks(request);
 }
 
-void CodecClient::onReset(ActiveRequest& request, Http::StreamResetReason reason) {
-  conn_log_debug("request reset", *connection_);
+void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
+  ENVOY_CONN_LOG(debug, "request reset", *connection_);
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamReset(reason);
   }
@@ -93,39 +99,40 @@ void CodecClient::onData(Buffer::Instance& data) {
   try {
     codec_->dispatch(data);
   } catch (CodecProtocolException& e) {
-    conn_log_info("protocol error: {}", *connection_, e.what());
+    ENVOY_CONN_LOG(info, "protocol error: {}", *connection_, e.what());
     close();
     protocol_error = true;
   } catch (PrematureResponseException& e) {
-    conn_log_info("premature response", *connection_);
+    ENVOY_CONN_LOG(info, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!active_requests_.empty() ||
-        Utility::getResponseStatus(e.headers()) != enumToInt(Http::Code::RequestTimeout)) {
+        Utility::getResponseStatus(e.headers()) != enumToInt(Code::RequestTimeout)) {
       protocol_error = true;
     }
   }
 
   if (protocol_error) {
-    stats_.upstream_cx_protocol_error_.inc();
+    host_->cluster().stats().upstream_cx_protocol_error_.inc();
   }
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                                 const CodecClientStats& stats, Stats::Store& store,
-                                 uint64_t codec_options)
-    : CodecClient(type, std::move(connection), stats) {
+                                 Upstream::HostDescriptionConstSharedPtr host)
+    : CodecClient(type, std::move(connection), host) {
   switch (type) {
   case Type::HTTP1: {
-    codec_.reset(new Http::Http1::ClientConnectionImpl(*connection_, *this));
+    codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));
     break;
   }
   case Type::HTTP2: {
-    codec_.reset(new Http::Http2::ClientConnectionImpl(*connection_, *this, store, codec_options));
+    codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, host->cluster().statsScope(),
+                                                 host->cluster().http2Settings()));
     break;
   }
   }
 }
 
-} // Http
+} // namespace Http
+} // namespace Envoy

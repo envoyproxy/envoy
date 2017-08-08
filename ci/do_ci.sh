@@ -1,55 +1,124 @@
 #!/bin/bash
 
+# Run a CI build/test target, e.g. docs, asan.
+
 set -e
 
-export CC=gcc-4.9
-export CXX=g++-4.9
-NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
+. "$(dirname "$0")"/build_setup.sh
+echo "building using ${NUM_CPUS} CPUs"
 
-echo "building using $NUM_CPUS CPUs"
+function bazel_release_binary_build() {
+  echo "Building..."
+  cd "${ENVOY_CI_DIR}"
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp -f \
+    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_DELIVERY_DIR}"/envoy
+}
 
-if [[ "$1" == "docs" ]]; then
-  echo "docs build..."
-  make docs
+function bazel_debug_binary_build() {
+  echo "Building..."
+  cd "${ENVOY_CI_DIR}"
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp -f \
+    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_DELIVERY_DIR}"/envoy-debug
+}
+
+if [[ "$1" == "bazel.release" ]]; then
+  setup_gcc_toolchain
+  echo "bazel release build with tests..."
+  bazel_release_binary_build
+  echo "Testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   exit 0
-elif [[ "$1" == "coverage" ]]; then
-  echo "coverage build..."
-  EXTRA_CMAKE_FLAGS="-DENVOY_CODE_COVERAGE:BOOL=ON"
-  TEST_TARGET="envoy.check-coverage"
-elif [[ "$1" == "asan" ]]; then
-  echo "asan build..."
-  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON"
-  TEST_TARGET="envoy.check"
+elif [[ "$1" == "bazel.release.server_only" ]]; then
+  setup_gcc_toolchain
+  echo "bazel release build..."
+  bazel_release_binary_build
+  exit 0
+elif [[ "$1" == "bazel.debug" ]]; then
+  setup_gcc_toolchain
+  echo "bazel debug build with tests..."
+  bazel_debug_binary_build
+  echo "Testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
+  exit 0
+elif [[ "$1" == "bazel.debug.server_only" ]]; then
+  setup_gcc_toolchain
+  echo "bazel debug build..."
+  bazel_debug_binary_build
+  exit 0
+elif [[ "$1" == "bazel.asan" ]]; then
+  setup_clang_toolchain
+  echo "bazel ASAN/UBSAN debug build with tests..."
+  # Due to Travis CI limits, we build and run the single fat coverage test binary rather than
+  # build O(100) * O(200MB) static test binaries. This saves 20GB of disk space, see #1400.
+  cd "${ENVOY_BUILD_DIR}"
+  NO_GCOV=1 "${ENVOY_SRCDIR}"/test/coverage/gen_build.sh
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  echo "Building and testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/coverage:coverage_tests \
+    //:echo2_integration_test //:envoy_binary_test
+  exit 0
+elif [[ "$1" == "bazel.tsan" ]]; then
+  setup_clang_toolchain
+  echo "bazel TSAN debug build with tests..."
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  echo "Building and testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
+    //:echo2_integration_test //:envoy_binary_test
+  exit 0
+elif [[ "$1" == "bazel.dev" ]]; then
+  setup_clang_toolchain
+  # This doesn't go into CI but is available for developer convenience.
+  echo "bazel fastbuild build with tests..."
+  cd "${ENVOY_CI_DIR}"
+  echo "Building..."
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container for developers.
+  cp -f \
+    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
+    "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
+  echo "Building and testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  exit 0
+elif [[ "$1" == "bazel.coverage" ]]; then
+  setup_gcc_toolchain
+  echo "bazel coverage build with tests..."
+  export GCOVR="/thirdparty/gcovr/scripts/gcovr"
+  export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
+  export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
+  export WORKSPACE=ci
+  # There is a bug in gcovr 3.3, where it takes the -r path,
+  # in our case /source, and does a regex replacement of various
+  # source file paths during HTML generation. It attempts to strip
+  # out the prefix (e.g. /source), but because it doesn't do a match
+  # and only strip at the start of the string, it removes /source from
+  # the middle of the string, corrupting the path. The workaround is
+  # to point -r in the gcovr invocation in run_envoy_bazel_coverage.sh at
+  # some Bazel created symlinks to the source directory in its output
+  # directory. Wow.
+  cd "${ENVOY_BUILD_DIR}"
+  SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  rsync -av "${ENVOY_BUILD_DIR}"/bazel-envoy/generated/coverage/ "${ENVOY_COVERAGE_DIR}"
+  exit 0
+elif [[ "$1" == "fix_format" ]]; then
+  echo "fix_format..."
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py fix
+  exit 0
+elif [[ "$1" == "check_format" ]]; then
+  echo "check_format..."
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py check
+  exit 0
 else
-  echo "normal build..."
-  TEST_TARGET="envoy.check"
+  echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
+  exit 1
 fi
-
-mkdir -p build
-cd build
-
-cmake \
-$EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
--DENVOY_COTIRE_MODULE_DIR:FILEPATH=/thirdparty/cotire-cotire-1.7.8/CMake \
--DENVOY_GMOCK_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_GPERFTOOLS_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_GTEST_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_HTTP_PARSER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_LIBEVENT_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_NGHTTP2_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_SPDLOG_INCLUDE_DIR:FILEPATH=/thirdparty/spdlog-0.11.0/include \
--DENVOY_TCLAP_INCLUDE_DIR:FILEPATH=/thirdparty/tclap-1.2.1/include \
--DENVOY_JANSSON_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_OPENSSL_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_PROTOBUF_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_PROTOBUF_PROTOC:FILEPATH=/thirdparty_build/bin/protoc \
--DENVOY_GCOVR:FILEPATH=/thirdparty/gcovr-3.3/scripts/gcovr \
--DENVOY_RAPIDJSON_INCLUDE_DIR:FILEPATH=/thirdparty/rapidjson-1.1.0/include \
--DENVOY_GCOVR_EXTRA_ARGS:STRING="-e test/* -e build/*" \
--DENVOY_EXE_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
--DENVOY_TEST_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
-..
-
-make check_format
-make -j$NUM_CPUS $TEST_TARGET

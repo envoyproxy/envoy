@@ -2,6 +2,7 @@
 
 #include "event2/event_struct.h"
 
+namespace Envoy {
 namespace Event {
 
 /**
@@ -15,4 +16,5 @@ protected:
   event raw_event_;
 };
 
-} // Event
+} // namespace Event
+} // namespace Envoy

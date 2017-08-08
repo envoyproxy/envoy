@@ -1,13 +1,18 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/http/header_map.h"
 
+#include "common/common/singleton.h"
+
+namespace Envoy {
 namespace Http {
 
 /**
  * Constant HTTP headers and values. All lower case.
  */
-class Headers {
+class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString Authorization{"authorization"};
@@ -18,15 +23,18 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
+  const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
-  const LowerCaseString EnvoyProtocolVersion{"x-envoy-protocol-version"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
+  const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
+  const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
+      "x-envoy-upstream-rq-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamRequestPerTryTimeoutMs{
       "x-envoy-upstream-rq-per-try-timeout-ms"};
@@ -34,15 +42,18 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
   const LowerCaseString Expect{"expect"};
+  const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
+  const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
+  const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
   const LowerCaseString RequestId{"x-request-id"};
@@ -50,16 +61,32 @@ public:
   const LowerCaseString Server{"server"};
   const LowerCaseString Status{":status"};
   const LowerCaseString TransferEncoding{"transfer-encoding"};
+  const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString Version{":version"};
+  const LowerCaseString XB3TraceId{"x-b3-traceid"};
+  const LowerCaseString XB3SpanId{"x-b3-spanid"};
+  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
+  const LowerCaseString XB3Sampled{"x-b3-sampled"};
+  const LowerCaseString XB3Flags{"x-b3-flags"};
 
   struct {
     const std::string Close{"close"};
+    const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 
   struct {
+    const std::string WebSocket{"websocket"};
+  } UpgradeValues;
+
+  struct {
     const std::string Text{"text/plain"};
+    const std::string Grpc{"application/grpc"};
+    const std::string GrpcWeb{"application/grpc-web"};
+    const std::string GrpcWebProto{"application/grpc-web+proto"};
+    const std::string GrpcWebText{"application/grpc-web-text"};
+    const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
+    const std::string Json{"application/json"};
   } ContentTypeValues;
 
   struct {
@@ -72,6 +99,12 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
   } EnvoyRetryOnValues;
+
+  struct {
+    const std::string Cancelled{"cancelled"};
+    const std::string DeadlineExceeded{"deadline-exceeded"};
+    const std::string ResourceExhausted{"resource-exhausted"};
+  } EnvoyRetryOnGrpcValues;
 
   struct {
     const std::string _100Continue{"100-continue"};
@@ -96,13 +129,16 @@ public:
     const std::string EnvoyHealthChecker{"Envoy/HC"};
   } UserAgentValues;
 
-  static Headers& get() {
-    static Headers instance;
-    return instance;
-  }
+  struct {
+    const std::string Default{"identity,deflate,gzip"};
+  } GrpcAcceptEncodingValues;
 
-private:
-  Headers() {}
+  struct {
+    const std::string Trailers{"trailers"};
+  } TEValues;
 };
 
-} // Http
+typedef ConstSingleton<HeaderValues> Headers;
+
+} // namespace Http
+} // namespace Envoy

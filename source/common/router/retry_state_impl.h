@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
@@ -8,6 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -16,12 +20,15 @@ namespace Router {
 class RetryStateImpl : public RetryState {
 public:
   static RetryStatePtr create(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                              const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
   ~RetryStateImpl();
 
   static uint32_t parseRetryOn(const std::string& config);
+
+  // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
+  static uint32_t parseRetryGrpcOn(const std::string& retry_grpc_on_header);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
@@ -31,7 +38,7 @@ public:
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                 const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  Upstream::ResourcePriority priority);
 
@@ -40,7 +47,7 @@ private:
   bool wouldRetry(const Http::HeaderMap* response_headers,
                   const Optional<Http::StreamResetReason>& reset_reason);
 
-  const Upstream::Cluster& cluster_;
+  const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
@@ -52,4 +59,5 @@ private:
   Upstream::ResourcePriority priority_;
 };
 
-} // Router
+} // namespace Router
+} // namespace Envoy

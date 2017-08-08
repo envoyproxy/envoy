@@ -12,11 +12,13 @@ Architecture overview
   http_filters
   http_routing
   grpc
+  websocket
   cluster_manager
   service_discovery
   health_checking
   connection_pooling
   load_balancing
+  outlier
   circuit_breaking
   global_rate_limiting
   ssl
@@ -27,3 +29,5 @@ Architecture overview
   mongo
   dynamo
   hot_restart
+  dynamic_configuration
+  init

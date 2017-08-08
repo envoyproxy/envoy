@@ -1,12 +1,26 @@
 #pragma once
 
-#include "fake_upstream.h"
-#include "server.h"
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
+#include "test/integration/utility.h"
+#include "test/mocks/buffer/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/printers.h"
+
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
@@ -16,6 +30,8 @@ public:
 
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }
+  bool reset() { return saw_reset_; }
+  Http::StreamResetReason reset_reason() { return reset_reason_; }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForBodyData(uint64_t size);
@@ -29,6 +45,8 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -39,6 +57,8 @@ private:
   std::string body_;
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
+  bool saw_reset_{};
+  Http::StreamResetReason reset_reason_{};
 };
 
 typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
@@ -49,13 +69,14 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-                         const Http::CodecClientStats& stats, Stats::Store& store,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
   void makeHeaderOnlyRequest(const Http::HeaderMap& headers, IntegrationStreamDecoder& response);
   void makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size,
                            IntegrationStreamDecoder& response);
   bool sawGoAway() { return saw_goaway_; }
+  void sendData(Http::StreamEncoder& encoder, Buffer::Instance& data, bool end_stream);
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
@@ -68,8 +89,9 @@ private:
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
   };
@@ -99,57 +121,53 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port);
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
+                       Network::Address::IpVersion version);
 
   void close();
-  const std::string& data() { return data_; }
   void waitForData(const std::string& data);
   void waitForDisconnect();
   void write(const std::string& data);
+  const std::string& data() { return payload_reader_->data(); }
 
 private:
-  struct ConnectionCallbacks : public Network::ConnectionCallbacks,
-                               public Network::ReadFilterBaseImpl {
+  struct ConnectionCallbacks : public Network::ConnectionCallbacks {
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-    void onEvent(uint32_t events) override;
-
-    // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationTcpClient& parent_;
   };
 
+  std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
-  std::string data_;
-  std::string data_to_wait_for_;
+  MockBuffer* client_write_buffer_;
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
+
+struct ApiFilesystemConfig {
+  std::string bootstrap_path_;
+  std::string cds_path_;
+  std::string eds_path_;
+};
 
 /**
  * Test fixture for all integration tests.
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  static const uint32_t ECHO_PORT = 10000;
-  static const uint32_t HTTP_PORT = 10001;
-  static const uint32_t HTTP_BUFFER_PORT = 10002;
-  static const uint32_t ADMIN_PORT = 10003;
-  static const uint32_t TCP_PROXY_PORT = 10004;
-
-  BaseIntegrationTest();
-  ~BaseIntegrationTest();
-
+  BaseIntegrationTest(Network::Address::IpVersion version);
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
    */
   void executeActions(std::list<std::function<void()>> actions) {
-    for (std::function<void()> action : actions) {
+    for (const std::function<void()>& action : actions) {
       action();
     }
   }
@@ -161,13 +179,20 @@ public:
                                                Http::CodecClient::Type type);
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
-  static IntegrationTestServerPtr test_server_;
-  static std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
-  static spdlog::level::level_enum default_log_level_;
+  // Test-wide port map.
+  void registerPort(const std::string& key, uint32_t port);
+  uint32_t lookupPort(const std::string& key);
+
+  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+  void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
+  void createApiTestServer(const std::string& json_path,
+                           const ApiFilesystemConfig& api_filesystem_config,
+                           const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
+  MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
-  Stats::IsolatedStoreImpl stats_store_;
 
 protected:
   void testRouterRedirect(Http::CodecClient::Type type);
@@ -177,7 +202,7 @@ protected:
                                             Http::CodecClient::Type type, uint64_t request_size,
                                             uint64_t response_size, bool big_header);
   void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
-                                              Http::CodecClient::Type type);
+                                              Http::CodecClient::Type type, bool close_upstream);
   void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                          Http::CodecClient::Type type);
   void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
@@ -189,35 +214,36 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                        Http::CodecClient::Type type);
   void testTwoRequests(Http::CodecClient::Type type);
-  void testBadHttpRequest();
+  void testBadFirstline();
+  void testMissingDelimiter();
+  void testInvalidCharacterInFirstline();
+  void testLowVersion();
   void testHttp10Request();
   void testNoHost();
+  void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
+  void testAbsolutePath();
+  void testConnect();
+  void testAllowAbsoluteSameRelative();
+  // Test that a request returns the same content with both allow_absolute_urls enabled and
+  // allow_absolute_urls disabled
+  void testEquivalent(const std::string& request);
+  void testValidZeroLengthContent(Http::CodecClient::Type type);
+  void testInvalidContentLength(Http::CodecClient::Type type);
+  void testMultipleContentLengths(Http::CodecClient::Type type);
   void testDrainClose(Http::CodecClient::Type type);
   void testRetry(Http::CodecClient::Type type);
+  void testGrpcRetry();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
-};
 
-class IntegrationTest : public BaseIntegrationTest, public testing::Test {
-public:
-  /**
-   * Global initializer for all integration tests.
-   */
-  static void SetUpTestCase() {
-    test_server_ = IntegrationTestServer::create("test/config/integration/server.json");
-    fake_upstreams_.emplace_back(new FakeUpstream(11000, FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(new FakeUpstream(11001, FakeHttpConnection::Type::HTTP1));
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  static void TearDownTestCase() {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
+  spdlog::level::level_enum default_log_level_;
+  IntegrationTestServerPtr test_server_;
+  TestEnvironment::PortMap port_map_;
+  Network::Address::IpVersion version_;
 };
+} // namespace Envoy

@@ -1,11 +1,18 @@
-#include "retry_state_impl.h"
+#include "common/router/retry_state_impl.h"
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/http/headers.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 
+namespace Envoy {
 namespace Router {
 
 // These are defined in envoy/server/router.h, however during certain cases the compiler is
@@ -13,17 +20,21 @@ namespace Router {
 const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::HeaderMap& request_headers,
-                                     const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                     const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
                                      Upstream::ResourcePriority priority) {
   RetryStatePtr ret;
 
   // We short circuit here and do not both with an allocation if there is no chance we will retry.
-  if (request_headers.EnvoyRetryOn() || route_policy.retryOn()) {
+  if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
+      route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -34,7 +45,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 }
 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                               const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
@@ -42,12 +53,15 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
-    if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-      const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
-      uint64_t temp;
-      if (StringUtil::atoul(max_retries, temp)) {
-        retries_remaining_ = temp;
-      }
+  }
+  if (request_headers.EnvoyRetryGrpcOn()) {
+    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().c_str());
+  }
+  if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
+    const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
+    uint64_t temp;
+    if (StringUtil::atoul(max_retries, temp)) {
+      retries_remaining_ = temp;
     }
   }
 
@@ -84,6 +98,22 @@ uint32_t RetryStateImpl::parseRetryOn(const std::string& config) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
+    }
+  }
+
+  return ret;
+}
+
+uint32_t RetryStateImpl::parseRetryGrpcOn(const std::string& retry_grpc_on_header) {
+  uint32_t ret = 0;
+  std::vector<std::string> retry_on_list = StringUtil::split(retry_grpc_on_header, ',');
+  for (const std::string& retry_on : retry_on_list) {
+    if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.DeadlineExceeded) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.ResourceExhausted) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
     }
   }
 
@@ -163,7 +193,25 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     }
   }
 
+  if (retry_on_ &
+          (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
+           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) &&
+      response_headers) {
+    Optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(*response_headers);
+    if (status.valid()) {
+      if ((status.value() == Grpc::Status::Canceled &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
+          (status.value() == Grpc::Status::DeadlineExceeded &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
+          (status.value() == Grpc::Status::ResourceExhausted &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED))) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
-} // Router
+} // namespace Router
+} // namespace Envoy

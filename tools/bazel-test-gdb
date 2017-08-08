@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Run a single Bazel test target under gdb. Usage:
+#
+# tools/bazel-test-gdb //test/foo:bar --some_other --bazel_args
+#
+# The default build type ("fastbuild") does not generate debugging symbols so
+# you almost certainly want to use "-c opt" or "-c dbg" Bazel arguments to
+# trigger generation of debug symbols.  By default the "opt" build type does not
+# include symbols for tests: see bazel/envoy_build_system.bzl for details.
+
+if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]
+then
+  echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a single test to run"
+  echo "$1 does not mach this pattern"
+  exit 1
+fi
+
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+[[ -z "${BAZEL}" ]] && BAZEL=bazel
+[[ -z "${GDB}" ]] && GDB=gdb
+
+GDB_RUNNER=$(mktemp -t "bazel-test-gdb.XXXXXXX")
+function cleanup() {
+  rm -f "${GDB_RUNNER}"
+}
+trap cleanup EXIT
+
+"${BAZEL}" test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
+  --test_output=summary --run_under="${SCRIPT_DIR}/gen_gdb_wrapper_script.py ${GDB} ${GDB_RUNNER}"
+chmod u+x "${GDB_RUNNER}"
+"${GDB_RUNNER}"

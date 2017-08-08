@@ -1,19 +1,27 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/init/init.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/hot_restart.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -22,12 +30,6 @@ namespace Server {
 class Instance {
 public:
   virtual ~Instance() {}
-
-  /**
-   * @return Thread::BasicLockable& the single lock used for writing out to access logs. In the
-   *         future we may decide to allow multiple access log locks.
-   */
-  virtual Thread::BasicLockable& accessLogLock() PURE;
 
   /**
    * @return Admin& the global HTTP admin endpoint for the server.
@@ -56,15 +58,9 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return Network::DnsResolver& the singleton DNS resolver for the server.
+   * @return Network::DnsResolverSharedPtr the singleton DNS resolver for the server.
    */
-  virtual Network::DnsResolver& dnsResolver() PURE;
-
-  /**
-   * @return TRUE if the server is currently draining. No new connections will be received and
-   *         filters should shed connections where possible.
-   */
-  virtual bool draining() PURE;
+  virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
    * Close the server's listening sockets and begin draining the listeners.
@@ -72,9 +68,9 @@ public:
   virtual void drainListeners() PURE;
 
   /**
-   * @return DrainManager& singleton for use by the entire server.
+   * @return const DrainManager& singleton for use by the entire server.
    */
-  virtual DrainManager& drainManager() PURE;
+  virtual const DrainManager& drainManager() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -85,13 +81,6 @@ public:
    * Toggle whether the server fails or passes external healthchecks.
    */
   virtual void failHealthcheck(bool fail) PURE;
-
-  /**
-   * Fetch a listen socket fd based on the listening port.
-   * @param port supplies the port to look up.
-   * @return the fd or -1 if there is no listening socket for the port.
-   */
-  virtual int getListenSocketFd(uint32_t port) PURE;
 
   /**
    * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.
@@ -108,6 +97,21 @@ public:
    * @return the server's hot restarter.
    */
   virtual HotRestart& hotRestart() PURE;
+
+  /**
+   * @return the server's init manager. This can be used for extensions that need to initialize
+   *         after cluster manager init but before the server starts listening. All extensions
+   *         should register themselves during configuration load. initialize() will be called on
+   *         each registered target after cluster manager init but before the server starts
+   *         listening. Once all targets have initialized and invoked their callbacks, the server
+   *         will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return the server's listener manager.
+   */
+  virtual ListenerManager& listenerManager() PURE;
 
   /**
    * @return the server's CLI options.
@@ -167,9 +171,10 @@ public:
   virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
-   * @return the local IP address of the server
+   * @return information about the local environment the server is running in.
    */
-  virtual const std::string& getLocalAddress() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() PURE;
 };
 
-} // Server
+} // namespace Server
+} // namespace Envoy

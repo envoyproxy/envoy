@@ -1,8 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
+namespace Envoy {
 namespace Server {
 
 class Instance;
@@ -37,7 +41,7 @@ public:
    * @param port supplies the port of the socket to duplicate.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
-  virtual int duplicateParentListenSocket(uint32_t port) PURE;
+  virtual int duplicateParentListenSocket(const std::string& address) PURE;
 
   /**
    * Retrieve stats from our parent process.
@@ -65,10 +69,16 @@ public:
   virtual void terminateParent() PURE;
 
   /**
+   * Shutdown the hot restarter.
+   */
+  virtual void shutdown() PURE;
+
+  /**
    * Return the hot restart compatability version so that operations code can decide whether to
    * perform a full or hot restart.
    */
   virtual std::string version() PURE;
 };
 
-} // Server
+} // namespace Server
+} // namespace Envoy

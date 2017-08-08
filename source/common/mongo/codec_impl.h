@@ -1,9 +1,15 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/mongo/codec.h"
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Mongo {
 
 class MessageImpl : public virtual Message {
@@ -18,7 +24,7 @@ public:
   int32_t responseTo() const override { return response_to_; }
 
 protected:
-  std::string documentListToString(const std::list<Bson::DocumentPtr>& documents) const;
+  std::string documentListToString(const std::list<Bson::DocumentSharedPtr>& documents) const;
 
   const int32_t request_id_;
   const int32_t response_to_;
@@ -69,13 +75,13 @@ public:
   void flags(int32_t flags) override { flags_ = flags; }
   const std::string& fullCollectionName() const override { return full_collection_name_; }
   void fullCollectionName(const std::string& name) override { full_collection_name_ = name; }
-  const std::list<Bson::DocumentPtr>& documents() const override { return documents_; }
-  std::list<Bson::DocumentPtr>& documents() override { return documents_; }
+  const std::list<Bson::DocumentSharedPtr>& documents() const override { return documents_; }
+  std::list<Bson::DocumentSharedPtr>& documents() override { return documents_; }
 
 private:
   int32_t flags_{};
   std::string full_collection_name_;
-  std::list<Bson::DocumentPtr> documents_;
+  std::list<Bson::DocumentSharedPtr> documents_;
 };
 
 class KillCursorsMessageImpl : public MessageImpl,
@@ -119,7 +125,7 @@ public:
   std::string toString(bool full) const override;
 
   // Mongo::QueryMessage
-  bool operator==(const QueryMessage& rhs) const;
+  bool operator==(const QueryMessage& rhs) const override;
   int32_t flags() const override { return flags_; }
   void flags(int32_t flags) override { flags_ = flags; }
   const std::string& fullCollectionName() const override { return full_collection_name_; }
@@ -129,11 +135,11 @@ public:
   int32_t numberToReturn() const override { return number_to_return_; }
   void numberToReturn(int32_t to_return) override { number_to_return_ = to_return; }
   virtual const Bson::Document* query() const override { return query_.get(); }
-  void query(Bson::DocumentPtr&& query) override { query_ = std::move(query); }
+  void query(Bson::DocumentSharedPtr&& query) override { query_ = std::move(query); }
   virtual const Bson::Document* returnFieldsSelector() const override {
     return return_fields_selector_.get();
   }
-  void returnFieldsSelector(Bson::DocumentPtr&& fields) override {
+  void returnFieldsSelector(Bson::DocumentSharedPtr&& fields) override {
     return_fields_selector_ = std::move(fields);
   }
 
@@ -142,8 +148,8 @@ private:
   std::string full_collection_name_;
   int32_t number_to_skip_{};
   int32_t number_to_return_{};
-  Bson::DocumentPtr query_;
-  Bson::DocumentPtr return_fields_selector_;
+  Bson::DocumentSharedPtr query_;
+  Bson::DocumentSharedPtr return_fields_selector_;
 };
 
 class ReplyMessageImpl : public MessageImpl,
@@ -168,15 +174,15 @@ public:
   void startingFrom(int32_t starting_from) override { starting_from_ = starting_from; }
   int32_t numberReturned() const override { return number_returned_; }
   void numberReturned(int32_t number_returned) override { number_returned_ = number_returned; }
-  const std::list<Bson::DocumentPtr>& documents() const override { return documents_; }
-  std::list<Bson::DocumentPtr>& documents() override { return documents_; }
+  const std::list<Bson::DocumentSharedPtr>& documents() const override { return documents_; }
+  std::list<Bson::DocumentSharedPtr>& documents() override { return documents_; }
 
 private:
   int32_t flags_{};
   int64_t cursor_id_{};
   int32_t starting_from_{};
   int32_t number_returned_{};
-  std::list<Bson::DocumentPtr> documents_;
+  std::list<Bson::DocumentSharedPtr> documents_;
 };
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {
@@ -209,4 +215,5 @@ private:
   Buffer::Instance& output_;
 };
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

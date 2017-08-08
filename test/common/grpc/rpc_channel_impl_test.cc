@@ -1,26 +1,38 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "common/grpc/common.h"
 #include "common/grpc/rpc_channel_impl.h"
+#include "common/http/message_impl.h"
 
-#include "test/generated/helloworld.pb.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/proto/helloworld.pb.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::Invoke;
 using testing::Return;
+using testing::_;
 
 namespace Grpc {
 
 class GrpcRequestImplTest : public testing::Test {
 public:
   GrpcRequestImplTest() : http_async_client_request_(&cm_.async_client_) {
-    ON_CALL(cm_.cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+        .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   }
 
   void expectNormalRequest(
       const Optional<std::chrono::milliseconds> timeout = Optional<std::chrono::milliseconds>()) {
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+        .WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
         .WillOnce(Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                              Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
@@ -32,7 +44,7 @@ public:
 
   NiceMock<Upstream::MockClusterManager> cm_;
   MockRpcChannelCallbacks grpc_callbacks_;
-  RpcChannelImpl grpc_request_{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
+  RpcChannelImpl grpc_request_{cm_, "fake_cluster", grpc_callbacks_,
                                Optional<std::chrono::milliseconds>()};
   helloworld::Greeter::Stub service_{&grpc_request_};
   Http::MockAsyncClientRequest http_async_client_request_;
@@ -49,14 +61,16 @@ TEST_F(GrpcRequestImplTest, NoError) {
   Http::LowerCaseString header_key("foo");
   std::string header_value("bar");
   EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers)
-                           -> void { headers.addStatic(header_key, header_value); }));
+      .WillOnce(Invoke([&](Http::HeaderMap& headers) -> void {
+        headers.addReference(header_key, header_value);
+      }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::TestHeaderMapImpl expected_request_headers{{":method", "POST"},
                                                    {":path", "/helloworld.Greeter/SayHello"},
-                                                   {":authority", "cluster"},
+                                                   {":authority", "fake_cluster"},
                                                    {"content-type", "application/grpc"},
+                                                   {"te", "trailers"},
                                                    {"foo", "bar"}};
 
   EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(&expected_request_headers));
@@ -65,17 +79,16 @@ TEST_F(GrpcRequestImplTest, NoError) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
-  response_http_message->body(Common::serializeBody(inner_response));
+  response_http_message->body() = Common::serializeBody(inner_response);
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onSuccess());
   http_callbacks_->onSuccess(std::move(response_http_message));
   EXPECT_EQ(response.SerializeAsString(), inner_response.SerializeAsString());
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.stats_store_.counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.success")
-          .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc.helloworld.Greeter.SayHello.success")
+                     .value());
 }
 
 TEST_F(GrpcRequestImplTest, Non200Response) {
@@ -92,10 +105,9 @@ TEST_F(GrpcRequestImplTest, Non200Response) {
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "non-200 response code"));
   http_callbacks_->onSuccess(std::move(response_http_message));
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.stats_store_.counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.failure")
-          .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc.helloworld.Greeter.SayHello.failure")
+                     .value());
 }
 
 TEST_F(GrpcRequestImplTest, NoResponseTrailers) {
@@ -194,12 +206,34 @@ TEST_F(GrpcRequestImplTest, ShortBodyInResponse) {
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaa")});
+  response_http_message->body().reset(new Buffer::OwnedImpl("aaa"));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "bad serialized body"));
   http_callbacks_->onSuccess(std::move(response_http_message));
+}
+
+TEST_F(GrpcRequestImplTest, EmptyBodyInResponse) {
+  expectNormalRequest();
+
+  helloworld::HelloRequest request;
+  request.set_name("a name");
+  helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
+  service_.SayHello(nullptr, &request, &response, nullptr);
+
+  Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  helloworld::HelloReply empty_response;
+  response_http_message->body() = Common::serializeBody(empty_response);
+  EXPECT_EQ(response_http_message->body()->length(), 5);
+  response_http_message->trailers(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+
+  EXPECT_CALL(grpc_callbacks_, onSuccess());
+  http_callbacks_->onSuccess(std::move(response_http_message));
+  EXPECT_EQ(response.SerializeAsString(), empty_response.SerializeAsString());
 }
 
 TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
@@ -213,7 +247,7 @@ TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaaaaaaa")});
+  response_http_message->body().reset(new Buffer::OwnedImpl("aaaaaaaa"));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -235,7 +269,8 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestFailure) {
 }
 
 TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+      .WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -268,8 +303,7 @@ TEST_F(GrpcRequestImplTest, Cancel) {
 
 TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   const Optional<std::chrono::milliseconds> timeout(std::chrono::milliseconds(100));
-  RpcChannelImpl grpc_request_timeout{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
-                                      timeout};
+  RpcChannelImpl grpc_request_timeout{cm_, "fake_cluster", grpc_callbacks_, timeout};
   helloworld::Greeter::Stub service_timeout{&grpc_request_timeout};
   expectNormalRequest(timeout);
   helloworld::HelloRequest request;
@@ -283,7 +317,7 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
 
-  response_http_message->body(Common::serializeBody(inner_response));
+  response_http_message->body() = Common::serializeBody(inner_response);
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -291,4 +325,5 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   http_callbacks_->onSuccess(std::move(response_http_message));
 }
 
-} // Grpc
+} // namespace Grpc
+} // namespace Envoy

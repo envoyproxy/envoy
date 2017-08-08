@@ -60,7 +60,7 @@ requests based on path, authority, content type, :ref:`runtime <arch_overview_ru
 This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
 building a service to service mesh.
 
-**gRPC support:** `gRPC <http://www.grpc.io/>`_ is a new RPC framework from Google that uses HTTP/2
+**gRPC support:** `gRPC <http://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
 HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.
@@ -82,15 +82,18 @@ including asynchronous DNS resolution and REST based lookup via a :ref:`service 
 way of building an Envoy mesh is to treat service discovery as an eventually consistent process.
 Envoy includes a :ref:`health checking <arch_overview_health_checking>` subsystem which can
 optionally perform active health checking of upstream service clusters. Envoy then uses the union of
-service discovery and health checking information to determine healthy load balancing targets.
+service discovery and health checking information to determine healthy load balancing targets. Envoy
+also supports passive health checking via an :ref:`outlier detection
+<arch_overview_outlier_detection>` subsystem.
 
 **Advanced load balancing:** :ref:`Load balancing <arch_overview_load_balancing>` among different
 components in a distributed system is a complex problem. Because Envoy is a self contained proxy
 instead of a library, it is able to implement advanced load balancing techniques in a single place
 and have them be accessible to any application. Currently Envoy includes support for :ref:`automatic
 retries <arch_overview_http_routing_retry>`, :ref:`circuit breaking <arch_overview_circuit_break>`,
-:ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service, and
-request shadowing. Future support is planned for automatic bad host outlier ejection and request
+:ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service,
+:ref:`request shadowing <config_http_conn_man_route_table_route_shadow>`, and
+:ref:`outlier detection <arch_overview_outlier_detection>`. Future support is planned for request
 racing.
 
 **Front/edge proxy support:** Although Envoy is primarily designed as a service to service
@@ -108,12 +111,15 @@ sink, though plugging in a different one would not be difficult. Statistics are 
 the :ref:`administration <operations_admin_interface>` port. Envoy also supports distributed
 :ref:`tracing <arch_overview_tracing>` via thirdparty providers.
 
+**Dynamic configuration:** Envoy optionally consumes a layered set of :ref:`dynamic configuration
+APIs <arch_overview_dynamic_config>`. Implementors can use these APIs to build complex centrally
+managed deployments if desired.
+
 Design goals
 ^^^^^^^^^^^^
 
-A short note on the design goals of the code itself: Although Envoy is by no means slow,
-little effort has been put into micro performance optimizations of the native code. Fans of deep
-performance tuning will find ample opportunity for improvement. The code has been written to be
-modular and easy to test versus aiming for the greatest possible absolute performance. It's our
-view that this is a more efficient use of time given that typical deployments will be alongside
-languages and runtimes many times slower and with many times greater memory usage.
+A short note on the design goals of the code itself: Although Envoy is by no means slow (we have
+spent considerable time optimizing certain fast paths), the code has been written to be modular and
+easy to test versus aiming for the greatest possible absolute performance. It's our view that this
+is a more efficient use of time given that typical deployments will be alongside languages and
+runtimes many times slower and with many times greater memory usage.

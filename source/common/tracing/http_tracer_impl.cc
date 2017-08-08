@@ -1,17 +1,44 @@
-#include "http_tracer_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
+#include <string>
+
+#include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include "common/grpc/common.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/message_impl.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Tracing {
+
+static std::string buildRequestLine(const Http::HeaderMap& request_headers,
+                                    const Http::AccessLog::RequestInfo& info) {
+  std::string path = request_headers.EnvoyOriginalPath()
+                         ? request_headers.EnvoyOriginalPath()->value().c_str()
+                         : request_headers.Path()->value().c_str();
+  static const size_t max_path_length = 128;
+
+  if (path.length() > max_path_length) {
+    path = path.substr(0, max_path_length);
+  }
+
+  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path,
+                     Http::AccessLog::AccessLogFormatUtils::protocolToString(info.protocol()));
+}
+
+static std::string buildResponseCode(const Http::AccessLog::RequestInfo& info) {
+  return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
+}
+
+static std::string valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
+  return header ? header->value().c_str() : default_value;
+}
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   if (!request_headers.RequestId()) {
@@ -34,7 +61,7 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 10000, result, 10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
@@ -44,6 +71,20 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
   }
 
   request_headers.RequestId()->value(x_request_id);
+}
+
+const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
+const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
+
+const std::string& HttpTracerUtility::toString(OperationName operation_name) {
+  switch (operation_name) {
+  case OperationName::Ingress:
+    return INGRESS_OPERATION;
+  case OperationName::Egress:
+    return EGRESS_OPERATION;
+  }
+
+  NOT_REACHED
 }
 
 Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
@@ -72,226 +113,71 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::NotTraceableRequestId, false};
   }
 
-  throw std::invalid_argument("Unknown trace_status");
+  NOT_REACHED;
 }
 
-HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats)
-    : runtime_(runtime),
-      stats_{HTTP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.http_tracer."))} {}
+HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
+                                                   Http::AccessLog::RequestInfo& request_info,
+                                                   Config& tracing_config)
+    : request_headers_(request_headers), request_info_(request_info),
+      tracing_config_(tracing_config) {}
 
-void HttpTracerImpl::addSink(HttpSinkPtr&& sink) { sinks_.push_back(std::move(sink)); }
+void HttpConnManFinalizerImpl::finalize(Span& span) {
+  // Pre response data.
+  if (request_headers_) {
+    span.setTag("guid:x-request-id", std::string(request_headers_->RequestId()->value().c_str()));
+    span.setTag("request_line", buildRequestLine(*request_headers_, request_info_));
+    span.setTag("host_header", valueOrDefault(request_headers_->Host(), "-"));
+    span.setTag("downstream_cluster",
+                valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
+    span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
 
-void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
-                           const Http::HeaderMap* response_headers,
-                           const Http::AccessLog::RequestInfo& request_info,
-                           const TracingContext& tracing_context) {
-  static const Http::HeaderMapImpl empty_headers;
-  if (!request_headers) {
-    request_headers = &empty_headers;
-  }
-  if (!response_headers) {
-    response_headers = &empty_headers;
-  }
+    if (request_headers_->ClientTraceId()) {
+      span.setTag("guid:x-client-trace-id",
+                  std::string(request_headers_->ClientTraceId()->value().c_str()));
+    }
 
-  stats_.flush_.inc();
-
-  Decision decision = HttpTracerUtility::isTracing(request_info, *request_headers);
-  populateStats(decision);
-
-  if (decision.is_tracing) {
-    stats_.doing_tracing_.inc();
-
-    for (HttpSinkPtr& sink : sinks_) {
-      sink->flushTrace(*request_headers, *response_headers, request_info, tracing_context);
+    // Build tags based on the custom headers.
+    for (const Http::LowerCaseString& header : tracing_config_.requestHeadersForTags()) {
+      const Http::HeaderEntry* entry = request_headers_->get(header);
+      if (entry) {
+        span.setTag(header.get(), entry->value().c_str());
+      }
     }
   }
-}
+  span.setTag("request_size", std::to_string(request_info_.bytesReceived()));
 
-void HttpTracerImpl::populateStats(const Decision& decision) {
-  switch (decision.reason) {
-  case Reason::ClientForced:
-    stats_.client_enabled_.inc();
-    break;
-  case Reason::HealthCheck:
-    stats_.health_check_.inc();
-    break;
-  case Reason::NotTraceableRequestId:
-    stats_.not_traceable_.inc();
-    break;
-  case Reason::Sampling:
-    stats_.random_sampling_.inc();
-    break;
-  case Reason::ServiceForced:
-    stats_.service_forced_.inc();
-    break;
+  // Post response data.
+  span.setTag("response_code", buildResponseCode(request_info_));
+  span.setTag("response_size", std::to_string(request_info_.bytesSent()));
+  span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info_));
+
+  if (!request_info_.responseCode().valid() ||
+      Http::CodeUtility::is5xx(request_info_.responseCode().value())) {
+    span.setTag("error", "true");
   }
 }
 
-LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
-                                     Event::Dispatcher& dispatcher)
-    : builder_(tracer), sink_(sink) {
-  flush_timer_ = dispatcher.createTimer([this]() -> void {
-    sink_.tracerStats().timer_flushed_.inc();
-    flushSpans();
-    enableTimer();
-  });
+HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
+    : driver_(std::move(driver)), local_info_(local_info) {}
 
-  enableTimer();
-}
+SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
+                                  const Http::AccessLog::RequestInfo& request_info) {
+  std::string span_name = HttpTracerUtility::toString(config.operationName());
 
-void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
-  builder_.addSpan(std::move(span));
-
-  uint64_t min_flush_spans =
-      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
-  if (builder_.pendingSpans() == min_flush_spans) {
-    flushSpans();
-  }
-}
-
-bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
-  // Note: We don't expect this to be called, since the Tracer
-  // reference is private to its LightStepSink.
-  return true;
-}
-
-std::unique_ptr<lightstep::Recorder>
-LightStepRecorder::NewInstance(LightStepSink& sink, Event::Dispatcher& dispatcher,
-                               const lightstep::TracerImpl& tracer) {
-  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink, dispatcher));
-}
-
-void LightStepRecorder::enableTimer() {
-  uint64_t flush_interval =
-      sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
-  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
-}
-
-void LightStepRecorder::flushSpans() {
-  if (builder_.pendingSpans() != 0) {
-    sink_.tracerStats().spans_sent_.add(builder_.pendingSpans());
-    lightstep::collector::ReportRequest request;
-    std::swap(request, builder_.pending());
-
-    Http::MessagePtr message = Grpc::Common::prepareHeaders(sink_.collectorCluster(),
-                                                            lightstep::CollectorServiceFullName(),
-                                                            lightstep::CollectorMethodName());
-
-    message->body(Grpc::Common::serializeBody(std::move(request)));
-
-    uint64_t timeout =
-        sink_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-    sink_.clusterManager()
-        .httpAsyncClientForCluster(sink_.collectorCluster())
-        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
-  }
-}
-
-LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
-    : tracer_(tracer), sink_(sink) {}
-
-LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             Stats::Store& stats, const std::string& service_node,
-                             ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                             std::unique_ptr<lightstep::TracerOptions> options)
-    : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_store_(stats),
-      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
-      tls_slot_(tls.allocateSlot()) {
-  if (!cm_.get(collector_cluster_)) {
-    throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     collector_cluster_));
+  if (config.operationName() == OperationName::Egress) {
+    span_name.append(" ");
+    span_name.append(request_headers.Host()->value().c_str());
   }
 
-  if (!(cm_.get(collector_cluster_)->features() & Upstream::Cluster::Features::HTTP2)) {
-    throw EnvoyException(
-        fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
+  SpanPtr active_span = driver_->startSpan(request_headers, span_name, request_info.startTime());
+  if (active_span) {
+    active_span->setTag("node_id", local_info_.nodeName());
+    active_span->setTag("zone", local_info_.zoneName());
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
-                             std::placeholders::_1)));
-
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
-  });
+  return active_span;
 }
 
-std::string LightStepSink::buildRequestLine(const Http::HeaderMap& request_headers,
-                                            const Http::AccessLog::RequestInfo& info) {
-  std::string path = request_headers.EnvoyOriginalPath()
-                         ? request_headers.EnvoyOriginalPath()->value().c_str()
-                         : request_headers.Path()->value().c_str();
-  static const size_t max_path_length = 256;
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path, info.protocol());
-}
-
-std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo& info) {
-  return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
-}
-
-static const char* valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
-  return header ? header->value().c_str() : default_value;
-}
-
-void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                               const Http::AccessLog::RequestInfo& request_info,
-                               const TracingContext& tracing_context) {
-  lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
-      tracing_context.operationName(),
-      {lightstep::StartTimestamp(request_info.startTime()),
-       lightstep::SetTag("guid:x-request-id", request_headers.RequestId()->value().c_str()),
-       lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
-       lightstep::SetTag("response code", buildResponseCode(request_info)),
-       lightstep::SetTag("request size", request_info.bytesReceived()),
-       lightstep::SetTag("response size", request_info.bytesSent()),
-       lightstep::SetTag("host header", valueOrDefault(request_headers.Host(), "-")),
-       lightstep::SetTag("downstream cluster",
-                         valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
-       lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
-       lightstep::SetTag("node id", service_node_)});
-
-  if (request_info.responseCode().valid() &&
-      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
-    span.SetTag("error", "true");
-  }
-
-  if (request_info.failureReason() != Http::AccessLog::FailureReason::None) {
-    span.SetTag("failure reason",
-                Http::AccessLog::FilterReasonUtils::toShortString(request_info.failureReason()));
-  }
-
-  if (request_headers.ClientTraceId()) {
-    span.SetTag("guid:x-client-trace-id", request_headers.ClientTraceId()->value().c_str());
-  }
-
-  span.Finish();
-}
-
-void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
-  Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                           lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
-                           false);
-}
-
-void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
-  try {
-    Grpc::Common::validateResponse(*msg);
-
-    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), true);
-  } catch (const Grpc::Exception& ex) {
-    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), false);
-  }
-}
-
-} // Tracing
+} // namespace Tracing
+} // namespace Envoy

@@ -1,7 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <functional>
+#include <memory>
+
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Event {
 
 /**
@@ -29,4 +34,5 @@ public:
 
 typedef std::unique_ptr<Timer> TimerPtr;
 
-} // Event
+} // namespace Event
+} // namespace Envoy

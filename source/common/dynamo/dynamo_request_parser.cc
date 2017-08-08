@@ -1,7 +1,13 @@
-#include "dynamo_request_parser.h"
+#include "common/dynamo/dynamo_request_parser.h"
+
+#include <cmath>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 #include "common/common/utility.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /*
@@ -69,8 +75,8 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
     table.table_name = json_data.getString("TableName", "");
   } else if (find(BATCH_OPERATIONS.begin(), BATCH_OPERATIONS.end(), operation) !=
              BATCH_OPERATIONS.end()) {
-    Json::Object tables = json_data.getObject("RequestItems", true);
-    tables.iterate([&table](const std::string& key, const Json::Object&) {
+    Json::ObjectSharedPtr tables = json_data.getObject("RequestItems", true);
+    tables->iterate([&table](const std::string& key, const Json::Object&) {
       if (table.table_name.empty()) {
         table.table_name = key;
       } else {
@@ -88,8 +94,8 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
 }
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {
   std::vector<std::string> unprocessed_tables;
-  Json::Object tables = json_data.getObject("UnprocessedKeys", true);
-  tables.iterate([&unprocessed_tables](const std::string& key, const Json::Object&) {
+  Json::ObjectSharedPtr tables = json_data.getObject("UnprocessedKeys", true);
+  tables->iterate([&unprocessed_tables](const std::string& key, const Json::Object&) {
     unprocessed_tables.emplace_back(key);
     return true;
   });
@@ -120,15 +126,15 @@ std::vector<RequestParser::PartitionDescriptor>
 RequestParser::parsePartitions(const Json::Object& json_data) {
   std::vector<RequestParser::PartitionDescriptor> partition_descriptors;
 
-  Json::Object partitions =
-      json_data.getObject("ConsumedCapacity", true).getObject("Partitions", true);
-  partitions.iterate([&partition_descriptors, &partitions](const std::string& key,
-                                                           const Json::Object&) {
+  Json::ObjectSharedPtr partitions =
+      json_data.getObject("ConsumedCapacity", true)->getObject("Partitions", true);
+  partitions->iterate([&partition_descriptors, &partitions](const std::string& key,
+                                                            const Json::Object&) {
     // For a given partition id, the amount of capacity used is returned in the body as a double.
     // A stat will be created to track the capacity consumed for the operation, table and partition.
     // Stats counter only increments by whole numbers, capacity is round up to the nearest integer
     // to account for this.
-    uint64_t capacity_integer = static_cast<uint64_t>(std::ceil(partitions.getDouble(key, 0.0)));
+    uint64_t capacity_integer = static_cast<uint64_t>(std::ceil(partitions->getDouble(key, 0.0)));
     partition_descriptors.emplace_back(key, capacity_integer);
     return true;
   });
@@ -136,4 +142,5 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
   return partition_descriptors;
 }
 
-} // Dynamo
+} // namespace Dynamo
+} // namespace Envoy

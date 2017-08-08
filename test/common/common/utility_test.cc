@@ -1,4 +1,15 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+using testing::ContainerEq;
 
 TEST(StringUtil, atoul) {
   uint64_t out;
@@ -19,6 +30,11 @@ TEST(StringUtil, atoul) {
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
+}
+
+TEST(ProdSystemTimeSourceTest, All) {
+  ProdSystemTimeSource source;
+  source.currentTime();
 }
 
 TEST(StringUtil, caseInsensitiveCompare) {
@@ -58,13 +74,79 @@ TEST(StringUtil, rtrim) {
   }
 }
 
+TEST(StringUtil, strlcpy) {
+  {
+    char dest[6];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("hello", dest);
+  }
+
+  {
+    char dest[6];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), 3));
+    EXPECT_STREQ("he", dest);
+  }
+
+  {
+    char dest[3];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("he", dest);
+  }
+
+  {
+    char dest[3];
+    EXPECT_EQ(0U, StringUtil::strlcpy(dest, std::string{""}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("", dest);
+  }
+
+  {
+    char dest[3] = "yo";
+
+    EXPECT_EQ(1U, StringUtil::strlcpy(dest, std::string{"a"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("a", dest);
+
+    EXPECT_EQ(10U, StringUtil::strlcpy(dest, std::string{"absolutely"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("ab", dest);
+  }
+}
+
 TEST(StringUtil, split) {
-  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ','));
-  EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ','));
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ','));
-  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello,", ','));
-  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ','));
-  EXPECT_EQ((std::vector<std::string>{"hello", "world"}), StringUtil::split("hello,world", ','));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ","));
+  EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello, ", ", "));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
+
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello world", " ")));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello   world", " ")));
+
+  EXPECT_THAT(std::vector<std::string>({"", "", "hello", "world"}),
+              ContainerEq(StringUtil::split("  hello world", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world", ""}),
+              ContainerEq(StringUtil::split("hello world ", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
+              ContainerEq(StringUtil::split("hello world", " ", true)));
+  EXPECT_THAT(std::vector<std::string>({"hello", "", "", "world"}),
+              ContainerEq(StringUtil::split("hello   world", " ", true)));
+}
+
+TEST(StringUtil, join) {
+  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
+  EXPECT_EQ("", StringUtil::join({}, ","));
+
+  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
+  EXPECT_EQ("", StringUtil::join({}, ""));
+
+  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
+  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
+  EXPECT_EQ("", StringUtil::join({}, ",,"));
 }
 
 TEST(StringUtil, endsWith) {
@@ -90,3 +172,11 @@ TEST(StringUtil, startsWith) {
   EXPECT_FALSE(StringUtil::startsWith("test", "TESTTEST", false));
   EXPECT_FALSE(StringUtil::startsWith("", "test"));
 }
+
+TEST(StringUtil, escape) {
+  EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
+  EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
+  EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
+  EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
+}
+} // namespace Envoy

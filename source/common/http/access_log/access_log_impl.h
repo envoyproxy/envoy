@@ -1,11 +1,16 @@
 #pragma once
 
-#include "envoy/api/api.h"
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "envoy/access_log/access_log.h"
 #include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -106,13 +111,8 @@ public:
  */
 class TraceableRequestFilter : public Filter {
 public:
-  TraceableRequestFilter(Runtime::Loader& runtime);
-
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
-
-private:
-  Runtime::Loader& runtime_;
 };
 
 /**
@@ -132,25 +132,22 @@ private:
 
 class InstanceImpl : public Instance {
 public:
-  InstanceImpl(const std::string& access_log_path, Api::Api& api, FilterPtr&& filter,
-               FormatterPtr&& formatter, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-               Stats::Store& stats_store);
+  InstanceImpl(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
+               Envoy::AccessLog::AccessLogManager& log_manager);
 
-  static InstancePtr fromJson(Json::Object& json, Api::Api& api, Event::Dispatcher& dispatcher,
-                              Thread::BasicLockable& lock, Stats::Store& stats_store,
-                              Runtime::Loader& runtime);
+  static InstanceSharedPtr fromJson(Json::Object& json, Runtime::Loader& runtime,
+                                    Envoy::AccessLog::AccessLogManager& log_manager);
 
   // Http::AccessLog::Instance
   void log(const HeaderMap* request_headers, const HeaderMap* response_headers,
            const RequestInfo& request_info) override;
-  // AccessLog::AccessLog
-  void reopen() override;
 
 private:
-  Filesystem::FilePtr log_file_;
+  Filesystem::FileSharedPtr log_file_;
   FilterPtr filter_;
   FormatterPtr formatter_;
 };
 
-} // AccessLog
-} // Http
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

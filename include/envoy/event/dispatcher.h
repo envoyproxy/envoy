@@ -1,16 +1,24 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
-#include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 #include "envoy/stats/stats.h"
 
+namespace Envoy {
 namespace Event {
 
 /**
@@ -32,34 +40,43 @@ public:
 
   /**
    * Create a client connection.
-   * @param url supplies the URL to connect to.
+   * @param address supplies the address to connect to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr createClientConnection(const std::string& url) PURE;
+  virtual Network::ClientConnectionPtr
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Create an SSL client connection.
    * @param ssl_ctx supplies the SSL context to use.
-   * @param url supplies the URL to connect to.
+   * @param address supplies the address to connect to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                                 const std::string& url) PURE;
+  virtual Network::ClientConnectionPtr
+  createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                            Network::Address::InstanceConstSharedPtr address) PURE;
 
   /**
-   * Create an async DNS resolver. Only a single resolver can exist in the process at a time and it
-   * should only be used on the thread that runs this dispatcher.
-   * @return Network::DnsResolverPtr that is owned by the caller.
+   * Create an async DNS resolver. The resolver should only be used on the thread that runs this
+   * dispatcher.
+   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
+   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
+   * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
-  virtual Network::DnsResolverPtr createDnsResolver() PURE;
+  virtual Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
 
   /**
    * Create a file event that will signal when a file is readable or writable. On UNIX systems this
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
    * @param cb supplies the callback to fire when the file is ready.
+   * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of FileReadyType events that the file event should
+   *               initially listen on.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb) PURE;
+  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+                                       uint32_t events) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
@@ -68,30 +85,32 @@ public:
 
   /**
    * Create a listener on a specific port.
+   * @param conn_handler supplies the handler for connections received by the listener
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
-   * @param stats_store supplies the Stats::Store to use.
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
+   * @param scope supplies the Stats::Scope to use.
+   * @param listener_options listener configuration options.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createListener(Network::ListenSocket& socket,
-                                              Network::ListenerCallbacks& cb,
-                                              Stats::Store& stats_store, bool use_proxy_proto) PURE;
+  virtual Network::ListenerPtr
+  createListener(Network::ConnectionHandler& conn_handler, Network::ListenSocket& socket,
+                 Network::ListenerCallbacks& cb, Stats::Scope& scope,
+                 const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Create a listener on a specific port.
+   * @param conn_handler supplies the handler for connections received by the listener
    * @param ssl_ctx supplies the SSL context to use.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
-   * @param stats_store supplies the Stats::Store to use.
+   * @param scope supplies the Stats::Scope to use.
+   * @param listener_options listener configuration options.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx,
-                                                 Network::ListenSocket& socket,
-                                                 Network::ListenerCallbacks& cb,
-                                                 Stats::Store& stats_store,
-                                                 bool use_proxy_proto) PURE;
+  virtual Network::ListenerPtr
+  createSslListener(Network::ConnectionHandler& conn_handler, Ssl::ServerContext& ssl_ctx,
+                    Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                    Stats::Scope& scope, const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Allocate a timer. @see Event::Timer for docs on how to use the timer.
@@ -134,8 +153,15 @@ public:
    */
   enum class RunType { Block, NonBlock };
   virtual void run(RunType type) PURE;
+
+  /**
+   * Returns a factory which connections may use for buffer creation.
+   * @return the buffer factory for this dispatcher.
+   */
+  virtual Buffer::Factory& getBufferFactory() PURE;
 };
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;
 
-} // Event
+} // namespace Event
+} // namespace Envoy

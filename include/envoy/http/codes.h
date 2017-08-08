@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -8,6 +9,8 @@ namespace Http {
  */
 enum class Code {
   // clang-format off
+  Continue                      = 100,
+
   OK                            = 200,
   Created                       = 201,
   Accepted                      = 202,
@@ -69,4 +72,5 @@ enum class Code {
   // clang-format on
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

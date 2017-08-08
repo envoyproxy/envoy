@@ -1,0 +1,19 @@
+{
+  "versionInfo": "0",
+  "resources": [{
+    "@type": "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+    "clusterName": "cluster_1",
+    "endpoints": [{
+      "lbEndpoints": [{
+        "endpoint": {
+          "address": {
+            "socketAddress": {
+              "ipAddress": "{{ ip_loopback_address }}",
+              "port": {"value": {{ upstream_0 }} }
+            }
+          }
+        }
+      }]
+    }]
+  }]
+}

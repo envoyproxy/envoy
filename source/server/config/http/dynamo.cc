@@ -1,33 +1,29 @@
-#include "server/config/network/http_connection_manager.h"
+#include "server/config/http/dynamo.h"
+
+#include <string>
+
+#include "envoy/registry/registry.h"
 
 #include "common/dynamo/dynamo_filter.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Config registration for http dynamodb filter.
- */
-class DynamoFilterConfig : public HttpFilterConfigFactory {
-public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string& stat_prefix,
-                                             Server::Instance& server) override {
-    if (type != HttpFilterType::Both || name != "http_dynamo_filter") {
-      return nullptr;
-    }
-
-    return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(Http::StreamFilterPtr{
-          new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
-    };
-  }
-};
+HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
+                                                            const std::string& stat_prefix,
+                                                            FactoryContext& context) {
+  return [&context, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+        new Dynamo::DynamoFilter(context.runtime(), stat_prefix, context.scope())});
+  };
+}
 
 /**
- * Static registration for the http dynamodb filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the http dynamodb filter. @see RegisterFactory.
  */
-static RegisterHttpFilterConfigFactory<DynamoFilterConfig> register_;
+static Registry::RegisterFactory<DynamoFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

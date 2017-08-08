@@ -1,5 +1,6 @@
 #include "mocks.h"
 
+namespace Envoy {
 namespace Ssl {
 
 MockContextManager::MockContextManager() {}
@@ -11,4 +12,5 @@ MockConnection::~MockConnection() {}
 MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}
 
-} // Ssl
+} // namespace Ssl
+} // namespace Envoy

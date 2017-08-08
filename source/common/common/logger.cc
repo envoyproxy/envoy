@@ -1,7 +1,15 @@
-#include "logger.h"
+#include "common/common/logger.h"
+
+#include <cstdint>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include "envoy/thread/thread.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Logger {
 
 #define GENERATE_LOGGER(X) Logger(#X),
@@ -34,3 +42,4 @@ void Registry::initialize(uint64_t log_level, Thread::BasicLockable& lock) {
 }
 
 } // Logger
+} // namespace Envoy

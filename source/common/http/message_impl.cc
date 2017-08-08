@@ -1,8 +1,12 @@
-#include "message_impl.h"
+#include "common/http/message_impl.h"
 
+#include <cstdint>
+#include <string>
+
+namespace Envoy {
 namespace Http {
 
-std::string MessageImpl::bodyAsString() {
+std::string MessageImpl::bodyAsString() const {
   std::string ret;
   if (body_) {
     uint64_t num_slices = body_->getRawSlices(nullptr, 0);
@@ -15,4 +19,5 @@ std::string MessageImpl::bodyAsString() {
   return ret;
 }
 
-} // Http
+} // namespace Http
+} // namespace Envoy

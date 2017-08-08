@@ -1,8 +1,8 @@
 {% import 'routing_helper.template.json' as helper -%}
 
-{% macro listener(port) %}
+{% macro listener(address) %}
   {
-    "port": {{ port }},
+    "address": "{{ address }}",
     {% if kwargs['ssl'] -%}
     "ssl_context": {
       "alpn_protocols": "h2,http/1.1",
@@ -61,6 +61,12 @@
               "max_request_time_s": 120
             }
           },
+          { "type": "decoder", "name": "rate_limit",
+            "config" : {
+              "domain": "envoy_front",
+              "request_type": "external"
+            }
+          },
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
@@ -72,31 +78,29 @@
   "listeners": [
     {# TCP listeners for public HTTP/HTTPS endpoints. Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener(9300, ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
-    {{ listener(9301, ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
 
     {# TCP listener for backhaul traffic from the double proxy.
        See envoy_double_proxy.template.json #}
-    {{ listener(9400, ssl=True, proxy_proto=False, pin_double_proxy_client=True,
+    {{ listener("tcp://0.0.0.0:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
                 router_file='envoy_router.template.json') }}
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://0.0.0.0:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 
   "tracing": {
     "http": {
-      "sinks": [
-        {
+      "driver": {
           "type": "lightstep",
-          "access_token_file": "/etc/envoy/lightstep_access_token",
           "config": {
+            "access_token_file": "/etc/envoy/lightstep_access_token",
             "collector_cluster": "lightstep_saas"
           }
-        }
-      ]
+      }
     }
   },
 
@@ -106,7 +110,18 @@
     "override_subdirectory": "envoy_override"
   },
 
+  "rate_limit_service": {
+    "type": "grpc_service",
+    "config": {
+      "cluster_name": "ratelimit"
+    }
+  },
+
   "cluster_manager": {
+    "outlier_detection": {
+      "event_log_path": "/var/log/envoy/outlier_events.log"
+    },
+
     "sds": {
       "cluster": {
         "name": "sds",
@@ -131,12 +146,12 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector.lightstep.com"
+        "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://collector.lightstep.com:443"}]
+      "hosts": [{"url": "tcp://collector-grpc.lightstep.com:443"}]
     },
     {% for service, options in clusters.iteritems() -%}
     {

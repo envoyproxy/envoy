@@ -1,31 +1,22 @@
 #pragma once
 
-#include "codec_wrappers.h"
+#include <cstdint>
+#include <list>
+#include <memory>
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
+namespace Envoy {
 namespace Http {
-
-/**
- * All stats for the codec client. @see stats_macros.h
- */
-#define ALL_CODEC_CLIENT_STATS(COUNTER) COUNTER(upstream_cx_protocol_error)
-
-/**
- * Definition of all stats for the codec client. @see stats_macros.h
- */
-struct CodecClientStats {
-  ALL_CODEC_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 /**
  * Callbacks specific to a codec client.
@@ -43,7 +34,7 @@ public:
    * Called when a stream is reset by the client.
    * @param reason supplies the reset reason.
    */
-  virtual void onStreamReset(Http::StreamResetReason reason) PURE;
+  virtual void onStreamReset(StreamResetReason reason) PURE;
 };
 
 /**
@@ -95,9 +86,13 @@ public:
    * connections. Thus, calling newStream() before the previous request has been fully encoded
    * is an error. Pipelining is supported however.
    * @param response_decoder supplies the decoder to use for response callbacks.
-   * @return Http::StreamEncoder& the encoder to use for encoding the request.
+   * @return StreamEncoder& the encoder to use for encoding the request.
    */
-  Http::StreamEncoder& newStream(Http::StreamDecoder& response_decoder);
+  StreamEncoder& newStream(StreamDecoder& response_decoder);
+
+  void setBufferStats(const Network::Connection::BufferStats& stats) {
+    connection_->setBufferStats(stats);
+  }
 
   void setCodecClientCallbacks(CodecClientCallbacks& callbacks) {
     codec_client_callbacks_ = &callbacks;
@@ -107,14 +102,17 @@ public:
     codec_callbacks_ = &callbacks;
   }
 
+  bool remoteClosed() const { return remote_closed_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
    * @param type supplies the codec type.
    * @param connection supplies the connection to communicate on.
-   * @param stats supplies stats to use for this client.
+   * @param host supplies the owning host.
    */
-  CodecClient(Type type, Network::ClientConnectionPtr&& connection, const CodecClientStats& stats);
+  CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+              Upstream::HostDescriptionConstSharedPtr host);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -124,8 +122,9 @@ protected:
   }
 
   const Type type_;
-  Http::ClientConnectionPtr codec_;
+  ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 
 private:
   /**
@@ -147,34 +146,25 @@ private:
   struct ActiveRequest;
 
   /**
-   * Wrapper for the client response decoder. We use this only for managing end of stream.
-   */
-  struct ResponseDecoderWrapper : public StreamDecoderWrapper {
-    ResponseDecoderWrapper(Http::StreamDecoder& inner, ActiveRequest& parent)
-        : StreamDecoderWrapper(inner), parent_(parent) {}
-
-    // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.parent_.responseDecodeComplete(parent_); }
-    void onDecodeComplete() override {}
-
-    ActiveRequest& parent_;
-  };
-
-  typedef std::unique_ptr<ResponseDecoderWrapper> ResponseDecoderWrapperPtr;
-
-  /**
    * Wrapper for an outstanding request. Designed for handling stream multiplexing.
    */
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
-                         public Http::StreamCallbacks {
-    ActiveRequest(CodecClient& parent) : parent_(parent) {}
+                         public StreamCallbacks,
+                         public StreamDecoderWrapper {
+    ActiveRequest(CodecClient& parent, StreamDecoder& inner)
+        : StreamDecoderWrapper(inner), parent_(parent) {}
 
-    // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    // StreamCallbacks
+    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
-    Http::StreamEncoder* encoder_{};
-    ResponseDecoderWrapperPtr decoder_wrapper_;
+    // StreamDecoderWrapper
+    void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
+    void onDecodeComplete() override {}
+
+    StreamEncoder* encoder_{};
     CodecClient& parent_;
   };
 
@@ -187,18 +177,25 @@ private:
   void responseDecodeComplete(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
-  void onReset(ActiveRequest& request, Http::StreamResetReason reason);
+  void onReset(ActiveRequest& request, StreamResetReason reason);
   void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks
-  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  // Pass watermark events from the connection on to the codec which will pass it to the underlying
+  // streams.
+  void onAboveWriteBufferHighWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  }
 
   std::list<ActiveRequestPtr> active_requests_;
-  CodecClientStats stats_;
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
+  bool remote_closed_{};
 };
 
 typedef std::unique_ptr<CodecClient> CodecClientPtr;
@@ -209,7 +206,8 @@ typedef std::unique_ptr<CodecClient> CodecClientPtr;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  const CodecClientStats& stats, Stats::Store& store, uint64_t codec_options);
+                  Upstream::HostDescriptionConstSharedPtr host);
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

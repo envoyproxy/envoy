@@ -1,12 +1,20 @@
+#include <chrono>
+#include <fstream>
+#include <string>
+
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/environment.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -14,6 +22,7 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::Throw;
+using testing::_;
 
 TEST(FileSystemImpl, BadFile) {
   Event::MockDispatcher dispatcher;
@@ -37,7 +46,7 @@ TEST(FileSystemImpl, directoryExists) {
 }
 
 TEST(FileSystemImpl, fileReadToEndSuccess) {
-  const std::string file_path = "/tmp/test_envoy";
+  const std::string file_path = TestEnvironment::temporaryPath("test_envoy");
   unlink(file_path.c_str());
   std::ofstream file(file_path);
 
@@ -49,8 +58,9 @@ TEST(FileSystemImpl, fileReadToEndSuccess) {
 }
 
 TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
-  unlink("/tmp/envoy_this_not_exist");
-  EXPECT_THROW(Filesystem::fileReadToEnd("/tmp/envoy_this_not_exist"), EnvoyException);
+  unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
+  EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
+               EnvoyException);
 }
 
 TEST(FileSystemImpl, flushToLogFilePeriodically) {
@@ -267,3 +277,4 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
     }
   }
 }
+} // namespace Envoy

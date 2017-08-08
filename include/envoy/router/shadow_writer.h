@@ -1,7 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "envoy/http/message.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -25,4 +30,5 @@ public:
 
 typedef std::unique_ptr<ShadowWriter> ShadowWriterPtr;
 
-} // Router
+} // namespace Router
+} // namespace Envoy

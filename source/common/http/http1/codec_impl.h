@@ -1,32 +1,37 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/to_lower_table.h"
+#include "common/http/codec_helper.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 
 #include "http_parser.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http1 {
-
-const std::string PROTOCOL_STRING = "HTTP/1.1";
 
 class ConnectionImpl;
 
 /**
  * Base class for HTTP/1.1 request and response encoders.
  */
-class StreamEncoderImpl : public StreamEncoder, public Stream, Logger::Loggable<Logger::Id::http> {
+class StreamEncoderImpl : public StreamEncoder,
+                          public Stream,
+                          Logger::Loggable<Logger::Id::http>,
+                          public StreamCallbackHelper {
 public:
-  void runResetCallbacks(StreamResetReason reason) {
-    for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onResetStream(reason);
-    }
-  }
-
   // Http::StreamEncoder
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -34,9 +39,10 @@ public:
   Stream& getStream() override { return *this; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { callbacks_.push_back(&callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { callbacks_.remove(&callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
+  void readDisable(bool) override {}
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
@@ -61,7 +67,6 @@ private:
    */
   void endEncode();
 
-  std::list<StreamCallbacks*> callbacks_{};
   bool chunk_encoding_{true};
 };
 
@@ -120,8 +125,8 @@ public:
   void onResetStreamBase(StreamResetReason reason);
 
   /**
-  * Flush all pending output from encoding.
-  */
+   * Flush all pending output from encoding.
+   */
   void flushOutput();
 
   void addCharToBuffer(char c);
@@ -133,9 +138,8 @@ public:
 
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;
-  uint64_t features() override { return 0; }
   void goAway() override {} // Called during connection manager drain flow
-  const std::string& protocolString() override { return Http1::PROTOCOL_STRING; }
+  Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
 
@@ -147,6 +151,7 @@ protected:
   Network::Connection& connection_;
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
+  Http::Code error_code_{Http::Code::BadRequest};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -222,6 +227,7 @@ private:
   virtual void sendProtocolError() PURE;
 
   static http_parser_settings settings_;
+  static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
@@ -231,6 +237,7 @@ private:
   Buffer::OwnedImpl output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
+  Protocol protocol_{Protocol::Http11};
 };
 
 /**
@@ -238,7 +245,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks);
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Http1Settings settings);
 
 private:
   /**
@@ -253,6 +261,16 @@ private:
     bool remote_complete_{};
   };
 
+  /**
+   * Manipulate the request's first line, parsing the url and converting to a relative path if
+   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
+   *
+   * @param is_connect true if the request has the CONNECT method
+   * @param headers the request's headers
+   * @throws CodecProtocolException on an invalid url in the request line
+   */
+  void handlePath(HeaderMapImpl& headers, unsigned int method);
+
   // ConnectionImpl
   void onEncodeComplete() override;
   void onMessageBegin() override;
@@ -265,6 +283,7 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
+  Http1Settings codec_settings_;
 };
 
 /**
@@ -276,6 +295,8 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
 
 private:
   struct PendingResponse {
@@ -289,7 +310,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  void onMessageBegin() {}
+  void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
@@ -301,5 +322,6 @@ private:
   std::list<PendingResponse> pending_responses_;
 };
 
-} // Http1
-} // Http
+} // namespace Http1
+} // namespace Http
+} // namespace Envoy

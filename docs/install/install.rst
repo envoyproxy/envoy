@@ -10,4 +10,5 @@ Building and installation
   building
   installation
   ref_configs
-  sandboxes
+  sandboxes/sandboxes.rst
+  tools/tools

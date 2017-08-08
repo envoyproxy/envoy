@@ -1,37 +1,34 @@
+#include "server/config/network/ratelimit.h"
+
+#include <chrono>
+#include <string>
+
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/filter/ratelimit.h"
-#include "server/configuration_impl.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Config registration for the rate limit filter. @see NetworkFilterConfigFactory.
- */
-class RateLimitConfigFactory : public NetworkFilterConfigFactory {
-public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& json_config,
-                                                Server::Instance& server) {
-    if (type != NetworkFilterType::Read || name != "ratelimit") {
-      return nullptr;
-    }
-
-    RateLimit::TcpFilter::ConfigPtr config(
-        new RateLimit::TcpFilter::Config(json_config, server.stats(), server.runtime()));
-    return [config, &server](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(Network::ReadFilterPtr{new RateLimit::TcpFilter::Instance(
-          config, server.rateLimitClient(Optional<std::chrono::milliseconds>()))});
-    };
-  }
-};
+NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
+                                                                   FactoryContext& context) {
+  RateLimit::TcpFilter::ConfigSharedPtr config(
+      new RateLimit::TcpFilter::Config(json_config, context.scope(), context.runtime()));
+  const uint32_t timeout_ms = json_config.getInteger("timeout_ms", 20);
+  return [config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new RateLimit::TcpFilter::Instance(
+        config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms)))});
+  };
+}
 
 /**
- * Static registration for the rate limit filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterFactory.
  */
-static RegisterNetworkFilterConfigFactory<RateLimitConfigFactory> registered_;
+static Registry::RegisterFactory<RateLimitConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

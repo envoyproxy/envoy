@@ -1,12 +1,18 @@
 #pragma once
 
+#include <string>
+
+namespace Envoy {
 /**
  * Wraps compiled in code versioning.
- * NOTE: The GIT_SHA is generated into version_generated.cc and is not present in the source tree.
  */
 class VersionInfo {
 public:
+  // Repository revision (e.g. git SHA1).
+  static const std::string& revision();
+  // Repository status (e.g. clean, modified).
+  static const std::string& revisionStatus();
+  // Repository information and build type.
   static std::string version();
-
-  static const std::string GIT_SHA;
 };
+} // namespace Envoy

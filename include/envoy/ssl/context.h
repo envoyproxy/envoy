@@ -1,7 +1,11 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Ssl {
 
 /**
@@ -35,4 +39,5 @@ typedef std::unique_ptr<ClientContext> ClientContextPtr;
 class ServerContext : public virtual Context {};
 typedef std::unique_ptr<ServerContext> ServerContextPtr;
 
-} // SSL
+} // namespace Ssl
+} // namespace Envoy

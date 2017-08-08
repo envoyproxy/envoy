@@ -1,5 +1,15 @@
-#include "utility.h"
+#include "common/common/utility.h"
 
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <iterator>
+#include <string>
+#include <vector>
+
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 std::string DateFormatter::fromTime(const SystemTime& time) {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
@@ -19,7 +29,15 @@ std::string DateFormatter::now() {
   return fromTimeT(current_time_t);
 }
 
+ProdSystemTimeSource ProdSystemTimeSource::instance_;
+ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
+
 bool DateUtil::timePointValid(SystemTime time_point) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
+             .count() != 0;
+}
+
+bool DateUtil::timePointValid(MonotonicTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;
 }
@@ -69,10 +87,26 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
+size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
+  strncpy(dst, src, size - 1);
+  dst[size - 1] = '\0';
+  return strlen(src);
+}
+
 std::vector<std::string> StringUtil::split(const std::string& source, char split) {
+  return StringUtil::split(source, std::string{split});
+}
+
+std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split,
+                                           bool keep_empty_string) {
   std::vector<std::string> ret;
   size_t last_index = 0;
   size_t next_index;
+
+  if (split.empty()) {
+    ret.emplace_back(source);
+    return ret;
+  }
 
   do {
     next_index = source.find(split, last_index);
@@ -80,18 +114,55 @@ std::vector<std::string> StringUtil::split(const std::string& source, char split
       next_index = source.size();
     }
 
-    if (next_index != last_index) {
+    if (next_index != last_index || keep_empty_string) {
       ret.emplace_back(subspan(source, last_index, next_index));
     }
 
-    last_index = next_index + 1;
+    last_index = next_index + split.size();
   } while (next_index != source.size());
 
   return ret;
 }
 
+std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
+  std::ostringstream buf;
+  std::copy(source.begin(), source.end(),
+            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+  std::string ret = buf.str();
+  // copy will always end with an extra delimiter, we remove it here.
+  return ret.substr(0, ret.length() - delimiter.length());
+}
+
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
   return source.substr(start, end - start);
+}
+
+std::string StringUtil::escape(const std::string& source) {
+  std::string ret;
+
+  // Prevent unnecessary allocation by allocating 2x original size.
+  ret.reserve(source.length() * 2);
+  for (char c : source) {
+    switch (c) {
+    case '\r':
+      ret += "\\r";
+      break;
+    case '\n':
+      ret += "\\n";
+      break;
+    case '\t':
+      ret += "\\t";
+      break;
+    case '"':
+      ret += "\\\"";
+      break;
+    default:
+      ret += c;
+      break;
+    }
+  }
+
+  return ret;
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
@@ -119,3 +190,10 @@ bool StringUtil::startsWith(const char* source, const std::string& start, bool c
     return strncasecmp(source, start.c_str(), start.size()) == 0;
   }
 }
+
+const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
+                                                       const std::string& default_value) {
+  return s.empty() ? default_value : s;
+}
+
+} // namespace Envoy

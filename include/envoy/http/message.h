@@ -1,8 +1,12 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -18,15 +22,10 @@ public:
   virtual HeaderMap& headers() PURE;
 
   /**
-   * @return Buffer::Instance* the message body, if any.
+   * @return Buffer::InstancePtr& the message body, if any. Callers are free to reallocate, remove,
+   *         etc. the body.
    */
-  virtual Buffer::Instance* body() PURE;
-
-  /**
-   * Set the body.
-   * @param body supplies the new body.
-   */
-  virtual void body(Buffer::InstancePtr&& body) PURE;
+  virtual Buffer::InstancePtr& body() PURE;
 
   /**
    * @return HeaderMap* the message trailers, if any.
@@ -42,9 +41,10 @@ public:
   /**
    * @return std::string the message body as a std::string.
    */
-  virtual std::string bodyAsString() PURE;
+  virtual std::string bodyAsString() const PURE;
 };
 
 typedef std::unique_ptr<Message> MessagePtr;
 
-} // Http
+} // namespace Http
+} // namespace Envoy

@@ -1,7 +1,11 @@
 #pragma once
 
-#include "envoy/common/pure.h"
+#include <memory>
 
+#include "envoy/common/pure.h"
+#include "envoy/network/address.h"
+
+namespace Envoy {
 namespace Network {
 
 /**
@@ -12,9 +16,9 @@ public:
   virtual ~ListenSocket() {}
 
   /**
-   * @return a name used for stats.  For TCP listen sockets, this is the port.
+   * @return the address that the socket is listening on.
    */
-  virtual const std::string name() PURE;
+  virtual Address::InstanceConstSharedPtr localAddress() const PURE;
 
   /**
    * @return fd the listen socket's file descriptor.
@@ -28,5 +32,7 @@ public:
 };
 
 typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
+typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
 
-} // Network
+} // namespace Network
+} // namespace Envoy

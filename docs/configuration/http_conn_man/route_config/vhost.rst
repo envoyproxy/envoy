@@ -16,7 +16,9 @@ upstream cluster to route to or whether to perform a redirect.
     "domains": [],
     "routes": [],
     "require_ssl": "...",
-    "virtual_clusters": []
+    "virtual_clusters": [],
+    "rate_limits": [],
+    "request_headers_to_add": []
   }
 
 name
@@ -25,14 +27,18 @@ name
 
 domains
   *(required, array)* A list of domains (host/authority header) that will be matched to this
-  virtual host. Currently, wildcard matching of the form "\*.foo.com" is not supported, however
-  a special entry "\*" is allowed which will match any host/authority header. Only a single virtual
-  host in the entire route configuration can match on "\*". A domain must be unique across all
-  virtual hosts or the config will fail to load.
+  virtual host. Wildcard hosts are supported in the form of "\*.foo.com" or "\*-bar.foo.com".
+  Note that the wildcard will not match the empty string. e.g. "\*-bar.foo.com" will match
+  "baz-bar.foo.com" but not "-bar.foo.com".  Additionally, a special entry "\*" is allowed
+  which will match any host/authority header.  Only a single virtual host in the entire route
+  configuration can match on "\*".  A domain must be unique across all virtual hosts or the config
+  will fail to load.
 
 :ref:`routes <config_http_conn_man_route_table_route>`
   *(required, array)* The list of routes that will be matched, in order, for incoming requests.
   The first route that matches will be used.
+
+.. _config_http_conn_man_route_table_vhost_require_ssl:
 
 require_ssl
   *(optional, string)* Specifies the type of TLS enforcement the virtual host expects. Possible
@@ -51,3 +57,23 @@ require_ssl
 :ref:`virtual_clusters <config_http_conn_man_route_table_vcluster>`
   *(optional, array)* A list of virtual clusters defined for this virtual host. Virtual clusters
   are used for additional statistics gathering.
+
+:ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
+  *(optional, array)* Specifies a set of rate limit configurations that will be applied to the
+  virtual host.
+
+.. _config_http_conn_man_route_table_vhost_add_req_headers:
+
+request_headers_to_add
+  *(optional, array)* Specifies a list of HTTP headers that should be added to each
+  request handled by this virtual host. Headers are specified in the following form:
+
+  .. code-block:: json
+
+    [
+      {"key": "header1", "value": "value1"},
+      {"key": "header2", "value": "value2"}
+    ]
+
+  *Note:* In the presence of duplicate header keys,
+  :ref:`precendence rules <config_http_conn_man_route_table_route_add_req_headers>` apply.

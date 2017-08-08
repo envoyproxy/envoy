@@ -1,7 +1,13 @@
 #pragma once
 
-#include "bson.h"
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "envoy/mongo/bson.h"
+
+namespace Envoy {
 /**
  * General implementation of https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/
  */
@@ -58,8 +64,8 @@ public:
   virtual void flags(int32_t flags) PURE;
   virtual const std::string& fullCollectionName() const PURE;
   virtual void fullCollectionName(const std::string& name) PURE;
-  virtual const std::list<Bson::DocumentPtr>& documents() const PURE;
-  virtual std::list<Bson::DocumentPtr>& documents() PURE;
+  virtual const std::list<Bson::DocumentSharedPtr>& documents() const PURE;
+  virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
 typedef std::unique_ptr<InsertMessage> InsertMessagePtr;
@@ -104,9 +110,9 @@ public:
   virtual int32_t numberToReturn() const PURE;
   virtual void numberToReturn(int32_t to_return) PURE;
   virtual const Bson::Document* query() const PURE;
-  virtual void query(Bson::DocumentPtr&& query) PURE;
+  virtual void query(Bson::DocumentSharedPtr&& query) PURE;
   virtual const Bson::Document* returnFieldsSelector() const PURE;
-  virtual void returnFieldsSelector(Bson::DocumentPtr&& fields) PURE;
+  virtual void returnFieldsSelector(Bson::DocumentSharedPtr&& fields) PURE;
 };
 
 typedef std::unique_ptr<QueryMessage> QueryMessagePtr;
@@ -133,8 +139,8 @@ public:
   virtual void startingFrom(int32_t starting_from) PURE;
   virtual int32_t numberReturned() const PURE;
   virtual void numberReturned(int32_t number_returned) PURE;
-  virtual const std::list<Bson::DocumentPtr>& documents() const PURE;
-  virtual std::list<Bson::DocumentPtr>& documents() PURE;
+  virtual const std::list<Bson::DocumentSharedPtr>& documents() const PURE;
+  virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
 typedef std::unique_ptr<ReplyMessage> ReplyMessagePtr;
@@ -146,7 +152,6 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() {}
 
-  virtual void decodeBase64(std::string&& message) PURE;
   virtual void decodeGetMore(GetMoreMessagePtr&& message) PURE;
   virtual void decodeInsert(InsertMessagePtr&& message) PURE;
   virtual void decodeKillCursors(KillCursorsMessagePtr&& message) PURE;
@@ -180,4 +185,5 @@ public:
   virtual void encodeReply(const ReplyMessage& message) PURE;
 };
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

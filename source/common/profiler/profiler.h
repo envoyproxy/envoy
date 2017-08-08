@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
+namespace Envoy {
 namespace Profiler {
 
 /**
@@ -14,8 +17,9 @@ public:
 
   /**
    * Start the profiler and write to the specified path.
+   * @return bool whether the call to start the profiler succeeded.
    */
-  static void startProfiler(const std::string& output_path);
+  static bool startProfiler(const std::string& output_path);
 
   /**
    * Stop the profiler.
@@ -31,4 +35,5 @@ private:
   static void forceLink();
 };
 
-} // Profiler
+} // namespace Profiler
+} // namespace Envoy

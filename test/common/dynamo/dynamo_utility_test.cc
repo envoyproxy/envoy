@@ -1,6 +1,12 @@
+#include <string>
+
 #include "common/dynamo/dynamo_utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::_;
 
 namespace Dynamo {
@@ -50,4 +56,5 @@ TEST(DynamoUtility, PartitionIdStatString) {
   }
 }
 
-} // Dynamo
+} // namespace Dynamo
+} // namespace Envoy

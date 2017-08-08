@@ -1,8 +1,17 @@
-#include "bson_impl.h"
+#include "common/mongo/bson_impl.h"
+
+#include <cstdint>
+#include <sstream>
+#include <string>
 
 #include "common/common/assert.h"
+#include "common/common/byte_order.h"
 #include "common/common/hex.h"
+#include "common/common/utility.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Bson {
 
 int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
@@ -10,8 +19,10 @@ int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
     throw EnvoyException("invalid buffer size");
   }
 
+  int32_t val;
   void* mem = data.linearize(sizeof(int32_t));
-  return le32toh(*reinterpret_cast<int32_t*>(mem));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int32_t));
+  return le32toh(val);
 }
 
 uint8_t BufferHelper::removeByte(Buffer::Instance& data) {
@@ -31,7 +42,7 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
   }
 
   void* mem = data.linearize(out_len);
-  memcpy(out, mem, out_len);
+  std::memcpy(out, mem, out_len);
   data.drain(out_len);
 }
 
@@ -74,10 +85,11 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
     throw EnvoyException("invalid buffer size");
   }
 
+  int64_t val;
   void* mem = data.linearize(sizeof(int64_t));
-  int64_t ret = le64toh(*reinterpret_cast<int64_t*>(mem));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int64_t));
   data.drain(sizeof(int64_t));
-  return ret;
+  return le64toh(val);
 }
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {
@@ -177,7 +189,7 @@ int32_t FieldImpl::byteSize() const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void FieldImpl::encode(Buffer::Instance& output) const {
@@ -230,7 +242,7 @@ void FieldImpl::encode(Buffer::Instance& output) const {
     return BufferHelper::writeInt32(output, value_.int32_value_);
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 bool FieldImpl::operator==(const Field& rhs) const {
@@ -292,7 +304,7 @@ bool FieldImpl::operator==(const Field& rhs) const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 std::string FieldImpl::toString() const {
@@ -303,7 +315,7 @@ std::string FieldImpl::toString() const {
 
   case Type::STRING:
   case Type::BINARY: {
-    return fmt::format("'{}'", value_.string_value_);
+    return fmt::format("\"{}\"", StringUtil::escape(value_.string_value_));
   }
 
   case Type::DOCUMENT:
@@ -312,11 +324,12 @@ std::string FieldImpl::toString() const {
   }
 
   case Type::OBJECT_ID: {
-    return Hex::encode(&value_.object_id_value_[0], value_.object_id_value_.size());
+    return fmt::format("\"{}\"",
+                       Hex::encode(&value_.object_id_value_[0], value_.object_id_value_.size()));
   }
 
   case Type::BOOLEAN: {
-    return std::to_string(value_.bool_value_);
+    return value_.bool_value_ ? "true" : "false";
   }
 
   case Type::NULL_VALUE: {
@@ -324,7 +337,8 @@ std::string FieldImpl::toString() const {
   }
 
   case Type::REGEX: {
-    return fmt::format("['{}', '{}']", value_.regex_value_.pattern_, value_.regex_value_.options_);
+    return fmt::format("[\"{}\", \"{}\"]", value_.regex_value_.pattern_,
+                       value_.regex_value_.options_);
   }
 
   case Type::INT32: {
@@ -338,7 +352,7 @@ std::string FieldImpl::toString() const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void DocumentImpl::fromBuffer(Buffer::Instance& data) {
@@ -348,11 +362,12 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     throw EnvoyException("invalid BSON message length");
   }
 
-  log_trace("BSON document length: {} data length: {}", message_length, original_buffer_length);
+  ENVOY_LOG(trace, "BSON document length: {} data length: {}", message_length,
+            original_buffer_length);
 
   while (true) {
     uint64_t document_bytes_remaining = data.length() - (original_buffer_length - message_length);
-    log_trace("BSON document bytes remaining: {}", document_bytes_remaining);
+    ENVOY_LOG(trace, "BSON document bytes remaining: {}", document_bytes_remaining);
     if (document_bytes_remaining == 1) {
       uint8_t last_byte = BufferHelper::removeByte(data);
       if (last_byte != 0) {
@@ -364,37 +379,37 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
 
     uint8_t element_type = BufferHelper::removeByte(data);
     std::string key = BufferHelper::removeCString(data);
-    log_trace("BSON element type: {:#x} key: {}", element_type, key);
+    ENVOY_LOG(trace, "BSON element type: {:#x} key: {}", element_type, key);
     switch (static_cast<Field::Type>(element_type)) {
     case Field::Type::DOUBLE: {
       double value = BufferHelper::removeDouble(data);
-      log_trace("BSON double: {}", value);
+      ENVOY_LOG(trace, "BSON double: {}", value);
       addDouble(key, value);
       break;
     }
 
     case Field::Type::STRING: {
       std::string value = BufferHelper::removeString(data);
-      log_trace("BSON string: {}", value);
+      ENVOY_LOG(trace, "BSON string: {}", value);
       addString(key, std::move(value));
       break;
     }
 
     case Field::Type::DOCUMENT: {
-      log_trace("BSON document");
+      ENVOY_LOG(trace, "BSON document");
       addDocument(key, DocumentImpl::create(data));
       break;
     }
 
     case Field::Type::ARRAY: {
-      log_trace("BSON array");
+      ENVOY_LOG(trace, "BSON array");
       addArray(key, DocumentImpl::create(data));
       break;
     }
 
     case Field::Type::BINARY: {
       std::string value = BufferHelper::removeBinary(data);
-      log_trace("BSON binary: {}", value);
+      ENVOY_LOG(trace, "BSON binary: {}", value);
       addBinary(key, std::move(value));
       break;
     }
@@ -408,20 +423,20 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
 
     case Field::Type::BOOLEAN: {
       bool value = BufferHelper::removeByte(data) != 0;
-      log_trace("BSON boolean: {}", value);
+      ENVOY_LOG(trace, "BSON boolean: {}", value);
       addBoolean(key, value);
       break;
     }
 
     case Field::Type::DATETIME: {
       int64_t value = BufferHelper::removeInt64(data);
-      log_trace("BSON datetime: {}", value);
+      ENVOY_LOG(trace, "BSON datetime: {}", value);
       addDatetime(key, value);
       break;
     }
 
     case Field::Type::NULL_VALUE: {
-      log_trace("BSON null value");
+      ENVOY_LOG(trace, "BSON null value");
       addNull(key);
       break;
     }
@@ -430,28 +445,28 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
       Field::Regex value;
       value.pattern_ = BufferHelper::removeCString(data);
       value.options_ = BufferHelper::removeCString(data);
-      log_trace("BSON regex pattern: {} options: {}", value.pattern_, value.options_);
+      ENVOY_LOG(trace, "BSON regex pattern: {} options: {}", value.pattern_, value.options_);
       addRegex(key, std::move(value));
       break;
     }
 
     case Field::Type::INT32: {
       int32_t value = BufferHelper::removeInt32(data);
-      log_trace("BSON int32: {}", value);
+      ENVOY_LOG(trace, "BSON int32: {}", value);
       addInt32(key, value);
       break;
     }
 
     case Field::Type::TIMESTAMP: {
       int64_t value = BufferHelper::removeInt64(data);
-      log_trace("BSON timestamp: {}", value);
+      ENVOY_LOG(trace, "BSON timestamp: {}", value);
       addTimestamp(key, value);
       break;
     }
 
     case Field::Type::INT64: {
       int64_t value = BufferHelper::removeInt64(data);
-      log_trace("BSON int64: {}", value);
+      ENVOY_LOG(trace, "BSON int64: {}", value);
       addInt64(key, value);
       break;
     }
@@ -509,7 +524,7 @@ std::string DocumentImpl::toString() const {
       out << ", ";
     }
 
-    out << fmt::format("'{}': {}", field->key(), field->toString());
+    out << fmt::format("\"{}\": {}", field->key(), field->toString());
     first = false;
   }
 
@@ -537,4 +552,5 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
   return nullptr;
 }
 
-} // Bson
+} // namespace Bson
+} // namespace Envoy

@@ -1,4 +1,7 @@
-#include "ratelimit.h"
+#include "common/http/filter/ratelimit.h"
+
+#include <string>
+#include <vector>
 
 #include "envoy/http/codes.h"
 
@@ -6,81 +9,65 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
-#include "common/http/headers.h"
+#include "common/router/config_impl.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Http {
 namespace RateLimit {
 
-const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
-    {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
+namespace {
 
-void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
-                                                 std::vector<::RateLimit::Descriptor>& descriptors,
-                                                 FilterConfig& config, const HeaderMap&,
-                                                 StreamDecoderFilterCallbacks&) {
-  // We limit on 2 dimensions.
-  // 1) All calls to the given cluster.
-  // 2) Calls to the given cluster and from this cluster.
-  // The service side configuration can choose to limit on 1 or both of the above.
-  descriptors.push_back({{{"to_cluster", route.clusterName()}}});
-  descriptors.push_back(
-      {{{"to_cluster", route.clusterName()}, {"from_cluster", config.localServiceCluster()}}});
+static const Http::HeaderMap* getTooManyRequestsHeader() {
+  static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
+      {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}};
+  return header_map;
 }
 
-void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
-                                               std::vector<::RateLimit::Descriptor>& descriptors,
-                                               FilterConfig&, const HeaderMap& headers,
-                                               StreamDecoderFilterCallbacks&) {
-  const HeaderEntry* header_value = headers.get(header_name_);
-  if (!header_value) {
+} // namespace
+
+void Filter::initiateCall(const HeaderMap& headers) {
+  bool is_internal_request =
+      headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
+
+  if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
+      (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
     return;
   }
 
-  descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
-
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
+  Router::RouteConstSharedPtr route = callbacks_->route();
+  if (!route || !route->routeEntry()) {
     return;
   }
 
-  descriptors.push_back(
-      {{{"route_key", route_key}, {descriptor_key_, header_value->value().c_str()}}});
-}
-
-void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
-                                              std::vector<::RateLimit::Descriptor>& descriptors,
-                                              FilterConfig&, const HeaderMap&,
-                                              StreamDecoderFilterCallbacks& callbacks) {
-  const std::string& remote_address = callbacks.downstreamAddress();
-  if (remote_address.empty()) {
+  const Router::RouteEntry* route_entry = route->routeEntry();
+  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
+  if (!cluster) {
     return;
   }
+  cluster_ = cluster->info();
 
-  descriptors.push_back({{{"remote_address", remote_address}}});
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
-    return;
+  // Get all applicable rate limit policy entries for the route.
+  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
+
+  // Get all applicable rate limit policy entries for the virtual host if the route opted to
+  // include the virtual host rate limits.
+  if (route_entry->includeVirtualHostRateLimits()) {
+    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                 route_entry, headers);
   }
 
-  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
-}
-
-FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
-                           Stats::Store& stats_store, Runtime::Loader& runtime)
-    : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
-      stats_store_(stats_store), runtime_(runtime) {
-  for (const Json::Object& action : config.getObjectArray("actions")) {
-    std::string type = action.getString("type");
-    if (type == "service_to_service") {
-      actions_.emplace_back(new ServiceToServiceAction());
-    } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(action));
-    } else if (type == "remote_address") {
-      actions_.emplace_back(new RemoteAddressAction());
-    } else {
-      throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
-    }
+  if (!descriptors.empty()) {
+    state_ = State::Calling;
+    initiating_call_ = true;
+    client_->limit(
+        *this, config_->domain(), descriptors,
+        {headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
+         headers.OtSpanContext() ? headers.OtSpanContext()->value().c_str() : EMPTY_STRING});
+    initiating_call_ = false;
   }
 }
 
@@ -89,33 +76,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
-  if (route && route->rateLimitPolicy().doGlobalLimiting()) {
-    // Check if the route_key is enabled for rate limiting.
-    const std::string& route_key = route->rateLimitPolicy().routeKey();
-    if (!route_key.empty() &&
-        !config_->runtime().snapshot().featureEnabled(
-            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
-      return FilterHeadersStatus::Continue;
-    }
-
-    std::vector<::RateLimit::Descriptor> descriptors;
-    for (const ActionPtr& action : config_->actions()) {
-      action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
-    }
-
-    if (!descriptors.empty()) {
-      cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
-      cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
-
-      state_ = State::Calling;
-      initiating_call_ = true;
-      client_->limit(*this, config_->domain(), descriptors,
-                     headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING);
-      initiating_call_ = false;
-    }
-  }
-
+  initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? FilterHeadersStatus::StopIteration
              : FilterHeadersStatus::Continue;
@@ -135,41 +96,69 @@ FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
 
 void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks.addResetStreamCallback([this]() -> void {
-    if (state_ == State::Calling) {
-      client_->cancel();
-    }
-  });
 }
 
-void Filter::complete(::RateLimit::LimitStatus status) {
+void Filter::onDestroy() {
+  if (state_ == State::Calling) {
+    state_ = State::Complete;
+    client_->cancel();
+  }
+}
+
+void Filter::complete(Envoy::RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
   switch (status) {
-  case ::RateLimit::LimitStatus::OK:
-    config_->stats().counter(cluster_ratelimit_stat_prefix_ + "ok").inc();
+  case Envoy::RateLimit::LimitStatus::OK:
+    cluster_->statsScope().counter("ratelimit.ok").inc();
     break;
-  case ::RateLimit::LimitStatus::Error:
-    config_->stats().counter(cluster_ratelimit_stat_prefix_ + "error").inc();
+  case Envoy::RateLimit::LimitStatus::Error:
+    cluster_->statsScope().counter("ratelimit.error").inc();
     break;
-  case ::RateLimit::LimitStatus::OverLimit:
-    config_->stats().counter(cluster_ratelimit_stat_prefix_ + "over_limit").inc();
-    Http::CodeUtility::ResponseStatInfo info{config_->stats(), cluster_stat_prefix_,
-                                             *TOO_MANY_REQUESTS_HEADER, true, EMPTY_STRING,
-                                             EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
+  case Envoy::RateLimit::LimitStatus::OverLimit:
+    cluster_->statsScope().counter("ratelimit.over_limit").inc();
+    Http::CodeUtility::ResponseStatInfo info{config_->scope(),
+                                             cluster_->statsScope(),
+                                             EMPTY_STRING,
+                                             *getTooManyRequestsHeader(),
+                                             true,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             EMPTY_STRING,
+                                             false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
   }
 
-  if (status == ::RateLimit::LimitStatus::OverLimit &&
+  if (status == Envoy::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*TOO_MANY_REQUESTS_HEADER)};
+    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getTooManyRequestsHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
 }
 
-} // RateLimit
-} // Http
+void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+                                          std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                          const Router::RouteEntry* route_entry,
+                                          const HeaderMap& headers) const {
+  for (const Router::RateLimitPolicyEntry& rate_limit :
+       rate_limit_policy.getApplicableRateLimit(config_->stage())) {
+    const std::string& disable_key = rate_limit.disableKey();
+    if (!disable_key.empty() &&
+        !config_->runtime().snapshot().featureEnabled(
+            fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
+      continue;
+    }
+    rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
+                                   headers, callbacks_->downstreamAddress());
+  }
+}
+
+} // namespace RateLimit
+} // namespace Http
+} // namespace Envoy

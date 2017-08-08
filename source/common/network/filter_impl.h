@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -8,6 +9,7 @@ namespace Network {
 class ReadFilterBaseImpl : public ReadFilter {
 public:
   void initializeReadFilterCallbacks(ReadFilterCallbacks&) override {}
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 };
 
 /**
@@ -16,6 +18,8 @@ public:
 class FilterBaseImpl : public Filter {
 public:
   void initializeReadFilterCallbacks(ReadFilterCallbacks&) override {}
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 };
 
-} // Network
+} // namespace Network
+} // namespace Envoy

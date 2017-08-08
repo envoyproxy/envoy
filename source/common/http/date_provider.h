@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -19,4 +20,5 @@ public:
   virtual void setDateHeader(HeaderMap& headers) PURE;
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

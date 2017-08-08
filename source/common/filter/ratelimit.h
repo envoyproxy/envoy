@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -8,6 +13,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace RateLimit {
 namespace TcpFilter {
 
@@ -36,14 +42,14 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const Json::Object& config, Stats::Store& stats_store, Runtime::Loader& runtime);
+  Config(const Json::Object& config, Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
   const std::vector<Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
 
 private:
-  static InstanceStats generateStats(const std::string& name, Stats::Store& store);
+  static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
 
   std::string domain_;
   std::vector<Descriptor> descriptors_;
@@ -51,7 +57,7 @@ private:
   Runtime::Loader& runtime_;
 };
 
-typedef std::shared_ptr<Config> ConfigPtr;
+typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
  * TCP rate limit filter instance. This filter will call the rate limit service with the given
@@ -63,18 +69,21 @@ class Instance : public Network::ReadFilter,
                  public Network::ConnectionCallbacks,
                  public RequestCallbacks {
 public:
-  Instance(ConfigPtr config, ClientPtr&& client) : config_(config), client_(std::move(client)) {}
+  Instance(ConfigSharedPtr config, ClientPtr&& client)
+      : config_(config), client_(std::move(client)) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     filter_callbacks_ = &callbacks;
     filter_callbacks_->connection().addConnectionCallbacks(*this);
   }
 
   // Network::ConnectionCallbacks
-  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   // RateLimit::RequestCallbacks
   void complete(LimitStatus status) override;
@@ -82,7 +91,7 @@ public:
 private:
   enum class Status { NotStarted, Calling, Complete };
 
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
@@ -90,4 +99,5 @@ private:
 };
 
 } // TcpFilter
-} // RateLimit
+} // namespace RateLimit
+} // namespace Envoy

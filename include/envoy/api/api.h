@@ -1,9 +1,13 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
+namespace Envoy {
 namespace Api {
 
 /**
@@ -25,9 +29,10 @@ public:
    * @param dispatcher supplies the dispatcher uses for async flushing.
    * @param lock supplies the lock to use for cross thread appends.
    */
-  virtual Filesystem::FilePtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                         Thread::BasicLockable& lock,
-                                         Stats::Store& stats_store) PURE;
+  virtual Filesystem::FileSharedPtr createFile(const std::string& path,
+                                               Event::Dispatcher& dispatcher,
+                                               Thread::BasicLockable& lock,
+                                               Stats::Store& stats_store) PURE;
 
   /**
    * @return bool whether a file exists and can be opened for read on disk.
@@ -42,4 +47,5 @@ public:
 
 typedef std::unique_ptr<Api> ApiPtr;
 
-} // Api
+} // namespace Api
+} // namespace Envoy

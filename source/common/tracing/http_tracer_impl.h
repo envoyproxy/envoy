@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -8,41 +11,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
-#include "lightstep/tracer.h"
-
+namespace Envoy {
 namespace Tracing {
-
-#define HTTP_TRACER_STATS(COUNTER)                                                                 \
-  COUNTER(global_switch_off)                                                                       \
-  COUNTER(invalid_request_id)                                                                      \
-  COUNTER(random_sampling)                                                                         \
-  COUNTER(service_forced)                                                                          \
-  COUNTER(client_enabled)                                                                          \
-  COUNTER(doing_tracing)                                                                           \
-  COUNTER(flush)                                                                                   \
-  COUNTER(not_traceable)                                                                           \
-  COUNTER(health_check)                                                                            \
-  COUNTER(traceable)
-
-struct HttpTracerStats {
-  HTTP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-#define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
-  COUNTER(spans_sent)                                                                              \
-  COUNTER(timer_flushed)
-
-struct LightstepTracerStats {
-  LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-class HttpNullTracer : public HttpTracer {
-public:
-  // Tracing::HttpTracer
-  void addSink(HttpSinkPtr&&) override {}
-  void trace(const Http::HeaderMap*, const Http::HeaderMap*, const Http::AccessLog::RequestInfo&,
-             const TracingContext&) override {}
-};
 
 enum class Reason {
   NotTraceableRequestId,
@@ -60,6 +30,13 @@ struct Decision {
 class HttpTracerUtility {
 public:
   /**
+   * Get string representation of the operation.
+   * @param operation name to convert.
+   * @return string representation of the operation.
+   */
+  static const std::string& toString(OperationName operation_name);
+
+  /**
    * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.
    * Note: there is a global switch which turns off tracing completely on server side.
    *
@@ -72,98 +49,70 @@ public:
    * Mutate request headers if request needs to be traced.
    */
   static void mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime);
+
+  /**
+   * 1) Fill in span tags based on the response headers.
+   * 2) Finish active span.
+   */
+  static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
+                           const Http::AccessLog::RequestInfo& request_info,
+                           const Config& tracing_config);
+
+  static const std::string INGRESS_OPERATION;
+  static const std::string EGRESS_OPERATION;
+};
+
+class NullSpan : public Span {
+public:
+  // Tracing::Span
+  void setTag(const std::string&, const std::string&) override {}
+  void finishSpan(SpanFinalizer&) override {}
+  void injectContext(Http::HeaderMap&) override {}
+  SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
+};
+
+class NullFinalizer : public SpanFinalizer {
+public:
+  // Tracing::SpanFinalizer
+  void finalize(Span&) override {}
+};
+
+/**
+ * Finalizer for Spans covering standard request ingress.
+ */
+class HttpConnManFinalizerImpl : public SpanFinalizer {
+public:
+  HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
+                           Http::AccessLog::RequestInfo& request_info, Config& tracing_config);
+
+  void finalize(Span& span) override;
+
+private:
+  Http::HeaderMap* request_headers_;
+  Http::AccessLog::RequestInfo& request_info_;
+  Config& tracing_config_;
+};
+
+class HttpNullTracer : public HttpTracer {
+public:
+  // Tracing::HttpTracer
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
+    return SpanPtr{new NullSpan()};
+  }
 };
 
 class HttpTracerImpl : public HttpTracer {
 public:
-  HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats);
+  HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  void addSink(HttpSinkPtr&& sink) override;
-  void trace(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-             const Http::AccessLog::RequestInfo& request_info,
-             const TracingContext& tracing_context) override;
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+                    const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
-  void populateStats(const Decision& decision);
-
-  Runtime::Loader& runtime_;
-  HttpTracerStats stats_;
-  std::vector<HttpSinkPtr> sinks_;
+  DriverPtr driver_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
-/**
- * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
- * application trace data.
- *
- * LightStepSink is for flushing data to LightStep collectors.
- */
-class LightStepSink : public HttpSink {
-public:
-  LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                Stats::Store& stats, const std::string& service_node, ThreadLocal::Instance& tls,
-                Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
-
-  // Tracer::HttpSink
-  void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-                  const Http::AccessLog::RequestInfo& request_info,
-                  const TracingContext& tracing_context) override;
-
-  Upstream::ClusterManager& clusterManager() { return cm_; }
-  const std::string& collectorCluster() { return collector_cluster_; }
-  Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& statsStore() { return stats_store_; }
-  LightstepTracerStats& tracerStats() { return tracer_stats_; }
-
-private:
-  struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
-    TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink);
-
-    void shutdown() override {}
-
-    lightstep::Tracer tracer_;
-    LightStepSink& sink_;
-  };
-
-  std::string buildRequestLine(const Http::HeaderMap& request_headers,
-                               const Http::AccessLog::RequestInfo& info);
-  std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
-
-  const std::string collector_cluster_;
-  Upstream::ClusterManager& cm_;
-  Stats::Store& stats_store_;
-  LightstepTracerStats tracer_stats_;
-  const std::string service_node_;
-  ThreadLocal::Instance& tls_;
-  Runtime::Loader& runtime_;
-  std::unique_ptr<lightstep::TracerOptions> options_;
-  uint32_t tls_slot_;
-};
-
-class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
-public:
-  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
-                    Event::Dispatcher& dispatcher);
-
-  // lightstep::Recorder
-  void RecordSpan(lightstep::collector::Span&& span) override;
-  bool FlushWithTimeout(lightstep::Duration) override;
-
-  // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
-
-  static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink& sink,
-                                                          Event::Dispatcher& dispatcher,
-                                                          const lightstep::TracerImpl& tracer);
-
-private:
-  void enableTimer();
-  void flushSpans();
-
-  lightstep::ReportBuilder builder_;
-  LightStepSink& sink_;
-  Event::TimerPtr flush_timer_;
-};
-
-} // Tracing
+} // namespace Tracing
+} // namespace Envoy

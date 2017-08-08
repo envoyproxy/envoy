@@ -1,7 +1,11 @@
 #include "mocks.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::ReturnArg;
+using testing::_;
 
 namespace Runtime {
 
@@ -13,4 +17,5 @@ MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(sn
 
 MockLoader::~MockLoader() {}
 
-} // Runtime
+} // namespace Runtime
+} // namespace Envoy

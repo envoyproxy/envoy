@@ -1,9 +1,14 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /*
@@ -95,4 +100,5 @@ private:
   RequestParser() {}
 };
 
-} // Dynamo
+} // namespace Dynamo
+} // namespace Envoy

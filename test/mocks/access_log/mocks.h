@@ -1,17 +1,16 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 
+#include "test/mocks/filesystem/mocks.h"
+
+#include "gmock/gmock.h"
+
+namespace Envoy {
 namespace AccessLog {
-
-class MockAccessLog : public AccessLog {
-public:
-  MockAccessLog();
-  ~MockAccessLog();
-
-  // AccessLog::AccessLog
-  MOCK_METHOD0(reopen, void());
-};
 
 class MockAccessLogManager : public AccessLogManager {
 public:
@@ -20,7 +19,10 @@ public:
 
   // AccessLog::AccessLogManager
   MOCK_METHOD0(reopen, void());
-  MOCK_METHOD1(registerAccessLog, void(AccessLogPtr));
+  MOCK_METHOD1(createAccessLog, Filesystem::FileSharedPtr(const std::string& file_name));
+
+  std::shared_ptr<Filesystem::MockFile> file_{new testing::NiceMock<Filesystem::MockFile>()};
 };
 
-} // AccessLog
+} // namespace AccessLog
+} // namespace Envoy

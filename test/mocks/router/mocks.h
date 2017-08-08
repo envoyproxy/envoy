@@ -1,8 +1,20 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/router/router.h"
+#include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 
+#include "gmock/gmock.h"
+
+namespace Envoy {
 namespace Router {
 
 class MockRedirectEntry : public RedirectEntry {
@@ -17,9 +29,11 @@ public:
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
 
+  std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
 };
@@ -39,16 +53,36 @@ public:
   DoRetryCallback callback_;
 };
 
-class TestRateLimitPolicy : public RateLimitPolicy {
+class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
-  // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
+  MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry();
+
+  // Router::RateLimitPolicyEntry
+  MOCK_CONST_METHOD0(stage, uint64_t());
+  MOCK_CONST_METHOD0(disableKey, const std::string&());
+  MOCK_CONST_METHOD5(populateDescriptors,
+                     void(const RouteEntry& route,
+                          std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address));
+
+  uint64_t stage_{};
+  std::string disable_key_;
+};
+
+class MockRateLimitPolicy : public RateLimitPolicy {
+public:
+  MockRateLimitPolicy();
+  ~MockRateLimitPolicy();
 
   // Router::RateLimitPolicy
-  const std::string& routeKey() const override { return route_key_; }
+  MOCK_CONST_METHOD1(
+      getApplicableRateLimit,
+      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint64_t stage));
+  MOCK_CONST_METHOD0(empty, bool());
 
-  bool do_global_limiting_{};
-  std::string route_key_;
+  std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {
@@ -86,6 +120,28 @@ public:
   Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
 };
 
+class MockVirtualHost : public VirtualHost {
+public:
+  MockVirtualHost();
+  ~MockVirtualHost();
+
+  // Router::VirtualHost
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
+
+  std::string name_{"fake_vhost"};
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+};
+
+class MockHashPolicy : public HashPolicy {
+public:
+  MockHashPolicy();
+  ~MockHashPolicy();
+
+  // Router::HashPolicy
+  MOCK_CONST_METHOD1(generateHash, Optional<uint64_t>(const Http::HeaderMap& headers));
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -94,6 +150,7 @@ public:
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD1(finalizeRequestHeaders, void(Http::HeaderMap& headers));
+  MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
@@ -101,13 +158,32 @@ public:
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
+  MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
+  MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(useWebSocket, bool());
+  MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
+  MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
 
   std::string cluster_name_{"fake_cluster"};
-  std::string vhost_name_{"fake_vhost"};
+  std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
-  TestRateLimitPolicy rate_limit_policy_;
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
+  testing::NiceMock<MockVirtualHost> virtual_host_;
+  MockHashPolicy hash_policy_;
+};
+
+class MockRoute : public Route {
+public:
+  MockRoute();
+  ~MockRoute();
+
+  // Router::Route
+  MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
+  MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+
+  testing::NiceMock<MockRouteEntry> route_entry_;
 };
 
 class MockConfig : public Config {
@@ -116,30 +192,18 @@ public:
   ~MockConfig();
 
   // Router::Config
-  MOCK_CONST_METHOD2(redirectRequest,
-                     const RedirectEntry*(const Http::HeaderMap& headers, uint64_t random_value));
-  MOCK_CONST_METHOD2(routeForRequest,
-                     const RouteEntry*(const Http::HeaderMap&, uint64_t random_value));
+  MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(usesRuntime, bool());
 
+  std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
-class MockStableRouteTable : public StableRouteTable {
-public:
-  MockStableRouteTable();
-  ~MockStableRouteTable();
-
-  // Router::StableRouteTable
-  MOCK_CONST_METHOD1(redirectRequest, const RedirectEntry*(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD1(routeForRequest, const RouteEntry*(const Http::HeaderMap&));
-
-  testing::NiceMock<MockRouteEntry> route_entry_;
-};
-
-} // Router
+} // namespace Router
+} // namespace Envoy

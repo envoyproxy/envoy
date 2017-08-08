@@ -1,7 +1,9 @@
 FROM lyft/envoy:latest
 
-RUN apt-get install -y python-dev
-RUN pip install grpcio requests
+RUN apt-get update
+RUN apt-get -q install -y python-dev \
+    python-pip
+RUN pip install -q grpcio requests
 ADD ./client /client
 RUN chmod a+x /client/client.py
 RUN mkdir /var/log/envoy/

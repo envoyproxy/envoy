@@ -1,41 +1,43 @@
-#include "codec_impl.h"
-#include "proxy.h"
+#include "common/mongo/proxy.h"
 
-#include "envoy/api/api.h"
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/mongo/codec_impl.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Mongo {
 
-AccessLog::AccessLog(Api::Api& api, const std::string& file_name, Event::Dispatcher& dispatcher,
-                     Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  file_ = api.createFile(file_name, dispatcher, lock, stats_store);
+AccessLog::AccessLog(const std::string& file_name,
+                     Envoy::AccessLog::AccessLogManager& log_manager) {
+  file_ = log_manager.createAccessLog(file_name);
 }
 
-AccessLog::~AccessLog() {}
-
-void AccessLog::reopen() { file_->reopen(); }
-
-void AccessLog::logMessage(const Message& message, const std::string&, bool full,
+void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
   static const std::string log_format =
-      "{{\"time\": \"{}\", \"message\": \"{}\", \"upstream_host\": \"{}\"}}\n";
+      "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = std::chrono::system_clock::now();
   std::string log_line =
       fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now), message.toString(full),
-                  upstream_host ? upstream_host->url() : "-");
+                  upstream_host ? upstream_host->address()->asString() : "-");
 
   file_->write(log_line);
 }
 
-ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Store& store,
-                         Runtime::Loader& runtime, AccessLogPtr access_log)
-    : stat_prefix_(stat_prefix), stat_store_(store), stats_(generateStats(stat_prefix, store)),
+ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
+                         Runtime::Loader& runtime, AccessLogSharedPtr access_log)
+    : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), access_log_(access_log) {
 
   if (!runtime_.snapshot().featureEnabled("mongo.connection_logging_enabled", 100)) {
@@ -50,25 +52,25 @@ ProxyFilter::~ProxyFilter() {}
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   stats_.op_get_more_.inc();
   logMessage(*message, true);
-  log_debug("decoded GET_MORE: {}", message->toString(true));
+  ENVOY_LOG(debug, "decoded GET_MORE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   stats_.op_insert_.inc();
   logMessage(*message, true);
-  log_debug("decoded INSERT: {}", message->toString(true));
+  ENVOY_LOG(debug, "decoded INSERT: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
-  log_debug("decoded KILL_CURSORS: {}", message->toString(true));
+  ENVOY_LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   stats_.op_query_.inc();
   logMessage(*message, true);
-  log_debug("decoded QUERY: {}", message->toString(true));
+  ENVOY_LOG(debug, "decoded QUERY: {}", message->toString(true));
 
   if (message->flags() & QueryMessage::Flags::TailableCursor) {
     stats_.op_query_tailable_cursor_.inc();
@@ -86,8 +88,8 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   ActiveQueryPtr active_query(new ActiveQuery(*this, *message));
   if (!active_query->query_info_.command().empty()) {
     // First field key is the operation.
-    stat_store_.counter(fmt::format("{}cmd.{}.total", stat_prefix_,
-                                    active_query->query_info_.command())).inc();
+    scope_.counter(fmt::format("{}cmd.{}.total", stat_prefix_, active_query->query_info_.command()))
+        .inc();
   } else {
     // Normal query, get stats on a per collection basis first.
     std::string collection_stat_prefix =
@@ -104,6 +106,9 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
     }
 
     // Global stats.
+    if (active_query->query_info_.max_time() < 1) {
+      stats_.op_query_no_max_time_.inc();
+    }
     if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
       stats_.op_query_scatter_get_.inc();
     } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
@@ -116,18 +121,18 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
 
 void ProxyFilter::chargeQueryStats(const std::string& prefix,
                                    QueryMessageInfo::QueryType query_type) {
-  stat_store_.counter(fmt::format("{}.query.total", prefix)).inc();
+  scope_.counter(fmt::format("{}.query.total", prefix)).inc();
   if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
-    stat_store_.counter(fmt::format("{}.query.scatter_get", prefix)).inc();
+    scope_.counter(fmt::format("{}.query.scatter_get", prefix)).inc();
   } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
-    stat_store_.counter(fmt::format("{}.query.multi_get", prefix)).inc();
+    scope_.counter(fmt::format("{}.query.multi_get", prefix)).inc();
   }
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
   stats_.op_reply_.inc();
   logMessage(*message, false);
-  log_debug("decoded REPLY: {}", message->toString(true));
+  ENVOY_LOG(debug, "decoded REPLY: {}", message->toString(true));
 
   if (message->cursorId() != 0) {
     stats_.op_reply_valid_cursor_.inc();
@@ -172,18 +177,16 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string& prefix,
                                    const ReplyMessage& message) {
   uint64_t reply_documents_byte_size = 0;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     reply_documents_byte_size += document->byteSize();
   }
 
-  stat_store_.deliverHistogramToSinks(fmt::format("{}.reply_num_docs", prefix),
-                                      message.documents().size());
-  stat_store_.deliverHistogramToSinks(fmt::format("{}.reply_size", prefix),
-                                      reply_documents_byte_size);
-  stat_store_.deliverTimingToSinks(
-      fmt::format("{}.reply_time_ms", prefix),
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
-                                                            active_query.start_time_));
+  scope_.deliverHistogramToSinks(fmt::format("{}.reply_num_docs", prefix),
+                                 message.documents().size());
+  scope_.deliverHistogramToSinks(fmt::format("{}.reply_size", prefix), reply_documents_byte_size);
+  scope_.deliverTimingToSinks(fmt::format("{}.reply_time_ms", prefix),
+                              std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now() - active_query.start_time_));
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {
@@ -201,7 +204,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
   try {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
-    log().info("mongo decoding error: {}", e.what());
+    ENVOY_LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;
   }
@@ -209,15 +212,15 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 
 void ProxyFilter::logMessage(Message& message, bool full) {
   if (access_log_ && runtime_.snapshot().featureEnabled("mongo.logging_enabled", 100)) {
-    access_log_->logMessage(message, last_base64_op_, full, read_callbacks_->upstreamHost().get());
+    access_log_->logMessage(message, full, read_callbacks_->upstreamHost().get());
   }
 }
 
-void ProxyFilter::onEvent(uint32_t event) {
-  if ((event & Network::ConnectionEvent::RemoteClose) && !active_query_list_.empty()) {
+void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
     stats_.cx_destroy_local_with_active_rq_.inc();
   }
-  if ((event & Network::ConnectionEvent::LocalClose) && !active_query_list_.empty()) {
+  if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 }
@@ -238,4 +241,5 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

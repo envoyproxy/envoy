@@ -1,7 +1,16 @@
 #pragma once
 
+#include <strings.h>
+
+#include <chrono>
+#include <cstdint>
+#include <sstream>
+#include <string>
+#include <vector>
+
 #include "envoy/common/time.h"
 
+namespace Envoy {
 /**
  * Utility class for formatting dates given a strftime style format string.
  */
@@ -34,6 +43,28 @@ public:
 };
 
 /**
+ * Production implementation of SystemTimeSource that returns the current time.
+ */
+class ProdSystemTimeSource : public SystemTimeSource {
+public:
+  // SystemTimeSource
+  SystemTime currentTime() override { return std::chrono::system_clock::now(); }
+
+  static ProdSystemTimeSource instance_;
+};
+
+/**
+ * Production implementation of MonotonicTimeSource that returns the current time.
+ */
+class ProdMonotonicTimeSource : public MonotonicTimeSource {
+public:
+  // MonotonicTimeSource
+  MonotonicTime currentTime() override { return std::chrono::steady_clock::now(); }
+
+  static ProdMonotonicTimeSource instance_;
+};
+
+/**
  * Utility class for date/time helpers.
  */
 class DateUtil {
@@ -42,6 +73,11 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(SystemTime time_point);
+
+  /**
+   * @return whether a time_point contains a valid, not default constructed time.
+   */
+  static bool timePointValid(MonotonicTime time_point);
 };
 
 /**
@@ -68,7 +104,7 @@ public:
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
-   * @param out_len supplies the length of the output buffer. Must be >= 32.
+   * @param out_len supplies the length of the output buffer. Must be >= 21.
    * @param i supplies the number to convert.
    * @return the size of the string, not including the null termination.
    */
@@ -80,9 +116,34 @@ public:
   static void rtrim(std::string& source);
 
   /**
+   * Size-bounded string copying and concatenation
+   */
+  static size_t strlcpy(char* dst, const char* src, size_t size);
+
+  /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the string to split on.
+   * @param keep_empty_string result contains empty strings if the string starts or ends with
+   * 'split', or if instances of 'split' are adjacent.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
+   */
+  static std::vector<std::string> split(const std::string& source, const std::string& split,
+                                        bool keep_empty_string = false);
+
+  /**
+   * Join elements of a vector into a string delimited by delimiter.
+   * @param source supplies the strings to join.
+   * @param delimiter supplies the delimiter to join them together.
+   * @return string combining elements of `source` with `delimiter` in between each element.
+   */
+  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
+
+  /**
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
    */
   static std::vector<std::string> split(const std::string& source, char split);
 
@@ -91,6 +152,14 @@ public:
    * length.
    */
   static std::string subspan(const std::string& source, size_t start, size_t end);
+
+  /**
+   * Escape strings for logging purposes. Returns a copy of the string with
+   * \n, \r, \t, and " (double quote) escaped.
+   * @param source supplies the string to escape.
+   * @return escaped string.
+   */
+  static std::string escape(const std::string& source);
 
   /**
    * @return true if @param source ends with @param end.
@@ -102,4 +171,15 @@ public:
    * @return true if @param source starts with @param start and ignores cases.
    */
   static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
+
+  /**
+   * Provide a default value for a string if empty.
+   * @param s string.
+   * @param default_value replacement for s if empty.
+   * @return s is !s.empty() otherwise default_value.
+   */
+  static const std::string& nonEmptyStringOrDefault(const std::string& s,
+                                                    const std::string& default_value);
 };
+
+} // namespace Envoy

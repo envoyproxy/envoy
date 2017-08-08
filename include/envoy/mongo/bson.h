@@ -1,15 +1,21 @@
 #pragma once
 
+#include <array>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 /**
  * Implementation of http://bsonspec.org/spec.html
  */
 namespace Bson {
 
 class Document;
-typedef std::shared_ptr<Document> DocumentPtr;
+typedef std::shared_ptr<Document> DocumentSharedPtr;
 
 /**
  * A BSON document field. This is essentially a variably typed parameter that can be "cast" to
@@ -85,19 +91,19 @@ class Document {
 public:
   virtual ~Document() {}
 
-  virtual DocumentPtr addDouble(const std::string& key, double value) PURE;
-  virtual DocumentPtr addString(const std::string& key, std::string&& value) PURE;
-  virtual DocumentPtr addDocument(const std::string& key, DocumentPtr value) PURE;
-  virtual DocumentPtr addArray(const std::string& key, DocumentPtr value) PURE;
-  virtual DocumentPtr addBinary(const std::string& key, std::string&& value) PURE;
-  virtual DocumentPtr addObjectId(const std::string& key, Field::ObjectId&& value) PURE;
-  virtual DocumentPtr addBoolean(const std::string& key, bool value) PURE;
-  virtual DocumentPtr addDatetime(const std::string& key, int64_t value) PURE;
-  virtual DocumentPtr addNull(const std::string& key) PURE;
-  virtual DocumentPtr addRegex(const std::string& key, Field::Regex&& value) PURE;
-  virtual DocumentPtr addInt32(const std::string& key, int32_t value) PURE;
-  virtual DocumentPtr addTimestamp(const std::string& key, int64_t value) PURE;
-  virtual DocumentPtr addInt64(const std::string& key, int64_t value) PURE;
+  virtual DocumentSharedPtr addDouble(const std::string& key, double value) PURE;
+  virtual DocumentSharedPtr addString(const std::string& key, std::string&& value) PURE;
+  virtual DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) PURE;
+  virtual DocumentSharedPtr addArray(const std::string& key, DocumentSharedPtr value) PURE;
+  virtual DocumentSharedPtr addBinary(const std::string& key, std::string&& value) PURE;
+  virtual DocumentSharedPtr addObjectId(const std::string& key, Field::ObjectId&& value) PURE;
+  virtual DocumentSharedPtr addBoolean(const std::string& key, bool value) PURE;
+  virtual DocumentSharedPtr addDatetime(const std::string& key, int64_t value) PURE;
+  virtual DocumentSharedPtr addNull(const std::string& key) PURE;
+  virtual DocumentSharedPtr addRegex(const std::string& key, Field::Regex&& value) PURE;
+  virtual DocumentSharedPtr addInt32(const std::string& key, int32_t value) PURE;
+  virtual DocumentSharedPtr addTimestamp(const std::string& key, int64_t value) PURE;
+  virtual DocumentSharedPtr addInt64(const std::string& key, int64_t value) PURE;
 
   virtual bool operator==(const Document& rhs) const PURE;
   virtual int32_t byteSize() const PURE;
@@ -108,4 +114,5 @@ public:
   virtual const std::list<FieldPtr>& values() const PURE;
 };
 
-} // Bson
+} // namespace Bson
+} // namespace Envoy

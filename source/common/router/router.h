@@ -1,8 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -10,6 +16,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -18,6 +25,7 @@ namespace Router {
 // clang-format off
 #define ALL_ROUTER_STATS(COUNTER)                                                                  \
   COUNTER(no_route)                                                                                \
+  COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_total)
 // clang-format on
@@ -42,7 +50,7 @@ public:
   /**
    * Set the :scheme header based on the properties of the upstream cluster.
    */
-  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::Cluster& cluster);
+  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::ClusterInfo& cluster);
 
   /**
    * Determine whether a request should be shadowed.
@@ -69,18 +77,18 @@ public:
  */
 class FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, const std::string& service_zone, Stats::Store& stats,
-               Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+  FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
+               Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
-      : stats_store_(stats), service_zone_(service_zone), cm_(cm), runtime_(runtime),
-        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
+        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
-  Stats::Store& stats_store_;
-  const std::string service_zone_;
+  Stats::Scope& scope_;
+  const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
@@ -91,12 +99,14 @@ private:
   ShadowWriterPtr shadow_writer_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
+typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 
 /**
  * Service routing filter.
  */
-class Filter : Logger::Loggable<Logger::Id::router>, public Http::StreamDecoderFilter {
+class Filter : Logger::Loggable<Logger::Id::router>,
+               public Http::StreamDecoderFilter,
+               public Upstream::LoadBalancerContext {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
@@ -104,13 +114,26 @@ public:
 
   ~Filter();
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
-    callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
+  }
+
+  // Upstream::LoadBalancerContext
+  Optional<uint64_t> hashKey() const override {
+    if (route_entry_ && downstream_headers_) {
+      auto hash_policy = route_entry_->hashPolicy();
+      if (hash_policy) {
+        return hash_policy->generateHash(*downstream_headers_);
+      }
+    }
+    return {};
   }
 
 private:
@@ -130,8 +153,8 @@ private:
     void setupPerTryTimeout();
     void onPerTryTimeout();
 
-    void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) {
-      parent_.upstream_host_ = host;
+    void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+      upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }
 
@@ -142,12 +165,22 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {
+      // Have the connection manager disable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
+      parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      // Have the connection manager enable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
+      parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
-                       Upstream::HostDescriptionPtr host) override;
+                       Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
-                     Upstream::HostDescriptionPtr host) override;
+                     Upstream::HostDescriptionConstSharedPtr host) override;
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
@@ -156,6 +189,7 @@ private:
     Http::StreamEncoder* request_encoder_{};
     Optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::InstancePtr buffered_request_body_;
+    Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -167,23 +201,24 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  Http::AccessLog::FailureReason
-  streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
+  Http::AccessLog::ResponseFlag
+  streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  const std::string& upstreamZone();
-  void chargeUpstreamCode(const Http::HeaderMap& response_headers);
-  void chargeUpstreamCode(Http::Code code);
+  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  void chargeUpstreamCode(const Http::HeaderMap& response_headers,
+                          Upstream::HostDescriptionConstSharedPtr upstream_host);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
-                                         const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                         Runtime::RandomGenerator& random,
+                                         const Upstream::ClusterInfo& cluster,
+                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
   Upstream::ResourcePriority finalPriority();
+  Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   void onRequestComplete();
-  void onResetStream();
   void onResponseTimeout();
   void onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -197,18 +232,20 @@ private:
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  const RouteEntry* route_;
-  const Upstream::Cluster* cluster_;
-  std::list<std::string> alt_stat_prefixes_;
+  RouteConstSharedPtr route_;
+  const RouteEntry* route_entry_{};
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
+  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  Upstream::HostDescriptionPtr upstream_host_;
-  SystemTime downstream_request_complete_time_;
+  MonotonicTime downstream_request_complete_time_;
+  bool stream_destroyed_{};
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
@@ -222,9 +259,10 @@ public:
 private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
-                                 const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };
 
 } // Router
+} // namespace Envoy

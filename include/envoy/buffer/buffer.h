@@ -1,7 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Buffer {
 
 /**
@@ -11,13 +16,6 @@ struct RawSlice {
   void* mem_;
   uint64_t len_;
 };
-
-/**
- * Buffer change callback.
- * @param old_size supplies the size of the buffer prior to the change.
- * @param data supplies how much data was added or removed.
- */
-typedef std::function<void(uint64_t old_size, int64_t delta)> Callback;
 
 /**
  * A basic buffer abstraction.
@@ -66,6 +64,13 @@ public:
    * @return the actual number of slices needed, which may be greater than out_size. Passing
    *         nullptr for out and 0 for out_size will just return the size of the array needed
    *         to capture all of the slice data.
+   * TODO(mattklein123): WARNING: The underlying implementation of this function currently uses
+   * libevent's evbuffer. It has the infuriating property where calling getRawSlices(nullptr, 0)
+   * will return the slices that include all of the buffer data, but not any empty slices at the
+   * end. However, calling getRawSlices(iovec, SOME_CONST), WILL return potentially empty slices
+   * beyond the end of the buffer. Code that is trying to avoid stack overflow by limiting the
+   * number of returned slices needs to deal with this. When we get rid of evbuffer we can rework
+   * all of this.
    */
   virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
 
@@ -119,13 +124,6 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
 
   /**
-   * Set a buffer change callback. Only a single callback can be set at a time. The callback
-   * is invoked inline with buffer changes.
-   * @param callback supplies the callback to set. Pass nullptr to clear the callback.
-   */
-  virtual void setCallback(Callback callback) PURE;
-
-  /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
    * @return the number of bytes written or -1 if there was an error.
@@ -135,4 +133,21 @@ public:
 
 typedef std::unique_ptr<Instance> InstancePtr;
 
-} // Buffer
+/**
+ * A factory for creating buffers.
+ */
+class Factory {
+public:
+  virtual ~Factory() {}
+
+  /**
+   * Creates and returns a unique pointer to a new buffer.
+   * @return a newly created InstancePtr.
+   */
+  virtual InstancePtr create() PURE;
+};
+
+typedef std::unique_ptr<Factory> FactoryPtr;
+
+} // namespace Buffer
+} // namespace Envoy

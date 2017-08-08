@@ -1,22 +1,36 @@
-#include "server/options_impl.h"
+// NOLINT(namespace-envoy)
+#include "test/test_common/environment.h"
+#include "test/test_runner.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/ssl/openssl.h"
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "exe/signal_action.h"
+#endif
 
-#include "test/integration/integration.h"
+const char* __asan_default_options() {
+  static char result[] = {"check_initialization_order=true strict_init_order=true"};
+  return result;
+}
 
+// The main entry point (and the rest of this file) should have no logic in it,
+// this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
-  ::testing::InitGoogleMock(&argc, argv);
-  Ssl::OpenSsl::initialize();
-  Event::Libevent::Global::initialize();
+#ifdef ENVOY_HANDLE_SIGNALS
+  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+  Envoy::SignalAction handle_sigs;
+#endif
 
-  OptionsImpl options(argc, argv, "1", spdlog::level::err);
-  Thread::MutexBasicLockable lock;
-  Logger::Registry::initialize(options.logLevel(), lock);
-  BaseIntegrationTest::default_log_level_ =
-      static_cast<spdlog::level::level_enum>(options.logLevel());
-
-  return RUN_ALL_TESTS();
+  ::setenv("TEST_RUNDIR",
+           (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+            Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE"))
+               .c_str(),
+           1);
+  // Select whether to test only for IPv4, IPv6, or both. The default is to
+  // test for both. Options are {"v4only", "v6only", "all"}. Set
+  // ENVOY_IP_TEST_VERSIONS to "v4only" if the system currently does not support IPv6 network
+  // operations. Similary set ENVOY_IP_TEST_VERSIONS to "v6only" if IPv4 has already been
+  // phased out of network operations. Set to "all" (or don't set) if testing both
+  // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
+  // in upcoming PRs.
+  ::setenv("ENVOY_IP_TEST_VERSIONS", "all", 0);
+  return Envoy::TestRunner::RunTests(argc, argv);
 }

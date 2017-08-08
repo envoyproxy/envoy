@@ -1,7 +1,10 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/mongo/codec.h"
 
+namespace Envoy {
 namespace Mongo {
 
 /**
@@ -33,6 +36,11 @@ public:
   const std::string& callsite() { return callsite_; }
 
   /**
+   * @return the value of maxTimeMS or 0 if not given.
+   */
+  int32_t max_time() { return max_time_; }
+
+  /**
    * @return the type of a query message.
    */
   QueryType type() { return type_; }
@@ -46,6 +54,7 @@ private:
   std::string parseCallingFunction(const QueryMessage& query);
   std::string parseCallingFunctionJson(const std::string& json_string);
   std::string parseCollection(const std::string& full_collection_name);
+  int32_t parseMaxTime(const QueryMessage& query);
   const Bson::Document* parseCommand(const QueryMessage& query);
   void parseFindCommand(const Bson::Document& command);
   QueryType parseType(const QueryMessage& query);
@@ -54,8 +63,10 @@ private:
   int32_t request_id_;
   std::string collection_;
   std::string callsite_;
+  int32_t max_time_;
   QueryType type_{QueryType::ScatterGet};
   std::string command_;
 };
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

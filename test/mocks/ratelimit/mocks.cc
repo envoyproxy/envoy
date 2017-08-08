@@ -1,8 +1,10 @@
 #include "mocks.h"
 
+namespace Envoy {
 namespace RateLimit {
 
 MockClient::MockClient() {}
 MockClient::~MockClient() {}
 
-} // RateLimit
+} // namespace RateLimit
+} // namespace Envoy

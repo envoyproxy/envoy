@@ -1,0 +1,201 @@
+{
+  "listeners": [
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "ssl_context": {
+      "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
+      "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/servercert.pem",
+      "private_key_file": "{{ test_rundir }}/test/config/integration/certs/serverkey.pem"
+    },
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1"
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": true, "cache_time_ms": 2500, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {} }
+        ],
+        "forward_client_cert": "{{ forward_client_cert }}",
+        "set_current_client_cert_details": [ {{ set_current_client_cert_details }} ]
+      }
+    }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1"
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": true, "cache_time_ms": 2500, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {} }
+        ],
+        "forward_client_cert": "{{ forward_client_cert }}",
+        "set_current_client_cert_details": [ {{ set_current_client_cert_details }} ]
+      }
+    }]
+  }],
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
+  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
+
+  "cluster_manager": {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 5000,
+      "ssl_context": {
+        "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
+        "verify_subject_alt_name": [ "foo.lyft.com" ]
+      },
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}]
+    },
+    {
+      "name": "cluster_2",
+      "connect_timeout_ms": 5000,
+      "ssl_context": {
+        "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
+        "verify_subject_alt_name": [ "foo.lyft.com" ]
+      },
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "dns_lookup_family": "{{ dns_lookup_family }}",
+      "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
+    }]
+  }
+}

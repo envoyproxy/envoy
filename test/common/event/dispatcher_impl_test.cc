@@ -1,7 +1,13 @@
+#include <functional>
+
 #include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::InSequence;
 
 namespace Event {
@@ -45,4 +51,5 @@ TEST(DispatcherImplTest, DeferredDelete) {
   dispatcher.clearDeferredDeleteList();
 }
 
-} // Event
+} // namespace Event
+} // namespace Envoy

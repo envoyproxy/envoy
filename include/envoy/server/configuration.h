@@ -1,45 +1,20 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/ssl/context.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
-
-/**
- * A configuration for an individual listener.
- */
-class Listener {
-public:
-  virtual ~Listener() {}
-
-  /**
-   * @return Network::FilterChainFactory& the factory for setting up the filter chain on a new
-   *         connection.
-   */
-  virtual Network::FilterChainFactory& filterChainFactory() PURE;
-
-  /**
-   * @return uint64_t the port.
-   */
-  virtual uint64_t port() PURE;
-
-  /**
-   * @return Ssl::ServerContext* the SSL context
-   */
-  virtual Ssl::ServerContext* sslContext() PURE;
-
-  /**
-   * @return bool whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   */
-  virtual bool useProxyProto() PURE;
-};
-
-typedef std::unique_ptr<Listener> ListenerPtr;
 
 /**
  * Configuration for local disk runtime support.
@@ -83,11 +58,6 @@ public:
   virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
-   * @return const std::vector<ListenerPtr>& all listeners.
-   */
-  virtual const std::list<ListenerPtr>& listeners() PURE;
-
-  /**
    * @return RateLimit::ClientFactory& the global rate limit service client factory.
    */
   virtual RateLimit::ClientFactory& rateLimitClientFactory() PURE;
@@ -98,10 +68,46 @@ public:
    */
   virtual Optional<std::string> statsdTcpClusterName() PURE;
 
+  // TODO(hennna): DEPRECATED - will be removed in 1.4.0.
   /**
    * @return Optional<uint32_t> the optional local UDP statsd port to write to.
    */
   virtual Optional<uint32_t> statsdUdpPort() PURE;
+
+  /**
+   * @return Optional<std::string> the optional UDP statsd address to write to.
+   */
+  virtual Optional<std::string> statsdUdpIpAddress() PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
+   *         The server latches counters.
+   */
+  virtual std::chrono::milliseconds statsFlushInterval() PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "miss" statistic.
+   */
+  virtual std::chrono::milliseconds wdMissTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "mega miss" statistic.
+   */
+  virtual std::chrono::milliseconds wdMegaMissTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to a
+   *         single nonresponsive thread.
+   */
+  virtual std::chrono::milliseconds wdKillTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to
+   *         multiple nonresponsive threads.
+   */
+  virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
 };
 
 /**
@@ -117,9 +123,14 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return uint32_t the server admin HTTP port.
+   * @return const std::string& profiler output path.
    */
-  virtual uint32_t port() PURE;
+  virtual const std::string& profilePath() PURE;
+
+  /**
+   * @return Network::Address::InstanceConstSharedPtr the server address.
+   */
+  virtual Network::Address::InstanceConstSharedPtr address() PURE;
 };
 
 /**
@@ -145,5 +156,6 @@ public:
   virtual Runtime* runtime() PURE;
 };
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

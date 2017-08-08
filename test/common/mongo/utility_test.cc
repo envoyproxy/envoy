@@ -1,7 +1,12 @@
+#include <string>
+
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 #include "common/mongo/utility.h"
 
+#include "gtest/gtest.h"
+
+namespace Envoy {
 namespace Mongo {
 
 TEST(QueryMessageInfoTest, FindCommand) {
@@ -124,6 +129,32 @@ TEST(QueryMessageInfoTest, Callsite) {
   }
 }
 
+TEST(QueryMessageInfoTest, MaxTime) {
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
+    q.query(Bson::DocumentImpl::create());
+    QueryMessageInfo info(q);
+    EXPECT_EQ(0, info.max_time());
+  }
+
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
+    q.query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 1212));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(1212, info.max_time());
+  }
+
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
+    q.query(Bson::DocumentImpl::create()->addInt64("$maxTimeMS", 1212));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(1212, info.max_time());
+  }
+}
+
 TEST(QueryMessageInfoTest, Command) {
   {
     QueryMessageImpl q(0, 0);
@@ -158,4 +189,5 @@ TEST(QueryMessageInfoTest, Command) {
   }
 }
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

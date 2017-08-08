@@ -1,12 +1,16 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+
 #include "envoy/http/access_log.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
 struct RequestInfoImpl : public RequestInfo {
-  RequestInfoImpl(const std::string& protocol)
+  RequestInfoImpl(Protocol protocol)
       : protocol_(protocol), start_time_(std::chrono::system_clock::now()) {}
 
   // Http::AccessLog::RequestInfo
@@ -14,7 +18,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  const std::string& protocol() const override { return protocol_; }
+  Protocol protocol() const override { return protocol_; }
+  void protocol(Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
 
@@ -25,29 +30,32 @@ struct RequestInfoImpl : public RequestInfo {
                                                                  start_time_);
   }
 
-  void onFailedResponse(Http::AccessLog::FailureReason failure_reason) override {
-    failure_reason_ = failure_reason;
+  void setResponseFlag(Http::AccessLog::ResponseFlag response_flag) override {
+    response_flags_ |= response_flag;
   }
 
-  Http::AccessLog::FailureReason failureReason() const override { return failure_reason_; }
+  bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
-  void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_host_ = host;
+  }
 
-  Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
   bool healthCheck() const override { return hc_request_; }
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  const std::string& protocol_;
+  Protocol protocol_;
   const SystemTime start_time_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
-  FailureReason failure_reason_{FailureReason::None};
-  Upstream::HostDescriptionPtr upstream_host_{};
+  uint64_t response_flags_{};
+  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
 };
 
-} // AccessLog
-} // Http
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

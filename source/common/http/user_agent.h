@@ -1,8 +1,14 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
 #include "envoy/stats/stats_macros.h"
 
+namespace Envoy {
 /**
  * All stats for user agents. @see stats_macros.h
  */
@@ -38,17 +44,17 @@ public:
    * is assumed to be the same for further requests.
    * @param headers supplies the request headers.
    * @param prefix supplies the stat prefix for the UA stats.
-   * @param stat_store supplies the backing stat store.
+   * @param scope supplies the backing stat scope.
    */
   void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                             Stats::Store& stat_store);
+                             Stats::Scope& scope);
 
   /**
    * Called when a connection is being destroyed.
-   * @param events supplies the network events that caused destruction.
+   * @param event supplies the network event that caused destruction.
    * @param active_streams supplies whether there are still active streams at the time of closing.
    */
-  void onConnectionDestroy(uint32_t events, bool active_streams);
+  void onConnectionDestroy(Network::ConnectionEvent event, bool active_streams);
 
 private:
   enum class Type { NotInitialized, iOS, Android, Unknown };
@@ -58,4 +64,5 @@ private:
   std::string prefix_;
 };
 
-} // Http
+} // namespace Http
+} // Envoy

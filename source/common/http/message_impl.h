@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
@@ -7,6 +9,7 @@
 #include "common/common/non_copyable.h"
 #include "common/http/header_map_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -16,11 +19,10 @@ class MessageImpl : public Http::Message {
 public:
   // Http::Message
   HeaderMap& headers() override { return *headers_; }
-  Buffer::Instance* body() override { return body_.get(); }
-  void body(Buffer::InstancePtr&& body) override { body_ = std::move(body); }
+  Buffer::InstancePtr& body() override { return body_; }
   HeaderMap* trailers() override { return trailers_.get(); }
   void trailers(HeaderMapPtr&& trailers) override { trailers_ = std::move(trailers); }
-  std::string bodyAsString() override;
+  std::string bodyAsString() const override;
 
 protected:
   MessageImpl(HeaderMapPtr&& headers) : headers_(std::move(headers)) {}
@@ -42,4 +44,5 @@ public:
   ResponseMessageImpl(HeaderMapPtr&& headers) : MessageImpl(std::move(headers)) {}
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

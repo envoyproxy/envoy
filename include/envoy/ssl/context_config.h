@@ -1,7 +1,11 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Ssl {
 
 /**
@@ -29,6 +33,11 @@ public:
   virtual const std::string& cipherSuites() const PURE;
 
   /**
+   * The ':' delimited list of supported ECDH curves.
+   */
+  virtual const std::string& ecdhCurves() const PURE;
+
+  /**
    * @return The CA certificate file to use for peer validation.
    */
   virtual const std::string& caCertFile() const PURE;
@@ -44,16 +53,19 @@ public:
   virtual const std::string& privateKeyFile() const PURE;
 
   /**
-   * @return The subject alt name to be verified, if enabled. Otherwise, ""
+   * @return The subject alt names to be verified, if enabled. Otherwise, ""
    */
-  virtual const std::string& verifySubjectAltName() const PURE;
+  virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
 
   /**
    * @return The hex string representation of the certificate hash to be verified, if enabled.
    * Otherwise, ""
    */
   virtual const std::string& verifyCertificateHash() const PURE;
+};
 
+class ClientContextConfig : public virtual ContextConfig {
+public:
   /**
    * @return The server name indication if it's set and ssl enabled
    * Otherwise, ""
@@ -61,4 +73,13 @@ public:
   virtual const std::string& serverNameIndication() const PURE;
 };
 
-} // Ssl
+class ServerContextConfig : public virtual ContextConfig {
+public:
+  /**
+   * @return True if client certificate is required, false otherwise.
+   */
+  virtual bool requireClientCertificate() const PURE;
+};
+
+} // namespace Ssl
+} // namespace Envoy

@@ -1,9 +1,14 @@
 #pragma once
 
+#include <functional>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
+#include "envoy/network/listen_socket.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -29,6 +34,13 @@ public:
    */
   virtual void addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback) PURE;
+
+  /**
+   * Obtain socket the admin endpoint is bound to.
+   * @return Network::ListenSocket& socket reference.
+   */
+  virtual const Network::ListenSocket& socket() PURE;
 };
 
-} // Server
+} // namespace Server
+} // namespace Envoy

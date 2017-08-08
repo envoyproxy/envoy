@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -92,4 +93,5 @@ protected:
   StreamEncoder& inner_;
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

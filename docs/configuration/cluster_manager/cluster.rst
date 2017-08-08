@@ -9,6 +9,7 @@ Cluster
     "name": "...",
     "type": "...",
     "connect_timeout_ms": "...",
+    "per_connection_buffer_limit_bytes": "...",
     "lb_type": "...",
     "hosts": [],
     "service_name": "...",
@@ -18,8 +19,11 @@ Cluster
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",
-    "alt_stat_name": "...",
-    "dns_refresh_rate_ms": "..."
+    "http2_settings": "{...}",
+    "dns_refresh_rate_ms": "...",
+    "dns_lookup_family": "...",
+    "dns_resolvers": [],
+    "outlier_detection": "{...}"
   }
 
 .. _config_cluster_manager_cluster_name:
@@ -27,6 +31,9 @@ Cluster
 name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.
+  The cluster name can be at most 60 characters long, and must **not** contain ``:``.
+
+.. _config_cluster_manager_type:
 
 type
   *(required, string)* The :ref:`service discovery type <arch_overview_service_discovery_types>` to
@@ -37,10 +44,16 @@ connect_timeout_ms
   *(required, integer)* The timeout for new network connections to hosts in the cluster specified
   in milliseconds.
 
+.. _config_cluster_manager_cluster_per_connection_buffer_limit_bytes:
+
+per_connection_buffer_limit_bytes
+  *(optional, integer)* Soft limit on size of the cluster's connections read and write buffers.
+  If unspecified, an implementation defined default is applied (1MiB).
+
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
-  when picking a host in the cluster. Possible options are *round_robin*, *least_request*, and
-  *random*.
+  when picking a host in the cluster. Possible options are *round_robin*, *least_request*,
+  *ring_hash*, and *random*.
 
 hosts
   *(sometimes required, array)* If the service discovery type is *static*, *strict_dns*, or
@@ -65,7 +78,7 @@ hosts
 
   strict_dns
     Strict DNS clusters can specify any number of hostname:port combinations. All names will be
-    resolved using DNS and grouped together to form the final cluster. If multiple records are 
+    resolved using DNS and grouped together to form the final cluster. If multiple records are
     returned for a single name, all will be used. For example:
 
     .. code-block:: json
@@ -126,16 +139,45 @@ http_codec_options
   an HTTP/2 mesh, if it's desired to disable HTTP/2 header compression the *no_compression*
   option should be specified both here as well as in the HTTP connection manager.
 
-alt_stat_name
-  *(optional, string)* If an alternate stat name is specified, some :ref:`statistics
-  <config_cluster_manager_cluster_stats>` will be duplicated between the standard statistics and a
-  tree specified by this parameter (e.g., *cluster.<alt_stat_name>.*).
+.. _config_cluster_manager_cluster_http2_settings:
+
+http2_settings
+  *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec when
+  initiating HTTP connection pool connections. These are the same options supported in the HTTP connection
+  manager :ref:`http2_settings <config_http_conn_man_http2_settings>` option.
+
+.. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 
 dns_refresh_rate_ms
   *(optional, integer)* If the dns refresh rate is specified and the cluster type is either *strict_dns*,
   or *logical_dns*, this value is used as the cluster's dns refresh rate. If this setting is not specified,
   the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
+
+.. _config_cluster_manager_cluster_dns_lookup_family:
+
+dns_lookup_family
+  *(optional, string)* The DNS IP address resolution policy. The options are *v4_only*, *v6_only*,
+  and *auto*. If this setting is not specified, the value defaults to *v4_only*. When *v4_only* is selected,
+  the DNS resolver will only perform a lookup for addresses in the IPv4 family. If *v6_only* is selected,
+  the DNS resolver will only perform a lookup for addresses in the IPv6 family. If *auto* is specified,
+  the DNS resolver will first perform a lookup for addresses in the IPv6 family and fallback to a lookup for
+  addresses in the IPv4 family. For cluster types other than *strict_dns* and *logical_dns*, this setting
+  is ignored.
+
+.. _config_cluster_manager_cluster_dns_resolvers:
+
+dns_resolvers
+  *(optional, array)* If DNS resolvers are specified and the cluster type is either *strict_dns*, or
+  *logical_dns*, this value is used to specify the cluster's dns resolvers. If this setting is not
+  specified, the value defaults to the default resolver, which uses /etc/resolv.conf for
+  configuration. For cluster types other than *strict_dns* and *logical_dns* this setting is
+  ignored.
+
+:ref:`outlier_detection <config_cluster_manager_cluster_outlier_detection>`
+  *(optional, object)* If specified, outlier detection will be enabled for this upstream cluster.
+  See the :ref:`architecture overview <arch_overview_outlier_detection>` for more information on outlier
+  detection.
 
 .. toctree::
   :hidden:
@@ -145,3 +187,4 @@ dns_refresh_rate_ms
   cluster_ssl
   cluster_stats
   cluster_runtime
+  cluster_outlier_detection

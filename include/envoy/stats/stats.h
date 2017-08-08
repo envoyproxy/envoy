@@ -1,6 +1,21 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
+
+namespace Envoy {
+namespace Event {
+class Dispatcher;
+}
+
+namespace ThreadLocal {
+class Instance;
+}
 
 namespace Stats {
 
@@ -21,6 +36,8 @@ public:
   virtual uint64_t value() PURE;
 };
 
+typedef std::shared_ptr<Counter> CounterSharedPtr;
+
 /**
  * A gauge that can both increment and decrement.
  */
@@ -37,6 +54,8 @@ public:
   virtual bool used() PURE;
   virtual uint64_t value() PURE;
 };
+
+typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
 /**
  * An individual timespan that is owned by a timer. The initial time is captured on construction.
@@ -72,12 +91,20 @@ public:
   virtual std::string name() PURE;
 };
 
+typedef std::shared_ptr<Timer> TimerSharedPtr;
+
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
  */
 class Sink {
 public:
   virtual ~Sink() {}
+
+  /**
+   * This will be called before a sequence of flushCounter() and flushGauge() calls. Sinks can
+   * choose to optimize writing if desired with a paired endFlush() call.
+   */
+  virtual void beginFlush() PURE;
 
   /**
    * Flush a counter delta.
@@ -88,6 +115,12 @@ public:
    * Flush a gauge value.
    */
   virtual void flushGauge(const std::string& name, uint64_t value) PURE;
+
+  /**
+   * This will be called after beginFlush(), some number of flushCounter(), and some number of
+   * flushGauge(). Sinks can use this to optimize writing if desired.
+   */
+  virtual void endFlush() PURE;
 
   /**
    * Flush a histogram value.
@@ -103,16 +136,12 @@ public:
 typedef std::unique_ptr<Sink> SinkPtr;
 
 /**
- * A store for all known counters, gauges, and timers.
+ * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
+ * (for example to free/delete all of them).
  */
-class Store {
+class Scope {
 public:
-  virtual ~Store() {}
-
-  /**
-   * Add a sink that is used for stat flushing.
-   */
-  virtual void addSink(Sink& sink) PURE;
+  virtual ~Scope() {}
 
   /**
    * Deliver an individual histogram value to all registered sinks.
@@ -124,11 +153,73 @@ public:
    */
   virtual void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) PURE;
 
+  /**
+   * @return a counter within the scope's namespace.
+   */
   virtual Counter& counter(const std::string& name) PURE;
-  virtual std::list<std::reference_wrapper<Counter>> counters() const PURE;
+
+  /**
+   * @return a gauge within the scope's namespace.
+   */
   virtual Gauge& gauge(const std::string& name) PURE;
-  virtual std::list<std::reference_wrapper<Gauge>> gauges() const PURE;
+
+  /**
+   * @return a timer within the scope's namespace.
+   */
   virtual Timer& timer(const std::string& name) PURE;
 };
 
-} // Stats
+typedef std::unique_ptr<Scope> ScopePtr;
+
+/**
+ * A store for all known counters, gauges, and timers.
+ */
+class Store : public Scope {
+public:
+  /**
+   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
+   * that point to the same reference counted backing stats. This allows a new scope to be
+   * gracefully swapped in while an old scope with the same name is being destroyed.
+   * @param name supplies the scope's namespace prefix.
+   */
+  virtual ScopePtr createScope(const std::string& name) PURE;
+
+  /**
+   * @return a list of all known counters.
+   */
+  virtual std::list<CounterSharedPtr> counters() const PURE;
+
+  /**
+   * @return a list of all known gauges.
+   */
+  virtual std::list<GaugeSharedPtr> gauges() const PURE;
+};
+
+/**
+ * The root of the stat store.
+ */
+class StoreRoot : public Store {
+public:
+  /**
+   * Add a sink that is used for stat flushing.
+   */
+  virtual void addSink(Sink& sink) PURE;
+
+  /**
+   * Initialize the store for threading. This will be called once after all worker threads have
+   * been initialized. At this point the store can initialize itself for multi-threaded operation.
+   */
+  virtual void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
+                                   ThreadLocal::Instance& tls) PURE;
+
+  /**
+   * Shutdown threading support in the store. This is called once when the server is about to shut
+   * down.
+   */
+  virtual void shutdownThreading() PURE;
+};
+
+typedef std::unique_ptr<StoreRoot> StoreRootPtr;
+
+} // namespace Stats
+} // namespace Envoy

@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Network {
 
 class DrainDecision {
@@ -12,7 +13,8 @@ public:
    * @return TRUE if a connection should be drained and closed. It is up to individual network
    *         filters to determine when this should be called for the least impact possible.
    */
-  virtual bool drainClose() PURE;
+  virtual bool drainClose() const PURE;
 };
 
-} // Network
+} // namespace Network
+} // namespace Envoy

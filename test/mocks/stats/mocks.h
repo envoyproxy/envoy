@@ -1,9 +1,19 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <string>
+
 #include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/stats/stats_impl.h"
 
+#include "gmock/gmock.h"
+
+namespace Envoy {
 namespace Stats {
 
 class MockCounter : public Counter {
@@ -20,6 +30,21 @@ public:
   MOCK_METHOD0(value, uint64_t());
 };
 
+class MockGauge : public Gauge {
+public:
+  MockGauge();
+  ~MockGauge();
+
+  MOCK_METHOD1(add, void(uint64_t amount));
+  MOCK_METHOD0(dec, void());
+  MOCK_METHOD0(inc, void());
+  MOCK_METHOD0(name, std::string());
+  MOCK_METHOD1(set, void(uint64_t value));
+  MOCK_METHOD1(sub, void(uint64_t amount));
+  MOCK_METHOD0(used, bool());
+  MOCK_METHOD0(value, uint64_t());
+};
+
 class MockTimespan : public Timespan {
 public:
   MockTimespan();
@@ -29,18 +54,33 @@ public:
   MOCK_METHOD1(complete, void(const std::string& dynamic_name));
 };
 
+class MockSink : public Sink {
+public:
+  MockSink();
+  ~MockSink();
+
+  MOCK_METHOD0(beginFlush, void());
+  MOCK_METHOD2(flushCounter, void(const std::string& name, uint64_t delta));
+  MOCK_METHOD2(flushGauge, void(const std::string& name, uint64_t value));
+  MOCK_METHOD0(endFlush, void());
+  MOCK_METHOD2(onHistogramComplete, void(const std::string& name, uint64_t value));
+  MOCK_METHOD2(onTimespanComplete, void(const std::string& name, std::chrono::milliseconds ms));
+};
+
 class MockStore : public Store {
 public:
   MockStore();
   ~MockStore();
 
-  MOCK_METHOD1(addSink, void(Sink&));
+  ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
+
   MOCK_METHOD2(deliverHistogramToSinks, void(const std::string& name, uint64_t value));
   MOCK_METHOD2(deliverTimingToSinks, void(const std::string&, std::chrono::milliseconds));
   MOCK_METHOD1(counter, Counter&(const std::string&));
-  MOCK_CONST_METHOD0(counters, std::list<std::reference_wrapper<Counter>>());
+  MOCK_CONST_METHOD0(counters, std::list<CounterSharedPtr>());
+  MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
-  MOCK_CONST_METHOD0(gauges, std::list<std::reference_wrapper<Gauge>>());
+  MOCK_CONST_METHOD0(gauges, std::list<GaugeSharedPtr>());
   MOCK_METHOD1(timer, Timer&(const std::string& name));
 
   testing::NiceMock<MockCounter> counter_;
@@ -58,4 +98,5 @@ public:
   MOCK_METHOD2(deliverTimingToSinks, void(const std::string&, std::chrono::milliseconds));
 };
 
-} // Stats
+} // namespace Stats
+} // namespace Envoy

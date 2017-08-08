@@ -1,14 +1,18 @@
-#include "common.h"
-#include "rpc_channel_impl.h"
+#include "common/grpc/rpc_channel_impl.h"
 
+#include <cstdint>
+#include <string>
+
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
-#include "google/protobuf/message.h"
-
+namespace Envoy {
 namespace Grpc {
 
 void RpcChannelImpl::cancel() {
@@ -16,9 +20,9 @@ void RpcChannelImpl::cancel() {
   onComplete();
 }
 
-void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::RpcController*,
-                                const proto::Message* grpc_request, proto::Message* grpc_response,
-                                proto::Closure*) {
+void RpcChannelImpl::CallMethod(const Protobuf::MethodDescriptor* method, Protobuf::RpcController*,
+                                const Protobuf::Message* grpc_request,
+                                Protobuf::Message* grpc_response, Protobuf::Closure*) {
   ASSERT(!http_request_ && !grpc_method_ && !grpc_response_);
   grpc_method_ = method;
   grpc_response_ = grpc_response;
@@ -28,19 +32,20 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
 
   // This should be caught in configuration, and a request will fail normally anyway, but assert
   // here for clarity.
-  ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
+  ASSERT(cluster_->features() & Upstream::ClusterInfo::Features::HTTP2);
 
   Http::MessagePtr message =
-      Common::prepareHeaders(cluster_, method->service()->full_name(), method->name());
-  message->body(Common::serializeBody(*grpc_request));
+      Common::prepareHeaders(cluster_->name(), method->service()->full_name(), method->name());
+  message->body() = Common::serializeBody(*grpc_request);
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
-  http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);
+  http_request_ =
+      cm_.httpAsyncClientForCluster(cluster_->name()).send(std::move(message), *this, timeout_);
 }
 
 void RpcChannelImpl::incStat(bool success) {
-  Common::chargeStat(stats_store_, cluster_, grpc_method_->service()->full_name(),
-                     grpc_method_->name(), success);
+  Common::chargeStat(*cluster_, grpc_method_->service()->full_name(), grpc_method_->name(),
+                     success);
 }
 
 void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {
@@ -49,12 +54,13 @@ void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {
 
     // A gRPC response contains a 5 byte header. Currently we only support unary responses so we
     // ignore the header. @see serializeBody().
-    if (!http_response->body() || !(http_response->body()->length() > 5)) {
+    if (!http_response->body() || (http_response->body()->length() < 5)) {
       throw Exception(Optional<uint64_t>(), "bad serialized body");
     }
 
     http_response->body()->drain(5);
-    if (!grpc_response_->ParseFromString(http_response->bodyAsString())) {
+    Buffer::ZeroCopyInputStreamImpl stream(std::move(http_response->body()));
+    if (!grpc_response_->ParseFromZeroCopyStream(&stream)) {
       throw Exception(Optional<uint64_t>(), "bad serialized body");
     }
 
@@ -87,4 +93,5 @@ void RpcChannelImpl::onComplete() {
   grpc_response_ = nullptr;
 }
 
-} // Grpc
+} // namespace Grpc
+} // namespace Envoy

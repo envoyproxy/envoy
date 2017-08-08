@@ -1,38 +1,32 @@
+#include "server/config/network/tcp_proxy.h"
+
+#include <string>
+
 #include "envoy/network/connection.h"
-#include "envoy/server/instance.h"
+#include "envoy/registry/registry.h"
 
 #include "common/filter/tcp_proxy.h"
-#include "server/configuration_impl.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Config registration for the tcp proxy filter. @see NetworkFilterConfigFactory.
- */
-class TcpProxyConfigFactory : public NetworkFilterConfigFactory {
-public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
-                                                Server::Instance& server) {
-    if (type != NetworkFilterType::Read || name != "tcp_proxy") {
-      return nullptr;
-    }
-
-    Filter::TcpProxyConfigPtr filter_config(
-        new Filter::TcpProxyConfig(config, server.clusterManager(), server.stats()));
-    return [filter_config, &server](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(
-          Network::ReadFilterPtr{new Filter::TcpProxy(filter_config, server.clusterManager())});
-    };
-  }
-};
+NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Object& config,
+                                                                  FactoryContext& context) {
+  Filter::TcpProxyConfigSharedPtr filter_config(
+      new Filter::TcpProxyConfig(config, context.clusterManager(), context.scope()));
+  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
+        new Filter::TcpProxy(filter_config, context.clusterManager())});
+  };
+}
 
 /**
- * Static registration for the tcp_proxy filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the tcp_proxy filter. @see RegisterFactory.
  */
-static RegisterNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
+static Registry::RegisterFactory<TcpProxyConfigFactory, NamedNetworkFilterConfigFactory>
+    registered_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

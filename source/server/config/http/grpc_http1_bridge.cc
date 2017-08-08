@@ -1,33 +1,30 @@
-#include "envoy/server/instance.h"
+#include "server/config/http/grpc_http1_bridge.h"
+
+#include <string>
+
+#include "envoy/registry/registry.h"
 
 #include "common/grpc/http1_bridge_filter.h"
-#include "server/config/network/http_connection_manager.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Config registration for the grpc HTTP1 bridge filter. @see HttpFilterConfigFactory.
- */
-class GrpcHttp1BridgeFilterConfig : public HttpFilterConfigFactory {
-public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string&,
-                                             Server::Instance& server) override {
-    if (type != HttpFilterType::Both || name != "grpc_http1_bridge") {
-      return nullptr;
-    }
-
-    return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(Http::StreamFilterPtr{new Grpc::Http1BridgeFilter(server.stats())});
-    };
-  }
-};
+HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(const Json::Object&,
+                                                                     const std::string&,
+                                                                     FactoryContext& context) {
+  return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(context.clusterManager())});
+  };
+}
 
 /**
- * Static registration for the grpc HTTP1 bridge filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the grpc HTTP1 bridge filter. @see RegisterFactory.
  */
-static RegisterHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
+static Registry::RegisterFactory<GrpcHttp1BridgeFilterConfig, NamedHttpFilterConfigFactory>
+    register_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

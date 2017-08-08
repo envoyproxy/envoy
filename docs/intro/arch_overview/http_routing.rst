@@ -6,29 +6,47 @@ HTTP routing
 Envoy includes an HTTP :ref:`router filter <config_http_filters_router>` which can be installed to
 perform advanced routing tasks. This is useful both for handling edge traffic (traditional reverse
 proxy request handling) as well as for building a service to service Envoy mesh (typically via
-routing on the host/authority HTTP header to reach a particular upstream service cluster). At a high
+routing on the host/authority HTTP header to reach a particular upstream service cluster). Envoy
+also has the ability to be configured as forward proxy. In the forward proxy configuration, mesh
+clients can participate by appropriately configuring their http proxy to be an Envoy. At a high
 level the router takes an incoming HTTP request, matches it to an upstream cluster, acquires a
 :ref:`connection pool <arch_overview_conn_pool>` to a host in the upstream cluster, and forwards the
 request. The router filter supports the following features:
 
 * Virtual hosts that map domains/authorities to a set of routing rules.
-* Prefix and exact path matching rules (both case sensitive and case insensitive). Regex/slug
+* Prefix and exact path matching rules (both :ref:`case sensitive
+  <config_http_conn_man_route_table_route_case_sensitive>` and case insensitive). Regex/slug
   matching is not currently supported, mainly because it makes it difficult/impossible to
   programmatically determine whether routing rules conflict with each other. For this reason we
   don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
   future depending on demand.
-* TLS redirection at the virtual host level.
-* Path/host redirection at the route level.
-* Host rewriting.
-* Prefix rewriting.
-* Request retries specified either via HTTP header or via route configuration.
-* Request timeout specified either via HTTP header or via route configuration.
-* Runtime configuration routing rules.
-* Content type routing rules.
+* :ref:`TLS redirection <config_http_conn_man_route_table_vhost_require_ssl>` at the virtual host
+  level.
+* :ref:`Path <config_http_conn_man_route_table_route_path_redirect>`/:ref:`host
+  <config_http_conn_man_route_table_route_host_redirect>` redirection at the route level.
+* :ref:`Explicit host rewriting <config_http_conn_man_route_table_route_host_rewrite>`.
+* :ref:`Automatic host rewriting <config_http_conn_man_route_table_route_auto_host_rewrite>` based on
+  the DNS name of the selected upstream host.
+* :ref:`Prefix rewriting <config_http_conn_man_route_table_route_prefix_rewrite>`.
+* :ref:`Websocket upgrades <config_http_conn_man_route_table_route_use_websocket>` at route level.
+* :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
+  route configuration.
+* Request timeout specified either via :ref:`HTTP
+  header <config_http_filters_router_headers>` or via :ref:`route configuration
+  <config_http_conn_man_route_table_route_timeout>`.
+* Traffic shifting from one upstream cluster to another via :ref:`runtime values
+  <config_http_conn_man_route_table_route_runtime>` (see :ref:`traffic shifting/splitting
+  <config_http_conn_man_route_table_traffic_splitting>`).
+* Traffic splitting across multiple upstream clusters using :ref:`weight/percentage-based routing
+  <config_http_conn_man_route_table_route_weighted_clusters>` (see :ref:`traffic shifting/splitting
+  <config_http_conn_man_route_table_traffic_splitting_split>`).
+* Arbitrary header matching :ref:`routing rules <config_http_conn_man_route_table_route_headers>`.
 * Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
+* :ref:`Hash policy <config_http_conn_man_route_table_hash_policy>` based routing.
+* :ref:`Absolute urls <config_http_conn_man_http1_settings>` are supported for non-tls forward proxies.
 
 Route table
 -----------

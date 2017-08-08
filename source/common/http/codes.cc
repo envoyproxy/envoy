@@ -1,86 +1,109 @@
-#include "codes.h"
-#include "headers.h"
-#include "utility.h"
+#include "common/http/codes.h"
+
+#include <cstdint>
+#include <string>
 
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/http/headers.h"
+#include "common/http/utility.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Http {
 
-void CodeUtility::chargeBasicResponseStat(Stats::Store& store, const std::string& prefix,
+void CodeUtility::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
                                           Code response_code) {
   // Build a dynamic stat for the response code and increment it.
-  store.counter(fmt::format("{}upstream_rq_{}", prefix, groupStringForResponseCode(response_code)))
+  scope.counter(fmt::format("{}upstream_rq_{}", prefix, groupStringForResponseCode(response_code)))
       .inc();
-  store.counter(fmt::format("{}upstream_rq_{}", prefix, enumToInt(response_code))).inc();
+  scope.counter(fmt::format("{}upstream_rq_{}", prefix, enumToInt(response_code))).inc();
 }
 
 void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
   uint64_t response_code = Utility::getResponseStatus(info.response_headers_);
-  chargeBasicResponseStat(info.store_, info.prefix_, static_cast<Code>(response_code));
+  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
 
   std::string group_string = groupStringForResponseCode(static_cast<Code>(response_code));
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
-    info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string)).inc();
-    info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code)).inc();
+    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string))
+        .inc();
+    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code))
+        .inc();
   }
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
-    info.store_.counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, group_string)).inc();
-    info.store_.counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, response_code))
+    info.cluster_scope_
+        .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, group_string))
+        .inc();
+    info.cluster_scope_
+        .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, response_code))
         .inc();
   } else {
-    info.store_.counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, group_string)).inc();
-    info.store_.counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, response_code))
+    info.cluster_scope_
+        .counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, group_string))
+        .inc();
+    info.cluster_scope_
+        .counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, response_code))
         .inc();
   }
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    info.store_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
-                                    info.request_vcluster_name_, group_string)).inc();
-    info.store_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
-                                    info.request_vcluster_name_, response_code)).inc();
+    info.global_scope_
+        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
+                             info.request_vcluster_name_, group_string))
+        .inc();
+    info.global_scope_
+        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
+                             info.request_vcluster_name_, response_code))
+        .inc();
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
-                                    info.to_zone_, group_string)).inc();
-    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
-                                    info.to_zone_, response_code)).inc();
+    info.cluster_scope_
+        .counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                             info.to_zone_, group_string))
+        .inc();
+    info.cluster_scope_
+        .counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                             info.to_zone_, response_code))
+        .inc();
   }
 }
 
 void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
-  info.store_.deliverTimingToSinks(info.prefix_ + "upstream_rq_time", info.response_time_);
+  info.cluster_scope_.deliverTimingToSinks(info.prefix_ + "upstream_rq_time", info.response_time_);
   if (info.upstream_canary_) {
-    info.store_.deliverTimingToSinks(info.prefix_ + "canary.upstream_rq_time", info.response_time_);
+    info.cluster_scope_.deliverTimingToSinks(info.prefix_ + "canary.upstream_rq_time",
+                                             info.response_time_);
   }
 
   if (info.internal_request_) {
-    info.store_.deliverTimingToSinks(info.prefix_ + "internal.upstream_rq_time",
-                                     info.response_time_);
+    info.cluster_scope_.deliverTimingToSinks(info.prefix_ + "internal.upstream_rq_time",
+                                             info.response_time_);
   } else {
-    info.store_.deliverTimingToSinks(info.prefix_ + "external.upstream_rq_time",
-                                     info.response_time_);
+    info.cluster_scope_.deliverTimingToSinks(info.prefix_ + "external.upstream_rq_time",
+                                             info.response_time_);
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    info.store_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
-                                         info.request_vcluster_name_ + ".upstream_rq_time",
-                                     info.response_time_);
+    info.global_scope_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
+                                                info.request_vcluster_name_ + ".upstream_rq_time",
+                                            info.response_time_);
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    info.store_.deliverTimingToSinks(
+    info.cluster_scope_.deliverTimingToSinks(
         fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_, info.to_zone_),
         info.response_time_);
   }
@@ -103,6 +126,9 @@ std::string CodeUtility::groupStringForResponseCode(Code response_code) {
 const char* CodeUtility::toString(Code code) {
   // clang-format off
   switch (code) {
+  // 1xx
+  case Code::Continue:                      return "Continue";
+
   // 2xx
   case Code::OK:                            return "OK";
   case Code::Created:                       return "Created";
@@ -171,4 +197,5 @@ const char* CodeUtility::toString(Code code) {
   return "Unknown";
 }
 
-} // Http
+} // namespace Http
+} // namespace Envoy

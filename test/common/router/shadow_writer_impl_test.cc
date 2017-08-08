@@ -1,10 +1,18 @@
+#include <chrono>
+#include <string>
+
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 #include "common/router/shadow_writer_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::Invoke;
+using testing::_;
 
 namespace Router {
 
@@ -51,4 +59,5 @@ TEST(ShadowWriterImplTest, All) {
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
-} // Router
+} // namespace Router
+} // namespace Envoy

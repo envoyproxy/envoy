@@ -1,16 +1,24 @@
-language: cpp
+language: minimal
 sudo: required
+
 services:
   - docker
-install:
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y awscli
   - gem install travis --no-rdoc --no-ri
 matrix:
   fast_finish: true
 env:
-  - TEST_TYPE=normal
-  - TEST_TYPE=coverage
-  - TEST_TYPE=asan
+  - TEST_TYPE=bazel.release
+  - TEST_TYPE=bazel.asan
+  - TEST_TYPE=bazel.tsan
+  - TEST_TYPE=bazel.coverage
+  - TEST_TYPE=check_format
   - TEST_TYPE=docs
-script:
-  - travis lint .travis.yml --skip-completion-check
-  - docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+  - TEST_TYPE=build_image
+script: ./ci/ci_steps.sh
+
+branches:
+  only:
+    - master

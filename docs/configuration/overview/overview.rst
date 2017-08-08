@@ -3,9 +3,10 @@
 Overview
 ========
 
-The Envoy configuration format is written in JSON. The main configuration for the server is
-contained within the listeners and cluster manager sections. The other top level elements specify
-miscellaneous configuration.
+The Envoy configuration format is written in JSON and is validated against a JSON schema. The
+schema can be found in :repo:`source/common/json/config_schemas.cc`. The main configuration for the
+server is contained within the listeners and cluster manager sections. The other top level elements
+specify miscellaneous configuration.
 
 .. code-block:: json
 
@@ -15,7 +16,13 @@ miscellaneous configuration.
     "cluster_manager": "{...}",
     "flags_path": "...",
     "statsd_local_udp_port": "...",
+    "statsd_udp_ip_address": "...",
     "statsd_tcp_cluster_name": "...",
+    "stats_flush_interval_ms": "...",
+    "watchdog_miss_timeout_ms": "...",
+    "watchdog_megamiss_timeout_ms": "...",
+    "watchdog_kill_timeout_ms": "...",
+    "watchdog_multikill_timeout_ms": "...",
     "tracing": "{...}",
     "rate_limit_service": "{...}",
     "runtime": "{...}",
@@ -39,14 +46,45 @@ flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.
 
-statsd_local_udp_port
+statsd_local_udp_port (Warning: DEPRECATED and will be removed in 1.4.0)
   *(optional, integer)* The UDP port of a locally running statsd compliant listener. If specified,
   :ref:`statistics <arch_overview_statistics>` will be flushed to this port.
+
+statsd_udp_ip_address
+  *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
+  :ref:`statistics <arch_overview_statistics>` will be flushed to this address. IPv4 addresses should
+  have format host:port (ex: 127.0.0.1:855). IPv6 addresses should have URL format [host]:port
+  (ex: [::1]:855).
 
 statsd_tcp_cluster_name
   *(optional, string)* The name of a cluster manager cluster that is running a TCP statsd compliant
   listener. If specified, Envoy will connect to this cluster to flush :ref:`statistics
   <arch_overview_statistics>`.
+
+.. _config_overview_stats_flush_interval_ms:
+
+stats_flush_interval_ms
+  *(optional, integer)* The time in milliseconds between flushes to configured stats sinks. For
+  performance reasons Envoy latches counters and only flushes counters and gauges at a periodic
+  interval. If not specified the default is 5000ms (5 seconds).
+
+watchdog_miss_timeout_ms
+  *(optional, integer)* The time in milliseconds after which Envoy counts a nonresponsive thread in the
+  "server.watchdog_miss" statistic. If not specified the default is 200ms.
+
+watchdog_megamiss_timeout_ms
+  *(optional, integer)* The time in milliseconds after which Envoy counts a nonresponsive thread in the
+  "server.watchdog_mega_miss" statistic. If not specified the default is 1000ms.
+
+watchdog_kill_timeout_ms
+  *(optional, integer)* If a watched thread has been nonresponsive for this many milliseconds assume
+  a programming error and kill the entire Envoy process. Set to 0 to disable kill behavior. If not
+  specified the default is 0 (disabled).
+
+watchdog_multikill_timeout_ms
+  *(optional, integer)* If at least two watched threads have been nonresponsive for at least this many
+  milliseconds assume a true deadlock and kill the entire Envoy process. Set to 0 to disable this
+  behavior. If not specified the default is 0 (disabled).
 
 :ref:`tracing <config_tracing>`
   *(optional, object)* Configuration for an external :ref:`tracing <arch_overview_tracing>`

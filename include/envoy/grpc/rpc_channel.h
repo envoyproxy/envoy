@@ -1,13 +1,17 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
 
-#include "google/protobuf/service.h"
+#include "common/protobuf/protobuf.h"
 
-namespace proto = google::protobuf;
-
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -37,13 +41,15 @@ public:
 };
 
 /**
- * A single active grpc request arbiter. This interface derives from proto::RpcChannel. When
- * mocking, CallMethod() can be overriden to accept the response message and the mock constructor
- * can accept a RequestCallbacks object. An RpcChannel should be passed to the constructor of an RPC
- * stub generated via protoc using the "option cc_generic_services = true;" option. It can be used
- * for multiple service calls, but not concurrently.
+ * A single active grpc request arbiter. This interface derives from
+ * Protobuf::RpcChannel. When mocking, CallMethod() can be overriden to accept
+ * the response message and the mock constructor can accept a RequestCallbacks
+ * object. An RpcChannel should be passed to the constructor of an RPC stub
+ * generated via protoc using the "option cc_generic_services = true;" option.
+ * It can be used for multiple service calls, but not concurrently.
+ * DEPRECATED: See https://github.com/lyft/envoy/issues/1102
  */
-class RpcChannel : public proto::RpcChannel {
+class RpcChannel : public Protobuf::RpcChannel {
 public:
   virtual ~RpcChannel() {}
 
@@ -69,4 +75,5 @@ public:
                                const Optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
-} // Grpc
+} // namespace Grpc
+} // namespace Envoy

@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 /**
  * @return the size of a C array.
  */
@@ -15,3 +16,15 @@
  * Stop the compiler from complaining about an unreferenced parameter.
  */
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
+
+/**
+ * Have a generic fall-through for different versions of C++
+ */
+#if __cplusplus >= 201402L // C++14, C++17 and above
+#define FALLTHRU [[fallthrough]]
+#elif __cplusplus >= 201103L && __GNUC__ >= 7 // C++11 gcc 7
+#define FALLTHRU [[gnu::fallthrough]]
+#else // C++11 on gcc 6, and all other cases
+#define FALLTHRU
+#endif
+} // Envoy

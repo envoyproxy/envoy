@@ -5,6 +5,9 @@ Runtime
 
 Upstream clusters support the following runtime settings:
 
+Active health checking
+----------------------
+
 health_check.min_interval
   Min value for the health checking :ref:`interval <config_cluster_manager_cluster_hc_interval>`.
   Default value is 0. The health checking interval will be between *min_interval* and
@@ -20,6 +23,63 @@ health_check.verify_cluster
   <config_cluster_manager_cluster_hc_service_name>` as the :ref:`health check filter
   <arch_overview_health_checking_filter>` will write the remote service cluster into the response.
 
+.. _config_cluster_manager_cluster_runtime_outlier_detection:
+
+Outlier detection
+-----------------
+
+See the outlier detection :ref:`architecture overview <arch_overview_outlier_detection>` for more
+information on outlier detection. The runtime parameters supported by outlier detection are the 
+same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely:
+
+outlier_detection.consecutive_5xx
+  :ref:`consecutive_5XX
+  <config_cluster_manager_cluster_outlier_detection_consecutive_5xx>`
+  setting in outlier detection
+
+outlier_detection.interval_ms
+  :ref:`interval_ms
+  <config_cluster_manager_cluster_outlier_detection_interval_ms>`
+  setting in outlier detection
+
+outlier_detection.base_ejection_time_ms
+  :ref:`base_ejection_time_ms
+  <config_cluster_manager_cluster_outlier_detection_base_ejection_time_ms>`
+  setting in outlier detection
+
+outlier_detection.max_ejection_percent
+  :ref:`max_ejection_percent
+  <config_cluster_manager_cluster_outlier_detection_max_ejection_percent>`
+  setting in outlier detection
+
+outlier_detection.enforcing_consecutive_5xx
+  :ref:`enforcing_consecutive_5xx
+  <config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx>`
+  setting in outlier detection
+
+outlier_detection.enforcing_success_rate
+  :ref:`enforcing_success_rate
+  <config_cluster_manager_cluster_outlier_detection_enforcing_success_rate>`
+  setting in outlier detection
+
+outlier_detection.success_rate_minimum_hosts
+  :ref:`success_rate_minimum_hosts
+  <config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
+  setting in outlier detection
+
+outlier_detection.success_rate_request_volume
+  :ref:`success_rate_request_volume
+  <config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+  setting in outlier detection
+
+outlier_detection.success_rate_stdev_factor
+  :ref:`success_rate_stdev_factor
+  <config_cluster_manager_cluster_outlier_detection_success_rate_stdev_factor>`
+  setting in outlier detection
+
+Core
+----
+
 upstream.healthy_panic_threshold
   Sets the :ref:`panic threshold <arch_overview_load_balancing_panic_threshold>` percentage.
   Defaults to 50%.
@@ -32,7 +92,19 @@ upstream.weight_enabled
   Binary switch to turn on or off weighted load balancing. If set to non 0, weighted load balancing
   is enabled. Defaults to enabled.
 
+.. _config_cluster_manager_cluster_runtime_ring_hash:
+
+Ring hash load balancing
+------------------------
+
+upstream.ring_hash.min_ring_size
+  The minimum size of the hash ring for the :ref:`ring hash load balancer
+  <arch_overview_load_balancing_types>`. The default is 1024.
+
 .. _config_cluster_manager_cluster_runtime_zone_routing:
+
+Zone aware load balancing
+-------------------------
 
 upstream.zone_routing.enabled
   % of requests that will be routed to the same upstream zone. Defaults to 100% of requests.
@@ -41,6 +113,9 @@ upstream.zone_routing.min_cluster_size
   Minimal size of the upstream cluster for which zone aware routing can be attempted. Default value
   is 6. If the upstream cluster size is smaller than *min_cluster_size* zone aware routing will not
   be performed.
+
+Circuit breaking
+----------------
 
 circuit_breakers.<cluster_name>.<priority>.max_connections
   :ref:`Max connections circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_connections>`

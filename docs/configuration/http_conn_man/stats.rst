@@ -13,6 +13,7 @@ statistics:
    downstream_cx_total, Counter, Total connections
    downstream_cx_ssl_total, Counter, Total TLS connections
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
+   downstream_cx_websocket_total, Counter, Total WebSocket connections
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
@@ -23,6 +24,7 @@ statistics:
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_ssl_active, Gauge, Total active TLS connections
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
+   downstream_cx_websocket_active, Gauge, Total active WebSocket connections
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Timer, Connection length milliseconds
@@ -32,6 +34,8 @@ statistics:
    downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
+   downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
+   downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
    downstream_rq_total, Counter, Total requests
    downstream_rq_http1_total, Counter, Total HTTP/1.1 requests
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
@@ -44,6 +48,8 @@ statistics:
    downstream_rq_3xx, Counter, Total 3xx responses
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
+   downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
+   downstream_rq_non_ws_on_ws_route, Counter, Total HTTP requests rejected by WebSocket enabled routes due to missing upgrade header
    downstream_rq_time, Timer, Request time milliseconds
    failed_generate_uuid, Counter, Total UUID generation failures
 

@@ -1,10 +1,16 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
 #include "common/json/json_loader.h"
 
+#include "api/protocol.pb.h"
+
+namespace Envoy {
 namespace Http {
 
 /**
@@ -19,7 +25,7 @@ public:
    * @param headers supplies the headers to append to.
    * @param remote_address supplies the remote address to append.
    */
-  static void appendXff(HeaderMap& headers, const std::string& remote_address);
+  static void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
 
   /**
    * Creates an SSL (https) redirect path based on the input host and path headers.
@@ -34,6 +40,14 @@ public:
    * @return QueryParams the parsed parameters, if any.
    */
   static QueryParams parseQueryString(const std::string& url);
+
+  /**
+   * Parse a particular value out of a cookie
+   * @param headers supplies the headers to get the cookie from.
+   * @param key the key for the particular cookie value to return
+   * @return std::string the parsed cookie value, or "" if none exists
+   **/
+  static std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
   /**
    * Get the response status from the response headers.
@@ -52,20 +66,36 @@ public:
   static bool isInternalRequest(const HeaderMap& headers);
 
   /**
-   * @return uint64_t parse a "http_codec_options" JSON field and turn it into a bitmask of
-   *         CodecOption values.
+   * Determine whether this is a WebSocket Upgrade request.
+   * This function returns true if the following HTTP headers and values are present:
+   * - Connection: Upgrade
+   * - Upgrade: websocket
    */
-  static uint64_t parseCodecOptions(const Json::Object& config);
+  static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+
+  /**
+   * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
+   *         "http2_settings" JSON fields.
+   */
+  static Http2Settings parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config);
+
+  /**
+   * @return Http1Settings An Http1Settings populated from http1_settings JSON.
+   */
+  static Http1Settings parseHttp1Settings(const Json::Object& config);
 
   /**
    * Create a locally generated response using filter callbacks.
    * @param callbacks supplies the filter callbacks to use.
+   * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+   *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+   *                 is invoked in the context of sendLocalReply().
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content
    *                  type.
    */
-  static void sendLocalReply(StreamDecoderFilterCallbacks& callbacks, Code response_code,
-                             const std::string& body_text);
+  static void sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
+                             Code response_code, const std::string& body_text);
 
   /**
    * Send a redirect response (301).
@@ -82,4 +112,5 @@ public:
   static std::string getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

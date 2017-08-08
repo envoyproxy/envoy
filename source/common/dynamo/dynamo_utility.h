@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
+namespace Envoy {
 namespace Dynamo {
 
 class Utility {
@@ -21,4 +24,5 @@ public:
                                               const std::string& partition_id);
 };
 
-} // Dynamo
+} // namespace Dynamo
+} // namespace Envoy

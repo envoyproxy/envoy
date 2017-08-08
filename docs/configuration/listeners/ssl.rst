@@ -14,8 +14,9 @@ TLS :ref:`architecture overview <arch_overview_ssl>`.
     "alt_alpn_protocols": "...",
     "ca_cert_file": "...",
     "verify_certificate_hash": "...",
-    "verify_subject_alt_name": "...",
-    "cipher_suites": "..."
+    "verify_subject_alt_name": [],
+    "cipher_suites": "...",
+    "ecdh_curves": "..."
   }
 
 cert_chain_file
@@ -42,16 +43,58 @@ alt_alpn_protocols
 ca_cert_file
   *(optional, string)* A file containing certificate authority certificates to use in verifying
   a presented client side certificate. If not specified and a client certificate is presented it
-  will not be verified.
+  will not be verified. By default, a client certificate is optional, unless one of the additional
+  options (
+  :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`,
+  :ref:`verify_certificate_hash <config_listener_ssl_context_verify_certificate_hash>` or
+  :ref:`verify_subject_alt_name <config_listener_ssl_context_verify_subject_alt_name>`) is also
+  specified.
+
+.. _config_listener_ssl_context_require_client_certificate:
+
+require_client_certificate
+  *(optional, boolean)* If specified, Envoy will reject connections without a valid client certificate.
+
+.. _config_listener_ssl_context_verify_certificate_hash:
 
 verify_certificate_hash
   *(optional, string)* If specified, Envoy will verify (pin) the hash of the presented client
   side certificate.
 
+.. _config_listener_ssl_context_verify_subject_alt_name:
+
 verify_subject_alt_name
-  *(optional, string)* If specified, Envoy will verify the client side certificate's subject alt
-  name matches the specified value.
+  *(optional, array)* An optional list of subject alt names. If specified, Envoy will verify
+  that the client certificate's subject alt name matches one of the specified values.
 
 cipher_suites
-  *(optional, string)* If specified, the TLS listener will only support the specified cipher list.
-  If not specified, a default list will be used.
+  *(optional, string)* If specified, the TLS listener will only support the specified `cipher list
+  <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_.
+  If not specified, the default list:
+
+.. code-block:: none
+
+  [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]
+  [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]
+  ECDHE-ECDSA-AES128-SHA256
+  ECDHE-RSA-AES128-SHA256
+  ECDHE-ECDSA-AES128-SHA
+  ECDHE-RSA-AES128-SHA
+  AES128-GCM-SHA256
+  AES128-SHA256
+  AES128-SHA
+  ECDHE-ECDSA-AES256-GCM-SHA384
+  ECDHE-RSA-AES256-GCM-SHA384
+  ECDHE-ECDSA-AES256-SHA384
+  ECDHE-RSA-AES256-SHA384
+  ECDHE-ECDSA-AES256-SHA
+  ECDHE-RSA-AES256-SHA
+  AES256-GCM-SHA384
+  AES256-SHA256
+  AES256-SHA
+
+will be used.
+
+ecdh_curves
+  *(optional, string)* If specified, the TLS connection will only support the specified ECDH curves.
+  If not specified, the default curves (X25519, P-256) will be used.

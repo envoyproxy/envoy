@@ -22,6 +22,7 @@ extern "C" {
 void evconnlistener_free(evconnlistener*);
 }
 
+namespace Envoy {
 namespace Event {
 namespace Libevent {
 
@@ -34,8 +35,6 @@ public:
    * Initialize the library globally.
    */
   static void initialize();
-
-  static const int DNS_SIGNAL_ID;
 };
 
 typedef CSmartPtr<event_base, event_base_free> BasePtr;
@@ -43,5 +42,6 @@ typedef CSmartPtr<evbuffer, evbuffer_free> BufferPtr;
 typedef CSmartPtr<bufferevent, bufferevent_free> BufferEventPtr;
 typedef CSmartPtr<evconnlistener, evconnlistener_free> ListenerPtr;
 
-} // Libevent
-} // Event
+} // namespace Libevent
+} // namespace Event
+} // namespace Envoy

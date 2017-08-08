@@ -1,12 +1,12 @@
 {
   "listeners": [
   {
-    "port": 10001,
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "ssl_context": {
-      "ca_cert_file": "./test/config/integration/certs/cacert.pem",
-      "cert_chain_file": "./test/config/integration/certs/servercert.pem",
-      "private_key_file": "./test/config/integration/certs/serverkey.pem",
-      "verify_certificate_hash": "75:1D:5F:48:82:7E:30:1D:06:33:EC:B2:88:E3:22:5F:D0:48:D8:F2:D4:F8:7F:A9:89:7F:7E:AF:8F:89:AB:D0",
+      "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
+      "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/servercert.pem",
+      "private_key_file": "{{ test_rundir }}/test/config/integration/certs/serverkey.pem",
+      "verify_certificate_hash": "9E:D6:53:36:49:26:9C:69:4F:71:7E:87:29:A1:C8:B5:50:06:FD:51:01:3C:0E:0D:42:94:91:6E:00:D7:EA:04",
       "alpn_protocols": "h2,http/1.1",
       "alt_alpn_protocols": "http/1.1"
     },
@@ -19,10 +19,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -78,32 +89,33 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "port": 10003 },
-  "statsd_local_udp_port": 8125,
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
+  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
 
   "cluster_manager": {
     "clusters": [
     {
       "name": "cluster_1",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "ssl_context": {
-        "ca_cert_file": "./test/config/integration/certs/upstreamcacert.pem",
-        "verify_subject_alt_name": "foo.lyft.com"
+        "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
+        "verify_subject_alt_name": [ "foo.lyft.com" ]
       },
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11000"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}]
     },
     {
       "name": "cluster_2",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "ssl_context": {
-        "ca_cert_file": "./test/config/integration/certs/upstreamcacert.pem",
-        "verify_subject_alt_name": "foo.lyft.com"
+        "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
+        "verify_subject_alt_name": [ "foo.lyft.com" ]
       },
       "type": "strict_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
+      "dns_lookup_family": "{{ dns_lookup_family }}",
+      "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
     }]
   }
 }

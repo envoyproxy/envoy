@@ -22,8 +22,8 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
 Underlying implementation
 -------------------------
 
-Currently Envoy is written to use openssl 1.0.2 as the TLS provider. Swapping in a different
-provider in the future would not be difficult.
+Currently Envoy is written to use `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ as the
+TLS provider.
 
 .. _arch_overview_ssl_auth_filter:
 

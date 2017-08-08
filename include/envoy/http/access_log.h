@@ -1,36 +1,46 @@
 #pragma once
 
-#include "envoy/access_log/access_log.h"
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
-enum class FailureReason {
-  // No failure.
-  None,
+enum ResponseFlag {
   // Local server healthcheck failed.
-  FailedLocalHealthCheck,
+  FailedLocalHealthCheck = 0x1,
   // No healthy upstream.
-  NoHealthyUpstream,
+  NoHealthyUpstream = 0x2,
   // Request timeout on upstream.
-  UpstreamRequestTimeout,
+  UpstreamRequestTimeout = 0x4,
   // Local codec level reset was sent on the stream.
-  LocalReset,
+  LocalReset = 0x8,
   // Remote codec level reset was received on the stream.
-  UpstreamRemoteReset,
+  UpstreamRemoteReset = 0x10,
   // Local reset by a connection pool due to an initial connection failure.
-  UpstreamConnectionFailure,
+  UpstreamConnectionFailure = 0x20,
   // If the stream was locally reset due to connection termination.
-  UpstreamConnectionTermination,
+  UpstreamConnectionTermination = 0x40,
   // The stream was reset because of a resource overflow.
-  UpstreamOverflow,
+  UpstreamOverflow = 0x80,
   // No route found for a given request.
-  NoRouteFound,
+  NoRouteFound = 0x100,
+  // Request was delayed before proxying.
+  DelayInjected = 0x200,
+  // Abort with error code was injected.
+  FaultInjected = 0x400,
+  // Request was ratelimited locally by rate limit filter.
+  RateLimited = 0x800
 };
 
 /**
@@ -41,15 +51,14 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * filter can trigger this callback on failed response to provide more details about
-   * failure.
+   * Each filter can set independent response flag, flags are accumulated.
    */
-  virtual void onFailedResponse(FailureReason failure_reason) PURE;
+  virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * filter can trigger this callback when an upstream host has been selected.
+   * Filter can trigger this callback when an upstream host has been selected.
    */
-  virtual void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) PURE;
+  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -64,7 +73,12 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual const std::string& protocol() const PURE;
+  virtual Protocol protocol() const PURE;
+
+  /**
+   * Set the request's protocol.
+   */
+  virtual void protocol(Protocol protocol) PURE;
 
   /**
    * @return the response code.
@@ -82,14 +96,14 @@ public:
   virtual std::chrono::milliseconds duration() const PURE;
 
   /**
-   * @return the failure reason for richer log experience.
+   * @return whether response flag is set or not.
    */
-  virtual FailureReason failureReason() const PURE;
+  virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return upstream host description.
    */
-  virtual Upstream::HostDescriptionPtr upstreamHost() const PURE;
+  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
    * @return whether the request is a health check request or not.
@@ -121,7 +135,7 @@ typedef std::unique_ptr<Filter> FilterPtr;
 /**
  * Abstract access logger for HTTP requests and responses.
  */
-class Instance : public ::AccessLog::AccessLog {
+class Instance {
 public:
   virtual ~Instance() {}
 
@@ -136,7 +150,7 @@ public:
                    const RequestInfo& request_info) PURE;
 };
 
-typedef std::shared_ptr<Instance> InstancePtr;
+typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 /**
  * Interface for access log formatter.
@@ -152,5 +166,6 @@ public:
 
 typedef std::unique_ptr<Formatter> FormatterPtr;
 
-} // AccessLog
-} // Http
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

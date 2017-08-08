@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
@@ -7,6 +11,7 @@
 
 #include "common/http/codec_client.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
@@ -17,7 +22,7 @@ namespace Http2 {
  */
 class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host, Stats::Store& store,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority);
   ~ConnPoolImpl();
 
@@ -37,8 +42,11 @@ protected:
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType type, uint64_t, int64_t delta) override;
-    void onEvent(uint32_t events) override { parent_.onConnectionEvent(*this, events); }
+    void onEvent(Network::ConnectionEvent event) override {
+      parent_.onConnectionEvent(*this, event);
+    }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     // CodecClientCallbacks
     void onStreamDestroy() override { parent_.onStreamDestroy(*this); }
@@ -51,7 +59,7 @@ protected:
 
     ConnPoolImpl& parent_;
     CodecClientPtr client_;
-    Upstream::HostDescriptionPtr real_host_description_;
+    Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
@@ -62,10 +70,9 @@ protected:
 
   void checkForDrained();
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
-  virtual uint64_t maxConcurrentStreams() PURE;
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
-  void onConnectionEvent(ActiveClient& client, uint32_t events);
+  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onConnectTimeout(ActiveClient& client);
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
@@ -73,8 +80,7 @@ protected:
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::ConstHostPtr host_;
-  Stats::Store& stats_store_;
+  Upstream::HostConstSharedPtr host_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
@@ -90,7 +96,6 @@ public:
 
 private:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
-  uint64_t maxConcurrentStreams() override;
   uint32_t maxTotalStreams() override;
 
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
@@ -98,5 +103,6 @@ private:
   static const uint64_t MAX_STREAMS = (1 << 29);
 };
 
-} // Http2
-} // Http
+} // namespace Http2
+} // namespace Http
+} // namespace Envoy

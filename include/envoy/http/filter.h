@@ -1,11 +1,19 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -63,15 +71,21 @@ public:
   virtual ~StreamFilterCallbacks() {}
 
   /**
-   * Register a callback that will get called when the underlying stream has been reset (either
-   * upstream reset from another filter or downstream reset from the remote side).
-   */
-  virtual void addResetStreamCallback(std::function<void()> callback) PURE;
-
-  /**
-   * @return uint64_t the ID of the originating connection for logging purposes.
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
    */
   virtual uint64_t connectionId() PURE;
+
+  /**
+   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   */
+  virtual const Network::Connection* connection() PURE;
+
+  /**
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
+   */
+  virtual Ssl::Connection* ssl() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
@@ -84,12 +98,16 @@ public:
   virtual void resetStream() PURE;
 
   /**
-   * @return const Router::StableRouteTable& the route table used for HTTP routing decisions.
-   *         The most important consumer of this information is the router filter. However,
-   *         other filters may wish to know the route that will be taken for various reasons so
-   *         the information is supplied to all filters. The table may be empty.
+   * Returns the route for the current request. The assumption is that the implementation can do
+   * caching where applicable to avoid multiple lookups.
+   *
+   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
+   *       routing (such as the request headers). In practice, we don't do this anywhere currently,
+   *       but in the future we might need to provide the ability to clear the cache if a filter
+   *       knows that it has modified the headers in a way that would affect routing. In the future
+   *       we may also want to allow the filter to override the route entry.
    */
-  virtual const Router::StableRouteTable& routeTable() PURE;
+  virtual Router::RouteConstSharedPtr route() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -101,6 +119,12 @@ public:
    * put into the access log.
    */
   virtual AccessLog::RequestInfo& requestInfo() PURE;
+
+  /**
+   * @return span context used for tracing purposes. Individual filters may add or modify
+   *              information in the span context.
+   */
+  virtual Tracing::Span& activeSpan() PURE;
 
   /**
    * @return the trusted downstream address for the connection.
@@ -132,6 +156,26 @@ public:
   virtual const Buffer::Instance* decodingBuffer() PURE;
 
   /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from decodeData() is not sufficient.
+   *
+   * 1) If a headers only request needs to be turned into a request with a body, this method can
+   * be called to add body in the decodeHeaders() callback. Subsequent filters will receive
+   * decodeHeaders(..., false) followed by decodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the decodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive decodeData(..., false)
+   * followed by decodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addDecodedData(Buffer::Instance& data) PURE;
+
+  /**
    * Called with headers to be encoded, optionally indicating end of stream.
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
@@ -154,15 +198,48 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times.  Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
+ * Common base class for both decoder and encoder filters.
+ */
+class StreamFilterBase {
+public:
+  virtual ~StreamFilterBase() {}
+
+  /**
+   * This routine is called prior to a filter being destroyed. This may happen after normal stream
+   * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
+   * sure that any async events are cleaned up in the context of this routine. This includes timers,
+   * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
+   * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
+   * complications. Filters must not invoke either encoder or decoder filter callbacks after having
+   * onDestroy() invoked.
+   */
+  virtual void onDestroy() PURE;
 };
 
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter {
+class StreamDecoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamDecoderFilter() {}
-
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -187,12 +264,12 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter decoder callbacks that the
-   * filter should use.
+   * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterPtr;
+typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
 
 /**
  * Stream encoder filter callbacks add additional callbacks that allow a encoding filter to restart
@@ -216,15 +293,43 @@ public:
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
   virtual const Buffer::Instance* encodingBuffer() PURE;
+
+  /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from encodeData() is not sufficient.
+   *
+   * 1) If a headers only response needs to be turned into a response with a body, this method can
+   * be called to add body in the encodeHeaders() callback. Subsequent filters will receive
+   * encodeHeaders(..., false) followed by encodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the encodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive encodeData(..., false)
+   * followed by encodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addEncodedData(Buffer::Instance& data) PURE;
+
+  /**
+   * Called when an encoder filter goes over its high watermark.
+   */
+  virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter {
+class StreamEncoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamEncoderFilter() {}
-
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
    * @param headers supplies the headers to be encoded.
@@ -249,19 +354,19 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
-   * use.
+   * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterPtr;
+typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
 
 /**
  * A filter that handles both encoding and decoding.
  */
 class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
 
-typedef std::shared_ptr<StreamFilter> StreamFilterPtr;
+typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -275,19 +380,25 @@ public:
    * Add a decoder filter that is used when reading stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamDecoderFilter(Http::StreamDecoderFilterPtr filter) PURE;
+  virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamEncoderFilter(Http::StreamEncoderFilterPtr filter) PURE;
+  virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamFilter(Http::StreamFilterPtr filter) PURE;
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
+
+  /**
+   * Add an access log handler that is called when the stream is destroyed.
+   * @param handler supplies the handler to add.
+   */
+  virtual void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**
@@ -308,4 +419,5 @@ public:
   virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

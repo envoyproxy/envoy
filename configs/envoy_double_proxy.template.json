@@ -1,6 +1,6 @@
-{% macro listener(port,ssl,proxy_proto) %}
+{% macro listener(address,ssl,proxy_proto) %}
   {
-    "port": {{ port }},
+    "address": "{{ address }}",
     {% if ssl -%}
     "ssl_context": {
       "alpn_protocols": "h2,http/1.1",
@@ -79,29 +79,27 @@
   "listeners": [
     {# TCP listener for external port 443 (SSL). Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener(9300,True,True) }},
+    {{ listener("tcp://0.0.0.0:9300",True,True) }},
 
     {# TCP listener for external port 80 (non-SSL). Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener(9301,False,True) }}
+    {{ listener("tcp://0.0.0.0:9301",False,True) }}
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://127.0.0.1:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 
   "tracing": {
     "http": {
-      "sinks": [
-        {
+      "driver": {
           "type": "lightstep",
-          "access_token_file": "/etc/envoy/lightstep_access_token",
           "config": {
+            "access_token_file": "/etc/envoy/lightstep_access_token",
             "collector_cluster": "lightstep_saas"
           }
-        }
-      ]
+      }
     }
   },
 
@@ -133,7 +131,7 @@
       "ssl_context": {
         "cert_chain_file": "/etc/envoy/envoy-double-proxy.pem",
         "private_key_file": "/etc/envoy/envoy-double-proxy.key",
-        "verify_subject_alt_name": "front-proxy.yourcompany.net"
+        "verify_subject_alt_name": ["front-proxy.yourcompany.net"]
       },
       "hosts": [{"url": "tcp://front-proxy.yourcompany.net:9400"}]
     },
@@ -142,12 +140,12 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector.lightstep.com"
+        "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://collector.lightstep.com:443"}]
+      "hosts": [{"url": "tcp://collector-grpc.lightstep.com:443"}]
     }
     ]
   }

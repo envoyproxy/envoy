@@ -1,3 +1,6 @@
+#include <chrono>
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/http/filter/buffer_filter.h"
@@ -6,13 +9,18 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/printers.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
+using testing::_;
 
 namespace Http {
 
@@ -66,7 +74,7 @@ TEST_F(BufferFilterTest, RequestTimeout) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   timer_->callback_();
 
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
   EXPECT_EQ(1U, config_->stats_.rq_timeout_.value());
 }
 
@@ -78,8 +86,8 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
   TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  Buffer::OwnedImpl buffered_data("buffered");
-  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&buffered_data));
+  Buffer::InstancePtr buffered_data(new Buffer::OwnedImpl("buffered"));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(buffered_data.get()));
 
   Buffer::OwnedImpl data1("hello");
   config_->max_request_bytes_ = 1;
@@ -87,7 +95,7 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
   EXPECT_EQ(1U, config_->stats_.rq_too_large_.value());
 }
 
@@ -107,7 +115,8 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 
   // It's possible that the stream will be reset on the TX side even after RX end stream. Mimic
   // that here.
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
 }
 
-} // Http
+} // namespace Http
+} // namespace Envoy

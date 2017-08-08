@@ -1,0 +1,252 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_library(
+    name = "async_client_lib",
+    srcs = ["async_client_impl.cc"],
+    hdrs = ["async_client_impl.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:async_client_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:message_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/router:router_ratelimit_interface",
+        "//include/envoy/router:shadow_writer_interface",
+        "//include/envoy/ssl:connection_interface",
+        "//source/common/common:empty_string",
+        "//source/common/common:linked_object",
+        "//source/common/http/access_log:request_info_lib",
+        "//source/common/router:router_lib",
+        "//source/common/tracing:http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_client_lib",
+    srcs = ["codec_client.cc"],
+    hdrs = ["codec_client.h"],
+    deps = [
+        ":codec_wrappers_lib",
+        ":exception_lib",
+        ":utility_lib",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:linked_object",
+        "//source/common/common:logger_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
+        "//source/common/network:filter_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_helper_lib",
+    hdrs = ["codec_helper.h"],
+)
+
+envoy_cc_library(
+    name = "codec_wrappers_lib",
+    hdrs = ["codec_wrappers.h"],
+    deps = ["//include/envoy/http:codec_interface"],
+)
+
+envoy_cc_library(
+    name = "codes_lib",
+    srcs = ["codes.cc"],
+    hdrs = ["codes.h"],
+    deps = [
+        ":headers_lib",
+        ":utility_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_manager_lib",
+    srcs = [
+        "conn_manager_impl.cc",
+        "conn_manager_utility.cc",
+    ],
+    hdrs = [
+        "conn_manager_impl.h",
+        "conn_manager_utility.h",
+    ],
+    deps = [
+        ":codes_lib",
+        ":date_provider_lib",
+        ":exception_lib",
+        ":header_map_lib",
+        ":headers_lib",
+        ":user_agent_lib",
+        ":utility_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/http:access_log_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:wshandler_callback_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:linked_object",
+        "//source/common/common:utility_lib",
+        "//source/common/http/access_log:access_log_formatter_lib",
+        "//source/common/http/access_log:request_info_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
+        "//source/common/http/websocket:ws_handler_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/runtime:uuid_util_lib",
+        "//source/common/tracing:http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "date_provider_lib",
+    srcs = ["date_provider_impl.cc"],
+    hdrs = [
+        "date_provider.h",
+        "date_provider_impl.h",
+    ],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "exception_lib",
+    hdrs = ["exception.h"],
+    deps = ["//include/envoy/http:header_map_interface"],
+)
+
+envoy_cc_library(
+    name = "header_map_lib",
+    srcs = ["header_map_impl.cc"],
+    hdrs = ["header_map_impl.h"],
+    deps = [
+        ":headers_lib",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:non_copyable",
+        "//source/common/common:singleton",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "headers_lib",
+    hdrs = ["headers.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "message_lib",
+    srcs = ["message_impl.cc"],
+    hdrs = ["message_impl.h"],
+    deps = [
+        ":header_map_lib",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:message_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:non_copyable",
+    ],
+)
+
+envoy_cc_library(
+    name = "rest_api_fetcher_lib",
+    srcs = ["rest_api_fetcher.cc"],
+    hdrs = ["rest_api_fetcher.h"],
+    deps = [
+        ":message_lib",
+        ":utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:enum_to_int",
+    ],
+)
+
+envoy_cc_library(
+    name = "user_agent_lib",
+    srcs = ["user_agent.cc"],
+    hdrs = ["user_agent.h"],
+    deps = [
+        ":headers_lib",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    external_deps = ["envoy_protocol"],
+    deps = [
+        ":exception_lib",
+        ":header_map_lib",
+        ":headers_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:utility_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_utility_lib",
+    srcs = ["filter_utility.cc"],
+    hdrs = ["filter_utility.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)

@@ -12,31 +12,31 @@ the only one supported.
 
   {
     "http": {
-      "sinks": []
+      "driver": "{...}"
     }
   }
 
 http
   *(optional, object)* Provides configuration for the HTTP tracer.
 
-sinks
-  *(optional, string)* Provides list of sinks traces are sent to.
+driver
+  *(optional, object)* Provides the driver that handles trace and span creation.
 
-Each sink can be configured separately. Currently only the `LightStep <http://lightstep.com/>`_ sink
-is supported.
+Currently `LightStep <http://lightstep.com/>`_  and `Zipkin
+<http://zipkin.io>` drivers are supported.
+
+LightStep driver
+----------------
 
 .. code-block:: json
 
   {
     "type": "lightstep",
-    "access_token_file": "...",
     "config": {
+      "access_token_file": "...",
       "collector_cluster": "..."
     }
   }
-
-type
-  *(required, string)* Sink type, the only currently supported value is *lightstep*.
 
 access_token_file
   *(required, string)* File containing the access token to the `LightStep <http://lightstep.com/>`_
@@ -44,3 +44,26 @@ access_token_file
 
 collector_cluster
   *(required, string)* The cluster manager cluster that hosts the LightStep collectors.
+
+
+Zipkin driver
+-------------
+
+.. code-block:: json
+
+  {
+    "type": "zipkin",
+    "config": {
+      "collector_cluster": "...",
+      "collector_endpoint": "..."
+    }
+  }
+
+collector_cluster
+  *(required, string)* The cluster manager cluster that hosts the Zipkin collectors. Note that the
+  Zipkin cluster must be defined under `clusters` in the cluster manager configuration section.
+
+collector_endpoint
+  *(optional, string)* The API endpoint of the Zipkin service where the
+  spans will be sent. When using a standard Zipkin installation, the
+  API endpoint is typically `/api/v1/spans`, which is the default value.

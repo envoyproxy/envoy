@@ -1,30 +1,19 @@
-#include "dispatcher_impl.h"
-#include "file_event_impl.h"
+#include "common/event/file_event_impl.h"
+
+#include <cstdint>
+
+#include "common/common/assert.h"
+#include "common/event/dispatcher_impl.h"
 
 #include "event2/event.h"
 
-#include "common/common/assert.h"
-
+namespace Envoy {
 namespace Event {
 
-FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb) : cb_(cb) {
-  event_assign(&raw_event_, &dispatcher.base(), fd, EV_PERSIST | EV_ET | EV_READ | EV_WRITE,
-               [](evutil_socket_t, short what, void* arg) -> void {
-                 FileEventImpl* event = static_cast<FileEventImpl*>(arg);
-                 uint32_t events = 0;
-                 if (what & EV_READ) {
-                   events |= FileReadyType::Read;
-                 }
-
-                 if (what & EV_WRITE) {
-                   events |= FileReadyType::Write;
-                 }
-
-                 ASSERT(events);
-                 event->cb_(events);
-               },
-               this);
-
+FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
+                             FileTriggerType trigger, uint32_t events)
+    : cb_(cb), base_(&dispatcher.base()), fd_(fd), trigger_(trigger) {
+  assignEvents(events);
   event_add(&raw_event_, nullptr);
 }
 
@@ -38,8 +27,46 @@ void FileEventImpl::activate(uint32_t events) {
     libevent_events |= EV_WRITE;
   }
 
+  if (events & FileReadyType::Closed) {
+    libevent_events |= EV_CLOSED;
+  }
+
   ASSERT(libevent_events);
   event_active(&raw_event_, libevent_events, 0);
 }
 
-} // Event
+void FileEventImpl::assignEvents(uint32_t events) {
+  event_assign(&raw_event_, base_, fd_,
+               EV_PERSIST | (trigger_ == FileTriggerType::Level ? 0 : EV_ET) |
+                   (events & FileReadyType::Read ? EV_READ : 0) |
+                   (events & FileReadyType::Write ? EV_WRITE : 0) |
+                   (events & FileReadyType::Closed ? EV_CLOSED : 0),
+               [](evutil_socket_t, short what, void* arg) -> void {
+                 FileEventImpl* event = static_cast<FileEventImpl*>(arg);
+                 uint32_t events = 0;
+                 if (what & EV_READ) {
+                   events |= FileReadyType::Read;
+                 }
+
+                 if (what & EV_WRITE) {
+                   events |= FileReadyType::Write;
+                 }
+
+                 if (what & EV_CLOSED) {
+                   events |= FileReadyType::Closed;
+                 }
+
+                 ASSERT(events);
+                 event->cb_(events);
+               },
+               this);
+}
+
+void FileEventImpl::setEnabled(uint32_t events) {
+  event_del(&raw_event_);
+  assignEvents(events);
+  event_add(&raw_event_, nullptr);
+}
+
+} // namespace Event
+} // namespace Envoy

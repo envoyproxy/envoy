@@ -1,26 +1,43 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/event/libevent.h"
 
-// Forward decls to avoid leaking libevent headers to rest of program.
-struct evbuffer_cb_info;
-typedef void (*evbuffer_cb_func)(evbuffer* buffer, const evbuffer_cb_info* info, void* arg);
-
+namespace Envoy {
 namespace Buffer {
+
+class OwnedImplFactory : public Factory {
+public:
+  // Buffer::Factory
+  InstancePtr create() override;
+};
+
+class LibEventInstance : public Instance {
+public:
+  // Allows access into the underlying buffer for move() optimizations.
+  virtual Event::Libevent::BufferPtr& buffer() PURE;
+  // Called after accessing the memory in buffer() directly to allow any post-processing.
+  virtual void postProcess() PURE;
+};
 
 /**
  * Wraps an allocated and owned evbuffer.
+ *
+ * Note that due to the internals of move() accessing buffer(), OwnedImpl is not
+ * compatible with non-LibEventInstance buffers.
  */
-class OwnedImpl : public Instance {
+class OwnedImpl : public LibEventInstance {
 public:
   OwnedImpl();
   OwnedImpl(const std::string& data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
 
-  // Instance
+  // LibEventInstance
   void add(const void* data, uint64_t size) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
@@ -34,17 +51,14 @@ public:
   int read(int fd, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
-  void setCallback(Callback callback) override;
   int write(int fd) override;
+  void postProcess() override {}
+
+  Event::Libevent::BufferPtr& buffer() override { return buffer_; }
 
 private:
-  void onBufferChange(const evbuffer_cb_info& info);
-
-  static const evbuffer_cb_func buffer_cb_; // Static callback used for all evbuffer callbacks.
-                                            // This allows us to add/remove by value.
-
   Event::Libevent::BufferPtr buffer_;
-  Callback cb_; // The per buffer callback. Invoked via the buffer_cb_ static thunk.
 };
 
-} // Buffer
+} // namespace Buffer
+} // namespace Envoy

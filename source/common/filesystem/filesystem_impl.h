@@ -1,5 +1,12 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <mutex>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
@@ -7,6 +14,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
 
+namespace Envoy {
 // clang-format off
 #define FILESYSTEM_STATS(COUNTER, GAUGE)                                                           \
   COUNTER(write_buffered)                                                                          \
@@ -82,18 +90,31 @@ private:
 
   int fd_;
   std::string path_;
-  Thread::BasicLockable& lock_;
+  Thread::BasicLockable& flush_lock_; // This lock is used only by the flush thread when writing
+                                      // to disk. This is used to make sure that file blocks do
+                                      // not get interleaved.
+  std::mutex write_lock_; // The lock is used when filling the flush buffer. It allows multiple
+                          // threads to write to the same file at relatively high performance.
+                          // It is always local to the process.
   Thread::ThreadPtr flush_thread_;
   std::condition_variable_any flush_event_;
   std::atomic<bool> flush_thread_exit_{};
   std::atomic<bool> reopen_file_{};
-  Buffer::OwnedImpl flush_buffer_;
+  Buffer::OwnedImpl flush_buffer_; // This buffer is used by multiple threads. It gets filled and
+                                   // then flushed either when max size is reached or when a timer
+                                   // fires.
+  Buffer::OwnedImpl about_to_write_buffer_; // This buffer is used only by the flush thread. Data
+                                            // is moved from flush_buffer_ under lock, and then
+                                            // the lock is released so that flush_buffer_ can
+                                            // continue to fill. This buffer is then used for the
+                                            // final write to disk.
   Event::TimerPtr flush_timer_;
-  Event::Dispatcher& dispatcher_;
   OsSysCalls& os_sys_calls_;
-  // Time interval buffer gets flushed no matter if it reached the MIN_FLUSH_SIZE or not.
-  const std::chrono::milliseconds flush_interval_msec_;
+  const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
+                                                        // matter if it reached the MIN_FLUSH_SIZE
+                                                        // or not.
   FileSystemStats stats_;
 };
 
-} // Filesystem
+} // namespace Filesystem
+} // Envoy

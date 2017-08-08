@@ -1,5 +1,14 @@
 #pragma once
 
+#include <dirent.h>
+
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <random>
+#include <string>
+#include <unordered_map>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
@@ -10,8 +19,9 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
-#include <dirent.h>
+#include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Runtime {
 
 /**
@@ -73,7 +83,15 @@ public:
   }
 
   bool featureEnabled(const std::string& key, uint64_t default_value) const override {
-    return featureEnabled(key, default_value, generator_.random());
+    // Avoid PNRG if we know we don't need it.
+    uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
+    if (cutoff == 0) {
+      return false;
+    } else if (cutoff == 100) {
+      return true;
+    } else {
+      return generator_.random() % 100 < cutoff;
+    }
   }
 
   bool featureEnabled(const std::string& key, uint64_t default_value,
@@ -83,9 +101,6 @@ public:
 
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string&, uint64_t default_value) const override;
-
-  // ThreadLocal::ThreadLocalObject
-  void shutdown() override {}
 
 private:
   struct Directory {
@@ -120,7 +135,7 @@ private:
  */
 class LoaderImpl : public Loader {
 public:
-  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::Instance& tls,
+  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const std::string& root_symlink_path, const std::string& subdir,
              const std::string& override_dir, Stats::Store& store, RandomGenerator& generator);
 
@@ -132,8 +147,7 @@ private:
   void onSymlinkSwap();
 
   Filesystem::WatcherPtr watcher_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   RandomGenerator& generator_;
   std::string root_path_;
   std::string override_path_;
@@ -146,7 +160,7 @@ private:
  */
 class NullLoaderImpl : public Loader {
 public:
-  NullLoaderImpl(RandomGenerator& generator) : generator_(generator), snapshot_(generator) {}
+  NullLoaderImpl(RandomGenerator& generator) : snapshot_(generator) {}
 
   // Runtime::Loader
   Snapshot& snapshot() override { return snapshot_; }
@@ -186,8 +200,8 @@ private:
     RandomGenerator& generator_;
   };
 
-  RandomGenerator& generator_;
   NullSnapshotImpl snapshot_;
 };
 
-} // Runtime
+} // namespace Runtime
+} // namespace Envoy

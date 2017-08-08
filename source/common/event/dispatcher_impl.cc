@@ -1,30 +1,43 @@
-#include "dispatcher_impl.h"
-#include "file_event_impl.h"
-#include "signal_impl.h"
-#include "timer_impl.h"
+#include "common/event/dispatcher_impl.h"
 
-#include "envoy/network/listener.h"
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
 
+#include "common/buffer/buffer_impl.h"
+#include "common/event/file_event_impl.h"
+#include "common/event/signal_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/ssl/connection_impl.h"
 
-#include "event2/bufferevent_ssl.h"
 #include "event2/event.h"
 
+namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : base_(event_base_new()),
+    : DispatcherImpl(Buffer::FactoryPtr{new Buffer::OwnedImplFactory}) {}
+
+DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
+    : buffer_factory_(std::move(factory)), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
+  ASSERT(isThreadSafe());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
 
   size_t num_to_delete = to_delete->size();
@@ -32,7 +45,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     return;
   }
 
-  log_trace("clearing deferred deletion list (size={})", num_to_delete);
+  ENVOY_LOG(trace, "clearing deferred deletion list (size={})", num_to_delete);
 
   // Swap the current deletion vector so that if we do deferred delete while we are deleting, we
   // use the other vector. We will get another callback to delete that vector.
@@ -55,49 +68,65 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ClientConnectionPtr DispatcherImpl::createClientConnection(const std::string& url) {
-  return Network::ClientConnectionImpl::create(*this, url);
+Network::ClientConnectionPtr
+DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address) {
+  ASSERT(isThreadSafe());
+  return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
 }
 
-Network::ClientConnectionPtr DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                                       const std::string& url) {
-  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, url)};
+Network::ClientConnectionPtr
+DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                                          Network::Address::InstanceConstSharedPtr address) {
+  ASSERT(isThreadSafe());
+  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
-Network::DnsResolverPtr DispatcherImpl::createDnsResolver() {
-  return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this)};
+Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+  ASSERT(isThreadSafe());
+  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb) {
-  return FileEventPtr{new FileEventImpl(*this, fd, cb)};
+FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+                                             uint32_t events) {
+  ASSERT(isThreadSafe());
+  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
+  ASSERT(isThreadSafe());
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::ListenSocket& socket,
-                                                    Network::ListenerCallbacks& cb,
-                                                    Stats::Store& stats_store,
-                                                    bool use_proxy_proto) {
+Network::ListenerPtr
+DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
+                               Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                               Stats::Scope& scope,
+                               const Network::ListenerOptions& listener_options) {
+  ASSERT(isThreadSafe());
   return Network::ListenerPtr{
-      new Network::ListenerImpl(*this, socket, cb, stats_store, use_proxy_proto)};
+      new Network::ListenerImpl(conn_handler, *this, socket, cb, scope, listener_options)};
 }
 
-Network::ListenerPtr DispatcherImpl::createSslListener(Ssl::ServerContext& ssl_ctx,
-                                                       Network::ListenSocket& socket,
-                                                       Network::ListenerCallbacks& cb,
-                                                       Stats::Store& stats_store,
-                                                       bool use_proxy_proto) {
-  return Network::ListenerPtr{
-      new Network::SslListenerImpl(*this, ssl_ctx, socket, cb, stats_store, use_proxy_proto)};
+Network::ListenerPtr
+DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
+                                  Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+                                  Network::ListenerCallbacks& cb, Stats::Scope& scope,
+                                  const Network::ListenerOptions& listener_options) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
+                                                           scope, listener_options)};
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return TimerPtr{new TimerImpl(*this, cb)};
+}
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
+  ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));
-  log_trace("item added to deferred deletion list (size={})", current_to_delete_->size());
+  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
     deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
   }
@@ -106,6 +135,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+  ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
@@ -118,15 +148,13 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 
   if (do_post) {
-    // If the dispatcher shuts down before this runs, we will leak. This never happens during
-    // normal operation so its not a big deal.
-    event_base_once(base_.get(), -1, EV_TIMEOUT, [](evutil_socket_t, short, void* arg) -> void {
-      static_cast<DispatcherImpl*>(arg)->runPostCallbacks();
-    }, this, nullptr);
+    post_timer_->enableTimer(std::chrono::milliseconds(0));
   }
 }
 
 void DispatcherImpl::run(RunType type) {
+  run_tid_ = Thread::Thread::currentThreadId();
+
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not gaurantee that events are run in any particular order. So even if we post() and call
@@ -148,4 +176,5 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
-} // Event
+} // namespace Event
+} // namespace Envoy

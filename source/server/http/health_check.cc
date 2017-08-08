@@ -1,9 +1,12 @@
-#include "health_check.h"
+#include "server/http/health_check.h"
+
+#include <chrono>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"
-#include "envoy/server/instance.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -11,22 +14,22 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
+#include "server/config/network/http_connection_manager.h"
+
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the health check filter. @see HttpFilterConfigFactory.
+ * Config registration for the health check filter. @see NamedHttpFilterConfigFactory.
  */
-HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                    const std::string& name,
-                                                                    const Json::Object& config,
-                                                                    const std::string&,
-                                                                    Server::Instance& server) {
-  if (type != HttpFilterType::Both || name != "health_check") {
-    return nullptr;
-  }
+HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Object& config,
+                                                                 const std::string&,
+                                                                 FactoryContext& context) {
+  config.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
 
   bool pass_through_mode = config.getBoolean("pass_through_mode");
   int64_t cache_time_ms = config.getInteger("cache_time_ms", 0);
@@ -36,26 +39,26 @@ HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterTy
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
   }
 
-  HealthCheckCacheManagerPtr cache_manager;
+  HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
-    cache_manager.reset(
-        new HealthCheckCacheManager(server.dispatcher(), std::chrono::milliseconds(cache_time_ms)));
+    cache_manager.reset(new HealthCheckCacheManager(context.dispatcher(),
+                                                    std::chrono::milliseconds(cache_time_ms)));
   }
 
-  return [&server, pass_through_mode, cache_manager, hc_endpoint](
-             Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterPtr{
-        new HealthCheckFilter(server, pass_through_mode, cache_manager, hc_endpoint)});
+  return [&context, pass_through_mode, cache_manager,
+          hc_endpoint](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+        new HealthCheckFilter(context, pass_through_mode, cache_manager, hc_endpoint)});
   };
 }
 
 /**
- * Static registration for the health check filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the health check filter. @see RegisterFactory.
  */
-static RegisterHttpFilterConfigFactory<HealthCheckFilterConfig> register_;
+static Registry::RegisterFactory<HealthCheckFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
+} // namespace Configuration
+} // namespace Server
 
 HealthCheckCacheManager::HealthCheckCacheManager(Event::Dispatcher& dispatcher,
                                                  std::chrono::milliseconds timeout)
@@ -77,7 +80,7 @@ Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& head
 
     // If we are not in pass through mode, we always handle. Otherwise, we handle if the server is
     // in the failed state or if we are using caching and we should use the cached response.
-    if (!pass_through_mode_ || server_.healthCheckFailed() ||
+    if (!pass_through_mode_ || context_.healthCheckFailed() ||
         (cache_manager_ && cache_manager_->useCachedResponseCode())) {
       handling_ = true;
     }
@@ -115,7 +118,9 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
     }
 
-    headers.insertEnvoyUpstreamHealthCheckedCluster().value(server_.options().serviceClusterName());
+    // Following setReference() is safe because local info is constant for the life of the server.
+    headers.insertEnvoyUpstreamHealthCheckedCluster().value().setReference(
+        context_.localInfo().clusterName());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -124,9 +129,9 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
 void HealthCheckFilter::onComplete() {
   ASSERT(handling_);
   Http::HeaderMapPtr headers;
-  if (server_.healthCheckFailed()) {
-    callbacks_->requestInfo().onFailedResponse(
-        Http::AccessLog::FailureReason::FailedLocalHealthCheck);
+  if (context_.healthCheckFailed()) {
+    callbacks_->requestInfo().setResponseFlag(
+        Http::AccessLog::ResponseFlag::FailedLocalHealthCheck);
     headers.reset(new Http::HeaderMapImpl{
         {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}});
   } else {
@@ -136,8 +141,8 @@ void HealthCheckFilter::onComplete() {
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {
-      callbacks_->requestInfo().onFailedResponse(
-          Http::AccessLog::FailureReason::FailedLocalHealthCheck);
+      callbacks_->requestInfo().setResponseFlag(
+          Http::AccessLog::ResponseFlag::FailedLocalHealthCheck);
     }
 
     headers.reset(new Http::HeaderMapImpl{
@@ -146,3 +151,4 @@ void HealthCheckFilter::onComplete() {
 
   callbacks_->encodeHeaders(std::move(headers), true);
 }
+} // namespace Envoy

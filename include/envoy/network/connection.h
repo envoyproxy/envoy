@@ -1,11 +1,17 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/ssl/connection.h"
 
+namespace Envoy {
 namespace Event {
 class Dispatcher;
 }
@@ -13,13 +19,12 @@ class Dispatcher;
 namespace Network {
 
 /**
- * Events that occur on a connection. Maybe be combined.
+ * Events that occur on a connection.
  */
-class ConnectionEvent {
-public:
-  static const uint32_t RemoteClose = 0x1;
-  static const uint32_t LocalClose = 0x2;
-  static const uint32_t Connected = 0x4;
+enum class ConnectionEvent {
+  RemoteClose,
+  LocalClose,
+  Connected,
 };
 
 /**
@@ -35,18 +40,21 @@ public:
   virtual ~ConnectionCallbacks() {}
 
   /**
-   * Callback for connection buffer changes.
-   * @param type supplies which buffer has changed.
-   * @param old_size supplies the original size of the buffer.
-   * @param delta supplies how much data was added or removed from the buffer.
+   * Callback for connection events.
+   * @param events supplies the ConnectionEvent that occurred.
    */
-  virtual void onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta) PURE;
+  virtual void onEvent(ConnectionEvent event) PURE;
 
   /**
-   * Callback for connection events.
-   * @param events supplies the ConnectionEvent events that occurred as a bitmask.
+   * Called when the write buffer for a connection goes over its high watermark.
    */
-  virtual void onEvent(uint32_t events) PURE;
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the write buffer for a connection goes from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -63,6 +71,13 @@ enum class ConnectionCloseType {
 class Connection : public Event::DeferredDeletable, public FilterManager {
 public:
   enum class State { Open, Closing, Closed };
+
+  struct BufferStats {
+    Stats::Counter& read_total_;
+    Stats::Gauge& read_current_;
+    Stats::Counter& write_total_;
+    Stats::Gauge& write_current_;
+  };
 
   virtual ~Connection() {}
 
@@ -84,14 +99,14 @@ public:
   /**
    * @return uint64_t the unique local ID of this connection.
    */
-  virtual uint64_t id() PURE;
+  virtual uint64_t id() const PURE;
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
    *         ALPN). If network level negotation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
-  virtual std::string nextProtocol() PURE;
+  virtual std::string nextProtocol() const PURE;
 
   /**
    * Enable/Disable TCP NO_DELAY on the connection.
@@ -109,12 +124,27 @@ public:
   /**
    * @return bool whether reading is enabled on the connection.
    */
-  virtual bool readEnabled() PURE;
+  virtual bool readEnabled() const PURE;
 
   /**
-   * @return The address of the remote client
+   * @return The address of the remote client.
    */
-  virtual const std::string& remoteAddress() PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
+
+  /**
+   * @return the local address of the connection. For client connections, this is the origin
+   * address. For server connections, this is the local destination address. For server connections
+   * it can be different from the proxy address if the downstream connection has been redirected or
+   * the proxy is operating in transparent mode.
+   */
+  virtual const Address::Instance& localAddress() const PURE;
+
+  /**
+   * Set the buffer stats to update when the connection's read/write buffers change. Note that
+   * for performance reasons these stats are eventually consistent and may not always accurately
+   * represent the buffer contents at any given point in time.
+   */
+  virtual void setBufferStats(const BufferStats& stats) PURE;
 
   /**
    * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
@@ -122,15 +152,37 @@ public:
   virtual Ssl::Connection* ssl() PURE;
 
   /**
+   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   */
+  virtual const Ssl::Connection* ssl() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
-  virtual State state() PURE;
+  virtual State state() const PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
    */
   virtual void write(Buffer::Instance& data) PURE;
+
+  /**
+   * Set a soft limit on the size of buffers for the connection.
+   * For the read buffer, this limits the bytes read prior to flushing to further stages in the
+   * processing pipeline.
+   * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
+   * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
+   * reads on the socket funneling data to the write buffer.  When enough data is drained from the
+   * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
+   * resuming reading.
+   */
+  virtual void setBufferLimits(uint32_t limit) PURE;
+
+  /**
+   * Get the value set with setBufferLimits.
+   */
+  virtual uint32_t bufferLimit() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
@@ -149,4 +201,5 @@ public:
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
 
-} // Network
+} // namespace Network
+} // namespace Envoy

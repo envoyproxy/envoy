@@ -1,6 +1,11 @@
+#include <string>
+
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
+#include "gtest/gtest.h"
+
+namespace Envoy {
 TEST(UUIDUtilsTest, mod) {
   uint16_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
@@ -41,8 +46,12 @@ TEST(UUIDUtilsTest, checkDistribution) {
   for (int i = 0; i < 500000; ++i) {
     std::string uuid = random.uuid();
 
+    const char c = uuid[19];
+    ASSERT_TRUE(uuid[14] == '4');                              // UUID version 4 (random)
+    ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
+
     uint16_t value;
-    UuidUtils::uuidModBy(uuid, value, mod);
+    ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
 
     if (value < required_percentage) {
       interesting_samples++;
@@ -51,6 +60,14 @@ TEST(UUIDUtilsTest, checkDistribution) {
   }
 
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
+}
+
+TEST(UUIDUtilsTest, DISABLED_benchmark) {
+  Runtime::RandomGeneratorImpl random;
+
+  for (int i = 0; i < 500000; ++i) {
+    random.uuid();
+  }
 }
 
 TEST(UUIDUtilsTest, setAndCheckTraceable) {
@@ -74,3 +91,4 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
 }
+} // namespace Envoy

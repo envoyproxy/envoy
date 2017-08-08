@@ -1,0 +1,98 @@
+[
+  {
+    "test_name": "Test_1",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/"
+    },
+    "validate": {"cluster_name": "local_service_without_headers"}
+  },
+  {
+    "test_name": "Test_2",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+	  "field": "test_header",
+	  "value": "test"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_headers"}
+  },
+  {
+    "test_name": "Test_3",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+	  "field": "test_header_multiple1",
+	  "value": "test1"
+        },
+        {
+	  "field": "test_header_multiple2",
+	  "value": "test2"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_multiple_headers"}
+  },
+  {
+    "test_name": "Test_4",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+	  "field": "non_existent_header",
+	  "value": "foo"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_without_headers"}
+  },
+  {
+    "test_name": "Test_5",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+	  "field": "test_header_presence",
+	  "value": "test"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_empty_headers"}
+  },
+  {
+    "test_name": "Test_6",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+	  "field": "test_header_pattern",
+	  "value": "user=test-1223"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_header_pattern_set_regex"}
+  },
+  {
+    "test_name": "Test_7",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+          "field": "test_header_pattern",
+          "value": "customer=test-1223"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_without_headers"}
+  }
+]

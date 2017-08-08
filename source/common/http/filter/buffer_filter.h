@@ -1,10 +1,16 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/http/filter.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -17,7 +23,7 @@ namespace Http {
 // clang-format on
 
 /**
- * Wrapper struct for connection manager stats. @see stats_macros.h
+ * Wrapper struct for buffer filter stats. @see stats_macros.h
  */
 struct BufferFilterStats {
   ALL_BUFFER_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -32,17 +38,20 @@ struct BufferFilterConfig {
   std::chrono::seconds max_request_time_;
 };
 
-typedef std::shared_ptr<const BufferFilterConfig> BufferFilterConfigPtr;
+typedef std::shared_ptr<const BufferFilterConfig> BufferFilterConfigConstSharedPtr;
 
 /**
  * A filter that is capable of buffering an entire request before dispatching it upstream.
  */
 class BufferFilter : public StreamDecoderFilter {
 public:
-  BufferFilter(BufferFilterConfigPtr config);
+  BufferFilter(BufferFilterConfigConstSharedPtr config);
   ~BufferFilter();
 
-  static BufferFilterStats generateStats(const std::string& prefix, Stats::Store& store);
+  static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
+  // Http::StreamFilterBase
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
@@ -51,13 +60,13 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void onResetStream();
   void onRequestTimeout();
   void resetInternalState();
 
-  BufferFilterConfigPtr config_;
+  BufferFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
 };
 
 } // Http
+} // namespace Envoy

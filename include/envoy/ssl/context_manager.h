@@ -1,9 +1,12 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/stats.h"
 
+namespace Envoy {
 namespace Ssl {
 
 /**
@@ -14,26 +17,27 @@ public:
   virtual ~ContextManager() {}
 
   /**
-   * Builds an Ssl::ClientContext from an Ssl::ContextConfig
+   * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual Ssl::ClientContext& createSslClientContext(const std::string& name, Stats::Store& stats,
-                                                     ContextConfig& config) PURE;
+  virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
+                                                  ClientContextConfig& config) PURE;
 
   /**
-   * Builds an Ssl::ServerContext from an Ssl::ContextConfig
+   * Builds a ServerContext from a ServerContextConfig.
    */
-  virtual Ssl::ServerContext& createSslServerContext(const std::string& name, Stats::Store& stats,
-                                                     ContextConfig& config) PURE;
+  virtual ServerContextPtr createSslServerContext(Stats::Scope& scope,
+                                                  ServerContextConfig& config) PURE;
 
   /**
-   * @return the number of days until the next certificate being managed will expire
+   * @return the number of days until the next certificate being managed will expire.
    */
   virtual size_t daysUntilFirstCertExpires() PURE;
 
   /**
-   * @return a set of all contexts being managed
+   * Iterate through all currently allocated contexts.
    */
-  virtual std::vector<std::reference_wrapper<Ssl::Context>> getContexts() PURE;
+  virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
 };
 
-} // Ssl
+} // namespace Ssl
+} // namespace Envoy

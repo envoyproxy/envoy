@@ -36,7 +36,7 @@ format
 .. _config_http_conn_man_access_log_filter_param:
 
 filter
-  *(optional, string)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
+  *(optional, object)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
   determine if the access log needs to be written.
 
 .. _config_http_con_manager_access_log_format:
@@ -71,8 +71,8 @@ The following command operators are supported:
 %DURATION%
   Total duration in milliseconds of the request from the start time to the last byte out.
 
-%FAILURE_REASON%
-  Additional failure reason if any in addition to response code. Possible values are:
+%RESPONSE_FLAGS%
+  Additional details about the response, if any. Possible values are:
 
   * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
   * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
@@ -83,9 +83,15 @@ The following command operators are supported:
   * **UC**: Upstream connection termination in addition to 503 response code.
   * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
   * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+  * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
+
+%UPSTREAM_CLUSTER%
+  Upstream cluster to which the upstream host belongs to.
 
 %REQ(X?Y):Z%
   An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
@@ -106,7 +112,7 @@ If custom format is not specified, Envoy uses the following default format:
 .. code-block:: none
 
   [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
-  %RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
   %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
   "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
@@ -144,7 +150,7 @@ Status code
 Filters on HTTP response/status code.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=*  and *=* are the only supported operators.
 
 value
   *(required, integer)* Default value to compare against if runtime value is not available.
@@ -169,7 +175,7 @@ Duration
 Filters on total request duration in milliseconds.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=* and *=* are the only supported operators.
 
 value
   *(required, integer)* Default value to compare against if runtime values is not available.
@@ -205,6 +211,31 @@ Traceable
 
 Filters for requests that are traceable. See the :ref:`tracing overview <arch_overview_tracing>` for
 more information on how a request becomes traceable.
+
+
+.. _config_http_con_manager_access_log_filters_runtime:
+
+Runtime
+^^^^^^^^^
+.. code-block:: json
+
+  {
+    "filter": {
+      "type": "runtime",
+      "key" : "..."
+    }
+  }
+
+Filters for random sampling of requests. Sampling pivots on the header
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` being present. If
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
+consistently sample across multiple hosts based on the runtime key value and the value extracted
+from :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`. If it is missing, the
+filter will randomly sample based on the runtime key value.
+
+key
+  *(required, string)* Runtime key to get the percentage of requests to be sampled.
+  This runtime control is specified in the range 0-100 and defaults to 0.
 
 And
 ^^^

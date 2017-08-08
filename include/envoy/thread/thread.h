@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Thread {
 
 /**
@@ -12,6 +13,7 @@ public:
   virtual ~BasicLockable() {}
 
   virtual void lock() PURE;
+  virtual bool try_lock() PURE;
   virtual void unlock() PURE;
 };
 
@@ -36,4 +38,5 @@ private:
   T* lock_;
 };
 
-} // Thread
+} // namespace Thread
+} // namespace Envoy

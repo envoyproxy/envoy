@@ -1,17 +1,27 @@
-#include "listener_impl.h"
-#include "proxy_protocol.h"
+#include "common/network/proxy_protocol.h"
+
+#include <unistd.h>
+
+#include <cstdint>
+#include <memory>
+#include <string>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/empty_string.h"
+#include "common/common/utility.h"
+#include "common/network/address_impl.h"
+#include "common/network/listener_impl.h"
+#include "common/network/utility.h"
+
+namespace Envoy {
 namespace Network {
 
-const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
-
-ProxyProtocol::ProxyProtocol(Stats::Store& stats_store)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(stats_store))} {}
+ProxyProtocol::ProxyProtocol(Stats::Scope& scope)
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
 
 void ProxyProtocol::newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener) {
   std::unique_ptr<ActiveConnection> p{new ActiveConnection(*this, dispatcher, fd, listener)};
@@ -22,11 +32,14 @@ ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
                                                   Event::Dispatcher& dispatcher, int fd,
                                                   ListenerImpl& listener)
     : parent_(parent), fd_(fd), listener_(listener), search_index_(1) {
-  file_event_ = dispatcher.createFileEvent(fd, [this](uint32_t events) {
-    if (events & Event::FileReadyType::Read) {
-      onRead();
-    }
-  });
+  file_event_ =
+      dispatcher.createFileEvent(fd,
+                                 [this](uint32_t events) {
+                                   ASSERT(events == Event::FileReadyType::Read);
+                                   UNREFERENCED_PARAMETER(events);
+                                   onRead();
+                                 },
+                                 Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
 ProxyProtocol::ActiveConnection::~ActiveConnection() {
@@ -50,25 +63,54 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
-  if (proxy_line.find(PROXY_TCP4) != 0) {
+  // Remove the line feed at the end
+  StringUtil::rtrim(proxy_line);
+
+  // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
+  // SOURCE_PORT DESTINATION_PORT.
+  const auto line_parts = StringUtil::split(proxy_line, " ", true);
+
+  if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  size_t index = proxy_line.find(" ", PROXY_TCP4.size());
-  if (index == std::string::npos) {
+  Address::IpVersion protocol_version;
+  Address::InstanceConstSharedPtr remote_address;
+  Address::InstanceConstSharedPtr local_address;
+  if (line_parts[1] == "TCP4") {
+    protocol_version = Address::IpVersion::v4;
+    remote_address = Utility::parseInternetAddressAndPort(line_parts[2] + ":" + line_parts[4]);
+    local_address = Utility::parseInternetAddressAndPort(line_parts[3] + ":" + line_parts[5]);
+  } else if (line_parts[1] == "TCP6") {
+    protocol_version = Address::IpVersion::v6;
+    remote_address =
+        Utility::parseInternetAddressAndPort("[" + line_parts[2] + "]:" + line_parts[4]);
+    local_address =
+        Utility::parseInternetAddressAndPort("[" + line_parts[3] + "]:" + line_parts[5]);
+  } else {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  size_t addr_len = index - PROXY_TCP4.size();
-  std::string remote_address = proxy_line.substr(PROXY_TCP4.size(), addr_len);
-
+  // Error check the source and destination fields.  Most errors are cought by the address
+  // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
+  // an IPv6 address when parsing for an IPv4 address.  Remote address refers to the source
+  // address.
+  const auto remote_version = remote_address->ip()->version();
+  const auto local_version = local_address->ip()->version();
+  if (remote_version != protocol_version || local_version != protocol_version) {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+  // Check that both addresses are valid unicast addresses, as required for TCP
+  if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
+    throw EnvoyException("failed to read proxy protocol");
+  }
   ListenerImpl& listener = listener_;
   int fd = fd_;
   fd_ = -1;
 
   removeFromList(parent_.connections_);
 
-  listener.newConnection(fd, remote_address);
+  listener.newConnection(fd, remote_address, local_address);
 }
 
 void ProxyProtocol::ActiveConnection::close() {
@@ -97,11 +139,11 @@ bool ProxyProtocol::ActiveConnection::readLine(int fd, std::string& s) {
       }
     }
 
+    // Read the data upto and including the line feed, if available, but not past it.
+    // This should never fail, as search_index_ - buf_off_ <= nread, so we're asking
+    // only for bytes we have already seen.
     nread = recv(fd, buf_ + buf_off_, search_index_ - buf_off_, 0);
-
-    if (nread < 1) {
-      throw EnvoyException("failed to read proxy protocol");
-    }
+    ASSERT(size_t(nread) == search_index_ - buf_off_);
 
     buf_off_ += nread;
 
@@ -114,4 +156,5 @@ bool ProxyProtocol::ActiveConnection::readLine(int fd, std::string& s) {
   throw EnvoyException("failed to read proxy protocol");
 }
 
-} // Network
+} // namespace Network
+} // namespace Envoy

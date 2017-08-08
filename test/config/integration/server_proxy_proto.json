@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "port": 10001,
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "use_proxy_proto": true,
     "filters": [
     {
@@ -12,10 +12,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -50,10 +61,6 @@
                 {
                   "prefix": "/test/long/url",
                   "cluster": "cluster_1"
-                },
-                {
-                  "prefix": "/test/",
-                  "cluster": "cluster_2"
                 }
               ]
             }
@@ -71,24 +78,17 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "port": 10003 },
-  "statsd_local_udp_port": 8125,
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
+  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
 
   "cluster_manager": {
     "clusters": [
     {
       "name": "cluster_1",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11000"}]
-    },
-    {
-      "name": "cluster_2",
-      "connect_timeout_ms": 250,
-      "type": "strict_dns",
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}]
     }]
   }
 }

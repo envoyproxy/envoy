@@ -1,22 +1,25 @@
-#include "filter_manager_impl.h"
+#include "common/network/filter_manager_impl.h"
+
+#include <list>
 
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Network {
 
-void FilterManagerImpl::addWriteFilter(WriteFilterPtr filter) {
+void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
   downstream_filters_.emplace_back(filter);
 }
 
-void FilterManagerImpl::addFilter(FilterPtr filter) {
+void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
   addReadFilter(filter);
   addWriteFilter(filter);
 }
 
-void FilterManagerImpl::addReadFilter(ReadFilterPtr filter) {
+void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
   ActiveReadFilterPtr new_filter(new ActiveReadFilter{*this, filter});
   filter->initializeReadFilterCallbacks(*new_filter);
@@ -28,6 +31,14 @@ void FilterManagerImpl::destroyFilters() {
   downstream_filters_.clear();
 }
 
+bool FilterManagerImpl::initializeReadFilters() {
+  if (upstream_filters_.empty()) {
+    return false;
+  }
+  onContinueReading(nullptr);
+  return true;
+}
+
 void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
   std::list<ActiveReadFilterPtr>::iterator entry;
   if (!filter) {
@@ -37,9 +48,20 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
   }
 
   for (; entry != upstream_filters_.end(); entry++) {
-    FilterStatus status = (*entry)->filter_->onData(buffer_source_.getReadBuffer());
-    if (status == FilterStatus::StopIteration) {
-      return;
+    if (!(*entry)->initialized_) {
+      (*entry)->initialized_ = true;
+      FilterStatus status = (*entry)->filter_->onNewConnection();
+      if (status == FilterStatus::StopIteration) {
+        return;
+      }
+    }
+
+    Buffer::Instance& read_buffer = buffer_source_.getReadBuffer();
+    if (read_buffer.length() > 0) {
+      FilterStatus status = (*entry)->filter_->onData(read_buffer);
+      if (status == FilterStatus::StopIteration) {
+        return;
+      }
     }
   }
 }
@@ -50,7 +72,7 @@ void FilterManagerImpl::onRead() {
 }
 
 FilterStatus FilterManagerImpl::onWrite() {
-  for (const WriteFilterPtr& filter : downstream_filters_) {
+  for (const WriteFilterSharedPtr& filter : downstream_filters_) {
     FilterStatus status = filter->onWrite(buffer_source_.getWriteBuffer());
     if (status == FilterStatus::StopIteration) {
       return status;
@@ -60,4 +82,5 @@ FilterStatus FilterManagerImpl::onWrite() {
   return FilterStatus::Continue;
 }
 
-} // Network
+} // namespace Network
+} // namespace Envoy

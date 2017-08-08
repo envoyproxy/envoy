@@ -1,9 +1,11 @@
 #pragma once
 
-#include "event_impl_base.h"
-
 #include "envoy/event/signal.h"
 
+#include "common/event/dispatcher_impl.h"
+#include "common/event/event_impl_base.h"
+
+namespace Envoy {
 namespace Event {
 
 /**
@@ -17,4 +19,5 @@ private:
   SignalCb cb_;
 };
 
-} // Event
+} // namespace Event
+} // namespace Envoy

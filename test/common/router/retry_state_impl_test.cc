@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "common/http/header_map_impl.h"
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
@@ -5,11 +7,16 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-using testing::_;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
+using testing::_;
 
 namespace Router {
 
@@ -31,7 +38,7 @@ public:
   }
 
   TestRetryPolicy policy_;
-  NiceMock<Upstream::MockCluster> cluster_;
+  NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
@@ -86,6 +93,48 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote503) {
   EXPECT_TRUE(state_->enabled());
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "cancelled"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGrpcDeadlineExceeded) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "deadline-exceeded"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "4"}};
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGrpcResourceExhausted) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "resource-exhausted"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "8"}};
   expectTimerCreateAndEnable();
   EXPECT_TRUE(state_->shouldRetry(&response_headers, no_reset_, callback_));
   EXPECT_CALL(callback_ready_, ready());
@@ -258,4 +307,5 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
   EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
 }
 
-} // Router
+} // namespace Router
+} // namespace Envoy

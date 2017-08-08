@@ -1,13 +1,23 @@
 #pragma once
 
-#include "context_impl.h"
-#include "openssl.h"
+#include <string>
+#include <vector>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
+
+#include "common/ssl/context_impl.h"
+#include "common/ssl/context_manager_impl.h"
+
+#include "openssl/ssl.h"
+
+namespace Envoy {
+#ifndef OPENSSL_IS_BORINGSSL
+#error Envoy requires BoringSSL
+#endif
 
 namespace Ssl {
 
@@ -16,6 +26,8 @@ namespace Ssl {
   COUNTER(connection_error)                                                                        \
   COUNTER(handshake)                                                                               \
   COUNTER(no_certificate)                                                                          \
+  COUNTER(fail_verify_no_cert)                                                                     \
+  COUNTER(fail_verify_error)                                                                       \
   COUNTER(fail_verify_san)                                                                         \
   COUNTER(fail_verify_cert_hash)
 // clang-format on
@@ -27,18 +39,25 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
 };
 
-typedef CSmartPtr<SSL, SSL_free> SslConPtr;
-
 class ContextImpl : public virtual Context {
 public:
-  virtual SslConPtr newSsl() const;
+  ~ContextImpl() { parent_.releaseContext(this); }
+
+  virtual bssl::UniquePtr<SSL> newSsl() const;
 
   /**
-   * Performs all configured cert verifications on the connection
-   * @param ssl the connection to verify
-   * @return true if all configured cert verifications succeed
+   * Logs successful TLS handshake and updates stats.
+   * @param ssl the connection to log
    */
-  bool verifyPeer(SSL* ssl) const;
+  void logHandshake(SSL* ssl) const;
+
+  /**
+   * Performs subjectAltName verification
+   * @param ssl the certificate to verify
+   * @param subject_alt_names the configured subject_alt_names to match
+   * @return true if the verification succeeds
+   */
+  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
 
   /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
@@ -47,7 +66,7 @@ public:
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool sanMatch(const std::string& san, const char* pattern);
+  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
 
   SslStats& stats() { return stats_; }
 
@@ -57,7 +76,7 @@ public:
   std::string getCertChainInformation() override;
 
 protected:
-  ContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config);
+  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   /**
    * Specifies the context for which the session can be reused.  Any data is acceptable here.
@@ -65,15 +84,8 @@ protected:
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
-  typedef CSmartPtr<SSL_CTX, SSL_CTX_free> SslCtxPtr;
-
-  /**
-   * Performs subjectAltName verification
-   * @param ssl the certificate to verify
-   * @param subject_alt_name the configured subject_alt_name to match
-   * @return true if the verification succeeds
-   */
-  static bool verifySubjectAltName(X509* cert, const std::string& subject_alt_name);
+  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+  int verifyCertificate(X509* cert);
 
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the
@@ -88,31 +100,31 @@ protected:
   static bool verifyCertificateHash(X509* cert, const std::vector<uint8_t>& certificate_hash);
 
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
-  static SslStats generateStats(const std::string& prefix, Stats::Store& store);
+  static SslStats generateStats(Stats::Scope& scope);
   int32_t getDaysUntilExpiration(const X509* cert);
-  X509Ptr loadCert(const std::string& cert_file);
+  bssl::UniquePtr<X509> loadCert(const std::string& cert_file);
   static std::string getSerialNumber(X509* cert);
   std::string getCaFileName() { return ca_file_path_; };
   std::string getCertChainFileName() { return cert_chain_file_path_; };
 
-  SslCtxPtr ctx_;
-  std::string verify_subject_alt_name_;
+  ContextManagerImpl& parent_;
+  bssl::UniquePtr<SSL_CTX> ctx_;
+  std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<uint8_t> verify_certificate_hash_;
-  Stats::Store& store_;
-  const std::string stats_prefix_;
+  Stats::Scope& scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;
-  X509Ptr ca_cert_;
-  X509Ptr cert_chain_;
+  bssl::UniquePtr<X509> ca_cert_;
+  bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
 };
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config);
+  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ClientContextConfig& config);
 
-  SslConPtr newSsl() const override;
+  bssl::UniquePtr<SSL> newSsl() const override;
 
 private:
   std::string server_name_indication_;
@@ -120,7 +132,7 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config,
+  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ServerContextConfig& config,
                     Runtime::Loader& runtime);
 
 private:
@@ -132,3 +144,4 @@ private:
 };
 
 } // Ssl
+} // Envoy

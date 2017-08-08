@@ -1,9 +1,9 @@
 {% import 'routing_helper.template.json' as helper -%}
 {% import 'access_log_format_helper.template.json' as access_log_helper -%}
 
-{% macro ingress_listener(port) %}
+{% macro ingress_listener(address) %}
 {
-  "port": {{ port }},
+  "address": "{{ address }}",
   "filters": [
   {
     "type": "read",
@@ -90,9 +90,9 @@
 
 {
   "listeners": [
-  {{ ingress_listener(9211) }},
+  {{ ingress_listener("tcp://0.0.0.0:9211") }},
   {
-    "port": 9001,
+    "address": "tcp://127.0.0.1:9001",
     "filters": [
     {
       "type": "read",
@@ -100,8 +100,7 @@
       "config": {
         "codec_type": "auto",
         "tracing": {
-          "operation_name": "egress",
-          "type": "upstream_failure"
+          "operation_name": "egress"
         },
         "add_user_agent": true,
         "idle_timeout_s": 840,
@@ -130,6 +129,21 @@
                 {
                   "prefix": "/",
                   {{ helper.make_route_internal(service, options) }}
+                  {% if options.get('service_to_service_rate_limit', False) %}
+                  ,
+                  "rate_limits":[
+                    {
+                      "actions": [
+                        {
+                          "type": "destination_cluster"
+                        },
+                        {
+                          "type" : "source_cluster"
+                        }
+                      ]
+                    }
+                  ]
+                  {% endif %}
                 }
               ]
             }{% if not loop.last %},{% endif -%}
@@ -139,10 +153,49 @@
         "filters": [
           {"type": "decoder", "name": "rate_limit",
             "config": {
-              "domain": "envoy_service_to_service",
-              "actions": [
-                {"type": "service_to_service"}
-              ]
+              "domain": "envoy_service_to_service"
+            }
+          },
+          {"type": "both", "name": "grpc_http1_bridge", "config": {}},
+          {"type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  },
+  {# The following listener is configured to use route discovery service. #}
+  {
+    "address": "tcp://127.0.0.1:9002",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "tracing": {
+          "operation_name": "egress"
+        },
+        "add_user_agent": true,
+        "idle_timeout_s": 840,
+        "access_log": [
+        {
+          "path": "/var/log/envoy/egress_http_error.log",
+          "filter": {"type": "logical_or", "filters": [
+              {"type": "status_code", "op": ">=", "value": 400},
+              {"type": "duration", "op": ">=", "value": 2000}
+            ]
+          },
+          {{ access_log_helper.egress_error_log() }}
+        }],
+        "stat_prefix": "egress_http",
+        "use_remote_address": true,
+        "rds" : {
+          "cluster" : "rds",
+          "route_config_name": "9002_http_conn_man"
+        },
+        "filters": [
+          {"type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "envoy_service_to_service"
             }
           },
           {"type": "both", "name": "grpc_http1_bridge", "config": {}},
@@ -154,7 +207,7 @@
 
   {% for mapping in external_virtual_hosts -%}
   {
-    "port": {{ mapping['port'] }},
+    "address": "{{ mapping['address'] }}",
     "filters": [
     {
       "type": "read",
@@ -213,7 +266,7 @@
 
   {% for key, value in mongos_servers.iteritems() -%}
   {
-    "port": {{ value['port'] }},
+    "address": "{{ value['address'] }}",
     "filters": [
     {% if value.get('ratelimit', False) %}
     {
@@ -238,8 +291,14 @@
       "type": "read",
       "name": "tcp_proxy",
       "config": {
-        "cluster": "mongo_{{ key }}",
-        "stat_prefix": "mongo_{{ key }}"
+        "stat_prefix": "mongo_{{ key }}",
+        "route_config": {
+          "routes": [
+            {
+              "cluster": "mongo_{{ key }}"
+            }
+          ]
+        }
       }
     }]
   }{% if not loop.last %},{% endif -%}
@@ -247,21 +306,19 @@
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://0.0.0.0:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 
   "tracing": {
     "http": {
-      "sinks": [
-        {
-          "type": "lightstep",
+      "driver": {
+        "type": "lightstep",
+        "config": {
           "access_token_file": "/etc/envoy/lightstep_access_token",
-          "config": {
-            "collector_cluster": "lightstep_saas"
-          }
+          "collector_cluster": "lightstep_saas"
         }
-      ]
+      }
     }
   },
 
@@ -290,6 +347,16 @@
       "refresh_delay_ms": 30000
     },
 
+    "cds": {
+      "cluster": {
+        "name": "cds",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [{"url": "tcp://cds.yourcompany.net:80"}]
+      }
+    },
+
     "clusters": [
     {% for service, options in internal_virtual_hosts.iteritems() -%}
     {
@@ -308,7 +375,7 @@
         ,"sni": "{{ host['sni'] }}"
         {% endif -%}
         {% if host.get('verify_subject_alt_name', False) -%}
-        ,"verify_subject_alt_name": "{{ host['verify_subject_alt_name'] }}"
+        ,"verify_subject_alt_name": ["{{ host['verify_subject_alt_name'] }}"]
         {% endif -%}
       },
       "connect_timeout_ms": 1000,
@@ -370,6 +437,13 @@
       "hosts": [{"url": "tcp://127.0.0.1:8081"}]
     },
     {
+      "name": "rds",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://rds.yourcompany.net:80"}]
+    },
+    {
       "name": "statsd",
       "connect_timeout_ms": 250,
       "type": "static",
@@ -381,12 +455,12 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector.lightstep.com"
+        "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://collector.lightstep.com:443"}]
+      "hosts": [{"url": "tcp://collector-grpc.lightstep.com:443"}]
     }
     ]
   }

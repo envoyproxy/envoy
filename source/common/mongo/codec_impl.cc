@@ -1,20 +1,29 @@
-#include "bson_impl.h"
-#include "codec_impl.h"
+#include "common/mongo/codec_impl.h"
+
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <sstream>
+#include <string>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/base64.h"
+#include "common/mongo/bson_impl.h"
 
+#include "spdlog/spdlog.h"
+
+namespace Envoy {
 namespace Mongo {
 
-std::string MessageImpl::documentListToString(const std::list<Bson::DocumentPtr>& documents) const {
+std::string
+MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& documents) const {
   std::stringstream out;
   out << "[";
 
   bool first = true;
-  for (const Bson::DocumentPtr& document : documents) {
+  for (const Bson::DocumentSharedPtr& document : documents) {
     if (!first) {
       out << ", ";
     }
@@ -28,12 +37,12 @@ std::string MessageImpl::documentListToString(const std::list<Bson::DocumentPtr>
 }
 
 void GetMoreMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_trace("decoding get more message");
+  ENVOY_LOG(trace, "decoding get more message");
   Bson::BufferHelper::removeInt32(data); // "zero" (unused)
   full_collection_name_ = Bson::BufferHelper::removeCString(data);
   number_to_return_ = Bson::BufferHelper::removeInt32(data);
   cursor_id_ = Bson::BufferHelper::removeInt64(data);
-  log_trace(toString(true));
+  ENVOY_LOG(trace, "{}", toString(true));
 }
 
 bool GetMoreMessageImpl::operator==(const GetMoreMessage& rhs) const {
@@ -43,13 +52,14 @@ bool GetMoreMessageImpl::operator==(const GetMoreMessage& rhs) const {
 }
 
 std::string GetMoreMessageImpl::toString(bool) const {
-  return fmt::format("[GET_MORE id={} response_to={} collection='{}' return={} cursor={}]",
-                     request_id_, response_to_, full_collection_name_, number_to_return_,
-                     cursor_id_);
+  return fmt::format(
+      R"EOF({{"opcode": "OP_GET_MORE", "id": {}, "response_to": {}, "collection": "{}", "return": {}, )EOF"
+      R"EOF("cursor": {}}})EOF",
+      request_id_, response_to_, full_collection_name_, number_to_return_, cursor_id_);
 }
 
 void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
-  log_trace("decoding insert message");
+  ENVOY_LOG(trace, "decoding insert message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
 
@@ -59,7 +69,7 @@ void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& da
     documents_.emplace_back(Bson::DocumentImpl::create(data));
   }
 
-  log_trace(toString(true));
+  ENVOY_LOG(trace, "{}", toString(true));
 }
 
 bool InsertMessageImpl::operator==(const InsertMessage& rhs) const {
@@ -80,20 +90,22 @@ bool InsertMessageImpl::operator==(const InsertMessage& rhs) const {
 }
 
 std::string InsertMessageImpl::toString(bool full) const {
-  return fmt::format("[INSERT id={} response_to={} flags={:#x} collection='{}' documents={}]",
-                     request_id_, response_to_, flags_, full_collection_name_,
-                     full ? documentListToString(documents_) : std::to_string(documents_.size()));
+  return fmt::format(
+      R"EOF({{"opcode": "OP_INSERT", "id": {}, "response_to": {}, "flags": "{:#x}", "collection": "{}", )EOF"
+      R"EOF("documents": {}}})EOF",
+      request_id_, response_to_, flags_, full_collection_name_,
+      full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
 void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_trace("decoding kill cursors message");
+  ENVOY_LOG(trace, "decoding kill cursors message");
   Bson::BufferHelper::removeInt32(data); // zero
   number_of_cursor_ids_ = Bson::BufferHelper::removeInt32(data);
   for (int32_t i = 0; i < number_of_cursor_ids_; i++) {
     cursor_ids_.push_back(Bson::BufferHelper::removeInt64(data));
   }
 
-  log_trace(toString(true));
+  ENVOY_LOG(trace, "{}", toString(true));
 }
 
 bool KillCursorsMessageImpl::operator==(const KillCursorsMessage& rhs) const {
@@ -113,12 +125,14 @@ std::string KillCursorsMessageImpl::toString(bool) const {
   }
   cursors << "]";
 
-  return fmt::format("[KILL_CURSORS id={} response_to={} num_cursors={} cursors={}]", request_id_,
-                     response_to_, number_of_cursor_ids_, cursors.str());
+  return fmt::format(
+      R"EOF({{"opcode": "KILL_CURSORS", "id": {}, "response_to": "{:#x}", "num_cursors": "{}", )EOF"
+      R"EOF("cursors": {}}})EOF",
+      request_id_, response_to_, number_of_cursor_ids_, cursors.str());
 }
 
 void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
-  log_trace("decoding query message");
+  ENVOY_LOG(trace, "decoding query message");
   uint64_t original_buffer_length = data.length();
   ASSERT(message_length <= original_buffer_length);
 
@@ -132,7 +146,7 @@ void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& dat
     return_fields_selector_ = Bson::DocumentImpl::create(data);
   }
 
-  log_trace(toString(true));
+  ENVOY_LOG(trace, "{}", toString(true));
 }
 
 bool QueryMessageImpl::operator==(const QueryMessage& rhs) const {
@@ -159,15 +173,16 @@ bool QueryMessageImpl::operator==(const QueryMessage& rhs) const {
 }
 
 std::string QueryMessageImpl::toString(bool full) const {
-  return fmt::format("[QUERY id={} response_to={} flags={:#x} collection='{}' skip={} return={} "
-                     "query={} fields={}]",
-                     request_id_, response_to_, flags_, full_collection_name_, number_to_skip_,
-                     number_to_return_, full ? query_->toString() : "{...}",
-                     return_fields_selector_ ? return_fields_selector_->toString() : "{}");
+  return fmt::format(
+      R"EOF({{"opcode": "OP_QUERY", "id": {}, "response_to": {}, "flags": "{:#x}", "collection": "{}", )EOF"
+      R"EOF("skip": {}, "return": {}, "query": {}, "fields": {}}})EOF",
+      request_id_, response_to_, flags_, full_collection_name_, number_to_skip_, number_to_return_,
+      full ? query_->toString() : "\"{...}\"",
+      return_fields_selector_ ? return_fields_selector_->toString() : "{}");
 }
 
 void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
-  log_trace("decoding reply message");
+  ENVOY_LOG(trace, "decoding reply message");
   flags_ = Bson::BufferHelper::removeInt32(data);
   cursor_id_ = Bson::BufferHelper::removeInt64(data);
   starting_from_ = Bson::BufferHelper::removeInt32(data);
@@ -176,7 +191,7 @@ void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
     documents_.emplace_back(Bson::DocumentImpl::create(data));
   }
 
-  log_trace(toString(true));
+  ENVOY_LOG(trace, "{}", toString(true));
 }
 
 bool ReplyMessageImpl::operator==(const ReplyMessage& rhs) const {
@@ -199,32 +214,30 @@ bool ReplyMessageImpl::operator==(const ReplyMessage& rhs) const {
 
 std::string ReplyMessageImpl::toString(bool full) const {
   return fmt::format(
-      "[REPLY id={} response_to={} flags={:#x} cursor={} from={} returned={} documents={}]",
+      R"EOF({{"opcode": "OP_REPLY", "id": {}, "response_to": {}, "flags": "{:#x}", "cursor": "{}", )EOF"
+      R"EOF("from": {}, "returned": {}, "documents": {}}})EOF",
       request_id_, response_to_, flags_, cursor_id_, starting_from_, number_returned_,
       full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   // See if we have enough data for the message length.
-  log_trace("decoding {} bytes", data.length());
+  ENVOY_LOG(trace, "decoding {} bytes", data.length());
   if (data.length() < sizeof(int32_t)) {
     return false;
   }
 
   uint32_t message_length = Bson::BufferHelper::peakInt32(data);
-  log_trace("message is {} bytes", message_length);
+  ENVOY_LOG(trace, "message is {} bytes", message_length);
   if (data.length() < message_length) {
     return false;
   }
-
-  // Before draining, do a base64 convert of the entire op.
-  callbacks_.decodeBase64(Base64::encode(data, message_length));
 
   data.drain(sizeof(int32_t));
   int32_t request_id = Bson::BufferHelper::removeInt32(data);
   int32_t response_to = Bson::BufferHelper::removeInt32(data);
   Message::OpCode op_code = static_cast<Message::OpCode>(Bson::BufferHelper::removeInt32(data));
-  log_trace("message op: {}", static_cast<int32_t>(op_code));
+  ENVOY_LOG(trace, "message op: {}", static_cast<int32_t>(op_code));
 
   // Some messages need to know how long they are to parse. Subtract the header that we have already
   // parsed off before passing the final value.
@@ -271,7 +284,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     throw EnvoyException(fmt::format("invalid mongo op {}", static_cast<int32_t>(op_code)));
   }
 
-  log_trace("{} bytes remaining after decoding", data.length());
+  ENVOY_LOG(trace, "{} bytes remaining after decoding", data.length());
   return true;
 }
 
@@ -310,14 +323,14 @@ void EncoderImpl::encodeInsert(const InsertMessage& message) {
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-insert
   int32_t total_size = 16 + 4 + message.fullCollectionName().size() + 1;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
 
   encodeCommonHeader(total_size, message, Message::OpCode::OP_INSERT);
   Bson::BufferHelper::writeInt32(output_, message.flags());
   Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     document->encode(output_);
   }
 }
@@ -366,7 +379,7 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
 void EncoderImpl::encodeReply(const ReplyMessage& message) {
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-reply
   int32_t total_size = 16 + 20;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
 
@@ -375,9 +388,10 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
   Bson::BufferHelper::writeInt64(output_, message.cursorId());
   Bson::BufferHelper::writeInt32(output_, message.startingFrom());
   Bson::BufferHelper::writeInt32(output_, message.numberReturned());
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     document->encode(output_);
   }
 }
 
-} // Mongo
+} // namespace Mongo
+} // namespace Envoy

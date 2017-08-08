@@ -1,3 +1,5 @@
 FROM lyft/envoy:latest
 
-CMD /usr/local/bin/envoy -c /etc/front-envoy.json
+RUN apt-get update && apt-get -q install -y \
+    curl
+CMD /usr/local/bin/envoy -c /etc/front-envoy.json --service-cluster front-proxy

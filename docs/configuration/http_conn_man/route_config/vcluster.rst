@@ -27,7 +27,7 @@ such that they include network level failures.
   }
 
 pattern
-  *(required, string)* Specifies a regex pattern to use for matching requests. The regex grammer
+  *(required, string)* Specifies a regex pattern to use for matching requests. The regex grammar
   used is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
 
 name

@@ -1,23 +1,40 @@
-#include "stats_impl.h"
+#include "common/stats/stats_impl.h"
 
+#include <string.h>
+
+#include <chrono>
+#include <string>
+
+#include "common/common/utility.h"
+
+namespace Envoy {
 namespace Stats {
 
 void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
   std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now() - start_);
+      std::chrono::steady_clock::now() - start_);
   parent_.parent_.deliverTimingToSinks(dynamic_name, ms);
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  raw_data_list_.emplace_back(new RawStatData());
-  raw_data_list_.back()->initialize(name);
-  return raw_data_list_.back().get();
+  RawStatData* data = new RawStatData();
+  memset(data, 0, sizeof(RawStatData));
+  data->initialize(name);
+  return data;
+}
+
+void HeapRawStatDataAllocator::free(RawStatData& data) {
+  // This allocator does not ever have concurrent access to the raw data.
+  ASSERT(data.ref_count_ == 1);
+  delete &data;
 }
 
 void RawStatData::initialize(const std::string& name) {
   ASSERT(!initialized());
   ASSERT(name.size() <= MAX_NAME_SIZE);
-  strncpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
+  ASSERT(std::string::npos == name.find(':'));
+  ref_count_ = 1;
+  StringUtil::strlcpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
 }
 
 bool RawStatData::matches(const std::string& name) {
@@ -25,4 +42,5 @@ bool RawStatData::matches(const std::string& name) {
   return 0 == strcmp(name.substr(0, MAX_NAME_SIZE).c_str(), name_);
 }
 
-} // Stats
+} // namespace Stats
+} // namespace Envoy

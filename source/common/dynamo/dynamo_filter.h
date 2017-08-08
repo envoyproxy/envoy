@@ -1,13 +1,16 @@
 #pragma once
 
-#include "dynamo_request_parser.h"
+#include <cstdint>
+#include <string>
 
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
+#include "common/dynamo/dynamo_request_parser.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /**
@@ -18,10 +21,13 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Store& stats)
-      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), stats_(stats) {
+  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope)
+      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
+
+  // Http::StreamFilterBase
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -52,16 +58,17 @@ private:
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;
-  Stats::Store& stats_;
+  Stats::Scope& scope_;
 
   bool enabled_{};
   std::string operation_{};
   RequestParser::TableDescriptor table_descriptor_{"", true};
   std::string error_type_{};
-  SystemTime start_decode_;
+  MonotonicTime start_decode_;
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
 
-} // Dynamo
+} // namespace Dynamo
+} // namespace Envoy

@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Filesystem {
 
 class OsSysCalls {
@@ -40,13 +46,14 @@ public:
    * Write data to the file.
    */
   virtual void write(const std::string& data) PURE;
+
   /**
    * Reopen the file.
    */
   virtual void reopen() PURE;
 };
 
-typedef std::unique_ptr<File> FilePtr;
+typedef std::shared_ptr<File> FileSharedPtr;
 
 /**
  * Abstraction for a file watcher.
@@ -72,4 +79,5 @@ public:
 
 typedef std::unique_ptr<Watcher> WatcherPtr;
 
-} // Filesystem
+} // namespace Filesystem
+} // namespace Envoy

@@ -1,7 +1,8 @@
-#include "access_log_impl.h"
-#include "access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
 
-#include "envoy/api/api.h"
+#include <cstdint>
+#include <string>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -9,13 +10,15 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/http/headers.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -24,10 +27,9 @@ FilterImpl::FilterImpl(Json::Object& json, Runtime::Loader& runtime)
   std::string op = json.getString("op");
   if (op == ">=") {
     op_ = FilterOperation::GreaterEqual;
-  } else if (op == "=") {
-    op_ = FilterOperation::Equal;
   } else {
-    throw EnvoyException(fmt::format("invalid access log filter op '{}'", op));
+    ASSERT(op == "=");
+    op_ = FilterOperation::Equal;
   }
 
   if (json.hasObject("runtime_key")) {
@@ -49,7 +51,7 @@ bool FilterImpl::compareAgainstValue(uint64_t lhs) {
     return lhs == value;
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
@@ -66,14 +68,11 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
     return FilterPtr{new AndFilter(json, runtime)};
   } else if (type == "not_healthcheck") {
     return FilterPtr{new NotHealthCheckFilter()};
-  } else if (type == "traceable_request") {
-    return FilterPtr{new TraceableRequestFilter(runtime)};
   } else {
-    throw EnvoyException(fmt::format("invalid access log filter type '{}'", type));
+    ASSERT(type == "traceable_request");
+    return FilterPtr{new TraceableRequestFilter()};
   }
 }
-
-TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader& runtime) : runtime_(runtime) {}
 
 bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
@@ -100,7 +99,8 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
   const HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
   if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
-    uint64_t runtime_value = std::min(runtime_.snapshot().getInteger(runtime_key_, 0), 100UL);
+    uint64_t runtime_value =
+        std::min<uint64_t>(runtime_.snapshot().getInteger(runtime_key_, 0), 100);
 
     return sampled_value < static_cast<uint16_t>(runtime_value);
   } else {
@@ -109,18 +109,8 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 }
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
-  if (json.hasObject("filters")) {
-    std::vector<Json::Object> filters = json.getObjectArray("filters");
-    if (filters.size() < 2) {
-      throw EnvoyException(fmt::format("Filter list must have at least 2 filters, {} filters given",
-                                       filters.size()));
-    }
-
-    for (Json::Object& filter : filters) {
-      filters_.emplace_back(FilterImpl::fromJson(filter, runtime));
-    }
-  } else {
-    throw EnvoyException(fmt::format("Filter list cannot be empty in OperatorFilter"));
+  for (const Json::ObjectSharedPtr& filter : json.getObjectArray("filters")) {
+    filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
   }
 }
 
@@ -160,22 +150,21 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
   return !info.healthCheck();
 }
 
-InstanceImpl::InstanceImpl(const std::string& access_log_path, Api::Api& api, FilterPtr&& filter,
-                           FormatterPtr&& formatter, Event::Dispatcher& dispatcher,
-                           Thread::BasicLockable& lock, Stats::Store& stats_store)
+InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filter,
+                           FormatterPtr&& formatter,
+                           Envoy::AccessLog::AccessLogManager& log_manager)
     : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-  log_file_ = api.createFile(access_log_path, dispatcher, lock, stats_store);
+  log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
-InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock, Stats::Store& stats_store,
-                                   Runtime::Loader& runtime) {
+InstanceSharedPtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
+                                         Envoy::AccessLog::AccessLogManager& log_manager) {
   std::string access_log_path = json.getString("path");
 
   FilterPtr filter;
   if (json.hasObject("filter")) {
-    Json::Object filterObject = json.getObject("filter");
-    filter = FilterImpl::fromJson(filterObject, runtime);
+    Json::ObjectSharedPtr filterObject = json.getObject("filter");
+    filter = FilterImpl::fromJson(*filterObject, runtime);
   }
 
   FormatterPtr formatter;
@@ -185,11 +174,9 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dis
     formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
   }
 
-  return InstancePtr{new InstanceImpl(access_log_path, api, std::move(filter), std::move(formatter),
-                                      dispatcher, lock, stats_store)};
+  return InstanceSharedPtr{
+      new InstanceImpl(access_log_path, std::move(filter), std::move(formatter), log_manager)};
 }
-
-void InstanceImpl::reopen() { log_file_->reopen(); }
 
 void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
                        const RequestInfo& request_info) {
@@ -212,5 +199,6 @@ void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* respon
   log_file_->write(access_log_line);
 }
 
-} // AccessLog
-} // Http
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

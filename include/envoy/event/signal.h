@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
+namespace Envoy {
 namespace Event {
 
 /**
@@ -17,4 +21,5 @@ public:
 
 typedef std::unique_ptr<SignalEvent> SignalEventPtr;
 
-} // Event
+} // namespace Event
+} // namespace Envoy

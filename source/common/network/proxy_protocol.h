@@ -1,10 +1,15 @@
 #pragma once
 
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/linked_object.h"
 
+namespace Envoy {
 namespace Network {
 
 class ListenerImpl;
@@ -37,8 +42,7 @@ public:
     ~ActiveConnection();
 
   private:
-    static const size_t MAX_PROXY_PROTO_LEN = 56;
-    static const std::string PROXY_TCP4;
+    static const size_t MAX_PROXY_PROTO_LEN = 108;
 
     void onRead();
     void onReadWorker();
@@ -66,7 +70,7 @@ public:
     char buf_[MAX_PROXY_PROTO_LEN];
   };
 
-  ProxyProtocol(Stats::Store& stats_store);
+  ProxyProtocol(Stats::Scope& scope);
 
   void newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener);
 
@@ -75,4 +79,5 @@ private:
   std::list<std::unique_ptr<ActiveConnection>> connections_;
 };
 
-} // Network
+} // namespace Network
+} // namespace Envoy

@@ -1,16 +1,29 @@
 #pragma once
 
+#include <condition_variable>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include "envoy/api/api.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/stats_impl.h"
-#include "server/connection_handler.h"
 
+#include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
+
+namespace Envoy {
 class FakeHttpConnection;
 
 /**
@@ -20,7 +33,8 @@ class FakeStream : public Http::StreamDecoder, public Http::StreamCallbacks {
 public:
   FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder);
 
-  uint64_t bodyLength() { return body_length_; }
+  uint64_t bodyLength() { return body_.length(); }
+  Buffer::Instance& body() { return body_; }
   bool complete() { return end_stream_; }
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -41,6 +55,8 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   FakeHttpConnection& parent_;
@@ -50,34 +66,89 @@ private:
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
-  uint64_t body_length_{};
+  Buffer::OwnedImpl body_;
   bool saw_reset_{};
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
 
 /**
+ * Wraps a raw Network::Connection in a safe way, such that the connection can
+ * be placed in a queue for an arbitrary amount of time. It handles disconnects
+ * that take place in the queued state by failing the test. Once a
+ * QueuedConnectionWrapper object is instantiated by FakeHttpConnection or
+ * FakeRawConnection, it no longer plays a role.
+ * TODO(htuch): We can simplify the storage lifetime by destructing if/when
+ * removeConnectionCallbacks is added.
+ */
+class QueuedConnectionWrapper : public Network::ConnectionCallbacks {
+public:
+  QueuedConnectionWrapper(Network::Connection& connection)
+      : connection_(connection), parented_(false) {
+    connection_.addConnectionCallbacks(*this);
+  }
+  void set_parented() {
+    std::unique_lock<std::mutex> lock(lock_);
+    parented_ = true;
+  }
+  Network::Connection& connection() const { return connection_; }
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    RELEASE_ASSERT(parented_ || (event != Network::ConnectionEvent::RemoteClose &&
+                                 event != Network::ConnectionEvent::LocalClose));
+  }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+private:
+  Network::Connection& connection_;
+  bool parented_;
+  std::mutex lock_;
+};
+
+typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+
+/**
  * Base class for both fake raw connections and fake HTTP connections.
  */
 class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
+  ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
   void readDisable(bool disable);
-  void waitForDisconnect();
+  // By default waitForDisconnect assumes the next event is a disconnect and
+  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // wait until disconnect, set ignore_spurious_events = true.
+  void waitForDisconnect(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
-  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  void initialize() {
+    initialized_ = true;
+    connection_wrapper_->set_parented();
+    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
+  }
 
 protected:
-  FakeConnectionBase(Network::Connection& connection) : connection_(connection) {
-    connection.addConnectionCallbacks(*this);
-  }
+  FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
+      : connection_(connection_wrapper->connection()),
+        connection_wrapper_(std::move(connection_wrapper)) {}
 
   Network::Connection& connection_;
   std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
+  bool initialized_{false};
+
+private:
+  // We hold on to this as connection callbacks live for the entire life of the
+  // connection.
+  QueuedConnectionWrapperPtr connection_wrapper_;
 };
 
 /**
@@ -87,7 +158,7 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(Network::Connection& connection, Stats::Store& store, Type type);
+  FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
   Network::Connection& connection() { return connection_; }
   FakeStreamPtr waitForNewStream();
 
@@ -119,8 +190,9 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
  */
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
-  FakeRawConnection(Network::Connection& connection) : FakeConnectionBase(connection) {
-    connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+  FakeRawConnection(QueuedConnectionWrapperPtr connection_wrapper)
+      : FakeConnectionBase(std::move(connection_wrapper)) {
+    connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   void waitForData(uint64_t num_bytes);
@@ -147,16 +219,18 @@ typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
 class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::FilterChainFactory {
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type);
-  FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type);
+  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version);
+  FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type,
+               Network::Address::IpVersion version);
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
   FakeRawConnectionPtr waitForRawConnection();
+  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Network::FilterChainFactory
-  void createFilterChain(Network::Connection& connection) override;
+  bool createFilterChain(Network::Connection& connection) override;
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
@@ -165,12 +239,15 @@ private:
 
   Ssl::ServerContext* ssl_ctx_{};
   Network::ListenSocketPtr socket_;
-  Thread::ConditionalInitializer server_initialized_;
+  ConditionalInitializer server_initialized_;
   Thread::ThreadPtr thread_;
   std::mutex lock_;
   std::condition_variable new_connection_event_;
   Stats::IsolatedStoreImpl stats_store_;
-  ConnectionHandler handler_;
-  std::list<Network::Connection*> new_connections_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  Network::ConnectionHandlerPtr handler_;
+  std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };
+} // namespace Envoy

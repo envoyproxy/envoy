@@ -1,4 +1,6 @@
-#include "buffer_filter.h"
+#include "common/http/filter/buffer_filter.h"
+
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -10,9 +12,10 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
+namespace Envoy {
 namespace Http {
 
-BufferFilter::BufferFilter(BufferFilterConfigPtr config) : config_(config) {}
+BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
@@ -35,6 +38,7 @@ FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
     return FilterDataStatus::Continue;
   } else if (callbacks_->decodingBuffer() &&
              callbacks_->decodingBuffer()->length() > config_->max_request_bytes_) {
+    // TODO(htuch): Switch this to Utility::sendLocalReply().
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::PayloadTooLarge))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -49,14 +53,15 @@ FilterTrailersStatus BufferFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Store& store) {
+BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   std::string final_prefix = prefix + "buffer.";
-  return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
+  return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void BufferFilter::onResetStream() { resetInternalState(); }
+void BufferFilter::onDestroy() { resetInternalState(); }
 
 void BufferFilter::onRequestTimeout() {
+  // TODO(htuch): Switch this to Utility::sendLocalReply().
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{
       {Headers::get().Status, std::to_string(enumToInt(Http::Code::RequestTimeout))}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -67,7 +72,7 @@ void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
 }
 
-} // Http
+} // namespace Http
+} // namespace Envoy

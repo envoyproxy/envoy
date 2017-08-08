@@ -13,7 +13,8 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
     "config": {
       "stat_prefix": "...",
       "domain": "...",
-      "descriptors": []
+      "descriptors": [],
+      "timeout_ms": "..."
     }
   }
 
@@ -34,6 +35,10 @@ descriptors
       [{"key": "hello", "value": "world"}, {"key": "foo", "value": "bar"}],
       [{"key": "foo2", "value": "bar2"}]
     ]
+
+timeout_ms
+  *(optional, integer)* The timeout in milliseconds for the rate limit service RPC. If not set,
+  this defaults to 20ms.
 
 .. _config_network_filters_rate_limit_stats:
 

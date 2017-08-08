@@ -1,12 +1,20 @@
 #pragma once
 
-#include "libevent.h"
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <mutex>
+#include <vector>
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/common/thread.h"
+#include "common/event/libevent.h"
 
+namespace Envoy {
 namespace Event {
 
 /**
@@ -15,6 +23,7 @@ namespace Event {
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
   DispatcherImpl();
+  DispatcherImpl(Buffer::FactoryPtr&& factory);
   ~DispatcherImpl();
 
   /**
@@ -24,29 +33,48 @@ public:
 
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
-  Network::ClientConnectionPtr createClientConnection(const std::string& url) override;
-  Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                         const std::string& url) override;
-  Network::DnsResolverPtr createDnsResolver() override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
+  Network::ClientConnectionPtr
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) override;
+  Network::ClientConnectionPtr
+  createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                            Network::Address::InstanceConstSharedPtr address) override;
+  Network::DnsResolverSharedPtr createDnsResolver(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
+  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+                               uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store, bool use_proxy_proto) override;
-  Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                         Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                         bool use_proxy_proto) override;
+  Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
+                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                                      Stats::Scope& scope,
+                                      const Network::ListenerOptions& listener_options) override;
+  Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
+                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+                                         Network::ListenerCallbacks& cb, Stats::Scope& scope,
+                                         const Network::ListenerOptions& listener_options) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
+  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
 
 private:
   void runPostCallbacks();
+#ifndef NDEBUG
+  // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
+  // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
+  // run().
+  bool isThreadSafe() const {
+    return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
+  }
+#endif
 
+  Thread::ThreadId run_tid_{};
+  Buffer::FactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
+  TimerPtr post_timer_;
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
@@ -55,4 +83,5 @@ private:
   bool deferred_deleting_{};
 };
 
-} // Event
+} // namespace Event
+} // namespace Envoy

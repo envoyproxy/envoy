@@ -1,7 +1,16 @@
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
+#include "common/json/json_loader.h"
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
 using testing::Eq;
 using testing::NiceMock;
 using testing::Pointee;
@@ -10,14 +19,12 @@ namespace Mongo {
 
 class TestDecoderCallbacks : public DecoderCallbacks {
 public:
-  void decodeBase64(std::string&& message) override { decodeBase64_(message); }
   void decodeGetMore(GetMoreMessagePtr&& message) override { decodeGetMore_(message); }
   void decodeInsert(InsertMessagePtr&& message) override { decodeInsert_(message); }
   void decodeKillCursors(KillCursorsMessagePtr&& message) override { decodeKillCursors_(message); }
   void decodeQuery(QueryMessagePtr&& message) override { decodeQuery_(message); }
   void decodeReply(ReplyMessagePtr&& message) override { decodeReply_(message); }
 
-  MOCK_METHOD1(decodeBase64_, void(std::string& message));
   MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
   MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
   MOCK_METHOD1(decodeKillCursors_, void(KillCursorsMessagePtr& message));
@@ -71,29 +78,36 @@ TEST_F(MongoCodecImplTest, Query) {
   query.fullCollectionName("test");
   query.numberToSkip(20);
   query.numberToReturn(-1);
-  query.query(Bson::DocumentImpl::create()
-                  ->addDouble("double", 2.1)
-                  ->addString("string", "string_value")
-                  ->addDocument("document", Bson::DocumentImpl::create())
-                  ->addArray("array", Bson::DocumentImpl::create())
-                  ->addBinary("binary", "binary_value")
-                  ->addObjectId("object_id", Bson::Field::ObjectId())
-                  ->addBoolean("true", true)
-                  ->addBoolean("false", false)
-                  ->addDatetime("datetime", 1)
-                  ->addNull("null")
-                  ->addRegex("regex", {"hello", ""})
-                  ->addInt32("int32", 1)
-                  ->addTimestamp("timestamp", 1000)
-                  ->addInt64("int64", 2));
-  encoder_.encodeQuery(query);
+  query.query(
+      Bson::DocumentImpl::create()
+          ->addString("string", "string")
+          ->addDouble("double", 2.1)
+          ->addDocument("document", Bson::DocumentImpl::create()->addString("hello", "world"))
+          ->addArray("array", Bson::DocumentImpl::create()->addString("0", "foo"))
+          ->addBinary("binary", "binary_value")
+          ->addObjectId("object_id", Bson::Field::ObjectId())
+          ->addBoolean("true", true)
+          ->addBoolean("false", false)
+          ->addDatetime("datetime", 1)
+          ->addNull("null")
+          ->addRegex("regex", {"hello", ""})
+          ->addInt32("int32", 1)
+          ->addTimestamp("timestamp", 1000)
+          ->addInt64("int64", 2));
 
   QueryMessageImpl query2(2, 2);
   query2.fullCollectionName("test2");
   query2.query(Bson::DocumentImpl::create()->addString("string2", "string2_value"));
   query2.returnFieldsSelector(Bson::DocumentImpl::create()->addDouble("double2", -2.3));
-  encoder_.encodeQuery(query2);
 
+  Json::Factory::loadFromString(query.toString(true));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query2.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query2.toString(false)));
+
+  encoder_.encodeQuery(query);
+  encoder_.encodeQuery(query2);
   EXPECT_CALL(callbacks_, decodeQuery_(Pointee(Eq(query))));
   EXPECT_CALL(callbacks_, decodeQuery_(Pointee(Eq(query2))));
   decoder_.onData(output_);
@@ -133,8 +147,11 @@ TEST_F(MongoCodecImplTest, Reply) {
   reply.numberReturned(2);
   reply.documents().push_back(Bson::DocumentImpl::create());
   reply.documents().push_back(Bson::DocumentImpl::create());
-  encoder_.encodeReply(reply);
 
+  EXPECT_NO_THROW(Json::Factory::loadFromString(reply.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(reply.toString(false)));
+
+  encoder_.encodeReply(reply);
   EXPECT_CALL(callbacks_, decodeReply_(Pointee(Eq(reply))));
   decoder_.onData(output_);
 }
@@ -160,8 +177,11 @@ TEST_F(MongoCodecImplTest, GetMore) {
   get_more.fullCollectionName("test");
   get_more.numberToReturn(20);
   get_more.cursorId(20000);
-  encoder_.encodeGetMore(get_more);
 
+  EXPECT_NO_THROW(Json::Factory::loadFromString(get_more.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(get_more.toString(false)));
+
+  encoder_.encodeGetMore(get_more);
   EXPECT_CALL(callbacks_, decodeGetMore_(Pointee(Eq(get_more))));
   decoder_.onData(output_);
 }
@@ -198,8 +218,11 @@ TEST_F(MongoCodecImplTest, Insert) {
   insert.fullCollectionName("test");
   insert.documents().push_back(Bson::DocumentImpl::create());
   insert.documents().push_back(Bson::DocumentImpl::create());
-  encoder_.encodeInsert(insert);
 
+  EXPECT_NO_THROW(Json::Factory::loadFromString(insert.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(insert.toString(false)));
+
+  encoder_.encodeInsert(insert);
   EXPECT_CALL(callbacks_, decodeInsert_(Pointee(Eq(insert))));
   decoder_.onData(output_);
 }
@@ -234,8 +257,11 @@ TEST_F(MongoCodecImplTest, KillCursors) {
   KillCursorsMessageImpl kill(5, 5);
   kill.numberOfCursorIds(2);
   kill.cursorIds({20000, 40000});
-  encoder_.encodeKillCursors(kill);
 
+  EXPECT_NO_THROW(Json::Factory::loadFromString(kill.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(kill.toString(false)));
+
+  encoder_.encodeKillCursors(kill);
   EXPECT_CALL(callbacks_, decodeKillCursors_(Pointee(Eq(kill))));
   decoder_.onData(output_);
 }
@@ -288,4 +314,23 @@ TEST_F(MongoCodecImplTest, InvalidMessage) {
   EXPECT_THROW(decoder_.onData(output_), EnvoyException);
 }
 
-} // Mongo
+TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
+  QueryMessageImpl query(1, 1);
+  query.flags(0x4);
+  query.fullCollectionName("test");
+  query.numberToSkip(20);
+  query.numberToReturn(-1);
+  query.query(Bson::DocumentImpl::create()->addString("string_need_esc", "{\"foo\": \"bar\n\"}"));
+
+  EXPECT_EQ(
+      R"EOF({"opcode": "OP_QUERY", "id": 1, "response_to": 1, "flags": "0x4", )EOF"
+      R"EOF("collection": "test", "skip": 20, "return": -1, "query": )EOF"
+      R"EOF({"string_need_esc": "{\"foo\": \"bar\n\"}"}, "fields": {}})EOF",
+      query.toString(true));
+
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
+}
+
+} // namespace Mongo
+} // namespace Envoy

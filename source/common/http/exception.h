@@ -1,8 +1,11 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -36,4 +39,5 @@ public:
   CodecClientException(const std::string& message) : EnvoyException(message) {}
 };
 
-} // Http
+} // namespace Http
+} // namespace Envoy

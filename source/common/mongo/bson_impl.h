@@ -1,11 +1,16 @@
 #pragma once
 
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/mongo/bson.h"
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Bson {
 
 /**
@@ -41,7 +46,7 @@ public:
     value_.string_value_ = std::move(value);
   }
 
-  explicit FieldImpl(Type type, const std::string& key, DocumentPtr value)
+  explicit FieldImpl(Type type, const std::string& key, DocumentSharedPtr value)
       : type_(type), key_(key) {
     value_.document_value_ = value;
   }
@@ -145,12 +150,12 @@ private:
 
   /**
    * All of the possible variadic values that a field can be.
-   * TODO: Make this a C++11 union to save a little space and time.
+   * TODO(mattklein123): Make this a C++11 union to save a little space and time.
    */
   struct Value {
     double double_value_;
     std::string string_value_;
-    DocumentPtr document_value_;
+    DocumentSharedPtr document_value_;
     Field::ObjectId object_id_value_;
     bool bool_value_;
     int32_t int32_value_;
@@ -167,75 +172,75 @@ class DocumentImpl : public Document,
                      Logger::Loggable<Logger::Id::mongo>,
                      public std::enable_shared_from_this<DocumentImpl> {
 public:
-  static DocumentPtr create() { return DocumentPtr{new DocumentImpl()}; }
-  static DocumentPtr create(Buffer::Instance& data) {
+  static DocumentSharedPtr create() { return DocumentSharedPtr{new DocumentImpl()}; }
+  static DocumentSharedPtr create(Buffer::Instance& data) {
     std::shared_ptr<DocumentImpl> new_doc{new DocumentImpl()};
     new_doc->fromBuffer(data);
     return new_doc;
   }
 
   // Mongo::Document
-  DocumentPtr addDouble(const std::string& key, double value) override {
+  DocumentSharedPtr addDouble(const std::string& key, double value) override {
     fields_.emplace_back(new FieldImpl(key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addString(const std::string& key, std::string&& value) override {
+  DocumentSharedPtr addString(const std::string& key, std::string&& value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::STRING, key, std::move(value)));
     return shared_from_this();
   }
 
-  DocumentPtr addDocument(const std::string& key, DocumentPtr value) override {
+  DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::DOCUMENT, key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addArray(const std::string& key, DocumentPtr value) override {
+  DocumentSharedPtr addArray(const std::string& key, DocumentSharedPtr value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::ARRAY, key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addBinary(const std::string& key, std::string&& value) override {
+  DocumentSharedPtr addBinary(const std::string& key, std::string&& value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::BINARY, key, std::move(value)));
     return shared_from_this();
   }
 
-  DocumentPtr addObjectId(const std::string& key, Field::ObjectId&& value) override {
+  DocumentSharedPtr addObjectId(const std::string& key, Field::ObjectId&& value) override {
     fields_.emplace_back(new FieldImpl(key, std::move(value)));
     return shared_from_this();
   }
 
-  DocumentPtr addBoolean(const std::string& key, bool value) override {
+  DocumentSharedPtr addBoolean(const std::string& key, bool value) override {
     fields_.emplace_back(new FieldImpl(key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addDatetime(const std::string& key, int64_t value) override {
+  DocumentSharedPtr addDatetime(const std::string& key, int64_t value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::DATETIME, key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addNull(const std::string& key) override {
+  DocumentSharedPtr addNull(const std::string& key) override {
     fields_.emplace_back(new FieldImpl(key));
     return shared_from_this();
   }
 
-  DocumentPtr addRegex(const std::string& key, Field::Regex&& value) override {
+  DocumentSharedPtr addRegex(const std::string& key, Field::Regex&& value) override {
     fields_.emplace_back(new FieldImpl(key, std::move(value)));
     return shared_from_this();
   }
 
-  DocumentPtr addInt32(const std::string& key, int32_t value) override {
+  DocumentSharedPtr addInt32(const std::string& key, int32_t value) override {
     fields_.emplace_back(new FieldImpl(key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addTimestamp(const std::string& key, int64_t value) override {
+  DocumentSharedPtr addTimestamp(const std::string& key, int64_t value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::TIMESTAMP, key, value));
     return shared_from_this();
   }
 
-  DocumentPtr addInt64(const std::string& key, int64_t value) override {
+  DocumentSharedPtr addInt64(const std::string& key, int64_t value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::INT64, key, value));
     return shared_from_this();
   }
@@ -256,4 +261,5 @@ private:
   std::list<FieldPtr> fields_;
 };
 
-} // Bson
+} // namespace Bson
+} // namespace Envoy

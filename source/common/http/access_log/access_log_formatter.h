@@ -1,19 +1,25 @@
 #pragma once
 
+#include <functional>
+#include <string>
+#include <vector>
+
 #include "envoy/http/access_log.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
 /**
- * Util class for FilterReason.
+ * Util class for ResponseFlags.
  */
-class FilterReasonUtils {
+class ResponseFlagUtils {
 public:
-  static const std::string& toShortString(FailureReason failure_reason);
+  static const std::string toShortString(const RequestInfo& request_info);
 
 private:
-  FilterReasonUtils(){};
+  ResponseFlagUtils();
+  static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
   const static std::string FAILED_LOCAL_HEALTH_CHECK;
@@ -25,6 +31,9 @@ private:
   const static std::string UPSTREAM_CONNECTION_TERMINATION;
   const static std::string UPSTREAM_OVERFLOW;
   const static std::string NO_ROUTE_FOUND;
+  const static std::string DELAY_INJECTED;
+  const static std::string FAULT_INJECTED;
+  const static std::string RATE_LIMITED;
 };
 
 /**
@@ -45,9 +54,10 @@ private:
 class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
+  static const std::string& protocolToString(Protocol protocol);
 
 private:
-  AccessLogFormatUtils(){};
+  AccessLogFormatUtils();
 
   static const std::string DEFAULT_FORMAT;
 };
@@ -136,5 +146,6 @@ private:
   std::function<std::string(const RequestInfo&)> field_extractor_;
 };
 
-} // AccessLog
-} // Http
+} // namespace AccessLog
+} // namespace Http
+} // namespace Envoy

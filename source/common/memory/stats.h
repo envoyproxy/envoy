@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+
+namespace Envoy {
 namespace Memory {
 
 /**
@@ -19,4 +22,5 @@ public:
   static uint64_t totalCurrentlyReserved();
 };
 
-} // Memory
+} // namespace Memory
+} // namespace Envoy
