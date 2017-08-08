@@ -317,6 +317,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
       *config, cm_, store_, "foo_prefix", init_manager_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider, provider2);
+  EXPECT_EQ(2UL, provider->use_count());
 
   std::string config_json2 = R"EOF(
     {
@@ -331,10 +332,14 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
       *config2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider);
+  EXPECT_EQ(2UL, provider.use_count());
+  EXPECT_EQ(1UL, provider3.use_count());
 
   std::vector<RouteConfigProviderSharedPtr> configured_providers =
       route_config_provider_manager_.routeConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
+  EXPECT_EQ(3UL, provider.use_count());
+  EXPECT_EQ(2UL, provider3.use_count());
 
   provider.reset();
   provider2.reset();

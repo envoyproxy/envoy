@@ -28,7 +28,7 @@ route_config_name
   *(required, string)* The name of the route configuration. This name will be passed to the
   :ref:`RDS HTTP API <config_http_conn_man_rds_api>`. This allows an Envoy configuration with
   multiple HTTP listeners (and associated HTTP connection manager filters) to use different route
-  configurations.
+  configurations. The route_config_name must **not** contain ``:``.
 
 refresh_delay_ms
   *(optional, integer)* The delay, in milliseconds, between fetches to the RDS API. Envoy will add

@@ -101,9 +101,9 @@ private:
     ConfigConstSharedPtr config_;
   };
 
-  RdsRouteConfigProviderImpl(const Json::Object& config, const std::string& manager_identifier, Runtime::Loader& runtime,
-                             Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
+  RdsRouteConfigProviderImpl(const Json::Object& config, const std::string& manager_identifier,
+                             Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+                             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                              const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
                              RouteConfigProviderManagerImpl& route_config_provider_manager);
