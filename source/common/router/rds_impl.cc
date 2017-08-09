@@ -141,7 +141,7 @@ RouteConfigProviderManagerImpl::routeConfigProviders() {
     // of this code, locking the weak_ptr will not fail.
     Router::RouteConfigProviderSharedPtr provider = element.second.lock();
     ASSERT(provider)
-    ret.push_back(std::move(provider));
+    ret.push_back(provider);
   }
   return ret;
 };
