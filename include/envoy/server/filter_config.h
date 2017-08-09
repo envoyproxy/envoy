@@ -10,6 +10,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -104,6 +105,11 @@ public:
    * @return Stats::Scope& the filter's stats scope.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
 
   /**
    * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is

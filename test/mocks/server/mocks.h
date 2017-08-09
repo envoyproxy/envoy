@@ -258,6 +258,7 @@ public:
   MOCK_METHOD0(runtime, Runtime::Loader&());
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(shutdownAdmin, void());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(startTimeCurrentEpoch, time_t());
   MOCK_METHOD0(startTimeFirstEpoch, time_t());
   MOCK_METHOD0(stats, Stats::Store&());
@@ -285,6 +286,7 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
+  Singleton::ManagerPtr singleton_manager_;
 };
 
 namespace Configuration {
@@ -334,6 +336,7 @@ public:
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(server, Instance&());
+  MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -348,6 +351,7 @@ public:
   Stats::IsolatedStoreImpl scope_;
   testing::NiceMock<MockInstance> server_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  Singleton::ManagerPtr singleton_manager_;
 };
 
 } // namespace Configuration

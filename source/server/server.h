@@ -124,6 +124,7 @@ public:
   Runtime::Loader& runtime() override;
   void shutdown() override;
   void shutdownAdmin() override;
+  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
@@ -152,6 +153,7 @@ private:
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;

@@ -107,6 +107,7 @@ envoy_cc_library(
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
