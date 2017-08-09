@@ -61,8 +61,7 @@ public:
    * @param singleton supplies the singleton creation callback. This will only be called if the
    *        singleton does not already exist. NOTE: The manager only stores a weak pointer. This
    *        allows a singleton to be cleaned up if it is not needed any more. All code that uses
-   *        singletons must check for validity and create a new singleton if needed. It must also
-   *        store the shared_ptr for as long as the singleton is needed.
+   *        singletons must store the shared_ptr for as long as the singleton is needed.
    * @return InstancePtr the singleton.
    */
   virtual InstancePtr get(const std::string& name, SingletonFactoryCb) PURE;
