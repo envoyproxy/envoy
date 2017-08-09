@@ -114,6 +114,11 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   } else if (string_type == "logical_dns") {
     cluster.set_type(envoy::api::v2::Cluster::LOGICAL_DNS);
     set_dns_hosts();
+  } else if (string_type == "original_dst") {
+    if (json_cluster.hasObject("hosts")) {
+      throw EnvoyException("original_dst clusters must have no hosts configured");
+    }
+    cluster.set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
   } else {
     ASSERT(string_type == "sds");
     cluster.set_type(envoy::api::v2::Cluster::EDS);
@@ -122,6 +127,7 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
     eds_cluster_config->set_service_name(json_cluster.getString("service_name", ""));
   }
 
+  JSON_UTIL_SET_DURATION(json_cluster, cluster, cleanup_interval);
   JSON_UTIL_SET_DURATION(json_cluster, cluster, connect_timeout);
   JSON_UTIL_SET_INTEGER(json_cluster, cluster, per_connection_buffer_limit_bytes);
 
@@ -132,6 +138,8 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
     cluster.set_lb_policy(envoy::api::v2::Cluster::LEAST_REQUEST);
   } else if (lb_type == "random") {
     cluster.set_lb_policy(envoy::api::v2::Cluster::RANDOM);
+  } else if (lb_type == "original_dst_lb") {
+    cluster.set_lb_policy(envoy::api::v2::Cluster::ORIGINAL_DST_LB);
   } else {
     ASSERT(lb_type == "ring_hash");
     cluster.set_lb_policy(envoy::api::v2::Cluster::RING_HASH);

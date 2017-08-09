@@ -36,11 +36,12 @@ public:
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
-    conn_info.host_.reset(new Upstream::HostImpl(
+    conn_info.host_description_.reset(new Upstream::HostImpl(
         Upstream::ClusterInfoConstSharedPtr{new Upstream::MockClusterInfo}, "",
         Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
 
-    EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+    EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+        .WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, setBufferStats(_));
     EXPECT_CALL(*connection_, connect());
   }

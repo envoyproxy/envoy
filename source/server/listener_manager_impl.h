@@ -220,6 +220,7 @@ public:
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
   Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
+  Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
 
   // Network::DrainDecision

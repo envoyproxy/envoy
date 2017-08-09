@@ -231,8 +231,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
-  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
-                                  config_.random_, callbacks_->dispatcher(), finalPriority());
+  retry_state_ =
+      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
+                       config_.random_, callbacks_->dispatcher(), route_entry_->priority());
   do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
                                               callbacks_->streamId());
 
@@ -263,7 +264,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 }
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority(), this);
+  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
+                                            this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -301,21 +303,28 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::onBelowWriteBufferLowWatermark() {
+  // The downstream connection has buffer available.  Resume reads from upstream.
+  cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(false);
+  }
+}
+
+void Filter::onAboveWriteBufferHighWatermark() {
+  // The downstream connection is overrun.  Pause reads from upstream.
+  cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(true);
+  }
+}
+
 void Filter::cleanup() {
   upstream_request_.reset();
   retry_state_.reset();
   if (response_timeout_) {
     response_timeout_->disableTimer();
     response_timeout_.reset();
-  }
-}
-
-Upstream::ResourcePriority Filter::finalPriority() {
-  // Virtual cluster priority trumps route priority if the route has a virtual cluster.
-  if (request_vcluster_) {
-    return request_vcluster_->priority();
-  } else {
-    return route_entry_->priority();
   }
 }
 

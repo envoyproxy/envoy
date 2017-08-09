@@ -43,7 +43,6 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/config:protocol_json_lib",
         "//source/common/http:conn_manager_lib",
-        "//source/common/http:date_provider_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/access_log:access_log_lib",
         "//source/common/http/http1:codec_lib",

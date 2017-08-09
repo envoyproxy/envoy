@@ -11,7 +11,6 @@
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
-#include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
 #include "common/json/json_validator.h"
 
@@ -69,7 +68,8 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::ConnectionManagerConfig,
                                     Json::Validator {
 public:
-  HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context);
+  HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context,
+                              Http::DateProvider& date_provider);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -146,7 +146,7 @@ private:
   Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
-  Http::TlsCachingDateProviderImpl date_provider_;
+  Http::DateProvider& date_provider_;
 };
 
 /**

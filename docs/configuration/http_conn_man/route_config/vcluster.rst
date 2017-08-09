@@ -22,8 +22,7 @@ such that they include network level failures.
   {
     "pattern": "...",
     "name": "...",
-    "method": "...",
-    "priority": "..."
+    "method": "..."
   }
 
 pattern
@@ -38,9 +37,5 @@ name
 method
   *(optional, string)* Optionally specifies the HTTP method to match on. For example *GET*, *PUT*,
   etc.
-
-priority
-  *(optional, string)* Optionally specifies the virtual cluster :ref:`routing priority
-  <arch_overview_http_routing_priority>`.
 
 Documentation for :ref:`virtual cluser statistics <config_http_filters_router_stats>`.
