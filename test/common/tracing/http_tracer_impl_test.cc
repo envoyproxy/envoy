@@ -266,7 +266,35 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
+  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("error", "true"));
+  EXPECT_CALL(*span, setTag("response_size", "11"));
+  EXPECT_CALL(*span, setTag("response_flags", "-"));
+  EXPECT_CALL(*span, setTag("request_size", "10"));
+  NiceMock<MockConfig> config;
+
+  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
+  finalizer.finalize(*span);
+}
+
+TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  const std::string expected_cluster_name = "<my_upstream_cluster>";
+
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
+  Optional<uint32_t> response_code;
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, upstreamHost()).WillRepeatedly(Return(upstream_host));
+  EXPECT_CALL(*upstream_host, cluster()).WillOnce(ReturnRef(cluster_info));
+  EXPECT_CALL(cluster_info, name()).WillOnce(ReturnRef(expected_cluster_name));
+
+  EXPECT_CALL(*span, setTag("upstream_cluster", expected_cluster_name));
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
@@ -301,6 +329,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
@@ -355,6 +384,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
   ON_CALL(request_info, getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_code", "503"));
