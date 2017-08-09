@@ -38,12 +38,10 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
                                                               FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          date_provider_singleton_name);
-  if (date_provider == nullptr) {
-    date_provider = std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                       context.threadLocal());
-    context.singletonManager().set(date_provider_singleton_name, date_provider);
-  }
+          date_provider_singleton_name, [&context] {
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
+                                                                      context.threadLocal());
+          });
 
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
       new HttpConnectionManagerConfig(config, context, *date_provider));

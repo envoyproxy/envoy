@@ -4,21 +4,25 @@
 
 #include "envoy/singleton/manager.h"
 
+#include "common/common/thread.h"
+
 namespace Envoy {
 namespace Singleton {
 
 /**
- * Implementation of the singleton manager that checks the registry for name validity.
+ * Implementation of the singleton manager that checks the registry for name validity. It is
+ * assumed the singleton manager is only used on the main thread so it is not thread safe. Asserts
+ * verify that.
  */
 class ManagerImpl : public Manager {
 public:
+  ManagerImpl() : run_tid_(Thread::Thread::currentThreadId()) {}
+
   InstancePtr get(const std::string& name, SingletonFactoryCb cb) override;
-  //void set(const std::string& name, InstancePtr singleton) override;
 
 private:
-  void verifyRegistration(const std::string& name);
-
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
+  Thread::ThreadId run_tid_{};
 };
 
 } // namespace Singleton

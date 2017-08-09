@@ -1,20 +1,20 @@
-#include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
 #include "common/singleton/manager_impl.h"
 
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Singleton {
 
-TEST(SingletonManagerImplTest, NotRegistered) {
+// Must be a dedicated function so that TID is within the death test.
+static void deathTestWorker() {
   ManagerImpl manager;
+  manager.get("foo", [] { return nullptr; });
+}
 
-  EXPECT_THROW_WITH_MESSAGE(manager.get("foo"), EnvoyException,
-                            "invalid singleton name 'foo'. Make sure it is registered.");
+TEST(SingletonManagerImplDeathTest, NotRegistered) {
+  EXPECT_DEATH(deathTestWorker(), "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
 static constexpr char test_singleton_name[] = "test_singleton";
@@ -32,15 +32,13 @@ public:
 TEST(SingletonManagerImplTest, Basic) {
   ManagerImpl manager;
 
-  EXPECT_EQ(nullptr, manager.get("test_singleton"));
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
-  manager.set("test_singleton", singleton);
+  EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));
   EXPECT_EQ(1UL, singleton.use_count());
-  EXPECT_EQ(singleton, manager.get("test_singleton"));
+  EXPECT_EQ(singleton, manager.get("test_singleton", [] { return nullptr; }));
 
   EXPECT_CALL(*singleton, onDestroy());
   singleton.reset();
-  EXPECT_EQ(nullptr, manager.get("test_singleton"));
 }
 
 } // namespace Singleton

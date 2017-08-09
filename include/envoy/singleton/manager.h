@@ -42,35 +42,30 @@ public:
   virtual ~Manager() {}
 
   /**
-   * fixfix
+   * Callback function used to create a singleton.
    */
   typedef std::function<InstancePtr()> SingletonFactoryCb;
 
   /**
-   * This is a helper on top of get() that casts the object stored to the specified type. No type
-   * information is specified explicitly in code so dynamic_cast provides some level of protection
-   * via RTTI.
+   * This is a helper on top of get() that casts the object stored to the specified type. Since the
+   * manager only stores pointers to the base interface, dynamic_cast provides some level of
+   * protection via RTTI.
    */
   template <class T> std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb) {
     return std::dynamic_pointer_cast<T>(get(name, cb));
   }
 
   /**
-   * Get a singleton. fixfix
+   * Get a singleton and create it if it does not exist.
    * @param name supplies the singleton name. Must be registered via RegistrationImpl.
-   * @return InstancePtr the singleton.
-   */
-  virtual InstancePtr get(const std::string& name, SingletonFactoryCb) PURE;
-
-  /**
-   * Set a singleton.
-   * @param name supplies the singleton name. Must be registered via RegistrationImpl.
-   * @param singleton supplies the singleton. NOTE: The manager only stores a weak pointer. This
+   * @param singleton supplies the singleton creation callback. This will only be called if the
+   *        singleton does not already exist. NOTE: The manager only stores a weak pointer. This
    *        allows a singleton to be cleaned up if it is not needed any more. All code that uses
    *        singletons must check for validity and create a new singleton if needed. It must also
    *        store the shared_ptr for as long as the singleton is needed.
+   * @return InstancePtr the singleton.
    */
-  //virtual void set(const std::string& name, InstancePtr singleton) PURE;
+  virtual InstancePtr get(const std::string& name, SingletonFactoryCb) PURE;
 };
 
 typedef std::unique_ptr<Manager> ManagerPtr;
