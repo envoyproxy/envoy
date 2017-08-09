@@ -1145,7 +1145,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 
 class WatermarkTest : public RouterTest {
 public:
-  void sendRequest() {
+  void sendRequest(bool header_only_request = true, bool pool_ready = true) {
     EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
         .WillOnce(Return(std::chrono::milliseconds(0)));
     EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
@@ -1159,11 +1159,14 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder_ = &decoder;
-              callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_);
+              pool_callbacks_ = &callbacks;
+              if (pool_ready) {
+                callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_);
+              }
               return nullptr;
             }));
     HttpTestUtility::addDefaultHeaders(headers_);
-    router_.decodeHeaders(headers_, true);
+    router_.decodeHeaders(headers_, header_only_request);
   }
   void sendResponse() {
     response_decoder_->decodeHeaders(
@@ -1175,6 +1178,7 @@ public:
   Http::StreamCallbacks* stream_callbacks_;
   Http::StreamDecoder* response_decoder_ = nullptr;
   Http::TestHeaderMapImpl headers_;
+  Http::ConnectionPool::Callbacks* pool_callbacks_{nullptr};
 };
 
 TEST_F(WatermarkTest, DownstreamWatermarks) {
@@ -1207,6 +1211,41 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   router_.onBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  sendResponse();
+}
+
+TEST_F(WatermarkTest, FilterWatermarks) {
+  router_.setBufferLimit(10);
+  // Send the headers sans-fin, and don't flag the pool as ready.
+  sendRequest(false, false);
+
+  // Send 10 bytes of body to fill the 10 byte buffer.
+  Buffer::OwnedImpl data("1234567890");
+  router_.decodeData(data, false);
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
+
+  // Send one extra byte.  This should cause the buffer to go over the limit and pause downstream
+  // data.
+  Buffer::OwnedImpl last_byte("!");
+  router_.decodeData(last_byte, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
+
+  // Now set up the downstream connection.  The encoder will be given the buffered request body,
+  // The mock invocation below drains it, and the buffer will go under the watermark limit again.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
+  EXPECT_CALL(encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
+  pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
                     .value());
 
   sendResponse();

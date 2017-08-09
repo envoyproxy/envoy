@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -116,6 +117,7 @@ public:
   ~Filter();
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -175,13 +177,14 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
-    void onAboveWriteBufferHighWatermark() override {
-      // Have the connection manager disable reads on the downstream stream.
+    void onAboveWriteBufferHighWatermark() override { disableDataFromDownstream(); }
+    void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
+
+    void disableDataFromDownstream() {
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
       parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     }
-    void onBelowWriteBufferLowWatermark() override {
-      // Have the connection manager enable reads on the downstream stream.
+    void enableDataFromDownstream() {
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
       parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
     }
@@ -198,7 +201,7 @@ private:
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
     Http::StreamEncoder* request_encoder_{};
     Optional<Http::StreamResetReason> deferred_reset_reason_;
-    Buffer::InstancePtr buffered_request_body_;
+    std::unique_ptr<Buffer::WatermarkBuffer> buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
     bool calling_encode_headers_ : 1;
@@ -254,6 +257,7 @@ private:
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
+  uint32_t buffer_limit_{0};
   bool stream_destroyed_{};
 
   bool downstream_response_started_ : 1;

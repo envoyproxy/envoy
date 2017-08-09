@@ -32,6 +32,16 @@ Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end
     onDecodeComplete(data);
   }
 
+  // If the request is too large, send a 413 to the user.   This could be applied before the check
+  // above, but as Envoy buffer limits are soft limits, if we already have the data buffered might
+  // as well pass it through.
+  if (buffer_limit_ > 0 && data.length() > buffer_limit_) {
+    scope_.counter(fmt::format("{}rq_too_large", stat_prefix_)).inc();
+    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::PayloadTooLarge,
+                                  Http::CodeUtility::toString(Http::Code::PayloadTooLarge));
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   if (end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {

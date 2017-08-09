@@ -51,6 +51,7 @@ public:
   static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t) override {} // Buffer filter uses its own configured limits.
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -66,6 +67,7 @@ private:
   BufferFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
+  bool stream_reset_{false};
 };
 
 } // Http

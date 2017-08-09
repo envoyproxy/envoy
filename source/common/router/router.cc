@@ -280,6 +280,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
   // since it's all moves from here on.
+  // TODO(alyssawilk) figure out how to limit this.
   if (buffering) {
     Buffer::OwnedImpl copy(data);
     upstream_request_->encodeData(copy, end_stream);
@@ -652,7 +653,13 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_.reset(new Buffer::OwnedImpl());
+      buffered_request_body_.reset(
+          new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                      [this]() -> void { this->enableDataFromDownstream(); },
+                                      [this]() -> void { this->disableDataFromDownstream(); }));
+      if (parent_.buffer_limit_ > 0) {
+        buffered_request_body_->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
+      }
     }
 
     buffered_request_body_->move(data);

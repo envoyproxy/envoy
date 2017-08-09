@@ -73,7 +73,10 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
-FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
+FaultFilter::~FaultFilter() {
+  ASSERT(!delay_timer_);
+  ASSERT(!high_watermark_called_);
+}
 
 // Delays and aborts are independent events. One can inject a delay
 // followed by an abort or inject just a delay or abort. In this callback,
@@ -209,8 +212,16 @@ void FaultFilter::recordAbortsInjectedStats() {
 }
 
 FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
-  return delay_timer_ == nullptr ? FilterDataStatus::Continue
-                                 : FilterDataStatus::StopIterationAndBuffer;
+  if (delay_timer_ == nullptr) {
+    return FilterDataStatus::Continue;
+  }
+  // The fault filter mimizes buffering even more aggressively than configured, to avoid
+  // accumulating data during a delay.
+  if (limiting_buffers_ && !high_watermark_called_) {
+    high_watermark_called_ = true;
+    callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+  }
+  return FilterDataStatus::StopIterationAndBuffer;
 }
 
 FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
@@ -275,6 +286,13 @@ void FaultFilter::resetTimerState() {
   if (delay_timer_) {
     delay_timer_->disableTimer();
     delay_timer_.reset();
+  }
+  // It's not necessarily true that the buffer has drained below the low watermark, but this filter
+  // is no longer causing data to be buffered and this is the single safest place for watermark
+  // resumption.
+  if (high_watermark_called_) {
+    high_watermark_called_ = false;
+    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
 }
 

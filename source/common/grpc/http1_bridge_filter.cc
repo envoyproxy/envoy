@@ -9,9 +9,11 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/codes.h"
 #include "common/http/filter_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -48,10 +50,17 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::HeaderMap& head
   }
 }
 
-Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
+    // If the response is too large to fit in the buffer, send an error to the user.
+    if (buffer_limit_ > 0 && data.length() > buffer_limit_) {
+      Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_,
+                                    Http::Code::InternalServerError,
+                                    Http::CodeUtility::toString(Http::Code::InternalServerError));
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }

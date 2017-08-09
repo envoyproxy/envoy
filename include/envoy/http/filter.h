@@ -230,6 +230,18 @@ public:
   virtual ~StreamFilterBase() {}
 
   /**
+   * This routine is called on filter creation, setting the buffer limit for the
+   * filter.  Filters should abide by these limits unless custom configuration
+   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * If filters buffer enough bytes to hit the high watermark, it should either
+   * call on[Encoder|Decoder]FilterAboveWriteBufferHighWatermark to halt the
+   * flow of data or send an error response such as 413 (Payload Too Large).
+   * @param byte_limit supplies number of bytes this filter may buffer by default.
+   */
+  virtual void setBufferLimit(uint32_t byte_limit) PURE;
+
+  /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
    * sure that any async events are cleaned up in the context of this routine. This includes timers,

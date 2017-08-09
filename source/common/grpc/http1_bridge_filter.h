@@ -16,7 +16,8 @@ public:
   Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Http::StreamFilterBase
-  void onDestroy() override {}
+  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
+  void onDestroy() override { stream_reset_ = true; }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -48,9 +49,11 @@ private:
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_stat_tracking_{};
+  bool stream_reset_{false};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string grpc_service_;
   std::string grpc_method_;
+  uint32_t buffer_limit_{0};
 };
 
 } // namespace Grpc

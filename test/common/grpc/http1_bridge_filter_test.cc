@@ -100,6 +100,31 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
                      .value());
 }
 
+TEST_F(GrpcHttp1BridgeFilterTest, LargeResponseNoBridging) {
+  // Because there's no briding, the large response should be proxied through.
+  filter_.setBufferLimit(4);
+  protocol_ = Http::Protocol::Http2;
+
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {
   protocol_ = Http::Protocol::Http2;
 
@@ -155,6 +180,30 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNormalResponse) {
   EXPECT_EQ("200", response_headers.get_(":status"));
   EXPECT_EQ("5", response_headers.get_("content-length"));
   EXPECT_EQ("0", response_headers.get_("grpc-status"));
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, LargeResponseWithBridging) {
+  // Because briding buffers, we 500 for overly large responses.
+  filter_.setBufferLimit(4);
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  Http::TestHeaderMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
+  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(buffer.get()));
+  Http::TestHeaderMapImpl original_response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(original_response_headers, false));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "500"}, {"content-length", "21"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {

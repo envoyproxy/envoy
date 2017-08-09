@@ -80,6 +80,7 @@ public:
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t limit) override { limiting_buffers_ = limit > 0; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -103,9 +104,11 @@ private:
   FilterConfigSharedPtr config_;
   Envoy::RateLimit::ClientPtr client_;
   StreamDecoderFilterCallbacks* callbacks_{};
-  bool initiating_call_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  bool initiating_call_{};
+  bool limiting_buffers_{false};
+  bool high_watermark_called_{false};
 };
 
 } // namespace RateLimit

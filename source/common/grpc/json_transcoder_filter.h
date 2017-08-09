@@ -96,6 +96,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t) override {} // Unimplemented: see TODO in .cc file.
   void onDestroy() override { stream_reset_ = true; }
 
 private:

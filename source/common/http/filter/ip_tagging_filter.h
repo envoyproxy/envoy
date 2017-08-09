@@ -58,6 +58,7 @@ public:
   ~IpTaggingFilter();
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t) override {} // Non-buffering filter.
   void onDestroy() override;
 
   // Http::StreamDecoderFilter

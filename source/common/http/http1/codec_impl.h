@@ -42,7 +42,9 @@ public:
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
+  // TODO(alyssawilk) HTTP/1.1 flow control.
   void readDisable(bool) override {}
+  uint32_t bufferLimit() override { return 0; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}

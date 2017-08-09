@@ -116,6 +116,8 @@ public:
     config_.reset(new FaultFilterConfig(*config, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    data_.add("hello", 5);
+    filter_->setBufferLimit(3);
   }
 
   void expectDelayTimer(uint64_t duration_ms) {
@@ -271,6 +273,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
@@ -335,9 +338,10 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(1);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(1);
   timer_->callback_();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());

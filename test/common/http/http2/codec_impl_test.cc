@@ -370,6 +370,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames.  Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
+  // Make sure the limits were configured properly in test set up.
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->bufferLimit());
+  EXPECT_EQ(initial_stream_window, client_.getStream(1)->bufferLimit());
+
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));

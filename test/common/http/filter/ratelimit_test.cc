@@ -50,6 +50,7 @@ public:
     client_ = new Envoy::RateLimit::MockClient();
     filter_.reset(new Filter(config_, Envoy::RateLimit::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    filter_->setBufferLimit(100);
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
         route_rate_limit_);
@@ -170,9 +171,11 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   request_headers_.addViaCopy(Http::Headers::get().RequestId, "requestid");
   request_headers_.addViaCopy(Http::Headers::get().OtSpanContext, "context");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited))
@@ -200,6 +203,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 

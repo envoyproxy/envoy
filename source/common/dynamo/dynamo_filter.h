@@ -27,7 +27,8 @@ public:
   }
 
   // Http::StreamFilterBase
-  void onDestroy() override {}
+  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
+  void onDestroy() override { stream_reset_ = true; }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -60,7 +61,6 @@ private:
   std::string stat_prefix_;
   Stats::Scope& scope_;
 
-  bool enabled_{};
   std::string operation_{};
   RequestParser::TableDescriptor table_descriptor_{"", true};
   std::string error_type_{};
@@ -68,6 +68,9 @@ private:
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  uint32_t buffer_limit_{0};
+  bool enabled_{};
+  bool stream_reset_{false};
 };
 
 } // namespace Dynamo

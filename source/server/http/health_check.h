@@ -64,6 +64,7 @@ public:
         endpoint_(endpoint) {}
 
   // Http::StreamFilterBase
+  void setBufferLimit(uint32_t) override {} // This filter does not buffer.
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter

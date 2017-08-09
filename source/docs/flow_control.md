@@ -84,10 +84,7 @@ disable further data from downstream.  On the reverse path, when the downstream 
 backs up, the connection manager collects events for the downstream streams and
 the downstream conection.  It passes events to the router filter via
 `Envoy::Http::DownstreamWatermarkCallbacks` and the router can then call `readDisable()` on the
-upstream stream.  The API for provideWatermarkCallbacks is a performance
-optimization to avoid each watermark event on a downstream HTTP/2 connection resulting in
-"number of streams * number of filters" callbacks.  Instead, only the router
-filter is notified and only the "number of streams" multiplier applies.
+upstream stream.
 
 ## HTTP/2 codec recv buffer
 
@@ -105,9 +102,78 @@ The low watermark path is similar
  `ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark`.
  * `pendingRecvBufferLowWatermarkwhich` calls `readDisable(false)` on the stream.
 
-## HTTP/2 filters
+## HTTP/1 and HTTP/2 filters
 
-TODO(alyssawilk) implement and document.
+Each HTTP and HTTP/2 filter gets a call of `StreamFilterBase::setBufferLimit()` on creation.  If the
+limit is non-zero, the buffers are responsible for enforcing buffer limits.
+
+# Decoder filters
+
+Decoder filters buffering more than the buffer limit should call
+`onDecoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e. filters which can
+process more bytes as the underlying buffer is drained.   This causes the
+downstream stream to be readDisabled and the flow of downstream data to be
+halted.  The filter is then responsible for calling `onDecoderFilterBelowWriteBufferLowWatermark`
+when the buffer is drained to resume the flow of data.
+
+Decoder filters which must buffer the full response should respond with a 413 (Payload Too Large)
+when encountering a response body too large to buffer.
+
+The decoder high watermark path for streaming filters is as follows:
+
+ * When an instance of `Envoy::Router::StreamDecoderFilter` buffers too much data it should call
+   `StreamDecoderFilterCallback::onDecoderFilterAboveWriteBufferHighWatermark()`.
+ * When `Envoy::Http::ConnectionManagerImpl::ActiveStreamDecoderFilter` receives
+ `onDecoderFilterAboveWriteBufferHighWatermark()` it calls `readDisable(true)` on the downstream
+ stream to pause data.
+
+And the low watermark path:
+
+ * When the buffer of the `Envoy::Router::StreamDecoderFilter` drains should call
+   `StreamDecoderFilterCallback::onDecoderFilterBelowWriteBufferLowWatermark()`.
+ * When `Envoy::Http::ConnectionManagerImpl` receives
+ `onDecoderFilterAboveWriteBufferHighWatermark()` it calls `readDisable(false)` on the downstream
+ stream to pause data.
+
+# Encoder filters
+
+
+Encoder filters buffering more than the buffer limit should call
+`onEncoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e. filters which can
+process more bytes as the underlying buffer is drained.   The high watermark
+call will be passed from the `Envoy::Http::ConnectionManagerImpl` to the `Envoy::Router::Filter`
+which will `readDisable(true)` to stop the flow of upstream data.  Streaming filters which
+call `onEncoderFilterAboveWriteBufferHighWatermark` should call
+`onEncoderFilterBelowWriteBufferLowWatermark` when the underlying buffer drains.
+
+Filters which must buffer a full request body before processing further, should respond with a
+500 (Server Error) if encountering a request body which is larger than the buffer limits.
+
+The encoder high watermark path for streaming filters is as follows:
+
+ * When an instance of `Envoy::Router::StreamEncoderFilter` buffers too much data it should call
+   `StreamEncoderFilterCallback::onEncodeFilterAboveWriteBufferHighWatermark()`.
+ * When `Envoy::Http::ConnectionManagerImpl::ActiveStreamEncoderFilter` receives
+ `onEncoderFilterAboveWriteBufferHighWatermark()` it calls
+ `ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks()`
+ * `callHighWatermarkCallbacks()` then in turn calls
+    `DownstreamWatermarkCallbacks::onAboveWriteBufferHighWatermark()` for all
+    filters which registered to receive watermark events
+ * `Envoy::Router::Filter` receives `onAboveWriteBufferHighWatermark()` and calls
+   `readDisable(false)` on the upstream request.
+
+The encoder low watermark path for streaming filters is as follows:
+
+ * When an instance of `Envoy::Router::StreamEncoderFilter` buffers too much data it should call
+   `StreamEncoderFilterCallback::onEncodeFilterBelowWriteBufferLowWatermark()`.
+ * When `Envoy::Http::ConnectionManagerImpl::ActiveStreamEncoderFilter` receives
+ `onEncoderFilterBelowWriteBufferLowWatermark()` it calls
+ `ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks()`
+ * `callLowWatermarkCallbacks()` then in turn calls
+    `DownstreamWatermarkCallbacks::onBelowWriteBufferLowWatermark()` for all
+    filters which registered to receive watermark events
+ * `Envoy::Router::Filter` receives `onBelowWriteBufferLowWatermark()` and calls
+   `readDisable(true)` on the upstream request.
 
 # HTTP/2 codec upstream send buffer
 

@@ -84,8 +84,16 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
 FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   ASSERT(state_ != State::Responded);
-  return state_ == State::Calling ? FilterDataStatus::StopIterationAndBuffer
-                                  : FilterDataStatus::Continue;
+  if (state_ != State::Calling) {
+    return FilterDataStatus::Continue;
+  }
+  // The fault filter mimizes buffering even more aggressively than configured, to avoid
+  // accumulating data for rate limited requests.
+  if (limiting_buffers_ && !high_watermark_called_) {
+    high_watermark_called_ = true;
+    callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+  }
+  return FilterDataStatus::StopIterationAndBuffer;
 }
 
 FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
@@ -99,6 +107,10 @@ void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) 
 }
 
 void Filter::onDestroy() {
+  if (high_watermark_called_) {
+    high_watermark_called_ = false;
+    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  }
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
@@ -108,6 +120,10 @@ void Filter::onDestroy() {
 void Filter::complete(Envoy::RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
+  if (high_watermark_called_) {
+    high_watermark_called_ = false;
+    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  }
   switch (status) {
   case Envoy::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();

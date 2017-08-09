@@ -155,6 +155,7 @@ public:
   MOCK_METHOD1(resetStream, void(StreamResetReason reason));
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
+  MOCK_METHOD0(bufferLimit, uint32_t());
 
   std::list<StreamCallbacks*> callbacks_{};
 };
@@ -294,6 +295,7 @@ public:
   ~MockStreamDecoderFilter();
 
   // Http::StreamFilterBase
+  MOCK_METHOD1(setBufferLimit, void(uint32_t));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::StreamDecoderFilter
@@ -311,6 +313,7 @@ public:
   ~MockStreamEncoderFilter();
 
   // Http::StreamFilterBase
+  MOCK_METHOD1(setBufferLimit, void(uint32_t));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::MockStreamEncoderFilter
@@ -328,6 +331,7 @@ public:
   ~MockStreamFilter();
 
   // Http::StreamFilterBase
+  MOCK_METHOD1(setBufferLimit, void(uint32_t));
   MOCK_METHOD0(onDestroy, void());
 
   // Http::StreamDecoderFilter

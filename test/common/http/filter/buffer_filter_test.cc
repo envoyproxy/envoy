@@ -91,8 +91,10 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
 
   Buffer::OwnedImpl data1("hello");
   config_->max_request_bytes_ = 1;
-  TestHeaderMapImpl response_headers{{":status", "413"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  TestHeaderMapImpl response_headers{
+      {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
   filter_.onDestroy();
