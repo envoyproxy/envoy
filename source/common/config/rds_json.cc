@@ -28,7 +28,7 @@ void RdsJson::translateVirtualCluster(const Json::Object& json_virtual_cluster,
   JSON_UTIL_SET_STRING(json_virtual_cluster, virtual_cluster, name);
   JSON_UTIL_SET_STRING(json_virtual_cluster, virtual_cluster, pattern);
 
-  envoy::api::v2::RequestMethod method;
+  envoy::api::v2::RequestMethod method{};
   RequestMethod_Parse(json_virtual_cluster.getString("method", "METHOD_UNSPECIFIED"), &method);
   virtual_cluster.set_method(method);
 }
