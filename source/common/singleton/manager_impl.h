@@ -18,6 +18,7 @@ class ManagerImpl : public Manager {
 public:
   ManagerImpl() : run_tid_(Thread::Thread::currentThreadId()) {}
 
+  // Singleton::Manager
   InstancePtr get(const std::string& name, SingletonFactoryCb cb) override;
 
 private:
