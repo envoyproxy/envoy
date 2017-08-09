@@ -280,9 +280,6 @@ TEST_F(RdsImplTest, FailureArray) {
 
 class RouteConfigProviderManagerImplTest : public testing::Test {
 public:
-  RouteConfigProviderManagerImplTest() {}
-  ~RouteConfigProviderManagerImplTest() {}
-
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
@@ -346,7 +343,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   configured_providers.clear();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
-  // now we should only have the provider porinted at by provider3.
+  // now we should only have the provider pointed at by provider3.
   configured_providers = route_config_provider_manager_.routeConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
   EXPECT_EQ(provider3, configured_providers.front());
