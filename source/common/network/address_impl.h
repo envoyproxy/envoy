@@ -52,7 +52,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  int flagsFromSocketType(SocketType type) const;
+  int socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
