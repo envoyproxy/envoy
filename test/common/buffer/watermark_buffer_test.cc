@@ -19,7 +19,7 @@ public:
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
 };
-TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.high_watermark()); }
+TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 
 TEST_F(WatermarkBufferTest, AddChar) {
   buffer_.add(TEN_BYTES, 10);

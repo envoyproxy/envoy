@@ -87,7 +87,7 @@ FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   if (state_ != State::Calling) {
     return FilterDataStatus::Continue;
   }
-  // The fault filter mimizes buffering even more aggressively than configured, to avoid
+  // The fault filter minimizes buffering even more aggressively than configured, to avoid
   // accumulating data for rate limited requests.
   if (limiting_buffers_ && !high_watermark_called_) {
     high_watermark_called_ = true;

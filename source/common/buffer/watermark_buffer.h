@@ -54,7 +54,7 @@ public:
   void postProcess() override { checkLowWatermark(); }
 
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
-  uint32_t high_watermark() const { return high_watermark_; }
+  uint32_t highWatermark() const { return high_watermark_; }
 
 private:
   void checkHighWatermark();
