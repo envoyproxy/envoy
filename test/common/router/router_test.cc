@@ -55,6 +55,7 @@ public:
                 ShadowWriterPtr{shadow_writer_}, true),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
+
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
   }
@@ -113,7 +114,8 @@ TEST_F(RouterTest, ClusterNotFound) {
 }
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
-  callbacks_.route_->route_entry_.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
+  ON_CALL(callbacks_.route_->route_entry_, priority())
+      .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, &router_));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -1141,46 +1143,73 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   router_.decodeHeaders(incoming_headers, true);
 }
 
-TEST_F(RouterTest, Watermarks) {
-  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
-      .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+class WatermarkTest : public RouterTest {
+public:
+  void sendRequest() {
+    EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+        .WillOnce(Return(std::chrono::milliseconds(0)));
+    EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
-  NiceMock<Http::MockStreamEncoder> encoder;
-  NiceMock<Http::MockStream> stream;
-  Http::StreamCallbacks* stream_callbacks;
-  EXPECT_CALL(stream, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
-    stream_callbacks = &callbacks;
-  }));
-  EXPECT_CALL(encoder, getStream()).WillOnce(ReturnRef(stream));
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
-        return nullptr;
-      }));
+    EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
+      stream_callbacks_ = &callbacks;
+    }));
+    EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+        .WillOnce(Invoke(
+            [&](Http::StreamDecoder& decoder,
+                Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+              response_decoder_ = &decoder;
+              callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_);
+              return nullptr;
+            }));
+    HttpTestUtility::addDefaultHeaders(headers_);
+    router_.decodeHeaders(headers_, true);
+  }
+  void sendResponse() {
+    response_decoder_->decodeHeaders(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}, true);
+  }
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
-                                  {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  NiceMock<Http::MockStreamEncoder> encoder_;
+  NiceMock<Http::MockStream> stream_;
+  Http::StreamCallbacks* stream_callbacks_;
+  Http::StreamDecoder* response_decoder_ = nullptr;
+  Http::TestHeaderMapImpl headers_;
+};
 
-  stream_callbacks->onAboveWriteBufferHighWatermark();
+TEST_F(WatermarkTest, DownstreamWatermarks) {
+  sendRequest();
+
+  stream_callbacks_->onAboveWriteBufferHighWatermark();
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_backed_up_total")
                     .value());
-  stream_callbacks->onBelowWriteBufferLowWatermark();
+  stream_callbacks_->onBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_drained_total")
                     .value());
 
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"},
-                                  {"x-envoy-upstream-canary", "false"},
-                                  {"x-envoy-virtual-cluster", "hello"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
+  sendResponse();
+}
+
+TEST_F(WatermarkTest, UpstreamWatermarks) {
+  sendRequest();
+
+  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(stream_, readDisable(_));
+  router_.onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
+
+  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(stream_, readDisable(_));
+  router_.onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
+
+  sendResponse();
 }
 
 } // namespace Router

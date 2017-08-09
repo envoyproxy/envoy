@@ -38,21 +38,6 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
-TEST(UtilityTest, LocalInfoToNode) {
-  LocalInfo::MockLocalInfo local_info;
-  std::string foo_id("foo_id");
-  EXPECT_CALL(local_info, nodeName()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(foo_id));
-  std::string foo_zone("foo_zone");
-  EXPECT_CALL(local_info, zoneName()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(foo_zone));
-  std::string foo_cluster("foo_cluster");
-  EXPECT_CALL(local_info, clusterName()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(foo_cluster));
-  envoy::api::v2::Node node;
-  Utility::localInfoToNode(local_info, node);
-  EXPECT_EQ("foo_id", node.id());
-  EXPECT_EQ("foo_zone", node.locality().zone());
-  EXPECT_EQ("foo_cluster", node.metadata().fields().find("cluster")->second.string_value());
-}
-
 TEST(UtilityTest, SdsConfigToEdsConfig) {
   Upstream::SdsConfig sds_config{"sds", std::chrono::milliseconds(30000)};
   envoy::api::v2::ConfigSource config;

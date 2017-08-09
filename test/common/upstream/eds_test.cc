@@ -42,7 +42,7 @@ protected:
   envoy::api::v2::Cluster eds_cluster_;
   MockClusterManager cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::unique_ptr<EdsClusterImpl> cluster_;
+  std::shared_ptr<EdsClusterImpl> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

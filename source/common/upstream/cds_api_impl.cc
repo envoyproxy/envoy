@@ -22,10 +22,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Store& store)
     : cm_(cm), scope_(store.createScope("cluster_manager.cds.")) {
-  Config::Utility::localInfoToNode(local_info, node_);
+  Config::Utility::checkLocalInfo("cds", local_info);
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
-          cds_config, node_, dispatcher, cm, random, *scope_,
+          cds_config, local_info.node(), dispatcher, cm, random, *scope_,
           [this, &cds_config, &sds_config, &cm, &dispatcher, &random,
            &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
             return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,

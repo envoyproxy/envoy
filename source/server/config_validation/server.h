@@ -29,8 +29,8 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(Options& options, ComponentFactory& component_factory,
-                    const LocalInfo::LocalInfo& local_info);
+bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                    ComponentFactory& component_factory);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -49,9 +49,9 @@ class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public ListenerComponentFactory,
                            public WorkerFactory {
 public:
-  ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
-                     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-                     const LocalInfo::LocalInfo& local_info);
+  ValidationInstance(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                     Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
+                     ComponentFactory& component_factory);
 
   // Server::Instance
   Admin& admin() override { NOT_IMPLEMENTED; }
@@ -76,6 +76,7 @@ public:
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   void shutdownAdmin() override { NOT_IMPLEMENTED; }
+  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED; }
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED; }
@@ -83,7 +84,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
@@ -108,19 +109,21 @@ public:
   }
 
 private:
-  void initialize(Options& options, ComponentFactory& component_factory);
+  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
 
   Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{new Network::ValidationDnsResolver};
-  const LocalInfo::LocalInfo& local_info_;
+  LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;

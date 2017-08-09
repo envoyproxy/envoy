@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "common/singleton/manager_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -20,6 +22,9 @@ MockOptions::MockOptions(const std::string& config_path, const std::string& boot
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, bootstrapPath()).WillByDefault(ReturnRef(bootstrap_path_));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
+  ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
+  ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
+  ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
 }
 MockOptions::~MockOptions() {}
 
@@ -77,7 +82,8 @@ MockWorker::MockWorker() {
 }
 MockWorker::~MockWorker() {}
 
-MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
+MockInstance::MockInstance()
+    : ssl_context_manager_(runtime_loader_), singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
@@ -96,6 +102,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
+  ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
 }
 
 MockInstance::~MockInstance() {}
@@ -110,7 +117,7 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
-MockFactoryContext::MockFactoryContext() {
+MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -122,6 +129,7 @@ MockFactoryContext::MockFactoryContext() {
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, server()).WillByDefault(ReturnRef(server_));
+  ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
 }
 

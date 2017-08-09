@@ -42,12 +42,13 @@ TEST(UUIDUtilsTest, checkDistribution) {
   const int required_percentage = 11;
   int total_samples = 0;
   int interesting_samples = 0;
-  // For some reason, ASAN/UBSAN seems to run very slowly unless this is defined outside the loop
-  // condition.
-  const int iters = 500000;
 
-  for (int i = 0; i < iters; ++i) {
+  for (int i = 0; i < 500000; ++i) {
     std::string uuid = random.uuid();
+
+    const char c = uuid[19];
+    ASSERT_TRUE(uuid[14] == '4');                              // UUID version 4 (random)
+    ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
 
     uint16_t value;
     ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
@@ -59,6 +60,14 @@ TEST(UUIDUtilsTest, checkDistribution) {
   }
 
   EXPECT_NEAR(required_percentage / 100.0, interesting_samples * 1.0 / total_samples, 0.002);
+}
+
+TEST(UUIDUtilsTest, DISABLED_benchmark) {
+  Runtime::RandomGeneratorImpl random;
+
+  for (int i = 0; i < 500000; ++i) {
+    random.uuid();
+  }
 }
 
 TEST(UUIDUtilsTest, setAndCheckTraceable) {

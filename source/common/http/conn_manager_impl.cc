@@ -10,6 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/stats.h"
 #include "envoy/tracing/http_tracer.h"
@@ -51,11 +52,12 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
-                                             const LocalInfo::LocalInfo& local_info)
+                                             const LocalInfo::LocalInfo& local_info,
+                                             Upstream::ClusterManager& cluster_manager)
     : config_(config), stats_(config_.stats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
-      runtime_(runtime), local_info_(local_info) {}
+      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -91,7 +93,11 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
     } else {
-      stats_.named_.downstream_cx_http1_active_.dec();
+      if (isWebSocketConnection()) {
+        stats_.named_.downstream_cx_websocket_active_.dec();
+      } else {
+        stats_.named_.downstream_cx_http1_active_.dec();
+      }
     }
   }
 
@@ -172,6 +178,15 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
+  // Send the data through WebSocket handlers if this connection is a
+  // WebSocket connection.  N.B. The first request from the client to Envoy
+  // will still be processed as a normal HTTP/1.1 request, where Envoy will
+  // detect the WebSocket upgrade and establish a connection to the
+  // upstream.
+  if (isWebSocketConnection()) {
+    return ws_connection_->onData(data);
+  }
+
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
     if (codec_->protocol() == Protocol::Http2) {
@@ -208,15 +223,17 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     checkForDeferredClose();
 
     // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
-    // either redispatch if there are no streams and we have more data, or if we have a single
-    // complete stream but have not responded yet we will pause socket reads to apply back pressure.
+    // either redispatch if there are no streams and we have more data. If we have a single
+    // complete non-WebSocket stream but have not responded yet we will pause socket reads
+    // to apply back pressure.
     if (codec_->protocol() != Protocol::Http2) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
       }
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
+      if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
+          !isWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
     }
@@ -469,6 +486,44 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_);
+
+  ASSERT(!cached_route_.valid());
+  cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
+
+  // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
+  // TODO if there are no filters when starting a filter iteration, the connection manager
+  // should return 404. The current returns no response if there is no router filter.
+  if ((protocol == Protocol::Http11) && cached_route_.value()) {
+    const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+    const bool websocket_required = (route_entry != nullptr) && route_entry->useWebSocket();
+    const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
+
+    if (websocket_requested || websocket_required) {
+      if (websocket_requested && websocket_required) {
+        ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
+
+        connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
+            *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_,
+            connection_manager_.read_callbacks_));
+        connection_manager_.ws_connection_->onNewConnection();
+        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+        connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
+        connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+      } else if (websocket_requested) {
+        // Do not allow WebSocket upgrades if the route does not support it.
+        connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
+        encodeHeaders(nullptr, headers, true);
+      } else {
+        // Do not allow normal connections on WebSocket routes.
+        connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
+        HeaderMapImpl headers{
+            {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
+        encodeHeaders(nullptr, headers, true);
+      }
+      return;
+    }
+  }
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
@@ -827,6 +882,16 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
   connection_manager_.doDeferredStreamDestroy(*this);
 }
 
+void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to downstream stream watermark.", *this);
+  callHighWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to downstream stream watermark.", *this);
+  callLowWatermarkCallbacks();
+}
+
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
@@ -834,6 +899,18 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
 const std::vector<Http::LowerCaseString>&
 ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
   return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+}
+
+void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
+  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
+    callbacks->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
+  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
+    callbacks->onBelowWriteBufferLowWatermark();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
@@ -958,11 +1035,6 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.valid()) {
-    parent_.cached_route_.value(
-        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));
-  }
-
   return parent_.cached_route_.value();
 }
 
@@ -1004,6 +1076,18 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
   return parent_.addEncodedData(*this, data);
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_);
+  parent_.callHighWatermarkCallbacks();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_);
+  parent_.callLowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }

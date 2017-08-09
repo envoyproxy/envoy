@@ -110,10 +110,12 @@ envoy_cc_test(
     srcs = ["server_test.cc"],
     data = [
         ":empty_bootstrap.json",
+        ":node_bootstrap.json",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
     deps = [
+        "//source/common/common:version_lib",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",

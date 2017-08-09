@@ -83,7 +83,7 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, bool canary, uint32_t initial_weight,
            const std::string& zone)
-      : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
+      : HostDescriptionImpl(cluster, hostname, address, canary, zone), used_(true) {
     weight(initial_weight);
   }
 
@@ -100,6 +100,8 @@ public:
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
+  bool used() const override { return used_; }
+  void used(bool new_used) override { used_ = new_used; }
 
 protected:
   static Network::ClientConnectionPtr
@@ -109,6 +111,7 @@ protected:
 private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  std::atomic<bool> used_;
 };
 
 typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;
@@ -236,13 +239,14 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                           Stats::Store& stats, ThreadLocal::Instance& tls,
-                           Network::DnsResolverSharedPtr dns_resolver,
-                           Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                           const LocalInfo::LocalInfo& local_info,
-                           Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+  static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                 Stats::Store& stats, ThreadLocal::Instance& tls,
+                                 Network::DnsResolverSharedPtr dns_resolver,
+                                 Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 const LocalInfo::LocalInfo& local_info,
+                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                 bool added_via_api);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster

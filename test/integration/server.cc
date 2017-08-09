@@ -75,18 +75,16 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
-  Server::TestOptionsImpl options(config_path_, bootstrap_path_);
+  Server::TestOptionsImpl options(config_path_, bootstrap_path_, version);
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
-  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
-                                      "cluster_name", "node_name");
 
   ThreadLocal::InstanceImpl tls;
   Stats::HeapRawStatDataAllocator stats_allocator;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
   stat_store_ = &stats_store;
-  server_.reset(new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this,
-                                         local_info, tls));
+  server_.reset(new Server::InstanceImpl(options, Network::Utility::getLocalAddress(version), *this,
+                                         restarter, stats_store, lock, *this, tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   server_set_.setReady();

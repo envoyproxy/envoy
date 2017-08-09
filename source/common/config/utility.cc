@@ -40,14 +40,6 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   }
 }
 
-void Utility::localInfoToNode(const LocalInfo::LocalInfo& local_info, envoy::api::v2::Node& node) {
-  checkLocalInfo("envoy::api::v2::Node", local_info);
-  node.set_id(local_info.nodeName());
-  node.mutable_locality()->set_zone(local_info.zoneName());
-  (*node.mutable_metadata()->mutable_fields())["cluster"].set_string_value(
-      local_info.clusterName());
-}
-
 std::chrono::milliseconds
 Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source) {
   return std::chrono::milliseconds(

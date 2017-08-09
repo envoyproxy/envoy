@@ -75,6 +75,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
       auto_host_rewrite_(route.getBoolean("auto_host_rewrite", false)),
+      use_websocket_(route.getBoolean("use_websocket", false)),
       cluster_name_(route.getString("cluster", "")),
       cluster_header_name_(route.getString("cluster_header", "")),
       timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
@@ -99,6 +100,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ have_cluster)) {
     throw EnvoyException("routes must be either redirects or cluster targets");
+  }
+
+  // WebSockets are not allowed in redirect route entries.
+  if (isRedirect() && use_websocket_) {
+    throw EnvoyException("Redirect route entries must not have WebSockets enabled");
   }
 
   if (have_cluster) {
@@ -482,7 +488,6 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 
   pattern_ = std::regex{virtual_cluster.getString("pattern"), std::regex::optimize};
   name_ = virtual_cluster.getString("name");
-  priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
@@ -564,6 +569,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
     return default_virtual_host_.get();
   }
 
+  // TODO (@rshriram) Match Origin header in WebSocket
+  // request with VHost, using wildcard match
   const char* host = headers.Host()->value().c_str();
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {

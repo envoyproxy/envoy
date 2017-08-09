@@ -29,6 +29,7 @@ public:
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> hashKey() const override { return hash_key_; }
+  const Network::Connection* downstreamConnection() const override { return nullptr; }
 
   Optional<uint64_t> hash_key_;
 };

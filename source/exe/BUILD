@@ -24,7 +24,6 @@ envoy_cc_library(
     name = "envoy_common_lib",
     deps = [
         "//source/common/event:libevent_lib",
-        "//source/common/local_info:local_info_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:thread_local_store_lib",

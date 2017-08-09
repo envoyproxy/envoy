@@ -27,8 +27,11 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path, const std::string& bootstrap_path)
-      : config_path_(config_path), bootstrap_path_(bootstrap_path) {}
+  TestOptionsImpl(const std::string& config_path, const std::string& bootstrap_path,
+                  Network::Address::IpVersion ip_version)
+      : config_path_(config_path), bootstrap_path_(bootstrap_path),
+        local_address_ip_version_(ip_version), service_cluster_name_("cluster_name"),
+        service_node_name_("node_name"), service_zone_("zone_name") {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
@@ -45,12 +48,18 @@ public:
     return std::chrono::milliseconds(10000);
   }
   Mode mode() const override { return Mode::Serve; }
+  const std::string& serviceClusterName() override { return service_cluster_name_; }
+  const std::string& serviceNodeName() override { return service_node_name_; }
+  const std::string& serviceZone() override { return service_zone_; }
 
 private:
   const std::string config_path_;
   const std::string bootstrap_path_;
   const std::string admin_address_path_;
-  Network::Address::IpVersion local_address_ip_version_;
+  const Network::Address::IpVersion local_address_ip_version_;
+  const std::string service_cluster_name_;
+  const std::string service_node_name_;
+  const std::string service_zone_;
 };
 
 class TestDrainManager : public DrainManager {
