@@ -15,7 +15,7 @@
   additional error handing that cannot possibly happen in the case an exception is thrown.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
-* Function names using camel case starting with a lower case letter (e.g., `doFoo()`).
+* Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
 * Struct/Class member variables have a `_` postfix (e.g., `int foo_;`).
 * Enum values using PascalCase (e.g., `RoundRobin`).
 * 100 columns is the line limit.
