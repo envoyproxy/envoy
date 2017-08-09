@@ -319,6 +319,59 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   EXPECT_EQ(1UL, headers.size());
 }
 
+struct AddAHeaderResult_t {
+  const HeaderString& val;
+  const void* keyPtr;
+};
+
+const AddAHeaderResult_t addAHeader(HeaderMapImpl& headers) {
+  LowerCaseString lcKey("hello");
+
+  headers.addCopy(lcKey, "world");
+
+  AddAHeaderResult_t result{
+    headers.get(lcKey)->value(),
+    static_cast<const void*>(lcKey.get().data())
+  };
+
+  // This is... not exactly legal, but let's do it anyway. It should
+  // safe, since lcKey is still in scope here.
+  memcpy(const_cast<void*>(result.keyPtr), static_cast<const void*>("XXXXX"), 5);
+
+  // Make sure our brutality worked.
+  EXPECT_STREQ("XXXXX", lcKey.get().c_str()); 
+
+  return result;
+}
+
+TEST(HeaderMapImplTest, AddCopy) {
+  HeaderMapImpl headers;
+
+  AddAHeaderResult_t v1 = addAHeader(headers);
+
+  EXPECT_STREQ("world", v1.val.c_str());
+  EXPECT_EQ(5UL, v1.val.size());
+  EXPECT_EQ(1UL, headers.size());
+
+  // The LowerCaseString "hello" we used in addAHeader should be out of
+  // scope and thus destroyed by now. Build up another string with the same
+  // value (deliberately use concatenation to try to prevent issues with the
+  // compiler being too clever with string constants)...
+
+  std::string hrm("he");
+
+  LowerCaseString lcKey2(hrm + "llo");  // Try to force the compiler's hand here.
+
+  // ...and try making sure that that did what we want. It has the string value
+  // "hello", but it's not at the same address as our previous "hello".
+
+  EXPECT_STREQ("hello", lcKey2.get().c_str());
+  EXPECT_NE(v1.keyPtr, static_cast<const void*>(lcKey2.get().data()));
+
+  EXPECT_STREQ("world", headers.get(lcKey2)->value().c_str());
+  EXPECT_EQ(5UL, headers.get(lcKey2)->value().size());
+}
+
 TEST(HeaderMapImplTest, Equality) {
   TestHeaderMapImpl headers1;
   TestHeaderMapImpl headers2;
