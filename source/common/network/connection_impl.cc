@@ -283,7 +283,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
-    if (!(state_ & (InternalState::Connecting | InternalState::Unconnected))) {
+    if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -397,7 +397,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 }
 
 void ConnectionImpl::onReadReady() {
-  ASSERT(!(state_ & (InternalState::Connecting | InternalState::Unconnected)));
+  ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();
   uint64_t new_buffer_size = read_buffer_->length();
@@ -486,17 +486,16 @@ void ConnectionImpl::doConnect() {
   int rc = remote_address_->connect(fd_);
   if (rc == 0) {
     // write will become ready.
-    state_ |= InternalState::Connecting;
-    state_ &= ~InternalState::Unconnected;
+    ASSERT(state_ & InternalState::Connecting);
   } else {
     ASSERT(rc == -1);
     if (errno == EINPROGRESS) {
-      state_ |= InternalState::Connecting;
-      state_ &= ~InternalState::Unconnected;
+      ASSERT(state_ & InternalState::Connecting);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
       state_ |= InternalState::ImmediateConnectionError;
+      state_ &= ~InternalState::Connecting;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
@@ -531,7 +530,7 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
                      getNullLocalAddress(*address), false) {
-  markUnconnected();
+  markConnecting();
 }
 
 } // namespace Network

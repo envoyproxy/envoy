@@ -295,7 +295,7 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Co
                                            Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
                      getNullLocalAddress(*address), false, ctx, InitialState::Client) {
-  markUnconnected();
+  markConnecting();
 }
 
 void ClientConnectionImpl::connect() { doConnect(); }
