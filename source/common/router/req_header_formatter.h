@@ -44,7 +44,8 @@ private:
  */
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
-  PlainHeaderFormatter(const std::string& static_header_value): static_value_(static_header_value) {};
+  PlainHeaderFormatter(const std::string& static_header_value)
+      : static_value_(static_header_value){};
 
   // HeaderFormatter::format
   const std::string format(const Envoy::Http::AccessLog::RequestInfo&) const override {
@@ -71,7 +72,7 @@ public:
       Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
       const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
 
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>&
+  const std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>&
   headerFormatterMap() {
     return header_formatter_map_;
   };

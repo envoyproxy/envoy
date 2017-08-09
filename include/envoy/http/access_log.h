@@ -116,7 +116,7 @@ public:
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * Get the down stream address.
+   * Get the downstream address.
    */
   virtual const std::string& getDownstreamAddress() const PURE;
 };

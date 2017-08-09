@@ -47,7 +47,7 @@ struct RequestInfoImpl : public RequestInfo {
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   /**
-   * Get the down stream address.
+   * Get the downstream address.
    */
   const std::string& getDownstreamAddress() const override { return downstream_address_; };
 

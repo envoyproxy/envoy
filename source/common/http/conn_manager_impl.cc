@@ -507,8 +507,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
         connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-            *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_,
-            connection_manager_.read_callbacks_));
+            *request_headers_, request_info_, *route_entry, *this,
+            connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
         connection_manager_.ws_connection_->onNewConnection();
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
         connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();

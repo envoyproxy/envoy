@@ -676,7 +676,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
       .WillByDefault(Return(true));
 
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
-              finalizeRequestHeaders(_));
+              finalizeRequestHeaders(_, _));
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
       .WillOnce(Return(false));
   // TODO (rshriram) figure out how to test the auto host rewrite. Need handle over headers.
