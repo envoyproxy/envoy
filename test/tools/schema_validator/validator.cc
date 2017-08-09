@@ -52,9 +52,10 @@ void Validator::validate(const std::string& json_path, Schema::Type schema_type)
   case Schema::Type::Route: {
     Runtime::MockLoader runtime;
     Upstream::MockClusterManager cm;
-    // Construct a Router::ConfigImpl to validate the Route configuration and ignore the
-    // output since nothing will consume it.
-    UNREFERENCED_PARAMETER(Router::ConfigImpl(*loader, runtime, cm, false));
+    // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and ignore
+    // the output since nothing will consume it.
+    envoy::api::v2::RouteConfiguration route_config;
+    Config::RdsJson::translateRouteConfiguration(*loader, route_config);
     break;
   }
   default:

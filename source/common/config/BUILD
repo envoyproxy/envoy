@@ -21,6 +21,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "base_json_lib",
+    srcs = ["base_json.cc"],
+    hdrs = ["base_json.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        "//include/envoy/json:json_object_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_json_lib",
     srcs = ["cds_json.cc"],
     hdrs = ["cds_json.h"],
@@ -123,7 +133,9 @@ envoy_cc_library(
     hdrs = ["rds_json.h"],
     external_deps = ["envoy_rds"],
     deps = [
+        ":base_json_lib",
         ":json_utility_lib",
+        ":metadata_lib",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",

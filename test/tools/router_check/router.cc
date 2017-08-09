@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/config/rds_json.h"
+
 #include "test/test_common/printers.h"
 
 namespace Envoy {
@@ -40,12 +42,14 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
-  loader->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+  envoy::api::v2::RouteConfiguration route_config;
+  Config::RdsJson::translateRouteConfiguration(*loader, route_config);
 
   std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
   std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
       new NiceMock<Upstream::MockClusterManager>());
-  std::unique_ptr<Router::ConfigImpl> config(new Router::ConfigImpl(*loader, *runtime, *cm, false));
+  std::unique_ptr<Router::ConfigImpl> config(
+      new Router::ConfigImpl(route_config, *runtime, *cm, false));
 
   return RouterCheckTool(std::move(runtime), std::move(cm), std::move(config));
 }

@@ -9,16 +9,6 @@
 namespace Envoy {
 namespace Router {
 
-Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& config) {
-  std::string priority_string = config.getString("priority", "default");
-  if (priority_string == "default") {
-    return Upstream::ResourcePriority::Default;
-  } else {
-    ASSERT(priority_string == "high");
-    return Upstream::ResourcePriority::High;
-  }
-}
-
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::api::v2::RoutingPriority& priority) {
   switch (priority) {
