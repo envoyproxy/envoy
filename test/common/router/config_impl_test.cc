@@ -518,7 +518,7 @@ TEST(RouteMatcherTest, Priority) {
         }
       ],
       "virtual_clusters": [
-        {"pattern": "^/bar$", "method": "POST", "name": "foo", "priority": "high"}]
+        {"pattern": "^/bar$", "method": "POST", "name": "foo"}]
     }
   ]
 }
@@ -535,18 +535,6 @@ TEST(RouteMatcherTest, Priority) {
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->priority());
   EXPECT_EQ(Upstream::ResourcePriority::Default,
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->priority());
-
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "POST");
-    EXPECT_EQ(Upstream::ResourcePriority::High,
-              config.route(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
-  }
-
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
-    EXPECT_EQ(Upstream::ResourcePriority::Default,
-              config.route(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
-  }
 }
 
 TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
@@ -562,6 +550,31 @@ TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
           "cluster": "local_service",
           "host_rewrite": "foo",
           "auto_host_rewrite" : true
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
+}
+
+TEST(RouteMatcherTest, NoRedirectAndWebSocket) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "host_redirect": "new.lyft.com",
+          "use_websocket": true
         }
       ]
     }
@@ -1573,6 +1586,7 @@ TEST(RouteMatcherTest, WeightedClusters) {
     EXPECT_EQ(nullptr, route->hashPolicy());
     EXPECT_TRUE(route->opaqueConfig().empty());
     EXPECT_FALSE(route->autoHostRewrite());
+    EXPECT_FALSE(route->useWebSocket());
     EXPECT_TRUE(route->includeVirtualHostRateLimits());
   }
 

@@ -257,6 +257,25 @@ public:
 };
 
 /**
+ * Callbacks for downstream connection watermark limits.
+ */
+class DownstreamWatermarkCallbacks {
+public:
+  virtual ~DownstreamWatermarkCallbacks() {}
+
+  /**
+   * Called when the downstream connection or stream goes over its high watermark.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the downstream connection or stream goes from over its high watermark to under its
+   * low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
  * Callbacks for server connections.
  */
 class ServerConnectionCallbacks : public virtual ConnectionCallbacks {

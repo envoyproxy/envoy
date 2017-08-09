@@ -2,6 +2,7 @@
 
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/manager_impl.h"
 
 #include "server/configuration_impl.h"
 
@@ -33,7 +34,7 @@ ValidationInstance::ValidationInstance(Options& options,
                                        ComponentFactory& component_factory)
     : options_(options), stats_store_(store),
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
-      dispatcher_(api_->allocateDispatcher()),
+      dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
       listener_manager_(*this, *this, *this) {
   try {

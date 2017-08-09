@@ -64,19 +64,21 @@ public:
                    ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
                    const Network::ListenerOptions& listener_options)
       : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, listener_options) {
-    ON_CALL(*this, newConnection(_, _, _))
-        .WillByDefault(Invoke([this](int fd, Address::InstanceConstSharedPtr remote_address,
-                                     Address::InstanceConstSharedPtr local_address) -> void {
-          ListenerImpl::newConnection(fd, remote_address, local_address);
-        }
+    ON_CALL(*this, newConnection(_, _, _, _))
+        .WillByDefault(Invoke(
+            [this](int fd, Address::InstanceConstSharedPtr remote_address,
+                   Address::InstanceConstSharedPtr local_address, bool using_original_dst) -> void {
+              ListenerImpl::newConnection(fd, remote_address, local_address, using_original_dst);
+            }
 
-                              ));
+            ));
   }
 
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
   MOCK_METHOD1(getOriginalDst, Address::InstanceConstSharedPtr(int fd));
-  MOCK_METHOD3(newConnection, void(int fd, Address::InstanceConstSharedPtr remote_address,
-                                   Address::InstanceConstSharedPtr local_address));
+  MOCK_METHOD4(newConnection,
+               void(int fd, Address::InstanceConstSharedPtr remote_address,
+                    Address::InstanceConstSharedPtr local_address, bool using_original_dst));
 };
 
 class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -120,8 +122,8 @@ TEST_P(ListenerImplTest, NormalRedirect) {
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillOnce(Return(&listenerDst));
 
-  EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
-  EXPECT_CALL(listenerDst, newConnection(_, _, _));
+  EXPECT_CALL(listener, newConnection(_, _, _, _)).Times(0);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(*alt_address_, conn->localAddress());
@@ -161,8 +163,8 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillOnce(Return(&listenerDst));
 
-  EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
-  EXPECT_CALL(listenerDst, newConnection(_, _, _));
+  EXPECT_CALL(listener, newConnection(_, _, _, _)).Times(0);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(*alt_address_, conn->localAddress());
@@ -200,7 +202,7 @@ TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillOnce(Return(&listener));
 
-  EXPECT_CALL(listener, newConnection(_, _, _));
+  EXPECT_CALL(listener, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress(), *alt_address_);
@@ -237,7 +239,7 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
   EXPECT_CALL(listener, getOriginalDst(_)).WillOnce(Return(local_dst_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
 
-  EXPECT_CALL(listener, newConnection(_, _, _));
+  EXPECT_CALL(listener, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress(), *local_dst_address);
@@ -276,8 +278,8 @@ TEST_P(ListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener, getOriginalDst(_)).Times(0);
   EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
 
-  EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
-  EXPECT_CALL(listenerDst, newConnection(_, _, _)).Times(0);
+  EXPECT_CALL(listener, newConnection(_, _, _, _)).Times(1);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _, _)).Times(0);
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress(), *socket.localAddress());
@@ -313,7 +315,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   EXPECT_CALL(listener, getOriginalDst(_)).Times(0);
   EXPECT_CALL(connection_handler, findListenerByAddress(_)).Times(0);
 
-  EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
+  EXPECT_CALL(listener, newConnection(_, _, _, _)).Times(1);
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress(), *local_dst_address);

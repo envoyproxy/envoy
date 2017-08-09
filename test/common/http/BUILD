@@ -94,6 +94,8 @@ envoy_cc_test(
         "//source/common/http/access_log:access_log_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/buffer:buffer_mocks",

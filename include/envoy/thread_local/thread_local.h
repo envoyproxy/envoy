@@ -35,8 +35,8 @@ public:
 
   /**
    * This is a helper on top of get() that casts the object stored in the slot to the specified
-   * type. No type information is specified explicitly in code so dynamic_cast provides some level
-   * of protection via RTTI.
+   * type. Since the slot only stores pointers to the base interface, dynamic_cast provides some
+   * level of protection via RTTI.
    */
   template <class T> T& getTyped() { return *std::dynamic_pointer_cast<T>(get()); }
 

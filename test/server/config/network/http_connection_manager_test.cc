@@ -1,4 +1,5 @@
 #include "common/buffer/buffer_impl.h"
+#include "common/http/date_provider_impl.h"
 
 #include "server/config/network/http_connection_manager.h"
 
@@ -17,8 +18,14 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-TEST(HttpConnectionManagerConfigTest, InvalidFilterName) {
-  std::string json_string = R"EOF(
+class HttpConnectionManagerConfigTest : public testing::Test {
+public:
+  NiceMock<MockFactoryContext> context_;
+  Http::SlowDateProviderImpl date_provider_;
+};
+
+TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
+  const std::string json_string = R"EOF(
   {
     "codec_type": "http1",
     "stat_prefix": "router",
@@ -45,13 +52,13 @@ TEST(HttpConnectionManagerConfigTest, InvalidFilterName) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context_, date_provider_),
+                            EnvoyException,
                             "unable to create http filter factory for 'foo'/'encoder'");
 }
 
-TEST(HttpConnectionManagerConfigTest, InvalidFilterType) {
-  std::string json_string = R"EOF(
+TEST_F(HttpConnectionManagerConfigTest, InvalidFilterType) {
+  const std::string json_string = R"EOF(
   {
     "codec_type": "http1",
     "stat_prefix": "router",
@@ -78,13 +85,13 @@ TEST(HttpConnectionManagerConfigTest, InvalidFilterType) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(*json_config, context_, date_provider_),
+                            EnvoyException,
                             "unable to create http filter factory for 'router'/'encoder'");
 }
 
-TEST(HttpConnectionManagerConfigTest, MiscConfig) {
-  std::string json_string = R"EOF(
+TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
+  const std::string json_string = R"EOF(
   {
     "codec_type": "http1",
     "stat_prefix": "router",
@@ -114,11 +121,44 @@ TEST(HttpConnectionManagerConfigTest, MiscConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  HttpConnectionManagerConfig config(*json_config, context);
+  HttpConnectionManagerConfig config(*json_config, context_, date_provider_);
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
-  EXPECT_EQ(*context.local_info_.address_, config.localAddress());
+  EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
+  const std::string json_string = R"EOF(
+  {
+    "codec_type": "http1",
+    "stat_prefix": "router",
+    "route_config":
+    {
+      "virtual_hosts": [
+        {
+          "name": "service",
+          "domains": [ "*" ],
+          "routes": [
+            {
+              "prefix": "/",
+              "cluster": "cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters": [
+      { "type": "both", "name": "http_dynamo_filter", "config": {} }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  // We expect a single slot allocation vs. multiple.
+  EXPECT_CALL(context_.thread_local_, allocateSlot());
+  NetworkFilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
+  NetworkFilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
 }
 
 TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
