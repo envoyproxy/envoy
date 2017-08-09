@@ -10,8 +10,7 @@ namespace Config {
 
 void RdsJson::translateWeightedCluster(const Json::Object& json_weighted_clusters,
                                        envoy::api::v2::WeightedCluster& weighted_cluster) {
-  weighted_cluster.set_runtime_key_prefix(
-      json_weighted_clusters.getString("runtime_key_prefix", ""));
+  JSON_UTIL_SET_STRING(json_weighted_clusters, weighted_cluster, runtime_key_prefix);
   const auto clusters = json_weighted_clusters.getObjectArray("clusters");
   std::transform(clusters.cbegin(), clusters.cend(),
                  Protobuf::RepeatedPtrFieldBackInserter(weighted_cluster.mutable_clusters()),
