@@ -44,8 +44,8 @@ public:
 
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
-    rds_ = RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                           local_info_, store_, "foo.", tls_, init_manager_);
+    rds_ = RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.", init_manager_,
+                                           route_config_provider_manager_);
     expectRequest();
     init_manager_.initialize();
   }
@@ -75,7 +75,9 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
-  RouteConfigProviderPtr rds_;
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
+                                                                local_info_, tls_};
+  RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
 };
@@ -89,8 +91,8 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                               local_info_, store_, "foo.", tls_, init_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -108,8 +110,8 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
   interval_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                               local_info_, store_, "foo.", tls_, init_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -126,8 +128,8 @@ TEST_F(RdsImplTest, UnknownCluster) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   ON_CALL(cm_, get("foo_cluster")).WillByDefault(Return(nullptr));
   interval_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                               local_info_, store_, "foo.", tls_, init_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
+                                               init_manager_, route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -274,6 +276,83 @@ TEST_F(RdsImplTest, FailureArray) {
 
   EXPECT_EQ(1UL, store_.counter("foo.rds.update_attempt").value());
   EXPECT_EQ(1UL, store_.counter("foo.rds.update_failure").value());
+}
+
+class RouteConfigProviderManagerImplTest : public testing::Test {
+public:
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  Event::MockDispatcher dispatcher_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Stats::IsolatedStoreImpl store_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Init::MockManager> init_manager_;
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
+                                                                local_info_, tls_};
+};
+
+TEST_F(RouteConfigProviderManagerImplTest, Basic) {
+  init_manager_.initialize();
+
+  std::string config_json = R"EOF(
+    {
+      "cluster": "foo_cluster",
+      "route_config_name": "foo_route_config",
+      "refresh_delay_ms": 1000
+    }
+    )EOF";
+
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
+      *config, cm_, store_, "foo_prefix", init_manager_);
+  // Because this get has the same cluster and route_config_name, the provider returned is just a
+  // shared_ptr to the same provider as the one above.
+  RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_.getRouteConfigProvider(
+      *config, cm_, store_, "foo_prefix", init_manager_);
+  // So this means that both shared_ptrs should be the same.
+  EXPECT_EQ(provider, provider2);
+  EXPECT_EQ(2UL, provider.use_count());
+
+  std::string config_json2 = R"EOF(
+    {
+      "cluster": "bar_cluster",
+      "route_config_name": "foo_route_config",
+      "refresh_delay_ms": 1000
+    }
+    )EOF";
+
+  Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
+
+  RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
+      *config2, cm_, store_, "foo_prefix", init_manager_);
+  EXPECT_NE(provider3, provider);
+  EXPECT_EQ(2UL, provider.use_count());
+  EXPECT_EQ(1UL, provider3.use_count());
+
+  std::vector<RouteConfigProviderSharedPtr> configured_providers =
+      route_config_provider_manager_.routeConfigProviders();
+  EXPECT_EQ(2UL, configured_providers.size());
+  EXPECT_EQ(3UL, provider.use_count());
+  EXPECT_EQ(2UL, provider3.use_count());
+
+  provider.reset();
+  provider2.reset();
+  configured_providers.clear();
+
+  // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
+  // now we should only have the provider pointed at by provider3.
+  configured_providers = route_config_provider_manager_.routeConfigProviders();
+  EXPECT_EQ(1UL, configured_providers.size());
+  EXPECT_EQ(provider3, configured_providers.front());
+
+  provider3.reset();
+  configured_providers.clear();
+
+  configured_providers = route_config_provider_manager_.routeConfigProviders();
+  EXPECT_EQ(0UL, configured_providers.size());
 }
 
 } // namespace Router

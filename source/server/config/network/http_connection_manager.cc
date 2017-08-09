@@ -98,9 +98,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       date_provider_(date_provider) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
-      config, context_.runtime(), context_.clusterManager(), context_.dispatcher(),
-      context_.random(), context_.localInfo(), context_.scope(), stats_prefix_,
-      context_.threadLocal(), context_.initManager());
+      config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
+      context_.initManager(), context_.routeConfigProviderManager());
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");
