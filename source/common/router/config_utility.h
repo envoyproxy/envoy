@@ -8,9 +8,11 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/empty_string.h"
+#include "common/config/rds_json.h"
 #include "common/http/headers.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_validator.h"
+#include "common/protobuf/utility.h"
+
+#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -20,15 +22,20 @@ namespace Router {
  */
 class ConfigUtility {
 public:
-  struct HeaderData : Json::Validator {
+  struct HeaderData {
     // An empty header value allows for matching to be only based on header presence.
     // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
     // exact string matching.
-    HeaderData(const Json::Object& config)
-        : Json::Validator(config, Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA),
-          name_(config.getString("name")), value_(config.getString("value", EMPTY_STRING)),
+    HeaderData(const envoy::api::v2::HeaderMatcher& config)
+        : name_(config.name()), value_(config.value()),
           regex_pattern_(value_, std::regex::optimize),
-          is_regex_(config.getBoolean("regex", false)) {}
+          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {}
+    HeaderData(const Json::Object& config)
+        : HeaderData([&config] {
+            envoy::api::v2::HeaderMatcher header_matcher;
+            Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
+            return header_matcher;
+          }()) {}
 
     const Http::LowerCaseString name_;
     const std::string value_;
@@ -40,6 +47,11 @@ public:
    * @return the resource priority parsed from JSON.
    */
   static Upstream::ResourcePriority parsePriority(const Json::Object& config);
+
+  /**
+   * @return the resource priority parsed from proto.
+   */
+  static Upstream::ResourcePriority parsePriority(const envoy::api::v2::RoutingPriority& priority);
 
   /**
    * See if the specified headers are present in the request headers.

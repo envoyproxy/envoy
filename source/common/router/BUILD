@@ -25,10 +25,12 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:utility_lib",
+        "//source/common/config:rds_json_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -36,14 +38,15 @@ envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
+    external_deps = ["envoy_rds"],
     deps = [
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:rds_json_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -130,9 +133,9 @@ envoy_cc_library(
         "//include/envoy/router:router_ratelimit_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:rds_json_lib",
         "//source/common/http/filter:ratelimit_includes",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

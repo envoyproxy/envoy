@@ -118,6 +118,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "rds_json_lib",
+    srcs = ["rds_json.cc"],
+    hdrs = ["rds_json.h"],
+    external_deps = ["envoy_rds"],
+    deps = [
+        ":json_utility_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_factory_lib",
     hdrs = ["subscription_factory.h"],
     external_deps = ["envoy_base"],
