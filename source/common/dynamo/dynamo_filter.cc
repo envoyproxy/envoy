@@ -39,7 +39,7 @@ Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end
     scope_.counter(fmt::format("{}rq_too_large", stat_prefix_)).inc();
     Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::PayloadTooLarge,
                                   Http::CodeUtility::toString(Http::Code::PayloadTooLarge));
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   if (end_stream) {
