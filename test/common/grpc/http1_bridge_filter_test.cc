@@ -203,7 +203,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, LargeResponseWithBridging) {
       {":status", "500"}, {"content-length", "21"}, {"content-type", "text/plain"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {

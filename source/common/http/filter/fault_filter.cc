@@ -211,13 +211,11 @@ void FaultFilter::recordAbortsInjectedStats() {
   config_->stats().aborts_injected_.inc();
 }
 
-FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
+FilterDataStatus FaultFilter::decodeData(Buffer::Instance& data, bool) {
   if (delay_timer_ == nullptr) {
     return FilterDataStatus::Continue;
   }
-  // The fault filter mimizes buffering even more aggressively than configured, to avoid
-  // accumulating data during a delay.
-  if (limiting_buffers_ && !high_watermark_called_) {
+  if (buffer_limit_ > 0 && data.length() > buffer_limit_ && !high_watermark_called_) {
     high_watermark_called_ = true;
     callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   }

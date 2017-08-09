@@ -81,9 +81,7 @@ public:
   ~FaultFilter();
 
   // Http::StreamFilterBase
-  // Fault filter is more aggressive and limits buffered data even before
-  // hitting the buffer limit.
-  void setBufferLimit(uint32_t limit) override { limiting_buffers_ = limit > 0; }
+  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -110,7 +108,7 @@ private:
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
-  bool limiting_buffers_{false};
+  uint32_t buffer_limit_{0};
   bool high_watermark_called_{false};
 
   std::string downstream_cluster_delay_percent_key_{};

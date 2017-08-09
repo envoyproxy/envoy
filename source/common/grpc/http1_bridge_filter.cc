@@ -59,7 +59,7 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, boo
       Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_,
                                     Http::Code::InternalServerError,
                                     Http::CodeUtility::toString(Http::Code::InternalServerError));
-      return Http::FilterDataStatus::StopIterationAndBuffer;
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }

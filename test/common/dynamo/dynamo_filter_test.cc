@@ -101,7 +101,7 @@ TEST_F(DynamoFilterTest, jsonBodyTooLarge) {
       {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
 }
 
 TEST_F(DynamoFilterTest, bothOperationAndTableIncorrect) {

@@ -69,7 +69,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   uint32_t buffer_limit_{0};
-  bool enabled_{};
+  bool enabled_{false};
   bool stream_reset_{false};
 };
 

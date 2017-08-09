@@ -23,7 +23,7 @@ public:
   // Http::StreamFilterBase
   // Ignore buffer limtis: see ASSERT in decodeData: decoding_buffer_ buffers less than 4 bytes.
   void setBufferLimit(uint32_t) override {}
-  void onDestroy() override{};
+  void onDestroy() override {}
 
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
