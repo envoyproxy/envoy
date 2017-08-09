@@ -96,8 +96,9 @@ public:
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
         }));
-    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void disconnect(bool wait_for_remote_close) {
@@ -373,14 +374,16 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::failWrite));
+  EXPECT_CALL(*client_write_buffer_, write(_)).WillOnce(Invoke([&](int fd) -> int {
+    dispatcher_->exit();
+    return client_write_buffer_->failWrite(fd);
+  }));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
   client_connection_->write(second_buffer_to_write);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Clean up the connection.  The close() (called via disconnect) will attempt to flush.  The
   // call to write() will succeed, bringing the connection back under the low watermark.
@@ -477,6 +480,7 @@ public:
                                      .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
+    client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
     read_filter_.reset(new NiceMock<MockReadFilter>());
@@ -502,8 +506,10 @@ public:
           return FilterStatus::StopIteration;
         }));
 
-    client_connection_->addConnectionCallbacks(client_callbacks_);
-    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(buffer_size, filter_seen);

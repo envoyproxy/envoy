@@ -88,6 +88,7 @@ protected:
 
   virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
+  void markUnconnected() { state_ |= InternalState::Unconnected; }
   void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
@@ -113,10 +114,11 @@ protected:
 private:
   // clang-format off
   struct InternalState {
-    static const uint32_t ReadEnabled              = 0x1;
-    static const uint32_t Connecting               = 0x2;
-    static const uint32_t CloseWithFlush           = 0x4;
-    static const uint32_t ImmediateConnectionError = 0x8;
+    static const uint32_t ReadEnabled              = 0x01;
+    static const uint32_t Connecting               = 0x02;
+    static const uint32_t CloseWithFlush           = 0x04;
+    static const uint32_t ImmediateConnectionError = 0x08;
+    static const uint32_t Unconnected              = 0x10;
   };
   // clang-format on
 

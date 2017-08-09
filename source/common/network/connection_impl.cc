@@ -278,7 +278,10 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // to SSL_write(). That code will have to change if we ever copy here.
     write_buffer_.move(data);
 
-    if (!(state_ & InternalState::Connecting)) {
+    // Activating a write event before the socket is connected has the side-effect of tricking
+    // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
+    // with a connection error if a call to write(2) occurs before the connection is completed.
+    if (!(state_ & (InternalState::Connecting | InternalState::Unconnected))) {
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -392,7 +395,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 }
 
 void ConnectionImpl::onReadReady() {
-  ASSERT(!(state_ & InternalState::Connecting));
+  ASSERT(!(state_ & (InternalState::Connecting | InternalState::Unconnected)));
 
   IoResult result = doReadFromSocket();
   uint64_t new_buffer_size = read_buffer_->length();
@@ -445,27 +448,6 @@ void ConnectionImpl::onWriteReady() {
     ASSERT(0 == rc);
     UNREFERENCED_PARAMETER(rc);
 
-#ifdef __APPLE__
-    // When a connect() is performed on a non-blocking socket, it'll return -1/EINPROGRESS
-    // immediately and when select()'ed for writability it'll succeed or fail but when it fails the
-    // reason is hidden. `getsockopt(,,SO_ERROR,,)` solves this issue on some systems but in some
-    // cases (FreeBSD, OS X) getsockopt returns 0 even on `EAGAIN`. The following trick issues a
-    // `getpeername()` which will return -1/ENOTCONN if the socket is not connected and read(,,1)
-    // will produce the correct errno.
-    socklen_t slen = sizeof(struct sockaddr_in);
-    struct sockaddr sain;
-    if (error == 0 && getpeername(fd_, &sain, &slen) == -1 && errno == ENOTCONN) {
-      int rc = read_buffer_->read(fd_, 1);
-      ASSERT(-1 == rc);
-      UNREFERENCED_PARAMETER(rc);
-
-      error = errno;
-      if (errno == EAGAIN) {
-        return;
-      }
-    }
-#endif
-
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
       state_ &= ~InternalState::Connecting;
@@ -503,10 +485,12 @@ void ConnectionImpl::doConnect() {
   if (rc == 0) {
     // write will become ready.
     state_ |= InternalState::Connecting;
+    state_ &= ~InternalState::Unconnected;
   } else {
     ASSERT(rc == -1);
     if (errno == EINPROGRESS) {
       state_ |= InternalState::Connecting;
+      state_ &= ~InternalState::Unconnected;
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
@@ -544,7 +528,9 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address)) {}
+                     getNullLocalAddress(*address)) {
+  markUnconnected();
+}
 
 } // namespace Network
 } // namespace Envoy
