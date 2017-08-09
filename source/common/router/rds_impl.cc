@@ -156,7 +156,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
 
   auto it = route_config_providers_.find(manager_identifier);
   if (it == route_config_providers_.end()) {
-    // std::make_shared does not work with classes with private constructors. There are ways
+    // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
