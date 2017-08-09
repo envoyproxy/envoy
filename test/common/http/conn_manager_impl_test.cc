@@ -18,6 +18,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -247,7 +248,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  Runtime::RandomGeneratorImpl random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   RouteConfigProvider route_config_provider_;
@@ -385,6 +386,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         callbacks.addStreamDecoderFilter(filter);
       }));
 
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -430,6 +434,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
           }));
 
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -468,6 +475,9 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(filter);
       }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -514,6 +524,9 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         filter->callbacks_->requestInfo().healthCheck(true);
         return FilterHeadersStatus::StopIteration;
       }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
