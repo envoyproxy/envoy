@@ -297,7 +297,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ("value", zipkin_zipkin_span.binaryAnnotations()[0].value());
 
   // ====
-  // Test innocuous setTag() with annotated span
+  // Test setTag() with SR annotated span
   // ====
 
   const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
@@ -312,18 +312,27 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   Tracing::SpanPtr span2 = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
   ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
-  zipkin_span2->setTag("key", "value");
+  zipkin_span2->setTag("key2", "value2");
 
   Span& zipkin_zipkin_span2 = zipkin_span2->span();
-  EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
+  EXPECT_EQ(1ULL, zipkin_zipkin_span2.binaryAnnotations().size());
+  EXPECT_EQ("key2", zipkin_zipkin_span2.binaryAnnotations()[0].key());
+  EXPECT_EQ("value2", zipkin_zipkin_span2.binaryAnnotations()[0].value());
 
   // ====
-  // Test innocuous setTag() with empty annotations vector
+  // Test setTag() with empty annotations vector
   // ====
+  Tracing::SpanPtr span3 = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  ZipkinSpanPtr zipkin_span3(dynamic_cast<ZipkinSpan*>(span3.release()));
+  Span& zipkin_zipkin_span3 = zipkin_span3->span();
+
   std::vector<Annotation> annotations;
-  zipkin_zipkin_span2.setAnnotations(annotations);
-  zipkin_span2->setTag("key", "value");
-  EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
+  zipkin_zipkin_span3.setAnnotations(annotations);
+
+  zipkin_span3->setTag("key3", "value3");
+  EXPECT_EQ(1ULL, zipkin_zipkin_span3.binaryAnnotations().size());
+  EXPECT_EQ("key3", zipkin_zipkin_span3.binaryAnnotations()[0].key());
+  EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
 }
 } // namespace Zipkin
 } // namespace Envoy
