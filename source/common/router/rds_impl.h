@@ -141,6 +141,7 @@ public:
                                                       Init::Manager& init_manager) override;
 
 private:
+  const std::string MAP_CONCATENATOR = "_this_string_concatenates_route_config_name_and_cluster_";
   std::unordered_map<std::string, std::weak_ptr<RouteConfigProvider>> route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;

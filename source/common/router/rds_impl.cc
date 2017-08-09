@@ -150,9 +150,9 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
     const Json::Object& config, Upstream::ClusterManager& cm, Stats::Scope& scope,
     const std::string& stat_prefix, Init::Manager& init_manager) {
 
-  // RdsRouteConfigProviders are unique based on their <route_config_name>_<cluster>.
+  // RdsRouteConfigProviders are unique based on their <route_config_name>MAP_CONCATENATOR<cluster>.
   const std::string manager_identifier =
-      config.getString("route_config_name") + ":" + config.getString("cluster");
+      config.getString("route_config_name") + MAP_CONCATENATOR + config.getString("cluster");
 
   auto it = route_config_providers_.find(manager_identifier);
   if (it == route_config_providers_.end()) {
@@ -162,10 +162,9 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
 
     new_provider->registerInitTarget(init_manager);
 
-    route_config_providers_.insert(
-        {manager_identifier, std::weak_ptr<RdsRouteConfigProviderImpl>(new_provider)});
+    route_config_providers_.insert({manager_identifier, new_provider});
 
-    return std::move(new_provider);
+    return new_provider;
   }
 
   // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
@@ -173,7 +172,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   // of this code, locking the weak_ptr will not fail.
   Router::RouteConfigProviderSharedPtr new_provider = it->second.lock();
   ASSERT(new_provider);
-  return std::move(new_provider);
+  return new_provider;
 };
 
 } // namespace Router
