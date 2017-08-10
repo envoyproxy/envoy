@@ -100,11 +100,11 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
     if (version == IpVersion::v6) {
       domain = AF_INET6;
     } else {
-      RELEASE_ASSERT(version == IpVersion::v4);
+      ASSERT(version == IpVersion::v4);
       domain = AF_INET;
     }
   } else {
-    RELEASE_ASSERT(type() == Type::Pipe);
+    ASSERT(type() == Type::Pipe);
     domain = AF_UNIX;
   }
 
