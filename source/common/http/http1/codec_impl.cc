@@ -177,6 +177,8 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -259,7 +261,14 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
-    : connection_(connection) {
+    : connection_(connection),
+      output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                     [&]() -> void { this->onOutputBufferBelowLowWatermark(); },
+                     [&]() -> void { this->onOutputBufferAboveHighWatermark(); }) {
+  uint32_t buffer_limit = connection.bufferLimit();
+  if (buffer_limit > 0) {
+    output_buffer_.setWatermarks(buffer_limit / 2, buffer_limit);
+  }
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
@@ -356,6 +365,8 @@ void ConnectionImpl::onMessageBeginBase() {
   onMessageBegin();
 }
 
+ConnectionImpl::~ConnectionImpl() { ASSERT(!codec_high_watermark_called_); }
+
 void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   ASSERT(!reset_stream_called_);
   reset_stream_called_ = true;
@@ -373,7 +384,7 @@ void ServerConnectionImpl::onEncodeComplete() {
     // Only do this if remote is complete. If we are replying before the request is complete the
     // only logical thing to do is for higher level code to reset() / close the connection so we
     // leave the request around so that it can fire reset callbacks.
-    active_request_.reset();
+    resetActiveRequest();
   }
 }
 
@@ -542,7 +553,7 @@ void ServerConnectionImpl::onMessageComplete() {
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   ASSERT(active_request_);
   active_request_->response_encoder_.runResetCallbacks(reason);
-  active_request_.reset();
+  resetActiveRequest();
 }
 
 void ServerConnectionImpl::sendProtocolError() {
@@ -557,6 +568,29 @@ void ServerConnectionImpl::sendProtocolError() {
 
     connection_.write(bad_request_response);
   }
+}
+
+void ServerConnectionImpl::onOutputBufferAboveHighWatermark() {
+  if (active_request_) {
+    ASSERT(!codec_high_watermark_called_);
+    codec_high_watermark_called_ = true;
+    active_request_->response_encoder_.runHighWatermarkCallbacks();
+  }
+}
+void ServerConnectionImpl::onOutputBufferBelowLowWatermark() {
+  if (active_request_) {
+    ASSERT(codec_high_watermark_called_);
+    codec_high_watermark_called_ = false;
+    active_request_->response_encoder_.runLowWatermarkCallbacks();
+  }
+}
+
+void ServerConnectionImpl::resetActiveRequest() {
+  if (codec_high_watermark_called_) {
+    active_request_->response_encoder_.runLowWatermarkCallbacks();
+    codec_high_watermark_called_ = false;
+  }
+  active_request_.reset();
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
@@ -579,6 +613,18 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   request_encoder_.reset(new RequestStreamEncoderImpl(*this));
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
+}
+
+void ClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
+  ASSERT(!connection_high_watermark_called_);
+  connection_high_watermark_called_ = true;
+  request_encoder_->runHighWatermarkCallbacks();
+}
+
+void ClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
+  ASSERT(connection_high_watermark_called_);
+  connection_high_watermark_called_ = false;
+  request_encoder_->runLowWatermarkCallbacks();
 }
 
 void ClientConnectionImpl::onEncodeComplete() {
@@ -638,6 +684,18 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     pending_responses_.clear();
     request_encoder_->runResetCallbacks(reason);
   }
+}
+
+void ClientConnectionImpl::onOutputBufferAboveHighWatermark() {
+  ASSERT(!codec_high_watermark_called_);
+  codec_high_watermark_called_ = true;
+  request_encoder_->runHighWatermarkCallbacks();
+}
+
+void ClientConnectionImpl::onOutputBufferBelowLowWatermark() {
+  ASSERT(codec_high_watermark_called_);
+  codec_high_watermark_called_ = false;
+  request_encoder_->runLowWatermarkCallbacks();
 }
 
 } // namespace Http1

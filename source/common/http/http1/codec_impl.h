@@ -9,7 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
 #include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
@@ -42,7 +42,7 @@ public:
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
-  void readDisable(bool) override {}
+  void readDisable(bool disable) override;
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
@@ -107,6 +107,7 @@ private:
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http> {
 public:
+  ~ConnectionImpl();
   /**
    * @return Network::Connection& the backing network connection.
    */
@@ -131,7 +132,7 @@ public:
 
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
-  Buffer::OwnedImpl& buffer() { return output_buffer_; }
+  Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
@@ -143,6 +144,9 @@ public:
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
 
+  void readDisable(bool disable) { connection_.readDisable(disable); }
+  uint32_t bufferLimit() { return connection_.bufferLimit(); }
+
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
 
@@ -152,6 +156,7 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
+  bool codec_high_watermark_called_{false};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -226,6 +231,16 @@ private:
    */
   virtual void sendProtocolError() PURE;
 
+  /**
+   * Called when output_buffer_ goes from below its low watermark to over its high watermark.
+   */
+  virtual void onOutputBufferAboveHighWatermark() PURE;
+
+  /**
+   * Called when output_buffer_ goes from above its high watermark to below its low watermark.
+   */
+  virtual void onOutputBufferBelowLowWatermark() PURE;
+
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
 
@@ -234,7 +249,7 @@ private:
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool reset_stream_called_{};
-  Buffer::OwnedImpl output_buffer_;
+  Buffer::WatermarkBuffer output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
@@ -280,6 +295,10 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
+  void onOutputBufferAboveHighWatermark() override;
+  void onOutputBufferBelowLowWatermark() override;
+
+  void resetActiveRequest();
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
@@ -295,8 +314,8 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
 private:
   struct PendingResponse {
@@ -317,9 +336,12 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
+  void onOutputBufferAboveHighWatermark() override;
+  void onOutputBufferBelowLowWatermark() override;
 
   std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
   std::list<PendingResponse> pending_responses_;
+  bool connection_high_watermark_called_{false};
 };
 
 } // namespace Http1
