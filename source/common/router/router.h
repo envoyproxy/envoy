@@ -146,10 +146,6 @@ public:
     return callbacks_->connection();
   }
 
-protected:
-  uint32_t read_disable_calls_outstanding_{0};
-  uint32_t read_disable_calls_not_passed_on_{0};
-
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
@@ -195,12 +191,6 @@ private:
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-
-    void setRequestEncoder(Http::StreamEncoder& request_encoder);
-    void clearRequestEncoder();
-
-    void readDisable();
-    void readEnable();
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;

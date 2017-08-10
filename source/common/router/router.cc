@@ -93,7 +93,6 @@ FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
 }
 
 Filter::~Filter() {
-  ASSERT(read_disable_calls_outstanding_ == 0);
   // Upstream resources should already have been cleaned.
   ASSERT(!upstream_request_);
   ASSERT(!retry_state_);
@@ -305,24 +304,18 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
 }
 
 void Filter::onBelowWriteBufferLowWatermark() {
-  if (upstream_request_ && upstream_request_->request_encoder_) {
-    upstream_request_->readEnable();
-  } else {
-    // Reduce the pending calls to onAboveWriteBufferHighWatermark() by one.
-    ASSERT(read_disable_calls_not_passed_on_ > 0);
-
-    --read_disable_calls_not_passed_on_;
+  // The downstream connection has buffer available.  Resume reads from upstream.
+  cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(false);
   }
 }
 
 void Filter::onAboveWriteBufferHighWatermark() {
-  if (upstream_request_ && upstream_request_->request_encoder_) {
-    upstream_request_->readDisable();
-  } else {
-    // If there is no upstream request encoder, save state until there is one.  This counter will be
-    // converted to calls to onAboveWriteBufferHighWatermark() once there is an upstream request
-    // with an encoder.
-    ++read_disable_calls_not_passed_on_;
+  // The downstream connection is overrun.  Pause reads from upstream.
+  cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
+  if (upstream_request_) {
+    upstream_request_->request_encoder_->getStream().readDisable(true);
   }
 }
 
@@ -587,6 +580,7 @@ bool Filter::setupRetry(bool end_stream) {
   if (!end_stream) {
     upstream_request_->resetStream();
   }
+
   upstream_request_.reset();
   return true;
 }
@@ -624,7 +618,6 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
-  clearRequestEncoder();
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -683,7 +676,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
 }
 
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
-  clearRequestEncoder();
+  request_encoder_ = nullptr;
   if (!calling_encode_headers_) {
     parent_.onUpstreamReset(UpstreamResetType::Reset, Optional<Http::StreamResetReason>(reason));
   } else {
@@ -748,7 +741,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   request_encoder.getStream().addCallbacks(*this);
 
   conn_pool_stream_handle_ = nullptr;
-  setRequestEncoder(request_encoder);
+  request_encoder_ = &request_encoder;
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
@@ -783,46 +776,6 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                              Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,
                                 priority);
-}
-
-// When setting the request encoder, pass on all outstanding high watermark calls.
-void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
-  request_encoder_ = &request_encoder;
-  while (parent_.read_disable_calls_not_passed_on_ > 0) {
-    --parent_.read_disable_calls_not_passed_on_;
-    readDisable();
-  }
-}
-
-// Before destroying the request encoder, cancel all outstanding high watermark calls.
-// Store them as read_disable_calls_not_passed_on_ in case there is another
-// encoder attached.
-void Filter::UpstreamRequest::clearRequestEncoder() {
-  if (request_encoder_) {
-    uint32_t latched_read_disable_calls = parent_.read_disable_calls_outstanding_;
-    while (parent_.read_disable_calls_outstanding_ > 0) {
-      readEnable(); // decrements read_disable_calls_outstanding_
-    }
-    parent_.read_disable_calls_not_passed_on_ = latched_read_disable_calls;
-  }
-  request_encoder_ = nullptr;
-}
-
-void Filter::UpstreamRequest::readDisable() {
-  ASSERT(request_encoder_);
-  // The downstream connection is overrun.  Pause reads from upstream.
-  parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
-  request_encoder_->getStream().readDisable(true);
-  ++parent_.read_disable_calls_outstanding_;
-}
-
-void Filter::UpstreamRequest::readEnable() {
-  ASSERT(request_encoder_);
-  ASSERT(parent_.read_disable_calls_outstanding_ > 0);
-  // The downstream connection has buffer available.  Resume reads from upstream.
-  parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
-  request_encoder_->getStream().readDisable(false);
-  --parent_.read_disable_calls_outstanding_;
 }
 
 } // namespace Router

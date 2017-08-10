@@ -21,7 +21,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
@@ -1154,7 +1153,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
       stream_callbacks_ = &callbacks;
     }));
-    EXPECT_CALL(encoder_, getStream()).Times(AnyNumber()).WillRepeatedly(ReturnRef(stream_));
+    EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
             [&](Http::StreamDecoder& decoder,
@@ -1211,78 +1210,6 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
                     .value());
 
   sendResponse();
-}
-
-TEST_F(WatermarkTest, EarlyUpstreamWatermarksPassedOn) {
-  router_.onAboveWriteBufferHighWatermark();
-  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_flow_control_paused_reading_total")
-                    .value());
-
-  EXPECT_CALL(stream_, readDisable(true));
-  sendRequest();
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_flow_control_paused_reading_total")
-                    .value());
-
-  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(false));
-  router_.onBelowWriteBufferLowWatermark();
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_flow_control_resumed_reading_total")
-                    .value());
-
-  sendResponse();
-}
-
-TEST_F(WatermarkTest, RetryWithWatermarks) {
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_);
-        return nullptr;
-      }));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  // Send a high watermark notification.
-  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(true));
-  router_.onAboveWriteBufferHighWatermark();
-
-  // As the stream is detached from the router, the watermark state will be
-  // reset.
-  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
-  EXPECT_CALL(stream_, readDisable(false));
-  router_.retry_state_->expectRetry();
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
-  encoder_.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // We expect this reset to kick off a new request.
-  NiceMock<Http::MockStreamEncoder> encoder2;
-  // As the new encoder is attached, it should get the readDisable call automatically.
-  EXPECT_CALL(encoder2.stream_, readDisable(true));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
-        return nullptr;
-      }));
-  router_.retry_state_->callback_();
-  // As the new encoder is torn down it clears watermark state.
-  EXPECT_CALL(encoder2.stream_, readDisable(false));
-
-  // Normal response.
-  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(false));
-  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 } // namespace Router
