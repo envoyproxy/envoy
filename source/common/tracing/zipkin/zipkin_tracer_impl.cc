@@ -20,9 +20,7 @@ void ZipkinSpan::finishSpan(Tracing::SpanFinalizer& finalizer) {
 }
 
 void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
-  if (this->hasCSAnnotation()) {
-    span_.setTag(name, value);
-  }
+  span_.setTag(name, value);
 }
 
 void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
@@ -46,15 +44,6 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
 Tracing::SpanPtr ZipkinSpan::spawnChild(const std::string& name, SystemTime start_time) {
   SpanContext context(span_);
   return Tracing::SpanPtr{new ZipkinSpan(*tracer_.startSpan(name, start_time, context), tracer_)};
-}
-
-bool ZipkinSpan::hasCSAnnotation() {
-  auto annotations = span_.annotations();
-  if (annotations.size() > 0) {
-    // We currently expect only one annotation to be in the span when this function is called.
-    return annotations[0].value() == ZipkinCoreConstants::get().CLIENT_SEND;
-  }
-  return false;
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)

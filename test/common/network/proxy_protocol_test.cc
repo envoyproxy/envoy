@@ -47,7 +47,6 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
-          printf("argh!\n");
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));

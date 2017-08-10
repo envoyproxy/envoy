@@ -2,7 +2,11 @@
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+
+#if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#endif
+
 #include <netinet/ip.h>
 #include <sys/socket.h>
 
@@ -291,6 +295,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+#ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
@@ -303,6 +308,12 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   } else {
     return nullptr;
   }
+#else
+  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // divert), and whether it's possible to find the learn destination address.
+  UNREFERENCED_PARAMETER(fd);
+  return nullptr;
+#endif
 }
 
 void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {

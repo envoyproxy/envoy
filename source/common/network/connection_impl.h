@@ -45,7 +45,8 @@ class ConnectionImpl : public virtual Connection,
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address, bool using_original_dst);
+                 Address::InstanceConstSharedPtr local_address, bool using_original_dst,
+                 bool connected);
 
   ~ConnectionImpl();
 
