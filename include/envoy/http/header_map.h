@@ -296,6 +296,16 @@ public:
   virtual void addReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
+   * Add a header by copying both the header key and the value.
+   */
+  virtual void addCopy(const LowerCaseString& key, uint64_t value) PURE;
+
+  /**
+   * Add a header by copying both the header key and the value.
+   */
+  virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
    * @return uint64_t the approximate size of the header map in bytes.
    */
   virtual uint64_t byteSize() const PURE;
