@@ -390,7 +390,7 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
         response_decoder = &decoder;
         // simulate connect timeout, do not call callbacks.onPoolReady(...)
         UNREFERENCED_PARAMETER(callbacks);
-        return nullptr;
+        return &cancellable_;
       }));
 
   expectResponseTimerCreate();
@@ -405,6 +405,7 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
 
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(cancellable_, cancel());
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
