@@ -403,9 +403,9 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
+  EXPECT_CALL(cancellable_, cancel());
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
-  EXPECT_CALL(cancellable_, cancel());
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
