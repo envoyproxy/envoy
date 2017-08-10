@@ -114,7 +114,7 @@ void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_
                                  Address::InstanceConstSharedPtr local_address,
                                  bool using_original_dst) {
   ConnectionPtr new_connection(
-      new ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst));
+      new ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst, true));
   new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
@@ -122,9 +122,9 @@ void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_
 void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
                                     Address::InstanceConstSharedPtr local_address,
                                     bool using_original_dst) {
-  ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
-                                                       local_address, using_original_dst, ssl_ctx_,
-                                                       Ssl::ConnectionImpl::InitialState::Server));
+  ConnectionPtr new_connection(
+      new Ssl::ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst,
+                              true, ssl_ctx_, Ssl::ConnectionImpl::InitialState::Server));
   new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }

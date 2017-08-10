@@ -4,10 +4,13 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/thread.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
