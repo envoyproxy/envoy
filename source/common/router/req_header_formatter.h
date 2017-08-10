@@ -23,7 +23,7 @@ public:
   format(const Envoy::Http::AccessLog::RequestInfo& request_info) const PURE;
 };
 
-typedef std::shared_ptr<HeaderFormatter> HeaderFormatterPtr;
+typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
 
 /**
  * a formatter that expands the request header variable to a value based on info in RequestInfo.
@@ -56,6 +56,9 @@ private:
   const std::string static_value_;
 };
 
+class RequestHeaderParser;
+typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
+
 /**
  * This class will hold the parsing logic required during configuration build and
  * also perform evaluation for the variables at runtime.
@@ -64,7 +67,7 @@ class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
 public:
   virtual ~RequestHeaderParser() {}
 
-  static RequestHeaderParser parse(const Json::Object& config);
+  static RequestHeaderParserPtr parse(const Json::Object& config);
 
   static HeaderFormatterPtr parseInternal(const std::string& format);
 

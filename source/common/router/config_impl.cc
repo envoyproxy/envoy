@@ -155,7 +155,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(
     Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
-  request_headers_parser_.evaluateRequestHeaders(headers, requestInfo, requestHeadersToAdd());
+  request_headers_parser_->evaluateRequestHeaders(headers, requestInfo, requestHeadersToAdd());
 
   vhost_.requestHeaderParser().evaluateRequestHeaders(headers, requestInfo,
                                                       vhost_.requestHeadersToAdd());

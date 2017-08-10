@@ -32,8 +32,8 @@ HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format)
   return request_header_formatter_shared_ptr;
 }
 
-RequestHeaderParser RequestHeaderParser::parse(const Json::Object& config) {
-  RequestHeaderParser request_header_parser;
+RequestHeaderParserPtr RequestHeaderParser::parse(const Json::Object& config) {
+  RequestHeaderParserPtr request_header_parser(new RequestHeaderParser());
   std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
       header_formatter_map;
   if (config.hasObject("request_headers_to_add")) {
@@ -44,8 +44,8 @@ RequestHeaderParser RequestHeaderParser::parse(const Json::Object& config) {
         ENVOY_LOG(debug, "adding key {} to header formatter map", header->getString("key"));
         HeaderFormatterPtr header_formatter =
             RequestHeaderParser::parseInternal(header->getString("value"));
-        request_header_parser.header_formatter_map_.emplace(
-            Http::LowerCaseString(header->getString("key")), header_formatter);
+        request_header_parser->header_formatter_map_.emplace(
+            Http::LowerCaseString(header->getString("key")), std::move(header_formatter));
       }
     }
   }

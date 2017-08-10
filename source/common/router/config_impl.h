@@ -88,7 +88,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
-  RequestHeaderParser requestHeaderParser() const { return request_headers_parser_; };
+  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -121,7 +121,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ConfigImpl& global_route_config_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
-  RequestHeaderParser request_headers_parser_;
+  RequestHeaderParserPtr request_headers_parser_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -234,7 +234,7 @@ protected:
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
-  RequestHeaderParser requestHeaderParser() const { return request_headers_parser_; };
+  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   struct RuntimeData {
@@ -339,7 +339,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
-  RequestHeaderParser request_headers_parser_;
+  RequestHeaderParserPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -448,7 +448,7 @@ public:
 
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
-  RequestHeaderParser requestHeaderParser() const { return request_headers_parser_; };
+  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -456,7 +456,7 @@ private:
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
-  RequestHeaderParser request_headers_parser_;
+  RequestHeaderParserPtr request_headers_parser_;
 };
 
 /**
