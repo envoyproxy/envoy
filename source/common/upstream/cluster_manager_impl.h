@@ -36,8 +36,7 @@ public:
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& primary_dispatcher,
                             const LocalInfo::LocalInfo& local_info)
-      : runtime_(runtime), stats_(stats), cds_scope_(stats.createScope("cluster_manager.cds.")),
-        tls_(tls), random_(random), dns_resolver_(dns_resolver),
+      : runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), primary_dispatcher_(primary_dispatcher),
         local_info_(local_info) {}
 
@@ -59,7 +58,6 @@ public:
 private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  Stats::ScopePtr cds_scope_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;

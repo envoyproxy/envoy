@@ -21,14 +21,14 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
                        const Optional<SdsConfig>& sds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : cm_(cm) {
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
-          cds_config, local_info.node(), dispatcher, cm, random, scope,
-          [&cds_config, &sds_config, &cm, &dispatcher, &random, &local_info,
-           &scope]() -> Config::Subscription<envoy::api::v2::Cluster>* {
-            return new CdsSubscription(Config::Utility::generateStats(scope), cds_config,
+          cds_config, local_info.node(), dispatcher, cm, random, *scope_,
+          [this, &cds_config, &sds_config, &cm, &dispatcher, &random,
+           &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
+            return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
                                        sds_config, cm, dispatcher, random, local_info);
           },
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
