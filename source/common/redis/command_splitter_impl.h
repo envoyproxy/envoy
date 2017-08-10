@@ -58,6 +58,8 @@ private:
   ConnPool::PoolRequest* handle_{};
 };
 
+class EvalRequest : public SimpleRequest {};
+
 class FragmentedRequest : public SplitRequest {
 public:
   ~FragmentedRequest();
@@ -194,6 +196,7 @@ private:
 
   ConnPool::InstancePtr conn_pool_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
+  CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
