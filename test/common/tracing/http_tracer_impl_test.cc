@@ -283,17 +283,15 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
 TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  const std::string expected_cluster_name = "<my_upstream_cluster>";
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, upstreamHost()).WillRepeatedly(Return(request_info.host_));
-  EXPECT_CALL(*request_info.host_, cluster()).WillOnce(ReturnRef(request_info.host_->cluster_));
-  EXPECT_CALL(request_info.host_->cluster_, name()).WillOnce(ReturnRef(expected_cluster_name));
+  request_info.host_->cluster_.name_ = "my_upstream_cluster";
 
-  EXPECT_CALL(*span, setTag("upstream_cluster", expected_cluster_name));
+  EXPECT_CALL(*span, setTag("upstream_cluster", "my_upstream_cluster"));
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
