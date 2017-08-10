@@ -187,6 +187,16 @@ TEST(JsonLoaderTest, Basic) {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[null]}");
     EXPECT_THROW(json->getObjectArray("hello").at(0)->getDouble("foo"), Exception);
   }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{}");
+    EXPECT_THROW(json->getObjectArray("hello").empty(), Exception);
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{}");
+    EXPECT_TRUE(json->getObjectArray("hello", true).empty());
+  }
 }
 
 TEST(JsonLoaderTest, Integer) {
