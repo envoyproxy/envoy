@@ -57,7 +57,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
-                               bool using_original_dst)
+                               bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
       write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
@@ -69,6 +69,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd_ != -1);
+
+  if (!connected) {
+    state_ |= InternalState::Connecting;
+  }
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
@@ -181,7 +185,8 @@ void ConnectionImpl::noDelay(bool enable) {
   rc = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #ifdef __APPLE__
   if (-1 == rc && errno == EINVAL) {
-    // socket has been shut down
+    // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
+    // enabled despite this result.
     return;
   }
 #endif
@@ -529,9 +534,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false) {
-  markConnecting();
-}
+                     getNullLocalAddress(*address), false, false) {}
 
 } // namespace Network
 } // namespace Envoy

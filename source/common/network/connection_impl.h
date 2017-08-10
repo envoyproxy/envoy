@@ -45,7 +45,8 @@ class ConnectionImpl : public virtual Connection,
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address, bool using_original_dst);
+                 Address::InstanceConstSharedPtr local_address, bool using_original_dst,
+                 bool connected);
 
   ~ConnectionImpl();
 
@@ -89,7 +90,6 @@ protected:
 
   virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
-  void markConnecting() { state_ |= InternalState::Connecting; }
   void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
