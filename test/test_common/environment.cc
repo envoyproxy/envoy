@@ -126,8 +126,10 @@ std::string TestEnvironment::substitute(const std::string& str,
   switch (version) {
   case Network::Address::IpVersion::v4:
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v4_only");
+    break;
   case Network::Address::IpVersion::v6:
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
+    break;
   }
 
   return out_json_string;
