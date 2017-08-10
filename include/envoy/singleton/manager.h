@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -35,16 +36,16 @@ public:
 };
 
 /**
+ * Callback function used to create a singleton.
+ */
+typedef std::function<InstancePtr()> SingletonFactoryCb;
+
+/**
  * A manager for all server-side singletons.
  */
 class Manager {
 public:
   virtual ~Manager() {}
-
-  /**
-   * Callback function used to create a singleton.
-   */
-  typedef std::function<InstancePtr()> SingletonFactoryCb;
 
   /**
    * This is a helper on top of get() that casts the object stored to the specified type. Since the
