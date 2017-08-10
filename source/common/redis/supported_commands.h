@@ -105,6 +105,15 @@ struct SupportedCommands {
   }
 
   /**
+   * @return eval commands are treated as simple but hash on the second argument
+   */
+  static const std::vector<std::string>& evalCommands() {
+    static const std::vector<std::string>* commands =
+        new std::vector<std::string>{"eval", "evalsha"};
+    return *commands;
+  }
+
+  /**
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const std::vector<std::string>& hashMultipleSumResultCommands() {
