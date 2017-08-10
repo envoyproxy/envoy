@@ -319,17 +319,13 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   EXPECT_EQ(1UL, headers.size());
 }
 
-struct AddAHeaderResult_t {
+struct HeaderBrutalityResult {
   const HeaderString& val;
   const void* keyPtr;
 };
 
-const AddAHeaderResult_t addAHeader(HeaderMapImpl& headers) {
-  LowerCaseString lcKey("hello");
-
-  headers.addCopy(lcKey, "world");
-
-  AddAHeaderResult_t result{
+const HeaderBrutalityResult doHeaderBrutality(HeaderMapImpl& headers, LowerCaseString &lcKey) {
+  HeaderBrutalityResult result{
     headers.get(lcKey)->value(),
     static_cast<const void*>(lcKey.get().data())
   };
@@ -344,10 +340,52 @@ const AddAHeaderResult_t addAHeader(HeaderMapImpl& headers) {
   return result;
 }
 
+const HeaderBrutalityResult addAHeaderString(HeaderMapImpl& headers) {
+  // This needs to not be a parameter. Part of the test is that the 
+  // key we're using actually goes out of scope before we check the
+  // HeaderMap for the value we need.
+  LowerCaseString lcKey("hello");
+
+  headers.addCopy(lcKey, "world");
+
+  return doHeaderBrutality(headers, lcKey);
+}
+
+const HeaderBrutalityResult addAHeaderInt(HeaderMapImpl& headers) {
+  // This needs to not be a parameter. Part of the test is that the 
+  // key we're using actually goes out of scope before we check the
+  // HeaderMap for the value we need.
+  LowerCaseString lcKey("hello");
+
+  headers.addCopy(lcKey, 42);
+
+  return doHeaderBrutality(headers, lcKey);
+}
+
+// void dumpHeaders(HeaderMapImpl& headers, int idx) {
+//   std::cerr << "---- dumpHeaders " << idx << std::endl;
+
+//   headers.iterate(
+//     [](const HeaderEntry& header, void* ctx) -> void {
+//       (void)ctx;  // Shut up the "unused parameter" error
+
+//       std::string key(header.key().c_str());
+//       std::string value(header.value().c_str());
+
+//       std::cerr << key << ": "
+//                 << value
+//                 << std::endl;
+//     },
+//     nullptr
+//   );  
+// }
+
 TEST(HeaderMapImplTest, AddCopy) {
   HeaderMapImpl headers;
 
-  AddAHeaderResult_t v1 = addAHeader(headers);
+  // Start with a string value.
+  HeaderBrutalityResult v1 = addAHeaderString(headers);
+  // dumpHeaders(headers, 1);
 
   EXPECT_STREQ("world", v1.val.c_str());
   EXPECT_EQ(5UL, v1.val.size());
@@ -370,6 +408,28 @@ TEST(HeaderMapImplTest, AddCopy) {
 
   EXPECT_STREQ("world", headers.get(lcKey2)->value().c_str());
   EXPECT_EQ(5UL, headers.get(lcKey2)->value().size());
+
+  // Repeat with an int value.
+  //
+  // @kflynn: addReferenceKey and addCopy can both add multiple instances of a
+  // given header, so we need to delete the old "hello" header.
+  headers.remove(lcKey2);
+
+  HeaderBrutalityResult v2 = addAHeaderInt(headers);
+  // dumpHeaders(headers, 2);
+
+  EXPECT_STREQ("42", v2.val.c_str());
+  EXPECT_EQ(2UL, v2.val.size());
+  EXPECT_EQ(1UL, headers.size());
+
+  // We can make yet another different key to look up here.
+  LowerCaseString lcKey3(hrm + "ll" + "o");  // Try to force the compiler's hand here.
+  EXPECT_STREQ("hello", lcKey3.get().c_str());
+  EXPECT_NE(v1.keyPtr, static_cast<const void*>(lcKey3.get().data()));
+  EXPECT_NE(v2.keyPtr, static_cast<const void*>(lcKey3.get().data()));
+
+  EXPECT_STREQ("42", headers.get(lcKey3)->value().c_str());
+  EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
 }
 
 TEST(HeaderMapImplTest, Equality) {
