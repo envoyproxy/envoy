@@ -17,3 +17,6 @@ The following features have been DEPRECATED and will be removed in the specified
   * The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
     replaced with a more general connection() callback, which, when not returning a nullptr, can be
     used to get the connection id and SSL connection from the returned Connection object pointer.
+  * The protobuf stub gRPC support via `Grpc::RpcChannelImpl` is now replaced with `Grpc::AsyncClientImpl`.
+    This no longer uses `protoc` generated stubs but instead utilizes C++ template generation of the
+    RPC stubs. `Grpc::AsyncClientImpl` supports streaming, in addition to the previous unary, RPCs.
