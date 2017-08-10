@@ -451,9 +451,9 @@ public:
 
     client_connection_ =
         dispatcher_->createSslClientConnection(*client_ctx_, socket_.localAddress());
+    client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
-    client_connection_->addConnectionCallbacks(client_callbacks_);
   }
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
@@ -534,7 +534,8 @@ public:
 
     initialize(read_buffer_limit);
 
-    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
@@ -544,6 +545,8 @@ public:
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
+
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_)).Times(testing::AnyNumber());

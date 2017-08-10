@@ -18,7 +18,7 @@ public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Network::Address::InstanceConstSharedPtr remote_address,
                  Network::Address::InstanceConstSharedPtr local_address, bool using_original_dst,
-                 Context& ctx, InitialState state);
+                 bool connected, Context& ctx, InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection

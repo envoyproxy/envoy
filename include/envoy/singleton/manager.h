@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/singleton/instance.h"
