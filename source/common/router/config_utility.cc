@@ -19,6 +19,18 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
   }
 }
 
+Upstream::ResourcePriority
+ConfigUtility::parsePriority(const envoy::api::v2::RoutingPriority& priority) {
+  switch (priority) {
+  case envoy::api::v2::RoutingPriority::DEFAULT:
+    return Upstream::ResourcePriority::Default;
+  case envoy::api::v2::RoutingPriority::HIGH:
+    return Upstream::ResourcePriority::High;
+  default:
+    NOT_IMPLEMENTED;
+  }
+}
+
 bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
                                  const std::vector<HeaderData>& config_headers) {
   bool matches = true;
