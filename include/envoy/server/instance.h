@@ -145,6 +145,11 @@ public:
   virtual void shutdownAdmin() PURE;
 
   /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
    * @return the time that the server started during the current hot restart epoch.
    */
   virtual time_t startTimeCurrentEpoch() PURE;

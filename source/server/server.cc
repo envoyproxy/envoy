@@ -21,6 +21,7 @@
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/singleton/manager_impl.h"
 #include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -43,7 +44,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       stats_store_(store), server_stats_{ALL_SERVER_STATS(
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
-      dispatcher_(api_->allocateDispatcher()),
+      dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
