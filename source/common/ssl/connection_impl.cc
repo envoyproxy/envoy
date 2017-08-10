@@ -255,15 +255,12 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr);
 
-  // [indent=0 flags=XN_FLAG_RFC2253] is the documented set of parameters for
-  // single-line in RFC 2253 format.
+  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
   X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
 
   const uint8_t* data;
   size_t data_len;
   int rc = BIO_mem_contents(buf.get(), &data, &data_len);
-  // It should be impossible for BIO_mem_contents to fail when called with a BIO
-  // created using BIO_s_mem().
   ASSERT(rc == 1);
   UNREFERENCED_PARAMETER(rc);
   return std::string(reinterpret_cast<const char*>(data), data_len);
