@@ -21,8 +21,6 @@ public:
   virtual ~GrpcWebFilter(){};
 
   // Http::StreamFilterBase
-  // Ignore buffer limtis: see ASSERT in decodeData: decoding_buffer_ buffers less than 4 bytes.
-  void setBufferLimit(uint32_t) override {}
   void onDestroy() override {}
 
   // Implements StreamDecoderFilter.
@@ -34,6 +32,10 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
+  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    // Ignore buffer limits: see ASSERT in decodeData: decoding_buffer_ buffers less than 4 bytes.
+    settings.filter_type_ = Http::FilterType::STREAMING;
+  }
 
   // Implements StreamEncoderFilter.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
@@ -41,6 +43,9 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
+  }
+  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    settings.filter_type_ = Http::FilterType::STREAMING;
   }
 
 private:

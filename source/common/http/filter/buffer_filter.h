@@ -51,7 +51,6 @@ public:
   static BufferFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t) override {} // Buffer filter uses its own configured limits.
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -59,6 +58,9 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  void setDecoderBufferLimit(BufferLimitSettings& settings) override {
+    settings.buffer_limit_ = config_->max_request_bytes_;
+  }
 
 private:
   void onRequestTimeout();

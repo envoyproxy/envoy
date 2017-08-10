@@ -16,8 +16,7 @@ public:
   Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
-  void onDestroy() override { stream_reset_ = true; }
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -30,6 +29,9 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
+  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    settings.filter_type_ = Http::FilterType::BUFFERING;
+  }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -37,6 +39,9 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
+  }
+  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    settings.filter_type_ = Http::FilterType::BUFFERING;
   }
 
 private:
@@ -49,11 +54,9 @@ private:
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_stat_tracking_{};
-  bool stream_reset_{false};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string grpc_service_;
   std::string grpc_method_;
-  uint32_t buffer_limit_{0};
 };
 
 } // namespace Grpc

@@ -80,7 +80,6 @@ public:
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t limit) override { limiting_buffers_ = limit > 0; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -88,6 +87,9 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  void setDecoderBufferLimit(BufferLimitSettings& settings) override {
+    limiting_buffers_ = settings.buffer_limit_ > 0;
+  }
 
   // RateLimit::RequestCallbacks
   void complete(Envoy::RateLimit::LimitStatus status) override;

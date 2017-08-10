@@ -116,8 +116,6 @@ public:
     config_.reset(new FaultFilterConfig(*config, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    data_.add("hello", 5);
-    filter_->setBufferLimit(3);
   }
 
   void expectDelayTimer(uint64_t duration_ms) {
@@ -273,7 +271,6 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
@@ -339,64 +336,8 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-  data_.drain(2);
-  ASSERT_EQ(3, data_.length());
-
-  // 3 bytes should not trigger the watermark limit.
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-
-  data_.add("a");
-  // This write brings the buffer over the limit
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(1);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-
-  data_.add("a");
-  // The watermark callback should not be called for subsequent writes.
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
-
-  // When the alarm fires, the low watermark callback is called.
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(1);
-  timer_->callback_();
-
-  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
-  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
-}
-
-TEST_F(FaultFilterTest, WatermarkBounds) {
-  SetUpTest(fixed_delay_only_json);
-
-  // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .WillOnce(Return(true));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .WillOnce(Return(5000UL));
-
-  SCOPED_TRACE("FixedDelayNonZeroDuration");
-  expectDelayTimer(5000UL);
-
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
-      .WillOnce(Return(false));
-
-  // Delay only case
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
-      .Times(0);
-  EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(1);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
-  EXPECT_CALL(filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(1);
   timer_->callback_();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());

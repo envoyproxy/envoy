@@ -149,6 +149,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  stream.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
     filter->handle_->onDestroy();
   }
@@ -172,6 +173,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   ActiveStreamPtr new_stream(new ActiveStream(*this));
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
+  new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
   config_.filterFactory().createFilterChain(*new_stream);
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
@@ -367,6 +369,16 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
+
+  BufferLimitSettings settings{buffer_limit_, Http::FilterType::STREAMING};
+  filter->setDecoderBufferLimit(settings);
+  // FIXME corner cases with 0 here and below.
+  if (settings.buffer_limit_ > buffer_limit_) {
+    buffer_limit_ = settings.buffer_limit_;
+  }
+  if (settings.filter_type_ == Http::FilterType::BUFFERING) {
+    decoder_filters_all_streaming_ = false;
+  }
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -374,6 +386,14 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
+  BufferLimitSettings settings{buffer_limit_, Http::FilterType::STREAMING};
+  filter->setEncoderBufferLimit(settings);
+  if (settings.buffer_limit_ > buffer_limit_) {
+    buffer_limit_ = settings.buffer_limit_;
+  }
+  if (settings.filter_type_ == Http::FilterType::BUFFERING) {
+    encoder_filters_all_streaming_ = false;
+  }
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
@@ -966,7 +986,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
   // rebuffer, because we assume the filter has modified the buffer as it wishes in place.
   if (bufferedData().get() != &provided_data) {
     if (!bufferedData()) {
-      bufferedData().reset(new Buffer::OwnedImpl());
+      bufferedData().reset(createBuffer().release());
     }
     bufferedData()->move(provided_data);
   }
@@ -1067,6 +1087,30 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
   parent_.connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
+  if (parent_.encoder_filters_all_streaming_) {
+    onDecoderFilterAboveWriteBufferHighWatermark();
+  } else {
+    HeaderMapPtr response_headers{new HeaderMapImpl{
+        {Headers::get().Status, std::to_string(enumToInt(Http::Code::PayloadTooLarge))}}};
+    std::string body_text = CodeUtility::toString(Http::Code::PayloadTooLarge);
+    response_headers->insertContentLength().value(body_text.size());
+    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+
+    encodeHeaders(std::move(response_headers), false);
+    if (!parent_.destroyed_) {
+      Buffer::OwnedImpl buffer(body_text);
+      encodeData(buffer, true);
+    }
+  }
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
+  if (parent_.encoder_filters_all_streaming_) {
+    onDecoderFilterBelowWriteBufferLowWatermark();
+  }
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
@@ -1091,6 +1135,31 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
+  if (parent_.encoder_filters_all_streaming_) {
+    onEncoderFilterAboveWriteBufferHighWatermark();
+  } else {
+    // FIXME 500
+    HeaderMapPtr response_headers{new HeaderMapImpl{
+        {Headers::get().Status, std::to_string(enumToInt(Http::Code::InternalServerError))}}};
+    std::string body_text = CodeUtility::toString(Http::Code::InternalServerError);
+    response_headers->insertContentLength().value(body_text.size());
+    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+
+    parent_.response_headers_ = std::move(response_headers);
+    parent_.encodeHeaders(nullptr, *parent_.response_headers_, false);
+    if (!parent_.destroyed_) {
+      Buffer::OwnedImpl buffer(body_text);
+      parent_.encodeData(nullptr, buffer, true);
+    }
+  }
+}
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataDrained() {
+  if (parent_.encoder_filters_all_streaming_) {
+    onEncoderFilterBelowWriteBufferLowWatermark();
+  }
+}
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
   parent_.connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();

@@ -50,7 +50,7 @@ public:
     client_ = new Envoy::RateLimit::MockClient();
     filter_.reset(new Filter(config_, Envoy::RateLimit::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    filter_->setBufferLimit(100);
+    filter_->setBufferLimit(BufferLimitSettings{100, FilterType::STREAMING});
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
         route_rate_limit_);

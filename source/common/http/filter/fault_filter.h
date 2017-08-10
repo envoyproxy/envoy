@@ -81,7 +81,6 @@ public:
   ~FaultFilter();
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -89,6 +88,9 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  void setDecoderBufferLimit(BufferLimitSettings& settings) override {
+    settings.filter_type_ = FilterType::STREAMING;
+  }
 
 private:
   void recordAbortsInjectedStats();
@@ -108,8 +110,6 @@ private:
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
-  uint32_t buffer_limit_{0};
-  bool high_watermark_called_{false};
 
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};

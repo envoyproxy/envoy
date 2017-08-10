@@ -280,7 +280,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
   // since it's all moves from here on.
-  // TODO(alyssawilk) figure out how to limit this.
+  // FIXME(alyssawilk) figure out how to limit this.
   if (buffering) {
     Buffer::OwnedImpl copy(data);
     upstream_request_->encodeData(copy, end_stream);

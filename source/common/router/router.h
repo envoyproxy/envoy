@@ -117,7 +117,6 @@ public:
   ~Filter();
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t limit) override { buffer_limit_ = limit; }
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
@@ -128,6 +127,9 @@ public:
     callbacks_ = &callbacks;
     // Have the connection manager inform the router when the downstream buffers are overrun.
     callbacks.addDownstreamWatermarkCallbacks(*this);
+  }
+  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    buffer_limit_ = settings.buffer_limit_;
   }
 
   // Http::DownstreamWatermarkCallbacks

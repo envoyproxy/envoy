@@ -64,7 +64,6 @@ public:
         endpoint_(endpoint) {}
 
   // Http::StreamFilterBase
-  void setBufferLimit(uint32_t) override {} // This filter does not buffer.
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
@@ -73,6 +72,9 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+  }
+  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    settings.filter_type_ = Http::FilterType::STREAMING;
   }
 
   // Http::StreamEncoderFilter
@@ -84,6 +86,9 @@ public:
     return Http::FilterTrailersStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
+  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
+    settings.filter_type_ = Http::FilterType::STREAMING;
+  }
 
 private:
   void onComplete();

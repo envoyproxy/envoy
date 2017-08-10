@@ -222,24 +222,20 @@ public:
   virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
+// FIXME alyssar doxygen.
+enum class FilterType { STREAMING, BUFFERING };
+
+struct BufferLimitSettings {
+  uint32_t buffer_limit_;
+  FilterType filter_type_;
+};
+
 /**
  * Common base class for both decoder and encoder filters.
  */
 class StreamFilterBase {
 public:
   virtual ~StreamFilterBase() {}
-
-  /**
-   * This routine is called on filter creation, setting the buffer limit for the
-   * filter.  Filters should abide by these limits unless custom configuration
-   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * If filters buffer enough bytes to hit the high watermark, it should either
-   * call on[Encoder|Decoder]FilterAboveWriteBufferHighWatermark to halt the
-   * flow of data or send an error response such as 413 (Payload Too Large).
-   * @param byte_limit supplies number of bytes this filter may buffer by default.
-   */
-  virtual void setBufferLimit(uint32_t byte_limit) PURE;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -258,6 +254,22 @@ public:
  */
 class StreamDecoderFilter : public StreamFilterBase {
 public:
+  /**
+   * This routine is called on filter creation, setting the buffer limit for the
+   * filter.  Filters should abide by these limits unless custom configuration
+   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * If filters buffer enough bytes to hit the high watermark, it should either
+   * call on[Encoder|Decoder]FilterAboveWriteBufferHighWatermark to halt the
+   * flow of data or send an error response such as 413 (Payload Too Large).
+   *
+   * If the filter will return StopIterationAndBuffer it may override the buffer
+   * limit in settings, or the filter type.
+   *
+   * @param settings supplies the default buffer limit and filter type for this filter.
+   */
+  virtual void setDecoderBufferLimit(BufferLimitSettings& settings) PURE;
+
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -375,6 +387,15 @@ public:
    * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * This routine is called on filter creation, setting the buffer limit for the
+   * filter.  Filters should abide by these limits unless custom configuration
+   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * FIXME(alyssar) comment.
+   */
+  virtual void setEncoderBufferLimit(BufferLimitSettings& settings) PURE;
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
