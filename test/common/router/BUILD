@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_impl_test",
     srcs = ["config_impl_test.cc"],
     deps = [
+        "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",

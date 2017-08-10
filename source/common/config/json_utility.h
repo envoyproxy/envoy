@@ -37,6 +37,6 @@
   do {                                                                                             \
     if ((json).hasObject(#field_name "_ms")) {                                                     \
       (message).mutable_##field_name()->CopyFrom(                                                  \
-          Protobuf::util::TimeUtil::MillisecondsToDuration(json.getInteger(#field_name "_ms")));   \
+          Protobuf::util::TimeUtil::MillisecondsToDuration((json).getInteger(#field_name "_ms"))); \
     }                                                                                              \
   } while (0)

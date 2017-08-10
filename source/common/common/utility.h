@@ -180,6 +180,13 @@ public:
    */
   static const std::string& nonEmptyStringOrDefault(const std::string& s,
                                                     const std::string& default_value);
+
+  /**
+   * Convert a string to upper case.
+   * @param s string.
+   * @return std::string s converted to upper case.
+   */
+  static std::string toUpper(const std::string& s);
 };
 
 } // namespace Envoy

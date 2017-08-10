@@ -40,6 +40,29 @@ public:
    */
   static void translateHeaderMatcher(const Json::Object& json_header_matcher,
                                      envoy::api::v2::HeaderMatcher& header_matcher);
+
+  /**
+   * Translate a v1 JSON route configuration object to v2 envoy::api::v2::RouteConfiguration.
+   * @param json_route_config source v1 JSON route configuration object.
+   * @param route_config destination v2 envoy::api::v2::RouteConfiguration.
+   */
+  static void translateRouteConfiguration(const Json::Object& json_route_config,
+                                          envoy::api::v2::RouteConfiguration& route_config);
+
+  /**
+   * Translate a v1 JSON virtual host object to v2 envoy::api::v2::VirtualHost.
+   * @param json_virtual_host source v1 JSON virtual host object.
+   * @param virtual_host destination v2 envoy::api::v2::VirtualHost.
+   */
+  static void translateVirtualHost(const Json::Object& json_virtual_host,
+                                   envoy::api::v2::VirtualHost& virtual_host);
+
+  /**
+   * Translate a v1 JSON route object to v2 envoy::api::v2::Route.
+   * @param json_route source v1 JSON route object.
+   * @param route destination v2 envoy::api::v2::Route.
+   */
+  static void translateRoute(const Json::Object& json_route, envoy::api::v2::Route& route);
 };
 
 } // namespace Config

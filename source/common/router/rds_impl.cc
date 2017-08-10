@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
@@ -39,7 +40,11 @@ RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& run
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(const Json::Object& config,
                                                              Runtime::Loader& runtime,
                                                              Upstream::ClusterManager& cm)
-    : config_(new ConfigImpl(config, runtime, cm, true)) {}
+    : config_([&config, &runtime, &cm] {
+        envoy::api::v2::RouteConfiguration route_config;
+        Envoy::Config::RdsJson::translateRouteConfiguration(config, route_config);
+        return new ConfigImpl(route_config, runtime, cm, true);
+      }()) {}
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const Json::Object& config, const std::string& manager_identifier, Runtime::Loader& runtime,
@@ -92,7 +97,9 @@ void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   uint64_t new_hash = response_json->hash();
   if (new_hash != last_config_hash_ || !initialized_) {
     response_json->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
-    ConfigConstSharedPtr new_config(new ConfigImpl(*response_json, runtime_, cm_, false));
+    envoy::api::v2::RouteConfiguration route_config;
+    Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, route_config);
+    ConfigConstSharedPtr new_config(new ConfigImpl(route_config, runtime_, cm_, false));
     initialized_ = true;
     last_config_hash_ = new_hash;
     stats_.config_reload_.inc();

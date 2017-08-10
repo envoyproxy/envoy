@@ -44,11 +44,6 @@ public:
   };
 
   /**
-   * @return the resource priority parsed from JSON.
-   */
-  static Upstream::ResourcePriority parsePriority(const Json::Object& config);
-
-  /**
    * @return the resource priority parsed from proto.
    */
   static Upstream::ResourcePriority parsePriority(const envoy::api::v2::RoutingPriority& priority);

@@ -179,4 +179,12 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
+
+TEST(StringUtil, toUpper) {
+  EXPECT_EQ(StringUtil::toUpper(""), "");
+  EXPECT_EQ(StringUtil::toUpper("a"), "A");
+  EXPECT_EQ(StringUtil::toUpper("Ba"), "BA");
+  EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
+}
+
 } // namespace Envoy

@@ -25,6 +25,7 @@ envoy_cc_test_library(
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/common:base_includes",
+        "//source/common/config:rds_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//test/mocks/runtime:runtime_mocks",

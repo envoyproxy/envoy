@@ -82,9 +82,11 @@ public:
   /**
    * Get an array by name.
    * @param name supplies the key name.
+   * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<ObjectSharedPtr> the array of JSON  objects.
    */
-  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const PURE;
+  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
+                                                      bool allow_empty = false) const PURE;
 
   /**
    * Get a string value by name.

@@ -132,19 +132,16 @@ void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& rou
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
+RateLimitPolicyImpl::RateLimitPolicyImpl(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::RateLimit>& rate_limits)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
-  if (config.hasObject("rate_limits")) {
-    for (const Json::ObjectSharedPtr& json_rate_limit : config.getObjectArray("rate_limits")) {
-      envoy::api::v2::RateLimit rate_limit;
-      Envoy::Config::RdsJson::translateRateLimit(*json_rate_limit, rate_limit);
-      std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-          new RateLimitPolicyEntryImpl(rate_limit));
-      uint64_t stage = rate_limit_policy_entry->stage();
-      ASSERT(stage < rate_limit_entries_reference_.size());
-      rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
-      rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
-    }
+  for (const auto& rate_limit : rate_limits) {
+    std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
+        new RateLimitPolicyEntryImpl(rate_limit));
+    uint64_t stage = rate_limit_policy_entry->stage();
+    ASSERT(stage < rate_limit_entries_reference_.size());
+    rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
+    rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
   }
 }
 

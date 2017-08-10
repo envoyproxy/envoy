@@ -16,11 +16,10 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
@@ -33,30 +32,37 @@ std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
-RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
-  if (!config.hasObject("retry_policy")) {
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
+  if (!config.has_retry_policy()) {
     return;
   }
 
   per_try_timeout_ = std::chrono::milliseconds(
-      config.getObject("retry_policy")->getInteger("per_try_timeout_ms", 0));
-  num_retries_ = config.getObject("retry_policy")->getInteger("num_retries", 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
-  retry_on_ |=
-      RetryStateImpl::parseRetryGrpcOn(config.getObject("retry_policy")->getString("retry_on"));
+      PROTOBUF_GET_MS_OR_DEFAULT(config.retry_policy(), per_try_timeout, 0));
+  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
+  retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
+  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
-  if (!config.hasObject("shadow")) {
+ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
+  if (!config.has_request_mirror_policy()) {
     return;
   }
 
-  cluster_ = config.getObject("shadow")->getString("cluster");
-  runtime_key_ = config.getObject("shadow")->getString("runtime_key", "");
+  cluster_ = config.request_mirror_policy().cluster();
+  runtime_key_ = config.request_mirror_policy().runtime_key();
 }
 
-HashPolicyImpl::HashPolicyImpl(const Json::Object& config)
-    : header_name_(config.getString("header_name")) {}
+HashPolicyImpl::HashPolicyImpl(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy)
+    : header_name_(hash_policy[0].header().header_name()) {
+  // TODO(htuch): Add support for multiple hash policies, #1422.
+  ASSERT(hash_policy.size() == 1);
+  // TODO(htuch): Add support for cookie and source IP hash policies, #1295 and
+  // #1296.
+  ASSERT(hash_policy[0].policy_specifier_case() ==
+         envoy::api::v2::RouteAction::HashPolicy::kHeader);
+}
 
 Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
@@ -71,65 +77,29 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
 
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
-RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
-                                       Runtime::Loader& loader)
-    : case_sensitive_(route.getBoolean("case_sensitive", true)),
-      prefix_rewrite_(route.getString("prefix_rewrite", "")),
-      host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
-      auto_host_rewrite_(route.getBoolean("auto_host_rewrite", false)),
-      use_websocket_(route.getBoolean("use_websocket", false)),
-      cluster_name_(route.getString("cluster", "")),
-      cluster_header_name_(route.getString("cluster_header", "")),
-      timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
-      runtime_(loadRuntimeData(route)), loader_(loader),
-      host_redirect_(route.getString("host_redirect", "")),
-      path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
-      rate_limit_policy_(route), shadow_policy_(route),
-      priority_(ConfigUtility::parsePriority(route)), opaque_config_(parseOpaqueConfig(route)) {
-
-  route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
-
-  // Route can either have a host_rewrite with fixed host header or automatic host rewrite
-  // based on the DNS name of the instance in the backing cluster.
-  if (auto_host_rewrite_ && !host_rewrite_.empty()) {
-    throw EnvoyException("routes cannot have both auto_host_rewrite and host_rewrite options set");
-  }
-
-  bool have_weighted_clusters = route.hasObject("weighted_clusters");
-  bool have_cluster =
-      !cluster_name_.empty() || !cluster_header_name_.get().empty() || have_weighted_clusters;
-
-  // Check to make sure that we are either a redirect route or we have a cluster.
-  if (!(isRedirect() ^ have_cluster)) {
-    throw EnvoyException("routes must be either redirects or cluster targets");
-  }
-
-  // WebSockets are not allowed in redirect route entries.
-  if (isRedirect() && use_websocket_) {
-    throw EnvoyException("Redirect route entries must not have WebSockets enabled");
-  }
-
-  if (have_cluster) {
-    // This is a trick to do a three-way XOR. It would be nice if we could do this with the JSON
-    // schema but there is no obvious way to do this.
-    if ((!cluster_name_.empty() + !cluster_header_name_.get().empty() + have_weighted_clusters) !=
-        1) {
-      throw EnvoyException("routes must specify one of cluster/cluster_header/weighted_clusters");
-    }
-  }
-
+RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
+                                       const envoy::api::v2::Route& route, Runtime::Loader& loader)
+    : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
+      prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
+      vhost_(vhost),
+      auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
+      use_websocket_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false)),
+      cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      runtime_(loadRuntimeData(route.match())), loader_(loader),
+      host_redirect_(route.redirect().host_redirect()),
+      path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
+      rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
+      priority_(ConfigUtility::parsePriority(route.route().priority())),
+      opaque_config_(parseOpaqueConfig(route)) {
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent.
-  if (have_weighted_clusters) {
+  if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
     uint64_t total_weight = 0UL;
+    const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
-    envoy::api::v2::WeightedCluster weighted_cluster;
-    Envoy::Config::RdsJson::translateWeightedCluster(*route.getObject("weighted_clusters"),
-                                                     weighted_cluster);
-    const std::string& runtime_key_prefix = weighted_cluster.runtime_key_prefix();
-
-    for (const auto& cluster : weighted_cluster.clusters()) {
+    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       const std::string& cluster_name = cluster.name();
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
           new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
@@ -144,28 +114,24 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     }
   }
 
-  if (route.hasObject("headers")) {
-    std::vector<Json::ObjectSharedPtr> config_headers = route.getObjectArray("headers");
-    for (const Json::ObjectSharedPtr& header_map : config_headers) {
-      config_headers_.push_back(*header_map);
-    }
+  for (const auto& header_map : route.match().headers()) {
+    config_headers_.push_back(header_map);
   }
 
-  if (route.hasObject("hash_policy")) {
-    hash_policy_.reset(new HashPolicyImpl(*route.getObject("hash_policy")));
+  if (!route.route().hash_policy().empty()) {
+    hash_policy_.reset(new HashPolicyImpl(route.route().hash_policy()));
   }
 
-  if (route.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectSharedPtr& header : route.getObjectArray("request_headers_to_add")) {
-      request_headers_to_add_.push_back(
-          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
-    }
+  for (const auto& header_value_option : route.route().request_headers_to_add()) {
+    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                       header_value_option.header().value()});
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
   include_vh_rate_limits_ =
-      (rate_limit_policy_.empty() || route.getBoolean("include_vh_rate_limits", false));
+      (rate_limit_policy_.empty() ||
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -205,12 +171,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const 
 }
 
 Optional<RouteEntryImplBase::RuntimeData>
-RouteEntryImplBase::loadRuntimeData(const Json::Object& route) {
+RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::RouteMatch& route_match) {
   Optional<RuntimeData> runtime;
-  if (route.hasObject("runtime")) {
+  if (route_match.has_runtime()) {
     RuntimeData data;
-    data.key_ = route.getObject("runtime")->getString("key");
-    data.default_ = route.getObject("runtime")->getInteger("default");
+    data.key_ = route_match.runtime().runtime_key();
+    data.default_ = route_match.runtime().default_value();
     runtime.value(data);
   }
 
@@ -254,14 +220,19 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
 }
 
 std::multimap<std::string, std::string>
-RouteEntryImplBase::parseOpaqueConfig(const Json::Object& route) {
+RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   std::multimap<std::string, std::string> ret;
-  if (route.hasObject("opaque_config")) {
-    Json::ObjectSharedPtr obj = route.getObject("opaque_config");
-    obj->iterate([&ret](const std::string& name, const Json::Object& value) {
-      ret.emplace(name, value.asString());
-      return true;
-    });
+  if (route.has_metadata()) {
+    const auto filter_metadata =
+        route.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_ROUTER);
+    if (filter_metadata == route.metadata().filter_metadata().end()) {
+      return ret;
+    }
+    for (auto it : filter_metadata->second.fields()) {
+      if (it.second.kind_case() == Protobuf::Value::kStringValue) {
+        ret.emplace(it.first, it.second.string_value());
+      }
+    }
   }
   return ret;
 }
@@ -356,9 +327,10 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   }
 }
 
-PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
+PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
+                                           const envoy::api::v2::Route& route,
                                            Runtime::Loader& loader)
-    : RouteEntryImplBase(vhost, route, loader), prefix_(route.getString("prefix")) {}
+    : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers);
@@ -375,9 +347,9 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers
   return nullptr;
 }
 
-PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
-                                       Runtime::Loader& loader)
-    : RouteEntryImplBase(vhost, route, loader), path_(route.getString("path")) {}
+PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
+                                       const envoy::api::v2::Route& route, Runtime::Loader& loader)
+    : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
 void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers);
@@ -413,44 +385,40 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
   return nullptr;
 }
 
-VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
+VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host,
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
-    : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host),
+    : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config) {
-
-  virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
-
-  std::string require_ssl = virtual_host.getString("require_ssl", "");
-  if (require_ssl == "") {
+  switch (virtual_host.require_tls()) {
+  case envoy::api::v2::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
-  } else if (require_ssl == "all") {
-    ssl_requirements_ = SslRequirements::ALL;
-  } else {
-    ASSERT(require_ssl == "external_only");
+    break;
+  case envoy::api::v2::VirtualHost::EXTERNAL_ONLY:
     ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
+    break;
+  case envoy::api::v2::VirtualHost::ALL:
+    ssl_requirements_ = SslRequirements::ALL;
+    break;
+  default:
+    NOT_REACHED;
   }
 
-  if (virtual_host.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectSharedPtr& header :
-         virtual_host.getObjectArray("request_headers_to_add")) {
-      request_headers_to_add_.push_back(
-          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
-    }
+  for (const auto& header_value_option : virtual_host.request_headers_to_add()) {
+    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                       header_value_option.header().value()});
   }
 
-  for (const Json::ObjectSharedPtr& route : virtual_host.getObjectArray("routes")) {
-    bool has_prefix = route->hasObject("prefix");
-    bool has_path = route->hasObject("path");
-    if (!(has_prefix ^ has_path)) {
-      throw EnvoyException("routes must specify either prefix or path");
-    }
-
+  for (const auto& route : virtual_host.routes()) {
+    const bool has_prefix =
+        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;
+    const bool has_path = route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPath;
     if (has_prefix) {
-      routes_.emplace_back(new PrefixRouteEntryImpl(*this, *route, runtime));
+      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
     } else {
       ASSERT(has_path);
-      routes_.emplace_back(new PathRouteEntryImpl(*this, *route, runtime));
+      UNREFERENCED_PARAMETER(has_path);
+      routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
     }
 
     if (validate_clusters) {
@@ -464,13 +432,8 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
     }
   }
 
-  if (virtual_host.hasObject("virtual_clusters")) {
-    for (const Json::ObjectSharedPtr& json_virtual_cluster :
-         virtual_host.getObjectArray("virtual_clusters")) {
-      envoy::api::v2::VirtualCluster virtual_cluster;
-      Envoy::Config::RdsJson::translateVirtualCluster(*json_virtual_cluster, virtual_cluster);
-      virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
-    }
+  for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
+    virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
   }
 }
 
@@ -514,19 +477,15 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& 
   return nullptr;
 }
 
-RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& global_route_config,
-                           Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-                           bool validate_clusters) {
-
-  json_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
-
-  for (const Json::ObjectSharedPtr& virtual_host_config :
-       json_config.getObjectArray("virtual_hosts")) {
-    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(*virtual_host_config, global_route_config,
+RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_config,
+                           const ConfigImpl& global_route_config, Runtime::Loader& runtime,
+                           Upstream::ClusterManager& cm, bool validate_clusters) {
+  for (const auto& virtual_host_config : route_config.virtual_hosts()) {
+    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
 
-    for (const std::string& domain : virtual_host_config->getStringArray("domains")) {
+    for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
@@ -622,36 +581,28 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   return nullptr;
 }
 
-ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
+ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
                        Upstream::ClusterManager& cm, bool validate_clusters_default) {
-  route_matcher_.reset(
-      new RouteMatcher(config, *this, runtime, cm,
-                       config.getBoolean("validate_clusters", validate_clusters_default)));
+  route_matcher_.reset(new RouteMatcher(
+      config, *this, runtime, cm,
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));
 
-  if (config.hasObject("internal_only_headers")) {
-    for (const std::string& header : config.getStringArray("internal_only_headers")) {
-      internal_only_headers_.push_back(Http::LowerCaseString(header));
-    }
+  for (const std::string& header : config.internal_only_headers()) {
+    internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  if (config.hasObject("response_headers_to_add")) {
-    for (const Json::ObjectSharedPtr& header : config.getObjectArray("response_headers_to_add")) {
-      response_headers_to_add_.push_back(
-          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
-    }
+  for (const auto& header_value_option : config.response_headers_to_add()) {
+    response_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                        header_value_option.header().value()});
   }
 
-  if (config.hasObject("response_headers_to_remove")) {
-    for (const std::string& header : config.getStringArray("response_headers_to_remove")) {
-      response_headers_to_remove_.push_back(Http::LowerCaseString(header));
-    }
+  for (const std::string& header : config.response_headers_to_remove()) {
+    response_headers_to_remove_.push_back(Http::LowerCaseString(header));
   }
 
-  if (config.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectSharedPtr& header : config.getObjectArray("request_headers_to_add")) {
-      request_headers_to_add_.push_back(
-          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
-    }
+  for (const auto& header_value_option : config.request_headers_to_add()) {
+    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
+                                       header_value_option.header().value()});
   }
 }
 

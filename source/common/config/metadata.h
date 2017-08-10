@@ -44,6 +44,8 @@ class MetadataFilterValues {
 public:
   // Filter namespace for built-in load balancer.
   const std::string ENVOY_LB = "envoy.lb";
+  // Filter namespace for built-in router opaque data.
+  const std::string ENVOY_ROUTER = "envoy.router";
 };
 
 typedef ConstSingleton<MetadataFilterValues> MetadataFilters;
