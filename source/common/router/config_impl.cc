@@ -417,6 +417,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
     } else {
       ASSERT(has_path);
+      UNREFERENCED_PARAMETER(has_path);
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
     }
 
