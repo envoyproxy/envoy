@@ -252,20 +252,21 @@ std::string ConnectionImpl::subjectPeerCertificate() {
     return "";
   }
 
-  // Format settings for a single line in RFC 2253 format.
-  constexpr int indent = 0;
-  constexpr unsigned long flags = XN_FLAG_RFC2253;
+  bssl::UniquePtr<BIO> buf(IO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
 
-  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), indent, flags);
-  const uint8_t* buf_data;
-  size_t buf_data_len;
-  int mem_content_rc = BIO_mem_contents(buf.get(), &buf_data, &buf_data_len);
+  // [indent=0 flags=XN_FLAG_RFC2253] is the documented set of parameters for
+  // single-line in RFC 2253 format.
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
+
+  const uint8_t* data;
+  size_t data_len;
+  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
   // It should be impossible for BIO_mem_contents to fail when called with a BIO
   // created using BIO_s_mem().
-  UNREFERENCED_PARAMETER(mem_content_rc);
-  ASSERT(mem_content_rc == 1);
-  return std::string(reinterpret_cast<const char*>(buf_data), buf_data_len);
+  UNREFERENCED_PARAMETER(rc);
+  ASSERT(rc == 1);
+  return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
