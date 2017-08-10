@@ -252,7 +252,7 @@ std::string ConnectionImpl::subjectPeerCertificate() {
     return "";
   }
 
-  bssl::UniquePtr<BIO> buf(IO_new(BIO_s_mem()));
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr);
 
   // [indent=0 flags=XN_FLAG_RFC2253] is the documented set of parameters for
