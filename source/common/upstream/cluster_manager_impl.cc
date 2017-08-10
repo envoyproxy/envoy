@@ -645,7 +645,7 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::ConfigSourc
                                                const Optional<SdsConfig>& sds_config,
                                                ClusterManager& cm) {
   return CdsApiImpl::create(cds_config, sds_config, cm, primary_dispatcher_, random_, local_info_,
-                            stats_);
+                            *cds_scope_);
 }
 
 } // namespace Upstream

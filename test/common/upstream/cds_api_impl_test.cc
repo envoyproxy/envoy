@@ -41,8 +41,9 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
-    cds_ =
-        CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_);
+    cds_scope_ = store_.createScope("cluster_manager.cds.");
+    cds_ = CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_,
+                              *cds_scope_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -85,6 +86,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
+  Stats::ScopePtr cds_scope_;
   Http::MockAsyncClientRequest request_;
   CdsApiPtr cds_;
   Event::MockTimer* interval_timer_;
