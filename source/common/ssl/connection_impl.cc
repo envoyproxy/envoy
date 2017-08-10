@@ -264,8 +264,8 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   int rc = BIO_mem_contents(buf.get(), &data, &data_len);
   // It should be impossible for BIO_mem_contents to fail when called with a BIO
   // created using BIO_s_mem().
-  UNREFERENCED_PARAMETER(rc);
   ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
