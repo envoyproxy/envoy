@@ -1,7 +1,7 @@
-
-
 #include "server/config/http/gzip.h"
+
 #include "envoy/registry/registry.h"
+
 #include "common/http/filter/gzip_filter.h"
 
 namespace Envoy {

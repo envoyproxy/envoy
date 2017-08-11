@@ -1,5 +1,6 @@
 #include "common/http/filter/gzip_filter.h"
 #include "common/common/assert.h"
+
 #include "zlib.h"
 
 #include <iostream>
