@@ -193,7 +193,7 @@ public:
         new Http::TestHeaderMapImpl{{":status", code}});
     if (service_cluster.valid()) {
       response_headers->addCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
-                                   service_cluster.value());
+                                service_cluster.value());
     }
     if (conn_close) {
       response_headers->addCopy("connection", "close");
