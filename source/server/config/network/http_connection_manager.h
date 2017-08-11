@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/http/filter.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
@@ -69,7 +70,7 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     Json::Validator {
 public:
   HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context,
-                              Http::DateProvider& date_provider);
+                              Http::DateProvider& date_provider, Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -147,6 +148,7 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
+  Router::RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 /**

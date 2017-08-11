@@ -30,6 +30,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/router:rds_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/network:network_mocks",

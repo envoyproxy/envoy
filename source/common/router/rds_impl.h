@@ -10,6 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
@@ -124,7 +125,7 @@ private:
 };
 
 // TODO(junr03): use then singleton manager in #1410.
-class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager {
+class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager, public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,

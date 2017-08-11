@@ -59,6 +59,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
