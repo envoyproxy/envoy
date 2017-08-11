@@ -124,7 +124,6 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
-// TODO(junr03): use then singleton manager in #1410.
 class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager, public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
