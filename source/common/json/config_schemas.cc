@@ -354,11 +354,34 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
 
 const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
-    "$schema": "http://json-schema.org/schema#",
+    "$schema" : "http://json-schema.org/schema#",
     "type" : "object",
-    "properties":{
+    "properties" : {
       "stat_prefix" : {"type" : "string"},
-      "access_log" : {"type" : "string"}
+      "access_log" : {"type" : "string"},
+      "fault" : {
+        "type" : "object",
+        "properties" : {
+          "delay" : {
+            "type" : "object",
+            "properties" : {
+              "percent" : {
+                "type" : "integer",
+                "minimum" : 0,
+                "maximum" : 100
+              },
+              "duration_ms" : {
+                "type" : "integer",
+                "minimum" : 0
+              }
+            },
+            "required" : ["percent", "duration_ms"],
+            "additionalProperties" : false
+          }
+        },
+        "required": ["delay"],
+        "additionalProperties" : false
+      }
     },
     "required": ["stat_prefix"],
     "additionalProperties" : false

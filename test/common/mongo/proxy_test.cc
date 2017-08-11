@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
@@ -52,9 +53,20 @@ public:
   DecoderCallbacks* callbacks_{};
 };
 
+class TestFaultConfig : public FaultConfig {
+public:
+  uint32_t delayPercent() const override { return delay_percent_; }
+  uint64_t delayDuration() const override { return duration_ms_; }
+
+  uint32_t delay_percent_;
+  uint64_t duration_ms_;
+};
+
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() {
+  MongoProxyFilterTest() { setup(); }
+
+  void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.connection_logging_enabled", 100))
@@ -64,23 +76,89 @@ public:
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
     access_log_.reset(new AccessLog("test", log_manager_));
-    filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_));
+  }
+
+  void initializeFilter() {
+    filter_.reset(
+        new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_, dispatcher_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
+  }
+
+  void setupDelayFault(uint64_t duration_ms, uint32_t delay_percent, bool enable_fault) {
+    TestFaultConfig* test_config = new TestFaultConfig();
+    test_config->duration_ms_ = duration_ms;
+    test_config->delay_percent_ = delay_percent;
+    fault_config_.reset(test_config);
+
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.delay.percent", delay_percent))
+        .WillOnce(Return(enable_fault));
+
+    if (enable_fault) {
+      EXPECT_CALL(runtime_.snapshot_, getInteger("mongo.fault.delay.duration_ms", duration_ms))
+          .WillOnce(Return(duration_ms));
+    }
   }
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
   AccessLogSharedPtr access_log_;
+  FaultConfigSharedPtr fault_config_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
 };
 
+TEST_F(MongoProxyFilterTest, DelayFaults) {
+  const uint64_t delay = 10;
+  setupDelayFault(delay, 50, true);
+  initializeFilter();
+
+  Event::MockTimer* delay_timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay)));
+  EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+
+  EXPECT_CALL(*delay_timer, disableTimer());
+  delay_timer->callback_();
+  EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
+}
+
+TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
+  setupDelayFault(10, 50, false);
+  initializeFilter();
+
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data_));
+  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
+}
+
 TEST_F(MongoProxyFilterTest, Stats) {
+  initializeFilter();
+
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -149,9 +227,12 @@ TEST_F(MongoProxyFilterTest, Stats) {
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
   EXPECT_EQ(1U, store_.counter("test.op_insert").value());
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
+  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, CommandStats) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
@@ -178,6 +259,8 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
 }
 
 TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
+  initializeFilter();
+
   std::string json = R"EOF(
     {
       "hostname":"api-production-iad-canary",
@@ -223,6 +306,8 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
 }
 
 TEST_F(MongoProxyFilterTest, MultiGet) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
@@ -238,6 +323,8 @@ TEST_F(MongoProxyFilterTest, MultiGet) {
 }
 
 TEST_F(MongoProxyFilterTest, MaxTime) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
@@ -251,6 +338,8 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
 }
 
 TEST_F(MongoProxyFilterTest, DecodeError) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     throw EnvoyException("bad decode");
   }));
@@ -263,6 +352,8 @@ TEST_F(MongoProxyFilterTest, DecodeError) {
 }
 
 TEST_F(MongoProxyFilterTest, ConcurrentQuery) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(1, 0));
     message->fullCollectionName("db.test");
@@ -297,6 +388,8 @@ TEST_F(MongoProxyFilterTest, ConcurrentQuery) {
 }
 
 TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
@@ -320,6 +413,8 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
@@ -336,6 +431,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
+  initializeFilter();
+
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
