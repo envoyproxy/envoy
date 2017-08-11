@@ -220,7 +220,7 @@ public:
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,
-               RouteConfigProviderSharedPtr(const Json::Object& config,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::Rds& rds,
                                             Upstream::ClusterManager& cm, Stats::Scope& scope,
                                             const std::string& stat_prefix,
                                             Init::Manager& init_manager));

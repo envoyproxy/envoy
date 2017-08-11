@@ -171,7 +171,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "envoy_filter_http_connection_manager",
+    ],
     deps = [
         ":json_utility_lib",
         "//include/envoy/config:subscription_interface",
@@ -179,5 +182,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/common/json:config_schemas_lib",
     ],
 )
