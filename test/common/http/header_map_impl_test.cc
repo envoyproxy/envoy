@@ -324,24 +324,22 @@ struct HeaderBrutalityResult {
   const void* keyPtr;
 };
 
-const HeaderBrutalityResult doHeaderBrutality(HeaderMapImpl& headers, LowerCaseString &lcKey) {
-  HeaderBrutalityResult result{
-    headers.get(lcKey)->value(),
-    static_cast<const void*>(lcKey.get().data())
-  };
+const HeaderBrutalityResult doHeaderBrutality(HeaderMapImpl& headers, LowerCaseString& lcKey) {
+  HeaderBrutalityResult result{headers.get(lcKey)->value(),
+                               static_cast<const void*>(lcKey.get().data())};
 
   // This is... not exactly legal, but let's do it anyway. It should
   // safe, since lcKey is still in scope here.
   memcpy(const_cast<void*>(result.keyPtr), static_cast<const void*>("XXXXX"), 5);
 
   // Make sure our brutality worked.
-  EXPECT_STREQ("XXXXX", lcKey.get().c_str()); 
+  EXPECT_STREQ("XXXXX", lcKey.get().c_str());
 
   return result;
 }
 
 const HeaderBrutalityResult addAHeaderString(HeaderMapImpl& headers) {
-  // This needs to not be a parameter. Part of the test is that the 
+  // This needs to not be a parameter. Part of the test is that the
   // key we're using actually goes out of scope before we check the
   // HeaderMap for the value we need.
   LowerCaseString lcKey("hello");
@@ -352,7 +350,7 @@ const HeaderBrutalityResult addAHeaderString(HeaderMapImpl& headers) {
 }
 
 const HeaderBrutalityResult addAHeaderInt(HeaderMapImpl& headers) {
-  // This needs to not be a parameter. Part of the test is that the 
+  // This needs to not be a parameter. Part of the test is that the
   // key we're using actually goes out of scope before we check the
   // HeaderMap for the value we need.
   LowerCaseString lcKey("hello");
@@ -377,7 +375,7 @@ const HeaderBrutalityResult addAHeaderInt(HeaderMapImpl& headers) {
 //                 << std::endl;
 //     },
 //     nullptr
-//   );  
+//   );
 // }
 
 TEST(HeaderMapImplTest, AddCopy) {
@@ -398,7 +396,7 @@ TEST(HeaderMapImplTest, AddCopy) {
 
   std::string hrm("he");
 
-  LowerCaseString lcKey2(hrm + "llo");  // Try to force the compiler's hand here.
+  LowerCaseString lcKey2(hrm + "llo"); // Try to force the compiler's hand here.
 
   // ...and try making sure that that did what we want. It has the string value
   // "hello", but it's not at the same address as our previous "hello".
@@ -423,7 +421,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_EQ(1UL, headers.size());
 
   // We can make yet another different key to look up here.
-  LowerCaseString lcKey3(hrm + "ll" + "o");  // Try to force the compiler's hand here.
+  LowerCaseString lcKey3(hrm + "ll" + "o"); // Try to force the compiler's hand here.
   EXPECT_STREQ("hello", lcKey3.get().c_str());
   EXPECT_NE(v1.keyPtr, static_cast<const void*>(lcKey3.get().data()));
   EXPECT_NE(v2.keyPtr, static_cast<const void*>(lcKey3.get().data()));

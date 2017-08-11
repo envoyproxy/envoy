@@ -143,7 +143,7 @@ namespace Http {
  * A test version of HeaderMapImpl that adds some niceties since the prod one makes it very
  * difficult to do any string copies without really meaning to.
  *
- * @kflynn: might be able to just refactor around this now that addCopy is there? but the 
+ * @kflynn: might be able to just refactor around this now that addCopy is there? but the
  * methods using std::string keys are convenient, at least.
  */
 class TestHeaderMapImpl : public HeaderMapImpl {

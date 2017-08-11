@@ -292,8 +292,8 @@ public:
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addReferenceKey multiple times for the same header will result in multiple headers
+   * being present in the HeaderMap.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -305,8 +305,8 @@ public:
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addReferenceKey multiple times for the same header will result in multiple headers
+   * being present in the HeaderMap.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
