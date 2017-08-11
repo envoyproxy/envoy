@@ -62,8 +62,8 @@ public:
   void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
 
   // Add copying both key and value.
-  void addCopy(const LowerCaseString& key, uint64_t value);
-  void addCopy(const LowerCaseString& key, const std::string& value);
+  void addCopy(const LowerCaseString& key, uint64_t value) override;
+  void addCopy(const LowerCaseString& key, const std::string& value) override;
 
   uint64_t byteSize() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
