@@ -100,11 +100,9 @@ public:
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
-   * a way that affect routing, clearRouteCache() must be called to clear the cache.
+   * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
-   *       routing (such as the request headers). In the future we may also want to allow the
-   *       filter to override the route entry.
+   * NOTE: In the future we may want to allow the filter to override the route entry.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
 
