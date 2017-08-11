@@ -35,14 +35,11 @@ protected:
 };
 
 /**
- * SimpleRequest hashes the first argument as the key and sends the request to a single Redis.
+ * SingleServerRequest goes to a single Redis
  */
-class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
+class SingleServerRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
-  ~SimpleRequest();
-
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+  ~SingleServerRequest();
 
   // Redis::ConnPool::PoolCallbacks
   void onResponse(RespValuePtr&& response) override;
@@ -51,15 +48,42 @@ public:
   // Redis::CommandSplitter::SplitRequest
   void cancel() override;
 
-private:
-  SimpleRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+protected:
+  SingleServerRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
   ConnPool::PoolRequest* handle_{};
 };
 
-class EvalRequest : public SimpleRequest {};
+/**
+ * SimpleRequest hashes the first argument as the key.
+ */
+class SimpleRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
 
+private:
+  SimpleRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
+
+/**
+ * EvalRequest hashes the fourth argument as the key.
+ */
+class EvalRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  EvalRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
+
+/**
+ * FragmentedRequest is a request that contains multiple keys. An individual request is sent to the
+ * appropriate server for each key. The responses from all servers are combined and returned to the
+ * client.
+ */
 class FragmentedRequest : public SplitRequest {
 public:
   ~FragmentedRequest();

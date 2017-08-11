@@ -21,7 +21,22 @@ RespValuePtr Utility::makeError(const std::string& error) {
   return response;
 }
 
-SimpleRequest::~SimpleRequest() { ASSERT(!handle_); }
+SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
+
+void SingleServerRequest::onResponse(RespValuePtr&& response) {
+  handle_ = nullptr;
+  callbacks_.onResponse(std::move(response));
+}
+
+void SingleServerRequest::onFailure() {
+  handle_ = nullptr;
+  callbacks_.onResponse(Utility::makeError("upstream failure"));
+}
+
+void SingleServerRequest::cancel() {
+  handle_->cancel();
+  handle_ = nullptr;
+}
 
 SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                       const RespValue& incoming_request,
@@ -38,19 +53,24 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
   return std::move(request_ptr);
 }
 
-void SimpleRequest::onResponse(RespValuePtr&& response) {
-  handle_ = nullptr;
-  callbacks_.onResponse(std::move(response));
-}
+SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
+                                    const RespValue& incoming_request, SplitCallbacks& callbacks) {
 
-void SimpleRequest::onFailure() {
-  handle_ = nullptr;
-  callbacks_.onResponse(Utility::makeError("upstream failure"));
-}
+  if (incoming_request.asArray().size() < 4) {
+    callbacks.onResponse(Utility::makeError("wrong number of arguments for command"));
+    return nullptr;
+  }
 
-void SimpleRequest::cancel() {
-  handle_->cancel();
-  handle_ = nullptr;
+  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks)};
+
+  request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
+                                               incoming_request, *request_ptr);
+  if (!request_ptr->handle_) {
+    request_ptr->callbacks_.onResponse(Utility::makeError("no upstream host"));
+    return nullptr;
+  }
+
+  return std::move(request_ptr);
 }
 
 FragmentedRequest::~FragmentedRequest() {
@@ -294,7 +314,6 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
     addHandler(scope, stat_prefix, command, split_keys_sum_result_handler_);
   }
 
-  // TODO(danielhochman): support for EVAL
   addHandler(scope, stat_prefix, SupportedCommands::mget(), mget_handler_);
   addHandler(scope, stat_prefix, SupportedCommands::mset(), mset_handler_);
 }
