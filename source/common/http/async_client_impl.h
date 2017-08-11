@@ -201,6 +201,7 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

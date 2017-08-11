@@ -902,14 +902,17 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
-  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
-    callbacks->onAboveWriteBufferHighWatermark();
+  ++high_watermark_count_;
+  if (watermark_callbacks_) {
+    watermark_callbacks_->onAboveWriteBufferHighWatermark();
   }
 }
 
 void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
-  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
-    callbacks->onBelowWriteBufferLowWatermark();
+  ASSERT(high_watermark_count_ > 0);
+  --high_watermark_count_;
+  if (watermark_callbacks_) {
+    watermark_callbacks_->onBelowWriteBufferLowWatermark();
   }
 }
 
@@ -1072,6 +1075,26 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
   parent_.response_encoder_->getStream().readDisable(false);
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
+    DownstreamWatermarkCallbacks& watermark_callbacks) {
+  // This is called exactly once per stream, by the router filter.
+  // If there's ever a need for another filter to subscribe to watermark callbacks this can be
+  // turned into a vector.
+  ASSERT(parent_.watermark_callbacks_ == nullptr);
+  parent_.watermark_callbacks_ = &watermark_callbacks;
+  for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
+    watermark_callbacks.onAboveWriteBufferHighWatermark();
+  }
+}
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
+    DownstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
+  for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
+    watermark_callbacks.onBelowWriteBufferLowWatermark();
+  }
+  parent_.watermark_callbacks_ = nullptr;
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
