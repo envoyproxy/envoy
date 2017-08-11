@@ -33,10 +33,8 @@ static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singl
                                  Singleton::Registration>
     date_provider_singleton_registered_;
 
-static constexpr char route_config_provider_manager_singleton_name[] =
-    "route_config_provider_manager_singleton_name";
 static Registry::RegisterFactory<
-    Singleton::RegistrationImpl<route_config_provider_manager_singleton_name>,
+    Singleton::RegistrationImpl<Router::route_config_provider_manager_singleton_name>,
     Singleton::Registration>
     route_config_provider_manager_singleton_registered_;
 
@@ -52,7 +50,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
 
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          route_config_provider_manager_singleton_name, [&context] {
+          Router::route_config_provider_manager_singleton_name, [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
                 context.threadLocal());

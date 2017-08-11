@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -314,6 +315,27 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
   return Http::Code::OK;
 }
 
+static constexpr char route_config_provider_manager_singleton_name[] = "route_config_provider_manager_singleton_name";
+
+Http::Code AdminImpl::handlerRoutes(const std::string&, Buffer::Instance& response) {
+  auto route_config_provider_manager =
+  server_.singletonManager().getTyped<Router::ServerRouteConfigProviderManager>(Router::route_config_provider_manager_singleton_name, [] {
+    // If there is no RouteConfigProviderManager in the server's Singleton::Manager, then
+    // there are no currently loaded Http Filter Stacks.
+    return nullptr;
+  });
+
+  if (route_config_provider_manager == nullptr) {
+    response.add("There are no dynamic route tables currently loaded.");
+    return Http::Code::OK;
+  }
+
+  for (auto routeConfigProvider : route_config_provider_manager->routeConfigProviders()) {
+    // Add the configuration to the response.
+  }
+  return Http::Code::OK;
+}
+
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
   ENVOY_STREAM_LOG(info, "request complete: path: {}", *callbacks_, path);
@@ -357,7 +379,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
-          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)}} {
+          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)},
+          {"/routes", "print currently loaded RDS route tables", MAKE_HANDLER(handlerRoutes)}} {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);

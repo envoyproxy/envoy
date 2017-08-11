@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace Router {
 
+static constexpr char route_config_provider_manager_singleton_name[] = "route_config_provider_manager_singleton_name";
+
 /**
  * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
  * is exposed to the Server's FactoryContext in order to allow HttpConnectionManagers to get
