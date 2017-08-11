@@ -70,7 +70,8 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     Json::Validator {
 public:
   HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context,
-                              Http::DateProvider& date_provider, Router::RouteConfigProviderManager& route_config_provider_manager);
+                              Http::DateProvider& date_provider,
+                              Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;

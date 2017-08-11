@@ -33,8 +33,12 @@ static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singl
                                  Singleton::Registration>
     date_provider_singleton_registered_;
 
-static constexpr char route_config_provider_manager_singleton_name[] = "route_config_provider_manager_singleton_name";
-static Registry::RegisterFactory<Singleton::RegistrationImpl<route_config_provider_manager_singleton_name>, Singleton::Registration> route_config_provider_manager_singleton_registered_;
+static constexpr char route_config_provider_manager_singleton_name[] =
+    "route_config_provider_manager_singleton_name";
+static Registry::RegisterFactory<
+    Singleton::RegistrationImpl<route_config_provider_manager_singleton_name>,
+    Singleton::Registration>
+    route_config_provider_manager_singleton_registered_;
 
 NetworkFilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& config,
@@ -47,13 +51,17 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
           });
 
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
-  context.singletonManager().getTyped<Router::RouteConfigProviderManager>(route_config_provider_manager_singleton_name, [&context] {
-    return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.runtime(), context.dispatcher(), context.random(), context.localInfo(), context.threadLocal());
-  });
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          route_config_provider_manager_singleton_name, [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
+                context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
+                context.threadLocal());
+          });
 
-  std::shared_ptr<HttpConnectionManagerConfig> http_config(
-      new HttpConnectionManagerConfig(config, context, *date_provider, *route_config_provider_manager));
-  return [http_config, &context, date_provider, route_config_provider_manager](Network::FilterManager& filter_manager) -> void {
+  std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
+      config, context, *date_provider, *route_config_provider_manager));
+  return [http_config, &context, date_provider,
+          route_config_provider_manager](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
@@ -85,9 +93,9 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   return "";
 }
 
-HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
-                                                         FactoryContext& context,
-                                                         Http::DateProvider& date_provider, Router::RouteConfigProviderManager& route_config_provider_manager)
+HttpConnectionManagerConfig::HttpConnectionManagerConfig(
+    const Json::Object& config, FactoryContext& context, Http::DateProvider& date_provider,
+    Router::RouteConfigProviderManager& route_config_provider_manager)
     : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), context_(context),
       stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),

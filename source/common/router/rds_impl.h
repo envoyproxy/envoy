@@ -124,7 +124,8 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
-class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager, public Singleton::Instance {
+class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager,
+                                       public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
