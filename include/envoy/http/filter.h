@@ -99,7 +99,7 @@ public:
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
-   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in 
+   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affect routing, clearRouteCache() must be called to clear the cache.
    *
    * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
