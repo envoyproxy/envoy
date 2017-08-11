@@ -330,6 +330,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    void clearRouteCache() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;

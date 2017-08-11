@@ -102,12 +102,16 @@ public:
    * caching where applicable to avoid multiple lookups.
    *
    * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
-   *       routing (such as the request headers). In practice, we don't do this anywhere currently,
-   *       but in the future we might need to provide the ability to clear the cache if a filter
-   *       knows that it has modified the headers in a way that would affect routing. In the future
-   *       we may also want to allow the filter to override the route entry.
+   *       routing (such as the request headers). In the future we may also want to allow the
+   *       filter to override the route entry.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Clears the route cache for the current request. This must be called when a filter has modified
+   * the headers in a way that would affect routing.
+   */
+  virtual void clearRouteCache() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
