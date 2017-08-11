@@ -158,12 +158,10 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
     const envoy::api::v2::filter::Rds& rds, Upstream::ClusterManager& cm, Stats::Scope& scope,
     const std::string& stat_prefix, Init::Manager& init_manager) {
 
-  // RdsRouteConfigProviders are unique based on their
-  // <route_config_name>MAP_CONCATENATOR<serialized RDS config>.
+  // RdsRouteConfigProviders are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a
   // strong hash instead.
-  const std::string manager_identifier =
-      rds.route_config_name() + MAP_CONCATENATOR + rds.SerializeAsString();
+  const std::string manager_identifier = rds.SerializeAsString();
 
   auto it = route_config_providers_.find(manager_identifier);
   if (it == route_config_providers_.end()) {
