@@ -120,7 +120,7 @@ TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
-  big_headers.addViaCopy("big", std::string(63 * 1024, 'a'));
+  big_headers.addCopy("big", std::string(63 * 1024, 'a'));
 
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));

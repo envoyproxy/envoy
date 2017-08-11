@@ -140,11 +140,8 @@ private:
 namespace Http {
 
 /**
- * A test version of HeaderMapImpl that adds some niceties since the prod one makes it very
- * difficult to do any string copies without really meaning to.
- *
- * @kflynn: might be able to just refactor around this now that addCopy is there? but the
- * methods using std::string keys are convenient, at least.
+ * A test version of HeaderMapImpl that adds some niceties around letting us use
+ * std::string instead of always doing LowerCaseString() by hand.
  */
 class TestHeaderMapImpl : public HeaderMapImpl {
 public:
@@ -152,7 +149,8 @@ public:
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
 
-  void addViaCopy(const std::string& key, const std::string& value);
+  using HeaderMapImpl::addCopy;
+  void addCopy(const std::string& key, const std::string& value);
   std::string get_(const std::string& key);
   std::string get_(const LowerCaseString& key);
   bool has(const std::string& key);

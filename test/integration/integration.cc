@@ -363,7 +363,7 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
              {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
              {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
          if (big_header) {
-           headers.addViaCopy("big", std::string(4096, 'a'));
+           headers.addCopy("big", std::string(4096, 'a'));
          }
 
          codec_client->makeRequestWithBody(headers, request_size, *response);
@@ -1115,7 +1115,7 @@ void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
-  big_headers.addViaCopy("big", std::string(60 * 1024, 'a'));
+  big_headers.addCopy("big", std::string(60 * 1024, 'a'));
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },

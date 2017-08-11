@@ -435,10 +435,10 @@ TEST(HeaderMapImplTest, Equality) {
   TestHeaderMapImpl headers2;
   EXPECT_EQ(headers1, headers2);
 
-  headers1.addViaCopy("hello", "world");
+  headers1.addCopy("hello", "world");
   EXPECT_FALSE(headers1 == headers2);
 
-  headers2.addViaCopy("foo", "bar");
+  headers2.addCopy("foo", "bar");
   EXPECT_FALSE(headers1 == headers2);
 }
 

@@ -167,13 +167,13 @@ TestHeaderMapImpl::TestHeaderMapImpl(
     const std::initializer_list<std::pair<std::string, std::string>>& values)
     : HeaderMapImpl() {
   for (auto& value : values) {
-    addViaCopy(value.first, value.second);
+    addCopy(value.first, value.second);
   }
 }
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
 
-void TestHeaderMapImpl::addViaCopy(const std::string& key, const std::string& value) {
+void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
   addCopy(LowerCaseString(key), value);
 }
 
