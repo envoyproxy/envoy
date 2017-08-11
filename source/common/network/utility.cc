@@ -76,17 +76,18 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
+                                                              uint16_t port) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
-    sa4.sin_port = 0;
+    sa4.sin_port = htons(port);
     return std::make_shared<Address::Ipv4Instance>(&sa4);
   }
   sockaddr_in6 sa6;
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
-    sa6.sin6_port = 0;
+    sa6.sin6_port = htons(port);
     return std::make_shared<Address::Ipv6Instance>(sa6);
   }
   throwWithMalformedIp(ip_address);
@@ -149,11 +150,9 @@ Address::InstanceConstSharedPtr
 Utility::fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address) {
   switch (resolved_address.address_case()) {
   case envoy::api::v2::ResolvedAddress::kSocketAddress:
-    // TODO(htuch): Can do this more efficiently if it matters with direct sockaddr manipulation,
-    // keeping it simple for now.
-    return parseInternetAddressAndPort(fmt::format(
-        "{}:{}", ProtobufTypes::FromString(resolved_address.socket_address().ip_address()),
-        resolved_address.socket_address().port().value()));
+    return parseInternetAddress(
+        ProtobufTypes::FromString(resolved_address.socket_address().ip_address()),
+        resolved_address.socket_address().port().value());
   case envoy::api::v2::ResolvedAddress::kPipe:
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(resolved_address.pipe().path())};
