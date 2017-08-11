@@ -15,10 +15,12 @@ namespace Http {
 class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
+  const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
+  const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
@@ -41,6 +43,7 @@ public:
   const LowerCaseString EnvoyExpectedRequestTimeoutMs{"x-envoy-expected-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
+  const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
@@ -136,6 +139,17 @@ public:
   struct {
     const std::string Trailers{"trailers"};
   } TEValues;
+
+  struct {
+    const std::string Deflate{"deflate"};
+  } AcceptEncodingValues;
+
+  struct {
+    const std::string Br{"br"};
+    const std::string Compress{"compress"};
+    const std::string Deflate{"deflate"};
+    const std::string Gzip{"gzip"};
+  } ContentEncodingValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;

@@ -77,6 +77,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "gzip_lib",
+    srcs = ["gzip.cc"],
+    hdrs = ["gzip.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/http/filter:gzip_filter_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ip_tagging_lib",
     srcs = ["ip_tagging.cc"],
     hdrs = ["ip_tagging.h"],
