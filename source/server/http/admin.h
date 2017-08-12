@@ -127,6 +127,7 @@ private:
   Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
   Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
   Http::Code handlerListenerInfo(const std::string& url, Buffer::Instance& response);
+  Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
