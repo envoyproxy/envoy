@@ -60,6 +60,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object
 
   std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
       config, context, *date_provider, *route_config_provider_manager));
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count.
   return [http_config, &context, date_provider,
           route_config_provider_manager](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
