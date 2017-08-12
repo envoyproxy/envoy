@@ -109,9 +109,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         return Http::Utility::parseHttp2Settings(http2_protocol_options);
       }()),
       http1_settings_(Http::Utility::parseHttp1Settings(config)),
+      route_config_provider_manager_(route_config_provider_manager),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
-      date_provider_(date_provider), route_config_provider_manager_(route_config_provider_manager) {
+      date_provider_(date_provider) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,

@@ -145,11 +145,11 @@ private:
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
+  Router::RouteConfigProviderManager& route_config_provider_manager_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
-  Router::RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 /**
