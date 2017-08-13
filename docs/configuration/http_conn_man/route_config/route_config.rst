@@ -17,6 +17,8 @@ Route configuration
     "request_headers_to_add": []
   }
 
+.. _config_http_conn_man_route_table_validate_clusters:
+
 validate_clusters
   *(optional, boolean)* An optional boolean that specifies whether the clusters that the route
   table refers to will be validated by the cluster manager. If set to true and a route refers to
