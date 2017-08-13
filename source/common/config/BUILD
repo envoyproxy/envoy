@@ -65,6 +65,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_json_lib",
+    srcs = ["filter_json.cc"],
+    hdrs = ["filter_json.h"],
+    external_deps = ["envoy_filter_http_connection_manager"],
+    deps = [
+        ":json_utility_lib",
+        ":protocol_json_lib",
+        ":rds_json_lib",
+        ":utility_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_subscription_lib",
     hdrs = ["grpc_subscription_impl.h"],
     external_deps = ["envoy_base"],

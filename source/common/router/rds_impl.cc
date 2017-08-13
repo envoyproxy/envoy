@@ -9,45 +9,32 @@
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
-#include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
 namespace Envoy {
 namespace Router {
 
-RouteConfigProviderSharedPtr
-RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& runtime,
-                                Upstream::ClusterManager& cm, Stats::Scope& scope,
-                                const std::string& stat_prefix, Init::Manager& init_manager,
-                                RouteConfigProviderManager& route_config_provider_manager) {
-  bool has_rds = config.hasObject("rds");
-  bool has_route_config = config.hasObject("route_config");
-  if (!(has_rds ^ has_route_config)) {
-    throw EnvoyException(
-        "http connection manager must have either rds or route_config but not both");
-  }
-
-  if (has_route_config) {
+RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
+    const envoy::api::v2::filter::HttpConnectionManager& config, Runtime::Loader& runtime,
+    Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
+    Init::Manager& init_manager, RouteConfigProviderManager& route_config_provider_manager) {
+  switch (config.route_specifier_case()) {
+  case envoy::api::v2::filter::HttpConnectionManager::kRouteConfig:
     return RouteConfigProviderSharedPtr{
-        new StaticRouteConfigProviderImpl(*config.getObject("route_config"), runtime, cm)};
-  } else {
-    Json::ObjectSharedPtr json_rds = config.getObject("rds");
-    envoy::api::v2::filter::Rds rds;
-    Envoy::Config::Utility::translateRdsConfig(*json_rds, rds);
-    return route_config_provider_manager.getRouteConfigProvider(rds, cm, scope, stat_prefix,
-                                                                init_manager);
+        new StaticRouteConfigProviderImpl(config.route_config(), runtime, cm)};
+  case envoy::api::v2::filter::HttpConnectionManager::kRds:
+    return route_config_provider_manager.getRouteConfigProvider(config.rds(), cm, scope,
+                                                                stat_prefix, init_manager);
+  default:
+    NOT_REACHED;
   }
 }
 
-StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(const Json::Object& config,
-                                                             Runtime::Loader& runtime,
-                                                             Upstream::ClusterManager& cm)
-    : config_([&config, &runtime, &cm] {
-        envoy::api::v2::RouteConfiguration route_config;
-        Envoy::Config::RdsJson::translateRouteConfiguration(config, route_config);
-        return new ConfigImpl(route_config, runtime, cm, true);
-      }()) {}
+StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
+    const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
+    Upstream::ClusterManager& cm)
+    : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const envoy::api::v2::filter::Rds& rds, const std::string& manager_identifier,
