@@ -42,7 +42,7 @@ void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
   const auto actions = json_rate_limit.getObjectArray("actions");
   for (const auto json_action : actions) {
     auto* action = rate_limit.mutable_actions()->Add();
-    const std::string& type = json_action->getString("type");
+    const std::string type = json_action->getString("type");
     if (type == "source_cluster") {
       action->mutable_source_cluster();
     } else if (type == "destination_cluster") {
@@ -259,8 +259,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
     JSON_UTIL_SET_BOOL(json_route, *action, include_vh_rate_limits);
 
     if (json_route.hasObject("hash_policy")) {
-      const std::string& header_name =
-          json_route.getObject("hash_policy")->getString("header_name");
+      const std::string header_name = json_route.getObject("hash_policy")->getString("header_name");
       action->mutable_hash_policy()->Add()->mutable_header()->set_header_name(header_name);
     }
   }

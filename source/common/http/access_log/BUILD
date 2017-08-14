@@ -23,6 +23,7 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
+    external_deps = ["envoy_filter_http_connection_manager"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -35,7 +36,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
