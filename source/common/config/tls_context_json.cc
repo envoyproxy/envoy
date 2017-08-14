@@ -11,6 +11,12 @@ void TlsContextJson::translateDownstreamTlsContext(
     envoy::api::v2::DownstreamTlsContext& downstream_tls_context) {
   translateCommonTlsContext(json_tls_context, *downstream_tls_context.mutable_common_tls_context());
   JSON_UTIL_SET_BOOL(json_tls_context, downstream_tls_context, require_client_certificate);
+
+  std::vector<std::string> paths =
+      json_tls_context.getStringArray("session_ticket_key_paths", true);
+  for (const std::string& path : paths) {
+    downstream_tls_context.mutable_tls_session_ticket_key()->Add()->set_filename(path);
+  }
 }
 
 void TlsContextJson::translateUpstreamTlsContext(

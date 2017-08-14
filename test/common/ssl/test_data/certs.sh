@@ -36,5 +36,10 @@ openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey 
 # Generate selfsigned_cert.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
 
+# Write session ticket key files
+openssl rand 80 > ticket_key_a
+openssl rand 80 > ticket_key_b
+openssl rand 79 > ticket_key_wrong_len
+
 rm *csr
 rm *srl

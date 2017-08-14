@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/tls_context_json.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -77,7 +78,29 @@ ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config)
 ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()),
       require_client_certificate_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      session_ticket_keys_([&config] {
+        std::vector<std::vector<uint8_t>> ret;
+        for (const auto& datasource : config.tls_session_ticket_key()) {
+          switch (datasource.specifier_case()) {
+          case envoy::api::v2::DataSource::kFilename: {
+            const std::string key_data = Filesystem::fileReadToEnd(datasource.filename());
+            ret.push_back(std::vector<uint8_t>(key_data.begin(), key_data.end()));
+            break;
+          }
+          case envoy::api::v2::DataSource::kInline: {
+            const std::string& key_data = datasource.inline_();
+            ret.push_back(std::vector<uint8_t>(key_data.begin(), key_data.end()));
+            break;
+          }
+          default:
+            throw EnvoyException(fmt::format("Unexpected DataSource::specifier_case(): {}",
+                                             datasource.specifier_case()));
+          }
+        }
+
+        return ret;
+      }()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
   ASSERT(config.common_tls_context().tls_certificates().size() == 1);
 }

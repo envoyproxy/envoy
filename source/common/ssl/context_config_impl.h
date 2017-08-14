@@ -64,9 +64,13 @@ public:
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
+  const std::vector<std::vector<uint8_t>>& sessionTicketKeys() const override {
+    return session_ticket_keys_;
+  }
 
 private:
   const bool require_client_certificate_;
+  const std::vector<std::vector<uint8_t>> session_ticket_keys_;
 };
 
 } // namespace Ssl

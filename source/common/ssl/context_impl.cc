@@ -12,17 +12,30 @@
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
+#include "openssl/rand.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Ssl {
 
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
+int ContextImpl::ssl_context_index_ = -1;
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
+
+  if (ssl_context_index_ < 0) {
+    ssl_context_index_ = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    if (ssl_context_index_ < 0) {
+      throw EnvoyException("Failed to allocate SSL ex index");
+    }
+  }
+
+  if (SSL_CTX_set_ex_data(ctx_.get(), ssl_context_index_, this) != 1) {
+    throw EnvoyException("Failed to SSL_CTX_set_ex_data");
+  }
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     throw EnvoyException(
@@ -85,9 +98,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
-
-  SSL_CTX_set_session_id_context(ctx_.get(), &SERVER_SESSION_ID_CONTEXT,
-                                 sizeof SERVER_SESSION_ID_CONTEXT);
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 }
@@ -174,6 +184,10 @@ int ContextImpl::verifyCertificate(X509* cert) {
 
 void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
+
+  if (SSL_session_reused(ssl)) {
+    stats_.session_reused_.inc();
+  }
 
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
@@ -365,10 +379,119 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     SSL_CTX_set_alpn_select_cb(ctx_.get(),
                                [](SSL*, const unsigned char** out, unsigned char* outlen,
                                   const unsigned char* in, unsigned int inlen, void* arg) -> int {
-                                 return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
-                                     out, outlen, in, inlen);
+                                 return static_cast<ServerContextImpl*>(arg)
+                                     ->alpnSelectCallback(out, outlen, in, inlen);
                                },
                                this);
+  }
+
+  if (!config.sessionTicketKeys().empty()) {
+    session_ticket_keys_.resize(config.sessionTicketKeys().size());
+    for (unsigned i = 0; i < config.sessionTicketKeys().size(); ++i) {
+      // If this changes, need to figure out how to deal with key files
+      // that previously worked.  For now, just assert so we'll notice that
+      // it changed if it does.
+      static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
+
+      const std::vector<uint8_t>& src_key = config.sessionTicketKeys().at(i);
+      SessionTicketKey& dst_key = session_ticket_keys_.at(i);
+
+      if (src_key.size() != sizeof(SessionTicketKey)) {
+        throw EnvoyException(fmt::format("Incorrect TLS session ticket key length.  "
+                                         "Index {}, length {}, expected length {}.",
+                                         i, src_key.size(), sizeof(SessionTicketKey)));
+      }
+
+      std::copy_n(src_key.begin(), dst_key.name.size(), dst_key.name.begin());
+      size_t pos = dst_key.name.size();
+      std::copy_n(src_key.begin() + pos, dst_key.aes_key.size(), dst_key.aes_key.begin());
+      pos += dst_key.aes_key.size();
+      std::copy_n(src_key.begin() + pos, dst_key.hmac_key.size(), dst_key.hmac_key.begin());
+      pos += dst_key.hmac_key.size();
+      ASSERT(src_key.begin() + pos == src_key.end());
+    }
+    SSL_CTX_set_tlsext_ticket_key_cb(ctx_.get(), [](SSL* ssl, uint8_t* key_name, uint8_t* iv,
+                                                    EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
+                                                    int encrypt) -> int {
+      ContextImpl* context_impl =
+          static_cast<ContextImpl*>(SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), ssl_context_index_));
+      return dynamic_cast<ServerContextImpl*>(context_impl)
+          ->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+    });
+  }
+
+  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
+  unsigned session_context_len = 0;
+  if (ca_cert_ != nullptr) {
+    // If there is a CA cert, only allow resuming in a context with the same
+    // CA cert.  This ensures that the client is always validated against
+    // the correct CA cert, even if session resumption across different listeners
+    // is enabled.
+    int ret = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
+    if (ret != 1) {
+      throw EnvoyException("Failed to hash ca_cert");
+    }
+  } else {
+    memcpy(session_context_buf, &SERVER_SESSION_ID_CONTEXT, sizeof(SERVER_SESSION_ID_CONTEXT));
+    session_context_len = sizeof(SERVER_SESSION_ID_CONTEXT);
+  }
+
+  int ret = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
+  if (ret != 1) {
+    throw EnvoyException("Failed to set session id context");
+  }
+}
+
+int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
+                                            EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx, int encrypt) {
+  const EVP_MD* hmac = EVP_sha256();
+  const EVP_CIPHER* cipher = EVP_aes_256_cbc();
+
+  if (encrypt == 1) {
+    // Encrypt
+    RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
+    const SessionTicketKey& enc_key = session_ticket_keys_.front();
+
+    RELEASE_ASSERT(enc_key.name.size() == SSL_TICKET_KEY_NAME_LEN);
+    std::copy_n(enc_key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
+
+    if (!RAND_bytes(iv, EVP_CIPHER_iv_length(cipher))) {
+      return -1;
+    }
+
+    ASSERT(enc_key.aes_key.size() == EVP_CIPHER_key_length(cipher));
+    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.aes_key.data(), iv)) {
+      return -1;
+    }
+
+    if (!HMAC_Init_ex(hmac_ctx, enc_key.hmac_key.data(), enc_key.hmac_key.size(), hmac, nullptr)) {
+      return -1;
+    }
+
+    return 1; // success
+  } else {
+    // Decrypt
+    bool is_enc_key = true; // first element is the encryption key
+    for (const SessionTicketKey& key : session_ticket_keys_) {
+      RELEASE_ASSERT(key.name.size() == SSL_TICKET_KEY_NAME_LEN);
+      if (std::equal(key.name.begin(), key.name.end(), key_name)) {
+        if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
+          return 0;
+        }
+
+        ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
+        if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
+          return 0;
+        }
+
+        // If our current encryption was not the decryption key, renew
+        return is_enc_key ? 1  // success; do not renew
+                          : 2; // success: renew key
+      }
+      is_enc_key = false;
+    }
+
+    return 0; // decryption failed
   }
 }
 

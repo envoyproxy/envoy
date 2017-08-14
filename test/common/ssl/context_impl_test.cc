@@ -168,5 +168,63 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_EQ("", context->getCertChainInformation());
 }
 
+class SslServerContextImplTicketTest : public SslContextImplTest {
+public:
+  static void loadConfig(const std::string& json) {
+    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
+    ServerContextConfigImpl cfg(*loader);
+    Runtime::MockLoader runtime;
+    ContextManagerImpl manager(runtime);
+    Stats::IsolatedStoreImpl store;
+    ServerContextPtr server_ctx(manager.createSslServerContext(store, cfg));
+  }
+};
+
+TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
+  // First key is valid, second key isn't.  Should throw if any keys are invalid.
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+    ]
+  }
+  )EOF";
+
+  EXPECT_NO_THROW(loadConfig(json));
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
+  // First key is valid, second key isn't.  Should throw if any keys are invalid.
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
+    ]
+  }
+  )EOF";
+
+  EXPECT_THROW(loadConfig(json), EnvoyException);
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
+    ]
+  }
+  )EOF";
+
+  EXPECT_THROW(loadConfig(json), std::exception);
+}
+
 } // namespace Ssl
 } // namespace Envoy

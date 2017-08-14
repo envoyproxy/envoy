@@ -21,6 +21,12 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
             "type" : "array",
             "items" : {
               "type" : "string"
+            },
+            "session_ticket_key_paths": {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
             }
           },
           "cipher_suites" : {"type" : "string", "minLength" : 1},

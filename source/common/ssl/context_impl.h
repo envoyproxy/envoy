@@ -25,6 +25,7 @@ namespace Ssl {
 #define ALL_SSL_STATS(COUNTER, GAUGE, TIMER)                                                       \
   COUNTER(connection_error)                                                                        \
   COUNTER(handshake)                                                                               \
+  COUNTER(session_reused)                                                                          \
   COUNTER(no_certificate)                                                                          \
   COUNTER(fail_verify_no_cert)                                                                     \
   COUNTER(fail_verify_error)                                                                       \
@@ -84,6 +85,13 @@ protected:
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
+  /**
+   * The global SSL-library index used for storing a pointer to the context
+   * in the SSL instance, for retrieval in callbacks.  This is initialized
+   * when the first ContextImpl is instantiated, and is read-only after that.
+   */
+  static int ssl_context_index_;
+
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
   int verifyCertificate(X509* cert);
 
@@ -138,9 +146,17 @@ public:
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
+  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                           HMAC_CTX* hmac_ctx, int encrypt);
 
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
+  struct SessionTicketKey {
+    std::array<uint8_t, SSL_TICKET_KEY_NAME_LEN> name;
+    std::array<uint8_t, 32> aes_key;
+    std::array<uint8_t, 32> hmac_key;
+  };
+  std::vector<SessionTicketKey> session_ticket_keys_;
 };
 
 } // Ssl

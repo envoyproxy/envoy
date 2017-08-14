@@ -79,6 +79,13 @@ public:
    * @return True if client certificate is required, false otherwise.
    */
   virtual bool requireClientCertificate() const PURE;
+
+  /**
+   * @return The keys to use for encrypting and decrypting session tickets.
+   * The first element is used for encrypting new tickets, and all elements
+   * are candidates for decrypting received tickets.
+   */
+  virtual const std::vector<std::vector<uint8_t>>& sessionTicketKeys() const PURE;
 };
 
 } // namespace Ssl
