@@ -77,7 +77,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  Http::MockStreamDecoderFilterCallbacks callbacks_;
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
@@ -249,6 +249,8 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
         return nullptr;
       }));
 
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);

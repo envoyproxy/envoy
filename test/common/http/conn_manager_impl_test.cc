@@ -1196,6 +1196,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
 
   // Test what happens when there are no subscribers.
   conn_manager_->onAboveWriteBufferHighWatermark();
+  conn_manager_->onBelowWriteBufferLowWatermark();
 
   // The connection manger will outlive callbacks but never reference them once deleted.
   MockDownstreamWatermarkCallbacks callbacks;
@@ -1223,6 +1224,30 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   stream_callbacks_->onAboveWriteBufferHighWatermark();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   stream_callbacks_->onBelowWriteBufferLowWatermark();
+
+  // Set things up so the callbacks have been called twice.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  stream_callbacks_->onAboveWriteBufferHighWatermark();
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+
+  // Now unsubscribe and verify the 2 outstanding callbacks are cleared.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(2);
+  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+}
+
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
+  setup(false, "");
+  // Mark the connection manger as backed up before the stream is created.
+  ASSERT_EQ(decoder_filters_.size(), 0);
+  conn_manager_->onAboveWriteBufferHighWatermark();
+
+  // Now when the stream is created, it should be informed of the connection
+  // callbacks immediately.
+  setUpEncoderAndDecoder();
+  MockDownstreamWatermarkCallbacks callbacks;
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {

@@ -8,7 +8,7 @@ namespace Http {
 class StreamCallbackHelper {
 public:
   void runLowWatermarkCallbacks() {
-    if (reset_callbacks_run_) {
+    if (reset_callbacks_started_) {
       return;
     }
     ASSERT(high_watermark_callbacks_ > 0);
@@ -20,7 +20,7 @@ public:
   }
 
   void runHighWatermarkCallbacks() {
-    if (reset_callbacks_run_) {
+    if (reset_callbacks_started_) {
       return;
     }
     ++high_watermark_callbacks_;
@@ -34,6 +34,7 @@ public:
       return;
     }
 
+    reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
         callbacks->onResetStream(reason);
@@ -73,6 +74,7 @@ protected:
 private:
   std::vector<StreamCallbacks*> callbacks_;
   bool reset_callbacks_run_{};
+  bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{0};
 };
 
