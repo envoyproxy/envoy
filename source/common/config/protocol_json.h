@@ -10,6 +10,15 @@ namespace Config {
 class ProtocolJson {
 public:
   /**
+   * Translate v1 JSON HTTP/1.1 options and settings to v2 envoy::api::v2::Http1ProtocolOptions.
+   * @param json_http1_setting source v1 JSON HTTP/1.1 settings object.
+   * @param http1_protocol_options destination v2 envoy::api::v2::Http1ProtocolOptions.
+   */
+  static void
+  translateHttp1ProtocolOptions(const Json::Object& json_http1_settings,
+                                envoy::api::v2::Http1ProtocolOptions& http1_protocol_options);
+
+  /**
    * Translate v1 JSON HTTP/2 options and settings to v2 envoy::api::v2::Http2ProtocolOptions.
    * @param json_http_codec_options source v1 HTTP codec options string.
    * @param json_http2_setting source v1 JSON HTTP/2 settings object.

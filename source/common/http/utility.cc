@@ -161,11 +161,9 @@ Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOpt
   return ret;
 }
 
-Http1Settings Utility::parseHttp1Settings(const Json::Object& config) {
+Http1Settings Utility::parseHttp1Settings(const envoy::api::v2::Http1ProtocolOptions& config) {
   Http1Settings ret;
-
-  Json::ObjectSharedPtr http1_settings = config.getObject("http1_settings", true);
-  ret.allow_absolute_url_ = http1_settings->getBoolean("allow_absolute_url", false);
+  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, false);
   return ret;
 }
 

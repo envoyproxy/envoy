@@ -74,15 +74,16 @@ public:
   static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
 
   /**
-   * @return Http2Settings An Http2Settings populated from the "http_codec_options" and
-   *         "http2_settings" JSON fields.
+   * @return Http2Settings An Http2Settings populated from the envoy::api::v2::Http2ProtocolOptions
+   *         config.
    */
   static Http2Settings parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config);
 
   /**
-   * @return Http1Settings An Http1Settings populated from http1_settings JSON.
+   * @return Http1Settings An Http1Settings populated from the envoy::api::v2::Http1ProtocolOptions
+   *         config.
    */
-  static Http1Settings parseHttp1Settings(const Json::Object& config);
+  static Http1Settings parseHttp1Settings(const envoy::api::v2::Http1ProtocolOptions& config);
 
   /**
    * Create a locally generated response using filter callbacks.
