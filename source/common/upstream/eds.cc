@@ -42,10 +42,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
-  if (ProtobufTypes::FromString(cluster_load_assignment.cluster_name()) != cluster_name_) {
-    throw EnvoyException(
-        fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
-                    ProtobufTypes::FromString(cluster_load_assignment.cluster_name())));
+  if (cluster_load_assignment.cluster_name() != cluster_name_) {
+    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
+                                     cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
