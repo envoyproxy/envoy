@@ -67,39 +67,6 @@ TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
       EnvoyException, "unable to create http filter factory for 'foo'");
 }
 
-TEST_F(HttpConnectionManagerConfigTest, InvalidFilterType) {
-  const std::string json_string = R"EOF(
-  {
-    "codec_type": "http1",
-    "stat_prefix": "router",
-    "route_config":
-    {
-      "virtual_hosts": [
-        {
-          "name": "service",
-          "domains": [ "*" ],
-          "routes": [
-            {
-              "prefix": "/",
-              "cluster": "cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters": [
-      { "type": "encoder", "name": "router", "config": {}
-      }
-    ]
-  }
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(json_string), context_,
-                                  date_provider_),
-      EnvoyException, "unable to create http filter factory for 'router'");
-}
-
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string json_string = R"EOF(
   {
