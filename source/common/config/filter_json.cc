@@ -17,7 +17,7 @@ namespace {
 
 void translateComparisonFilter(const Json::Object& config,
                                envoy::api::v2::filter::ComparisonFilter& filter) {
-  const std::string& op = config.getString("op");
+  const std::string op = config.getString("op");
   if (op == ">=") {
     filter.set_op(envoy::api::v2::filter::ComparisonFilter::GE);
   } else {
@@ -66,7 +66,7 @@ void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndF
 void FilterJson::translateAccessLogFilter(
     const Json::Object& json_access_log_filter,
     envoy::api::v2::filter::AccessLogFilter& access_log_filter) {
-  const std::string& type = json_access_log_filter.getString("type");
+  const std::string type = json_access_log_filter.getString("type");
   if (type == "status_code") {
     translateStatusCodeFilter(json_access_log_filter,
                               *access_log_filter.mutable_status_code_filter());
@@ -136,7 +136,7 @@ void FilterJson::translateHttpConnectionManager(
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, add_user_agent);
 
   if (json_http_connection_manager.hasObject("tracing")) {
-    const auto& json_tracing = json_http_connection_manager.getObject("tracing");
+    const auto json_tracing = json_http_connection_manager.getObject("tracing");
     auto* tracing = http_connection_manager.mutable_tracing();
 
     envoy::api::v2::filter::HttpConnectionManager::Tracing::OperationName operation_name{};
