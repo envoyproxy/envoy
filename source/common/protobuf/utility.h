@@ -41,7 +41,8 @@ class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source,
                           const std::string& delimiter) {
-    return StringUtil::join(ProtobufTypes::stringVector(source), delimiter);
+    std::vector<std::string> proto_strings(source.begin(), source.end());
+    return StringUtil::join(proto_strings, delimiter);
   }
 };
 

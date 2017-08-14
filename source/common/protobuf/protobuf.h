@@ -43,12 +43,6 @@ namespace ProtobufWkt = google::protobuf;
 namespace ProtobufTypes {
 
 typedef std::string String;
-
-inline std::vector<std::string>
-stringVector(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source) {
-  return std::vector<std::string>(source.begin(), source.end());
-}
-
 typedef int64_t Int64;
 
 } // namespace ProtobufTypes
