@@ -83,19 +83,17 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
 }
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (!deflate_ || is_compressed_) {
+  if (end_stream) {
     return Http::FilterDataStatus::Continue;
   }
-
-  if (end_stream) {
-    std::cout << "total bytes in: " << total_bytes_in_ << std::endl;
-    std::cout << "total bytes out: " << total_bytes_out_ << std::endl;
+  
+  if (!deflate_ || is_compressed_) {
     return Http::FilterDataStatus::Continue;
   }
 
   if (compress(data)) {
     return Http::FilterDataStatus::Continue;
-  } else {
+  } else { 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 }
@@ -109,61 +107,61 @@ void GzipFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& c
 }
 
 bool GzipFilter::compress(Buffer::Instance& data) {
-  Buffer::InstancePtr temp_buffer{new Buffer::OwnedImpl()};
-  std::unique_ptr<Buffer::RawSlice> in(new Buffer::RawSlice);
-  std::unique_ptr<Buffer::RawSlice> out(new Buffer::RawSlice);
+  Buffer::InstancePtr buffer{new Buffer::OwnedImpl()};
+  Buffer::RawSlice in_slice{};
+  Buffer::RawSlice out_slice{};
 
-  int result, num_slices, data_len, flush_state, num_bytes_read, num_bytes_write;
+  std::unique_ptr<z_stream> ZstreamPtr{new z_stream()};
+  ZstreamPtr->zalloc = Z_NULL;
+  ZstreamPtr->zfree = Z_NULL;
+  ZstreamPtr->opaque = Z_NULL;
 
-  std::unique_ptr<z_stream> zstream(new z_stream());
-  zstream->zalloc = Z_NULL;
-  zstream->zfree = Z_NULL;
-  zstream->opaque = Z_NULL;
-
-  result = deflateInit(zstream.get(), Z_BEST_COMPRESSION);
-  if (result != Z_OK) {
+  if (deflateInit(ZstreamPtr.get(), Z_BEST_COMPRESSION) != Z_OK) {
     return false;
   }
 
+  uint data_len{};
+  uint num_bytes_read{};
+  uint num_bytes_write{};
+  uint num_slices{};
+  uint flush_state{};
+  uint result{};
+
   while (data.length() > 0) {
-    num_slices = data.getRawSlices(in.get(), 1);
+    num_slices = data.getRawSlices(&in_slice, 1);
     if (num_slices) {
-      zstream->avail_in = in->len_;
-      zstream->next_in = static_cast<Bytef*>(in->mem_);
+      ZstreamPtr->avail_in = in_slice.len_;
+      ZstreamPtr->next_in = static_cast<Bytef *>(in_slice.mem_);
     }
 
     data_len = data.length();
-    if (data_len - zstream->avail_in == 0) {
+    if (data_len - ZstreamPtr->avail_in == 0) {
       flush_state = Z_FINISH;
     } else {
       flush_state = Z_SYNC_FLUSH;
     }
 
-    temp_buffer->reserve(data_len, out.get(), 1);
-    zstream->avail_out = out->len_;
-    zstream->next_out = static_cast<unsigned char*>(out->mem_);
+    buffer->reserve(data_len, &out_slice, 1);
+    ZstreamPtr->avail_out = out_slice.len_;
+    ZstreamPtr->next_out = static_cast<Bytef *>(out_slice.mem_);
 
-    result = deflate(zstream.get(), flush_state);
+    result = deflate(ZstreamPtr.get(), flush_state);
     if (result != Z_OK && result != Z_STREAM_END) {
       return false;
     }
 
-    num_bytes_read = in->len_ - zstream->avail_in;
-    num_bytes_write = out->len_ - zstream->avail_out;
+    num_bytes_read = in_slice.len_ - ZstreamPtr->avail_in;
+    num_bytes_write = out_slice.len_ - ZstreamPtr->avail_out;
     data.drain(num_bytes_read);
-    out->len_ = num_bytes_write;
-    temp_buffer->commit(out.get(), 1);
+    out_slice.len_ = num_bytes_write;
+    buffer->commit(&out_slice, 1);
   };
 
-  total_bytes_in_ += zstream->total_in;
-  total_bytes_out_ += zstream->total_out;
-
-  result = deflateEnd(zstream.get());
-  if (result != Z_OK) {
+  if (deflateEnd(ZstreamPtr.get()) != Z_OK) {
     return false;
   }
-
-  data.move(*temp_buffer);
+  
+  data.move(*buffer);
   return true;
 }
 

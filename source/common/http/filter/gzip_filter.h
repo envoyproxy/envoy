@@ -1,15 +1,9 @@
 #pragma once
 
-// #include "zlib.h"
-
-// #include "common/buffer/buffer_impl.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "common/http/header_map_impl.h"
 #include "common/buffer/buffer_impl.h"
-
-
-// #include "server/config/network/http_connection_manager.h"
 
 namespace Envoy {
 namespace Http {
@@ -41,8 +35,7 @@ private:
   Http::HeaderEntry* content_encoding_header_{nullptr};
   bool deflate_{false};
   bool is_compressed_{true};
-  u_int64_t total_bytes_in_{0};
-  u_int64_t total_bytes_out_{0};
+
 };
 
 } // Http
