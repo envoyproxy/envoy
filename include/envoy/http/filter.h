@@ -219,7 +219,7 @@ public:
    * This routine can be called by a filter to subscribe to watermark events on the downstream
    * stream and downstream connection.
    *
-   * Immediately after subscribing, the filte will get a high watermark callback for each
+   * Immediately after subscribing, the filter will get a high watermark callback for each
    * outstanding backed up buffer.
    */
   virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
@@ -228,7 +228,7 @@ public:
    * This routine can be called by a filter to stop subscribing to watermark events on the
    * downstream stream and downstream connection.
    *
-   * It is not save to call this from under the stack of a DownstreamWatermarkCallbacks callback.
+   * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
    *
    * Immediately prior to removal, the filter will get a low watermark callback for every high
    * watermark callback it has outstanding.

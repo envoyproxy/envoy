@@ -290,11 +290,15 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
+    ASSERT(!underlying_connection_above_high_watermark_);
+    underlying_connection_above_high_watermark_ = true;
     for (ActiveStreamPtr& stream : streams_) {
       stream->callHighWatermarkCallbacks();
     }
   }
   void onBelowWriteBufferLowWatermark() override {
+    ASSERT(underlying_connection_above_high_watermark_);
+    underlying_connection_above_high_watermark_ = false;
     for (ActiveStreamPtr& stream : streams_) {
       stream->callLowWatermarkCallbacks();
     }
@@ -583,6 +587,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
+  bool underlying_connection_above_high_watermark_{false};
 };
 
 } // Http

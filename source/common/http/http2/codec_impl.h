@@ -67,7 +67,7 @@ public:
 /**
  * Base class for HTTP/2 client and server codecs.
  */
-class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::http2> {
+class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                  const Http2Settings& http2_settings)
@@ -175,6 +175,7 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+    uint32_t underlying_connection_above_watermark_count_{0};
     Buffer::WatermarkBuffer pending_recv_data_{
         Buffer::InstancePtr{new Buffer::OwnedImpl},
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
@@ -265,11 +266,15 @@ public:
   // Propogate network connection watermark events to each stream on the connection.
   // The router will propogate it downstream.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    ASSERT(!underlying_connection_above_watermark_);
     for (auto& stream : active_streams_) {
+      underlying_connection_above_watermark_ = true;
       stream->runHighWatermarkCallbacks();
     }
   }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
+    ASSERT(underlying_connection_above_watermark_);
+    underlying_connection_above_watermark_ = false;
     for (auto& stream : active_streams_) {
       stream->runLowWatermarkCallbacks();
     }
@@ -282,6 +287,7 @@ private:
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   Http::ConnectionCallbacks& callbacks_;
+  bool underlying_connection_above_watermark_{false};
 };
 
 /**
