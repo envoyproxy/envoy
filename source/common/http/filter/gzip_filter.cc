@@ -107,10 +107,6 @@ void GzipFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& c
 }
 
 bool GzipFilter::compress(Buffer::Instance& data) {
-  Buffer::InstancePtr buffer{new Buffer::OwnedImpl()};
-  Buffer::RawSlice in_slice{};
-  Buffer::RawSlice out_slice{};
-
   std::unique_ptr<z_stream> ZstreamPtr{new z_stream()};
   ZstreamPtr->zalloc = Z_NULL;
   ZstreamPtr->zfree = Z_NULL;
@@ -119,6 +115,10 @@ bool GzipFilter::compress(Buffer::Instance& data) {
   if (deflateInit(ZstreamPtr.get(), Z_BEST_COMPRESSION) != Z_OK) {
     return false;
   }
+
+  Buffer::InstancePtr buffer{new Buffer::OwnedImpl()};
+  Buffer::RawSlice in_slice{};
+  Buffer::RawSlice out_slice{};
 
   uint data_len{};
   uint num_bytes_read{};
