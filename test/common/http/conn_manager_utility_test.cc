@@ -169,7 +169,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   {
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"}};
-    EXPECT_CALL(random_, uuid()).Times(1);
+    EXPECT_CALL(random_, uuid());
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -186,7 +186,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).Times(1);
+    EXPECT_CALL(random_, uuid());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(false));
 
@@ -203,7 +203,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).Times(1);
+    EXPECT_CALL(random_, uuid());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(true));
 
