@@ -23,42 +23,27 @@ namespace Runtime {
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
-void RandomGeneratorImpl::random_bytes(uint8_t* out, size_t out_len) {
-  if (out_len >= 1024) {
-    int rc = RAND_bytes(out, out_len);
-    ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
-    return;
-  }
-
+std::string RandomGeneratorImpl::uuid() {
   static thread_local uint8_t buffered[2048];
-  // Initialize to sizeof(buffered), i.e. out-of-range value,
-  // in order to fill buffer with randomness on the first pass.
   static thread_local size_t buffered_idx = sizeof(buffered);
 
-  do {
-    if (buffered_idx >= sizeof(buffered)) {
-      int rc = RAND_bytes(buffered, sizeof(buffered));
-      ASSERT(rc == 1);
-      UNREFERENCED_PARAMETER(rc);
-      buffered_idx = 0;
-    }
+  // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
+  // i.e. out-of-range value, so the buffer will be filled with randomness on the first
+  // call to this function.
+  if (buffered_idx >= sizeof(buffered)) {
+    int rc = RAND_bytes(buffered, sizeof(buffered));
+    ASSERT(rc == 1);
+    UNREFERENCED_PARAMETER(rc);
+    buffered_idx = 0;
+  }
 
-    size_t available = std::min(sizeof(buffered) - buffered_idx, out_len);
+  // Consume 16 bytes from the buffer.
+  ASSERT(buffered_idx + 16 <= sizeof(buffered));
+  uint8_t* rand = &buffered[buffered_idx];
+  buffered_idx += 16;
 
-    std::memcpy(out, reinterpret_cast<void*>(&buffered[buffered_idx]), available);
-
-    buffered_idx += available;
-    out_len -= available;
-    out += available;
-  } while (out_len);
-}
-
-std::string RandomGeneratorImpl::uuid() {
   // Create UUID from Truly Random or Pseudo-Random Numbers.
   // See: https://tools.ietf.org/html/rfc4122#section-4.4
-  uint8_t rand[16];
-  random_bytes(rand, 16);
   rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
   rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
 

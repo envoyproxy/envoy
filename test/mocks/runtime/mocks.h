@@ -13,7 +13,6 @@ namespace Runtime {
 class MockRandomGenerator : public RandomGenerator {
 public:
   MOCK_METHOD0(random, uint64_t());
-  MOCK_METHOD2(random_bytes, void(uint8_t*, size_t));
   MOCK_METHOD0(uuid, std::string());
 };
 

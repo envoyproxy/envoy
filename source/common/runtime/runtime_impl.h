@@ -34,9 +34,6 @@ public:
   uint64_t random() override { return threadLocalGenerator()(); }
   std::string uuid() override;
 
-  // Runtime::RandomGeneratorImpl
-  void random_bytes(uint8_t* out, size_t out_len);
-
   static const size_t UUID_LENGTH;
 
 private:
