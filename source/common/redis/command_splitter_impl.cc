@@ -56,13 +56,14 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
 SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks) {
 
+  // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
+  // Ensure there are at least three args to the command be able to hash it.
   if (incoming_request.asArray().size() < 4) {
     callbacks.onResponse(Utility::makeError("wrong number of arguments for command"));
     return nullptr;
   }
 
   std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks)};
-
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
