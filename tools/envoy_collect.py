@@ -33,6 +33,7 @@ TODO(htuch):
   - Consider handling other signals.
   - bz2 compress tar ball.
 """
+from __future__ import print_function
 
 import argparse
 import ctypes
@@ -47,7 +48,7 @@ import subprocess as sp
 import sys
 import tarfile
 import tempfile
-import urllib2
+from six.moves import urllib
 
 ENVOY_PATH = os.getenv(
     'ENVOY_PATH',
@@ -60,7 +61,7 @@ DUMP_HANDLERS = ['clusters', 'listeners', 'server_info', 'stats']
 
 
 def FetchUrl(url):
-  return urllib2.urlopen(url).read()
+  return urllib.request.urlopen(url).read().decode('utf-8')
 
 
 def ModifyEnvoyconfig(config_path, output_directory):
@@ -106,7 +107,7 @@ def EnvoyCollect(parse_result, unknown_args):
     perf_data_path = os.path.join(envoy_tmpdir, 'perf.data')
     envoy_log_path = os.path.join(envoy_tmpdir, 'envoy.log')
     # The manifest of files that will be placed in the output .tar.
-    manifest = access_log_paths + dump_handlers_paths.values() + [
+    manifest = access_log_paths + list(dump_handlers_paths.values()) + [
         modified_envoy_config_path, perf_data_path, envoy_log_path
     ]
 
@@ -131,7 +132,7 @@ def EnvoyCollect(parse_result, unknown_args):
             '--admin-address-path',
             admin_address_path,
         ] + unknown_args[1:]))
-    print envoy_shcmd
+    print(envoy_shcmd)
 
     # Some process setup stuff to ensure the child process gets cleaned up properly if the
     # collector dies and doesn't get its signals implicity.
@@ -156,6 +157,7 @@ def EnvoyCollect(parse_result, unknown_args):
         for handler, path in dump_handlers_paths.items():
           with open(path, 'w') as f:
             f.write(FetchUrl('%s/%s' % (admin_address, handler)))
+        print('Sending Envoy process (PID=%d) SIGINT...' % envoy_proc.pid)
         envoy_proc.send_signal(signal.SIGINT)
 
       signal.signal(signal.SIGINT, SignalHandler)
