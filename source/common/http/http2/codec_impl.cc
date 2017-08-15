@@ -62,8 +62,6 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   }
 }
 
-ConnectionImpl::StreamImpl::~StreamImpl() {}
-
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
   uint8_t flags = 0;
   if (header.key().type() == HeaderString::Type::Reference) {
