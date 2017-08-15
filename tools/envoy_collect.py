@@ -21,8 +21,6 @@ with SIGINT (ctrl-c on stdin), collecting the various stats/log/profile in the
 --output-path tar ball.
 
 TODO(htuch):
-  - Add different modes for collecting for perf vs. debug. We don't want access
-    logging or -l trace for perf, don't care about profile data in debug.
   - Generate the full perf trace as well, since we may have a different version
     of perf local vs. remote.
   - Writeup some MD docs for GitHub.
@@ -30,8 +28,11 @@ TODO(htuch):
   - Flamegraph generation in post-processing.
   - Support other modes of data collection (e.g. snapshotting on SIGUSR,
     periodic).
+  - Validate in performance mode that we're using an opt binary.
   - Consider handling other signals.
   - bz2 compress tar ball.
+  - Use freeze or something similar to build a static binary with embedded Python, ending need to
+    have Python on remote host.
 """
 from __future__ import print_function
 
