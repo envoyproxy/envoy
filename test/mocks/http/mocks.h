@@ -184,6 +184,8 @@ public:
   MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
+  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 
   Protocol protocol_{Protocol::Http11};
 };
@@ -199,11 +201,11 @@ public:
   MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
+  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 
   // Http::ClientConnection
   MOCK_METHOD1(newStream, StreamEncoder&(StreamDecoder& response_decoder));
-  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
-  MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 };
 
 class MockFilterChainFactory : public FilterChainFactory {

@@ -290,14 +290,10 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callHighWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
   void onBelowWriteBufferLowWatermark() override {
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callLowWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
 private:

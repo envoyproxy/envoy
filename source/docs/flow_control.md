@@ -225,9 +225,13 @@ on the connection.  They pass the watermark event to the router, which calls
  * The downstream `Network::ConnectionImpl::write_buffer_` buffers too much
    data.  It calls
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
- * `Envoy::Http::Http2::ConnectionImpl::onAboveWriteBufferHighWatermark()`
-   calls `ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks()` on all
-   `ActiveStreams` on the connection.
+ * `Envoy::Http::Http2::ConnectionManagerImpl::onAboveWriteBufferHighWatermark()`
+   calls `ConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark()`
+   on `codec_`.
+ * When `Envoy::Http::Http2::ConnectionImpl` receives `onAboveWriteBufferHighWatermark()` it calls
+   `runHighWatermarkCallbacks()` for each stream of the connection.
+ * When `ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark()` is
+   called it calls `ConnectionImpl::ActiveStream::callHighWatermarkCallbacks()`
 From this point on, the flow is the same as when the downstream codec buffer
 goes over its high watermark.
 
@@ -235,9 +239,14 @@ The low watermark path is as follows:
 
  * The downstream `Network::ConnectionImpl::write_buffer_` drains.  It calls
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
- * `Envoy::Http::Http2::ConnectionImpl::onBelowWriteBufferLowWatermark()`
-   calls `ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks()` on all
-   `ActiveStreams` on the connection.
+ * `Envoy::Http::Http2::ConnectionManagerImpl::onBelowWriteBufferHighWatermark()`
+   calls `ConnectionImpl::onUnderlyingConnectionBelowWriteBufferHighWatermark()`
+   on `codec_`.
+ * When `Envoy::Http::Http2::ConnectionImpl` receives `onBelowWriteBufferHighWatermark()` it calls
+   `runHighWatermarkCallbacks()` for each stream of the connection.
+ * When `ConnectionManagerImpl::ActiveStream::onBelowWriteBufferHighWatermark()` is
+   called it calls `ConnectionImpl::ActiveStream::callHighWatermarkCallbacks()`
+
 From this point on, the flow is the same as when the downstream codec buffer
 goes under its low watermark.
 

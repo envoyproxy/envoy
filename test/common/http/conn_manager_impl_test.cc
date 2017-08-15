@@ -1230,16 +1230,17 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   // The connection manger will outlive callbacks but never reference them once deleted.
   MockDownstreamWatermarkCallbacks callbacks;
 
-  ASSERT_NE(0, decoder_filters_.size());
+  // Network::Connection callbacks are passed through the codec
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
-  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
-  // propogated.
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
   conn_manager_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
   conn_manager_->onBelowWriteBufferLowWatermark();
 
+  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
+  // propogated.
+  ASSERT_NE(0, decoder_filters_.size());
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
   // Make sure encoder filter callbacks are propogated to the watermark subscriber.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
