@@ -20,6 +20,8 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
 
   // Request external authentication
   auth_complete_ = false;
+  request_headers_ = &headers;
+
   MessagePtr request(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
 
   if (!config_->path_prefix_.empty()) {
@@ -69,28 +71,70 @@ ExtAuthStats ExtAuth::generateStats(const std::string& prefix, Stats::Store& sto
 
 void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   auth_request_ = nullptr;
+
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   std::string response_body(response->bodyAsString());
+
   log().info("ExtAuth Auth responded with code {}", response_code);
+
   if (!response_body.empty()) {
     log().info("ExtAuth Auth said: {}", response->bodyAsString());
   }
 
   if (response_code != enumToInt(Http::Code::OK)) {
     log().info("ExtAuth rejecting request");
+
     config_->stats_.rq_rejected_.inc();
+    request_headers_ = nullptr;
+
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(response->headers())};
+
     callbacks_->encodeHeaders(std::move(response_headers), response_body.empty());
+
     if (!response_body.empty()) {
       Buffer::OwnedImpl buffer(response_body);
       callbacks_->encodeData(buffer, true);
     }
+
     return;
   }
 
   log().info("ExtAuth accepting request");
+
+  response->headers().iterate(
+    [](const HeaderEntry& header, void* vctx) -> void {
+      ExtAuth *self = static_cast<ExtAuth *>(vctx);
+      // (void)vctx;
+
+      std::string key(header.key().c_str());
+      std::string value(header.value().c_str());
+
+      // log().info("ExtAuth response header {}: {}", key, value);
+
+      // Should we use a map<> for this? We don't expect there to be many
+      // allowed headers.
+
+      bool allowed = false;
+
+      for (std::string allowed_header : self->config_->allowed_headers_) {
+        if (key == allowed_header) {
+          log().info("ExtAuth allowing response header {}: {}", key, value);
+          allowed = true;
+
+          self->request_headers_->addCopy(LowerCaseString(key), value);
+        }
+      }
+
+      if (!allowed) {
+        log().info("ExtAuth not allowing response header {}: {}", key, value);
+      }
+    },
+    static_cast<void *>(this)
+  );
+
   config_->stats_.rq_passed_.inc();
   auth_complete_ = true;
+  request_headers_ = nullptr;
   callbacks_->continueDecoding();
 }
 

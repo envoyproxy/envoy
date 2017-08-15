@@ -34,6 +34,7 @@ struct ExtAuthConfig {
   ExtAuthStats stats_;
   std::string cluster_;
   std::chrono::milliseconds timeout_;
+  std::vector<std::string> allowed_headers_;
   std::string path_prefix_;
 };
 
@@ -69,6 +70,7 @@ private:
   StreamDecoderFilterCallbacks* callbacks_{};
   bool auth_complete_;
   Http::AsyncClient::Request* auth_request_{};
+  Http::HeaderMap* request_headers_;
 };
 
 } // Http

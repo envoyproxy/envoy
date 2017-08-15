@@ -12,6 +12,14 @@ const std::string EXTAUTH_HTTP_FILTER_SCHEMA(R"EOF(
     "properties" : {
       "cluster" : {"type" : "string"},
       "timeout_ms": {"type" : "integer"},
+      "allowed_headers": {
+        "type": "array",
+        "items": {
+            "type": "string"
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
       "path_prefix": {"type" : "string"}
     },
     "required" : ["cluster", "timeout_ms"],
@@ -38,6 +46,7 @@ HttpFilterFactoryCb ExtAuthConfig::tryCreateFilterFactory(HttpFilterType type,
       Http::ExtAuth::generateStats(stats_prefix, server.stats()),
       json_config.getString("cluster"),
       std::chrono::milliseconds(json_config.getInteger("timeout_ms")),
+      json_config.getStringArray("allowed_headers", true),
       prefix
     });
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
