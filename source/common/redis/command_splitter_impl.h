@@ -35,7 +35,7 @@ protected:
 };
 
 /**
- * SingleServerRequest goes to a single Redis
+ * SingleServerRequest is used as a base class for commands that hash to a single backend.
  */
 class SingleServerRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
