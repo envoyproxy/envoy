@@ -10,6 +10,7 @@
 #include "envoy/tracing/context.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
 #include "common/ratelimit/ratelimit.pb.h"
 
@@ -22,6 +23,10 @@ typedef Grpc::AsyncClient<pb::lyft::ratelimit::RateLimitRequest,
 typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
 
 typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
+
+typedef Grpc::AsyncSpanFinalizerFactory<pb::lyft::ratelimit::RateLimitRequest,
+                                        pb::lyft::ratelimit::RateLimitResponse>
+    RateLimitSpanFinalizerFactory;
 
 // TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client (limit() assumes only
@@ -38,8 +43,8 @@ public:
   // RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
-             const std::vector<Descriptor>& descriptors,
-             const Tracing::TransportContext& context) override;
+             const std::vector<Descriptor>& descriptors, const std::string& request_id,
+             Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -52,7 +57,8 @@ private:
   Grpc::AsyncRequest* request_{};
   Optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
-  Tracing::TransportContext context_;
+  std::string request_id_ = "";
+  std::unique_ptr<RateLimitSpanFinalizerFactory> finalizer_factory_;
 };
 
 class GrpcFactoryImpl : public ClientFactory {
@@ -72,7 +78,7 @@ public:
   // RateLimit::Client
   void cancel() override {}
   void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
-             const Tracing::TransportContext&) override {
+             const std::string&, Tracing::Span&) override {
     callbacks.complete(LimitStatus::OK);
   }
 };
@@ -83,6 +89,14 @@ public:
   ClientPtr create(const Optional<std::chrono::milliseconds>&) override {
     return ClientPtr{new NullClientImpl()};
   }
+};
+
+class RateLimitSpanFinalizerFactoryImpl : public RateLimitSpanFinalizerFactory {
+public:
+  RateLimitSpanFinalizerFactoryImpl() {}
+
+  Tracing::SpanFinalizerPtr create(const pb::lyft::ratelimit::RateLimitRequest& request,
+                                   const pb::lyft::ratelimit::RateLimitResponse* response) override;
 };
 
 } // namespace RateLimit

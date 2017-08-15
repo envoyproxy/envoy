@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

@@ -5,6 +5,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/linked_object.h"
+#include "common/common/utility.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/async_client_impl.h"
@@ -21,7 +22,7 @@ template <class RequestType, class ResponseType>
 class AsyncClientImpl final : public AsyncClient<RequestType, ResponseType> {
 public:
   AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name)
-      : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
+      : remote_cluster_name_(remote_cluster_name), cm_(cm) {}
 
   ~AsyncClientImpl() override {
     while (!active_streams_.empty()) {
@@ -31,10 +32,11 @@ public:
 
   // Grpc::AsyncClient
   AsyncRequest* send(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
-                     AsyncRequestCallbacks<ResponseType>& callbacks,
+                     AsyncRequestCallbacks<ResponseType>& callbacks, Tracing::Span& parent_span,
+                     AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory,
                      const Optional<std::chrono::milliseconds>& timeout) override {
     auto* const async_request = new AsyncRequestImpl<RequestType, ResponseType>(
-        *this, service_method, request, callbacks, timeout);
+        *this, service_method, request, callbacks, parent_span, finalizer_factory, timeout);
     std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>> grpc_stream{async_request};
 
     grpc_stream->initialize();
@@ -62,11 +64,13 @@ public:
     return active_streams_.front().get();
   }
 
+  const std::string remote_cluster_name_;
+
 private:
   Upstream::ClusterManager& cm_;
-  const std::string remote_cluster_name_;
   std::list<std::unique_ptr<AsyncStreamImpl<RequestType, ResponseType>>> active_streams_;
 
+  friend class AsyncRequestImpl<RequestType, ResponseType>;
   friend class AsyncStreamImpl<RequestType, ResponseType>;
 };
 
@@ -98,6 +102,7 @@ public:
         Common::prepareHeaders(parent_.remote_cluster_name_, service_method_.service()->full_name(),
                                service_method_.name());
     callbacks_.onCreateInitialMetadata(headers_message_->headers());
+
     stream_->sendHeaders(headers_message_->headers(), false);
   }
 
@@ -243,6 +248,7 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks<ResponseType>& callbacks_;
   const Optional<std::chrono::milliseconds>& timeout_;
+
   bool local_closed_{};
   bool remote_closed_{};
   bool http_reset_{};
@@ -261,10 +267,16 @@ class AsyncRequestImpl : public AsyncRequest,
 public:
   AsyncRequestImpl(AsyncClientImpl<RequestType, ResponseType>& parent,
                    const Protobuf::MethodDescriptor& service_method, const RequestType& request,
-                   AsyncRequestCallbacks<ResponseType>& callbacks,
+                   AsyncRequestCallbacks<ResponseType>& callbacks, Tracing::Span& parent_span,
+                   AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory,
                    const Optional<std::chrono::milliseconds>& timeout)
       : AsyncStreamImpl<RequestType, ResponseType>(parent, service_method, *this, timeout),
-        request_(request), callbacks_(callbacks) {}
+        request_(request), callbacks_(callbacks), finalizer_factory_(finalizer_factory) {
+
+    current_span_ = parent_span.spawnChild("async " + parent.remote_cluster_name_ + " egress",
+                                           ProdSystemTimeSource::instance_.currentTime());
+    current_span_->setTag("upstream_cluster_name", parent.remote_cluster_name_);
+  }
 
   void initialize() override {
     AsyncStreamImpl<RequestType, ResponseType>::initialize();
@@ -280,6 +292,7 @@ public:
 private:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+    current_span_->injectContext(metadata);
     callbacks_.onCreateInitialMetadata(metadata);
   }
 
@@ -292,20 +305,29 @@ private:
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
 
   void onRemoteClose(Grpc::Status::GrpcStatus status) override {
-    if (status != Grpc::Status::GrpcStatus::Ok) {
-      callbacks_.onFailure(status);
-      return;
+    Tracing::SpanFinalizerPtr finalizer = finalizer_factory_.create(request_, response_.get());
+    current_span_->setTag("grpc_status", std::to_string(status));
+
+    Grpc::Status::GrpcStatus reported_status = status;
+    if (status == Grpc::Status::GrpcStatus::Ok && response_ == nullptr) {
+      reported_status = Status::Internal;
     }
-    if (response_ == nullptr) {
-      callbacks_.onFailure(Status::Internal);
+
+    if (status != Grpc::Status::GrpcStatus::Ok) {
+      current_span_->setTag("error", "true");
+      current_span_->finishSpan(*finalizer);
+      callbacks_.onFailure(reported_status);
       return;
     }
 
+    current_span_->finishSpan(*finalizer);
     callbacks_.onSuccess(std::move(response_));
   }
 
   const RequestType& request_;
   AsyncRequestCallbacks<ResponseType>& callbacks_;
+  Tracing::SpanPtr current_span_;
+  AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory_;
   std::unique_ptr<ResponseType> response_;
 };
 

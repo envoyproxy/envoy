@@ -71,11 +71,15 @@ public:
   SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
 };
 
+typedef ConstSingleton<NullSpan> NullSpanInstance;
+
 class NullFinalizer : public SpanFinalizer {
 public:
   // Tracing::SpanFinalizer
   void finalize(Span&) override {}
 };
+
+typedef ConstSingleton<NullFinalizer> NullFinalizerInstance;
 
 /**
  * Finalizer for Spans covering standard request ingress.
