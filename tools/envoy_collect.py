@@ -64,7 +64,11 @@ def FetchUrl(url):
   return urllib.request.urlopen(url).read().decode('utf-8')
 
 
-def ModifyEnvoyconfig(config_path, output_directory):
+def ModifyEnvoyconfig(config_path, perf, output_directory):
+  # No modifications yet when in performance profiling mode.
+  if perf:
+    return config_path, []
+
   # Load original Envoy config.
   with open(config_path, 'r') as f:
     envoy_config = json.loads(f.read())
@@ -92,6 +96,7 @@ def ModifyEnvoyconfig(config_path, output_directory):
 
 
 def EnvoyCollect(parse_result, unknown_args):
+  perf = parse_result.performance
   envoy_tmpdir = tempfile.mkdtemp()
   manifest = []
   return_code = 1
@@ -99,36 +104,42 @@ def EnvoyCollect(parse_result, unknown_args):
     # Setup Envoy config and determine the paths of the files we're going to
     # generate.
     modified_envoy_config_path, access_log_paths = ModifyEnvoyconfig(
-        parse_result.config_path, envoy_tmpdir)
+        parse_result.config_path, perf, envoy_tmpdir)
     dump_handlers_paths = {
         h: os.path.join(envoy_tmpdir, '%s.txt' % h)
         for h in DUMP_HANDLERS
     }
-    perf_data_path = os.path.join(envoy_tmpdir, 'perf.data')
     envoy_log_path = os.path.join(envoy_tmpdir, 'envoy.log')
     # The manifest of files that will be placed in the output .tar.
     manifest = access_log_paths + list(dump_handlers_paths.values()) + [
-        modified_envoy_config_path, perf_data_path, envoy_log_path
+        modified_envoy_config_path, envoy_log_path
     ]
 
     # This is where we will find out where the admin endpoint is listening.
     admin_address_path = os.path.join(envoy_tmpdir, 'admin_address.txt')
 
-    # This is how we will invoke the wrapped envoy.
-    # TODO(htuch): Only run under perf when we want a profile, not during debug.
-    envoy_shcmd = ' '.join(
-        map(pipes.quote, [
+    if perf:
+      perf_data_path = os.path.join(envoy_tmpdir, 'perf.data')
+      perf_record_args = [
             PERF_PATH,
             'record',
             '-o',
             perf_data_path,
             '-g',
             '--',
+      ]
+    else:
+      perf_record_args = []
+
+    # This is how we will invoke the wrapped envoy.
+    # TODO(htuch): Only run under perf when we want a profile, not during debug.
+    envoy_shcmd = ' '.join(
+        map(pipes.quote, perf_record_args + [
             ENVOY_PATH,
             '-c',
             modified_envoy_config_path,
             '-l',
-            'trace',
+            'error' if perf else 'trace',
             '--admin-address-path',
             admin_address_path,
         ] + unknown_args[1:]))
@@ -136,10 +147,9 @@ def EnvoyCollect(parse_result, unknown_args):
 
     # Some process setup stuff to ensure the child process gets cleaned up properly if the
     # collector dies and doesn't get its signals implicity.
-    libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
-
     def EnvoyPreexecFn():
       os.setpgrp()
+      libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
       libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
 
     # Launch Envoy, and register for SIGINT.
@@ -152,11 +162,14 @@ def EnvoyCollect(parse_result, unknown_args):
           shell=True)
 
       def SignalHandler(signum, frame):
+        # Defer until the signal so that the Envoy process gets a chance to write the file out.
         with open(admin_address_path, 'r') as f:
           admin_address = 'http://%s' % f.read()
         for handler, path in dump_handlers_paths.items():
+          handler_url = '%s/%s' % (admin_address, handler)
+          print('Fetching %s' % handler_url)
           with open(path, 'w') as f:
-            f.write(FetchUrl('%s/%s' % (admin_address, handler)))
+            f.write(FetchUrl(handler_url))
         print('Sending Envoy process (PID=%d) SIGINT...' % envoy_proc.pid)
         envoy_proc.send_signal(signal.SIGINT)
 
@@ -194,4 +207,9 @@ if __name__ == '__main__':
       '--log-level',
       '-l',
       help='Envoy log level. This will be overriden when invoking Envoy.')
+  parser.add_argument(
+      '--performance',
+      '-p',
+      action='store_true',
+      help='Performance mode (collect perf trace, minimize log verbosity).')
   sys.exit(EnvoyCollect(*parser.parse_known_args(sys.argv)))
