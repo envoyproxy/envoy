@@ -4,7 +4,7 @@
 Example use:
 
   ./tools/envoy_collect.py --output-path=./envoy.tar -c
-  ./configs/google_com_proxy.json --service-node foo -e /path/to/envoy-static
+  ./configs/google_com_proxy.json --service-node foo
   <Ctrl-C>
   tar -tvf ./envoy.tar
   -rw------- htuch/eng         0 2017-08-13 21:13 access_0.log
@@ -17,7 +17,7 @@ Example use:
 
 The Envoy process will execute as normal and will terminate when interrupted
 with SIGINT (ctrl-c on stdin), collecting the various stats/log/profile in the
---output-path tar ball.
+--output-path tarball.
 
 TODO(htuch):
   - Generate the full perf trace as well, since we may have a different version
@@ -29,7 +29,7 @@ TODO(htuch):
     periodic).
   - Validate in performance mode that we're using an opt binary.
   - Consider handling other signals.
-  - bz2 compress tar ball.
+  - bz2 compress tarball.
   - Use freeze or something similar to build a static binary with embedded
     Python, ending need to have Python on remote host (and care about version).
 """
@@ -233,12 +233,10 @@ if __name__ == '__main__':
   # envoy_collect specific args.
   parser.add_argument(
       '--performance',
-      '-p',
       action='store_true',
       help='Performance mode (collect perf trace, minimize log verbosity).')
   parser.add_argument(
       '--envoy-binary',
-      '-e',
       default=DEFAULT_ENVOY_PATH,
       help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
   sys.exit(EnvoyCollect(*parser.parse_known_args(sys.argv)))
