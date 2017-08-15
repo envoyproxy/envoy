@@ -50,7 +50,7 @@ import tarfile
 import tempfile
 from six.moves import urllib
 
-ENVOY_PATH = os.getenv(
+DEFAULT_ENVOY_PATH = os.getenv(
     'ENVOY_PATH',
     'bazel-out/local-fastbuild/genfiles/source/exe/envoy-static.stamped')
 PERF_PATH = os.getenv('PERF_PATH', 'perf')
@@ -135,7 +135,7 @@ def EnvoyCollect(parse_result, unknown_args):
     # TODO(htuch): Only run under perf when we want a profile, not during debug.
     envoy_shcmd = ' '.join(
         map(pipes.quote, perf_record_args + [
-            ENVOY_PATH,
+            parse_result.envoy_binary,
             '-c',
             modified_envoy_config_path,
             '-l',
@@ -207,9 +207,15 @@ if __name__ == '__main__':
       '--log-level',
       '-l',
       help='Envoy log level. This will be overriden when invoking Envoy.')
+  # envoy_collect specific args.
   parser.add_argument(
       '--performance',
       '-p',
       action='store_true',
       help='Performance mode (collect perf trace, minimize log verbosity).')
+  parser.add_argument(
+      '--envoy-binary',
+      '-e',
+      default=DEFAULT_ENVOY_PATH,
+      help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
   sys.exit(EnvoyCollect(*parser.parse_known_args(sys.argv)))
