@@ -30,7 +30,7 @@ public:
   }
 
   void runResetCallbacks(StreamResetReason reason) {
-    if (reset_callbacks_run_) {
+    if (reset_callbacks_started_) {
       return;
     }
 
@@ -40,8 +40,6 @@ public:
         callbacks->onResetStream(reason);
       }
     }
-
-    reset_callbacks_run_ = true;
   }
 
 protected:
@@ -52,7 +50,7 @@ protected:
 
   void addCallbacks_(StreamCallbacks& callbacks) {
     callbacks_.push_back(&callbacks);
-    if (!reset_callbacks_run_) {
+    if (!reset_callbacks_started_) {
       for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
         callbacks.onAboveWriteBufferHighWatermark();
       }
@@ -73,7 +71,6 @@ protected:
 
 private:
   std::vector<StreamCallbacks*> callbacks_;
-  bool reset_callbacks_run_{};
   bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{0};
 };
