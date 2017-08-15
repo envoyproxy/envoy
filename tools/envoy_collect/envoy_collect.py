@@ -136,6 +136,7 @@ def EnvoyCollect(parse_result, unknown_args):
     # Only run under 'perf record' in performance mode.
     if perf:
       perf_data_path = os.path.join(envoy_tmpdir, 'perf.data')
+      manifest.append(perf_data_path)
       perf_record_args = [
           PERF_PATH,
           'record',
