@@ -200,6 +200,72 @@ INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerTest, RedisSimpleRequest
 INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                         RedisSimpleRequestCommandHandlerTest, testing::Values("INCR", "inCrBY"));
 
+TEST_F(RedisSimpleRequestCommandHandlerTest, EvalSuccess) {
+  InSequence s;
+
+  RespValue request;
+  makeBulkStringArray(request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
+  makeRequest("key", request);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+
+  ToLowerTable table;
+  std::string lower_command("eval");
+  table.toLowerCase(lower_command);
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+};
+
+TEST_F(RedisSimpleRequestCommandHandlerTest, EvalShaSuccess) {
+  InSequence s;
+
+  RespValue request;
+  makeBulkStringArray(request, {"EVALSHA", "return {ARGV[1]}", "1", "keykey", "arg"});
+  makeRequest("keykey", request);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+
+  ToLowerTable table;
+  std::string lower_command("evalsha");
+  table.toLowerCase(lower_command);
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+};
+
+TEST_F(RedisSimpleRequestCommandHandlerTest, EvalWrongNumberOfArgs) {
+  InSequence s;
+
+  RespValue response;
+  response.type(RespType::Error);
+  response.asString() = "wrong number of arguments for command";
+
+  RespValue request;
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  makeBulkStringArray(request, {"eval", "return {ARGV[1]}"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  makeBulkStringArray(request, {"evalsha", "return {ARGV[1]}", "1"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+};
+
+TEST_F(RedisSimpleRequestCommandHandlerTest, EvalNoUpstream) {
+  InSequence s;
+
+  RespValue request;
+  makeBulkStringArray(request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
+  EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(request), _)).WillOnce(Return(nullptr));
+  RespValue response;
+  response.type(RespType::Error);
+  response.asString() = "no upstream host";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(request, callbacks_);
+  EXPECT_EQ(nullptr, handle_);
+};
+
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
 public:
   void setup(uint32_t num_gets, const std::list<uint64_t>& null_handle_indexes) {
