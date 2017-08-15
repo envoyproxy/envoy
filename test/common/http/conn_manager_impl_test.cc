@@ -434,10 +434,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
           }));
 
-  // Treat request as internal, otherwise x-request-id header will be overwritten.
-  use_remote_address_ = false;
-  EXPECT_CALL(random_, uuid()).Times(0);
-
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -476,10 +472,6 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamDecoderFilter(filter);
       }));
-
-  // Treat request as internal, otherwise x-request-id header will be overwritten.
-  use_remote_address_ = false;
-  EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
