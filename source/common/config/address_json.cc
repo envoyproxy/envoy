@@ -30,7 +30,7 @@ void AddressJson::translateResolvedAddress(const std::string& json_address, bool
       socket_address->set_ip_address(address->ip()->addressAsString());
       break;
     case Network::Address::IpVersion::v6:
-      socket_address->set_ip_address("[" + address->ip()->addressAsString() + "]");
+      socket_address->set_ip_address(address->ip()->addressAsString());
       break;
     }
     socket_address->mutable_port()->set_value(address->ip()->port());

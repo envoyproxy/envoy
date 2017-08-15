@@ -78,6 +78,7 @@ public:
   std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
+  std::string asJsonString() const override;
 
   bool empty() const override;
   bool hasObject(const std::string& name) const override;
@@ -462,6 +463,14 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
 std::vector<ObjectSharedPtr> Field::asObjectArray() const {
   checkType(Type::Array);
   return {value_.array_value_.begin(), value_.array_value_.end()};
+}
+
+std::string Field::asJsonString() const {
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  rapidjson::Document document = asRapidJsonDocument();
+  document.Accept(writer);
+  return buffer.GetString();
 }
 
 bool Field::empty() const {

@@ -40,3 +40,13 @@
           Protobuf::util::TimeUtil::MillisecondsToDuration((json).getInteger(#field_name "_ms"))); \
     }                                                                                              \
   } while (0)
+
+// Set a google.protobuf.Duration field in a protobuf message with the corresponding field's
+// seconds value from a JSON object if the field is set in the JSON object.
+#define JSON_UTIL_SET_DURATION_SECONDS(json, message, field_name)                                  \
+  do {                                                                                             \
+    if ((json).hasObject(#field_name "_s")) {                                                      \
+      (message).mutable_##field_name()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration( \
+          1000 * (json).getInteger(#field_name "_s")));                                            \
+    }                                                                                              \
+  } while (0)

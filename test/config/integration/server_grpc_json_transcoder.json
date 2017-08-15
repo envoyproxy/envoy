@@ -39,7 +39,7 @@
               "domains": [ "*" ],
               "routes": [
                 {
-                  "prefix": "/",
+                  "prefix": "/bookstore.Bookstore",
                   "cluster": "cluster_1"
                 }
               ]

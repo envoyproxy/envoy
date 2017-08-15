@@ -12,6 +12,8 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "api/filter/http_connection_manager.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -31,16 +33,15 @@ public:
    * ptrs happen from the destructor of the RouteConfigProvider. This function creates a
    * RouteConfigProvider if there isn't one with the same (route_config_name, cluster) already.
    * Otherwise, it returns a RouteConfigProviderSharedPtr created from the manager held weak_ptr.
-   * @param config supplies the json configuration of an RdsRouteConfigProvider.
+   * @param rds supplies the proto configuration of an RdsRouteConfigProvider.
    * @param scope supplies the scope to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager supplies the init manager.
    */
-  virtual RouteConfigProviderSharedPtr getRouteConfigProvider(const Json::Object& config,
-                                                              Upstream::ClusterManager& cm,
-                                                              Stats::Scope& scope,
-                                                              const std::string& stat_prefix,
-                                                              Init::Manager& init_manager) PURE;
+  virtual RouteConfigProviderSharedPtr
+  getRouteConfigProvider(const envoy::api::v2::filter::Rds& rds, Upstream::ClusterManager& cm,
+                         Stats::Scope& scope, const std::string& stat_prefix,
+                         Init::Manager& init_manager) PURE;
 };
 
 /**

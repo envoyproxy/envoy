@@ -88,7 +88,9 @@ host_redirect
 path_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
   a 301 redirect response will be sent which swaps the path portion of the URL with this value.
-  *host_redirect*  can also be specified along with this option.
+  *host_redirect*  can also be specified along with this option. The router filter will place
+  the original path before rewrite into the :ref:`x-envoy-original-path
+  <config_http_filters_router_x-envoy-original-path>` header.
 
 .. _config_http_conn_man_route_table_route_prefix_rewrite:
 

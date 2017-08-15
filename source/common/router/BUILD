@@ -52,10 +52,15 @@ envoy_cc_library(
     name = "rds_lib",
     srcs = ["rds_impl.cc"],
     hdrs = ["rds_impl.h"],
+    external_deps = [
+        "envoy_filter_http_connection_manager",
+        "envoy_rds",
+    ],
     deps = [
         ":config_lib",
+        ":rds_subscription_lib",
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/init:init_interface",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
@@ -64,9 +69,26 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:rds_json_lib",
+        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_subscription_lib",
+    srcs = ["rds_subscription.cc"],
+    hdrs = ["rds_subscription.h"],
+    external_deps = [
+        "envoy_filter_http_connection_manager",
+    ],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:rds_json_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )
 

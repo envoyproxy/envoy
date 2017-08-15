@@ -1,6 +1,8 @@
 #include <chrono>
 #include <string>
 
+#include "common/config/filter_json.h"
+#include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
@@ -23,6 +25,16 @@ using testing::ReturnRef;
 using testing::_;
 
 namespace Router {
+namespace {
+
+envoy::api::v2::filter::HttpConnectionManager
+parseHttpConnectionManagerFromJson(const std::string& json_string) {
+  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
+                                                            http_connection_manager);
+  return http_connection_manager;
+}
 
 class RdsImplTest : public testing::Test {
 public:
@@ -30,21 +42,25 @@ public:
   ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
-    std::string config_json = R"EOF(
+    const std::string config_json = R"EOF(
     {
       "rds": {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
         "refresh_delay_ms": 1000
-      }
+      },
+      "codec_type": "auto",
+      "stat_prefix": "foo",
+      "filters": [
+        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      ]
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
-    rds_ = RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.", init_manager_,
+    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                           runtime_, cm_, store_, "foo.", init_manager_,
                                            route_config_provider_manager_);
     expectRequest();
     init_manager_.initialize();
@@ -83,53 +99,70 @@ public:
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
-  std::string config_json = R"EOF(
+  const std::string config_json = R"EOF(
     {
       "rds": {},
-      "route_config": {}
+      "route_config": {},
+      "codec_type": "auto",
+      "stat_prefix": "foo",
+      "filters": [
+        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      ]
     }
     )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                               runtime_, cm_, store_, "foo.", init_manager_,
+                                               route_config_provider_manager_),
                EnvoyException);
 }
 
 TEST_F(RdsImplTest, LocalInfoNotDefined) {
-  std::string config_json = R"EOF(
+  const std::string config_json = R"EOF(
     {
       "rds": {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config"
-      }
+      },
+      "codec_type": "auto",
+      "stat_prefix": "foo",
+      "filters": [
+        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      ]
     }
     )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
-  interval_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                               runtime_, cm_, store_, "foo.", init_manager_,
+                                               route_config_provider_manager_),
                EnvoyException);
 }
 
 TEST_F(RdsImplTest, UnknownCluster) {
-  std::string config_json = R"EOF(
+  const std::string config_json = R"EOF(
     {
       "rds": {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config"
-      }
+      },
+      "codec_type": "auto",
+      "stat_prefix": "foo",
+      "filters": [
+        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      ]
     }
     )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  ON_CALL(cm_, get("foo_cluster")).WillByDefault(Return(nullptr));
+  EXPECT_CALL(cm_, get("foo_cluster")).WillOnce(Return(nullptr));
   interval_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, store_, "foo.",
-                                               init_manager_, route_config_provider_manager_),
+  EXPECT_THROW(dynamic_cast<RdsRouteConfigProviderImpl*>(
+                   RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                                   runtime_, cm_, store_, "foo.", init_manager_,
+                                                   route_config_provider_manager_)
+                       .get())
+                   ->initialize([] {}),
                EnvoyException);
 }
 
@@ -304,14 +337,16 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
     )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+  envoy::api::v2::filter::Rds rds;
+  Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
   RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
-      *config, cm_, store_, "foo_prefix", init_manager_);
+      rds, cm_, store_, "foo_prefix", init_manager_);
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
   RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_.getRouteConfigProvider(
-      *config, cm_, store_, "foo_prefix", init_manager_);
+      rds, cm_, store_, "foo_prefix", init_manager_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider, provider2);
   EXPECT_EQ(2UL, provider.use_count());
@@ -325,9 +360,11 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
     )EOF";
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
+  envoy::api::v2::filter::Rds rds2;
+  Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
 
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
-      *config2, cm_, store_, "foo_prefix", init_manager_);
+      rds2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider);
   EXPECT_EQ(2UL, provider.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
@@ -355,5 +392,6 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(0UL, configured_providers.size());
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

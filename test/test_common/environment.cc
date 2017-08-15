@@ -120,6 +120,9 @@ std::string TestEnvironment::substitute(const std::string& str,
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
                                        Network::Test::getLoopbackAddressUrlString(version));
+  const std::regex ntop_loopback_address_regex("\\{\\{ ntop_ip_loopback_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
+                                       Network::Test::getLoopbackAddressString(version));
 
   // Substitute dns lookup family.
   const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");

@@ -29,6 +29,7 @@ envoy_cc_test(
     srcs = ["http_connection_manager_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/router:rds_lib",
         "//source/server/config/http:dynamo_lib",
