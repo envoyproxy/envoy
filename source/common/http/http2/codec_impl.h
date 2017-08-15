@@ -275,15 +275,11 @@ public:
   // Propogate network connection watermark events to each stream on the connection.
   // The router will propogate it downstream.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
-    ASSERT(!underlying_connection_above_watermark_);
     for (auto& stream : active_streams_) {
-      underlying_connection_above_watermark_ = true;
       stream->runHighWatermarkCallbacks();
     }
   }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    ASSERT(underlying_connection_above_watermark_);
-    underlying_connection_above_watermark_ = false;
     for (auto& stream : active_streams_) {
       stream->runLowWatermarkCallbacks();
     }
@@ -296,7 +292,6 @@ private:
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   Http::ConnectionCallbacks& callbacks_;
-  bool underlying_connection_above_watermark_{false};
 };
 
 /**

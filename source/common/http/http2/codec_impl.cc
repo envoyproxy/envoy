@@ -747,7 +747,8 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
   StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &decoder;
-  if (underlying_connection_above_watermark_) {
+  // If the connection is currently above the high watermark, make sure to inform the new stream.
+  if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
   stream->moveIntoList(std::move(stream), active_streams_);

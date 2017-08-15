@@ -774,9 +774,7 @@ void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_enc
 }
 
 void Filter::UpstreamRequest::clearRequestEncoder() {
-  // Before clearing the encoder, unsubscribe from callbacks.  This may result
-  // in some clean up calls to onBelowWriteBufferLowWatermark which reference
-  // the encoder.
+  // Before clearing the encoder, unsubscribe from callbacks.
   if (request_encoder_) {
     parent_.callbacks_->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
   }

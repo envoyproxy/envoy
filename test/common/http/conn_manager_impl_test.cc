@@ -1282,6 +1282,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
 
   // Now when the stream is created, it should be informed of the connection
   // callbacks immediately.
+  EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
   setUpEncoderAndDecoder();
   ASSERT_GE(decoder_filters_.size(), 1);
   MockDownstreamWatermarkCallbacks callbacks;

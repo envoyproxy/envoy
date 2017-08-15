@@ -75,6 +75,7 @@ public:
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool usingOriginalDst() const override { return using_original_dst_; }
+  bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
@@ -149,6 +150,7 @@ private:
   // has been called N times.
   uint32_t read_disable_count_{0};
   const bool using_original_dst_;
+  bool above_high_watermark_{false};
 };
 
 /**
