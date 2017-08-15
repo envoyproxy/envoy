@@ -78,6 +78,7 @@ If health check is configured, the cluster has an additional statistics tree roo
   attempt, Counter, Number of health checks
   success, Counter, Number of successful health checks
   failure, Counter, Number of immediately failed health checks (e.g. HTTP 503) as well as network failures
+  passive_failure, Counter, Number of health check failures due to passive events (e.g. x-envoy-immediate-health-check-fail)
   network_failure, Counter, Number of health check failures due to network error
   verify_cluster, Counter, Number of health checks that attempted cluster name verification
   healthy, Gauge, Number of healthy members

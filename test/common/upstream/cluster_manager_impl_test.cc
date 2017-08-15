@@ -346,6 +346,38 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
+      "health_check": {
+        "type": "http",
+        "timeout_ms": 1000,
+        "interval_ms": 1000,
+        "unhealthy_threshold": 2,
+        "healthy_threshold": 2,
+        "path": "/healthcheck"
+      }
+    }]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(
+      factory_.dispatcher_,
+      createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
+      .WillOnce(Return(connection));
+  create(*loader);
+  factory_.tls_.shutdownThread();
+}
+
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));

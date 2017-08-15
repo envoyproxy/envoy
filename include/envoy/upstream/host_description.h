@@ -5,6 +5,7 @@
 
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/health_checker_sink.h"
 #include "envoy/upstream/outlier_detection.h"
 
 namespace Envoy {
@@ -53,6 +54,11 @@ public:
    * @return the host's outlier detection sink.
    */
   virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
+
+  /**
+   * @return the host's health checker sink.
+   */
+  virtual HealthCheckerSink& healthChecker() const PURE;
 
   /**
    * @return the hostname associated with the host if any.

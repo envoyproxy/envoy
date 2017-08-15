@@ -17,6 +17,11 @@ Health check filter :ref:`architecture overview <arch_overview_health_checking_f
      }
   }
 
+Note that the filter will automatically set the :ref:`x-envoy-immediate-health-check-fail
+<config_http_filters_router_x-envoy-immediate-health-check-fail>` header if the
+:ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin endpoint has been
+called.
+
 pass_through_mode
   *(required, boolean)* Specifies whether the filter operates in pass through mode or not.
 

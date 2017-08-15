@@ -412,8 +412,8 @@ TEST(StaticClusterImplTest, HealthyStat) {
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
 
-  MockHealthChecker* health_checker = new NiceMock<MockHealthChecker>();
-  cluster.setHealthChecker(HealthCheckerPtr{health_checker});
+  std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
+  cluster.setHealthChecker(health_checker);
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
@@ -485,6 +485,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(0UL, cluster.hostsPerZone().size());
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
+  cluster.hosts()[0]->healthChecker().setUnhealthy();
 }
 
 TEST(StaticClusterImplTest, UnsupportedLBType) {
