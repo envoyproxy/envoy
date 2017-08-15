@@ -81,15 +81,13 @@ public:
   void evaluateRequestHeaders(
       Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
       const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
-};
 
 private:
-/**
- * Building a map of request header formatters.
- */
-std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-    header_formatter_map_;
-}; // namespace Router
-
-} // namespace Envoy
+  /**
+   * Building a map of request header formatters.
+   */
+  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
+      header_formatter_map_;
+};
+} // namespace Router
 } // namespace Envoy
