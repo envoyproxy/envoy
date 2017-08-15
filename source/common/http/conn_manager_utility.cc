@@ -122,7 +122,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId() && (edge_request || !request_headers.RequestId())) {
-    // TODO PERF: Write UUID directly to the header map.
+    // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
     const std::string uuid = random.uuid();
     ASSERT(!uuid.empty());
     request_headers.insertRequestId().value(uuid);
