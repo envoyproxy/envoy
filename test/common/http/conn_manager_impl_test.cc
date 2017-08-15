@@ -95,7 +95,6 @@ public:
         .WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
         .WillByDefault(ReturnRef(remote_address_));
-    ON_CALL(random_, uuid()).WillByDefault(Return(random_uuid_));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
                                                   local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -249,7 +248,6 @@ public:
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  const std::string random_uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   RouteConfigProvider route_config_provider_;

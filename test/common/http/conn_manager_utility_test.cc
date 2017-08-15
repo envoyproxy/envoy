@@ -35,13 +35,10 @@ public:
 
     tracing_config_ = {Tracing::OperationName::Ingress, {}};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
-
-    ON_CALL(random_, uuid()).WillByDefault(Return(random_uuid_));
   }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  const std::string random_uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   Optional<std::string> user_agent_;
@@ -181,7 +178,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
     // No changes to uuid as x-client-trace-id is missing.
-    EXPECT_EQ(random_uuid_, headers.get_(Headers::get().RequestId));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -197,7 +194,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ(random_uuid_, headers.get_(Headers::get().RequestId));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -214,7 +211,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    // Traceable (client trace) variant of random_uuid_
+    // Traceable (client trace) variant of random_.uuid_
     EXPECT_EQ("a121e9e1-feae-b136-9e0e-6fac343d56c9", headers.get_(Headers::get().RequestId));
   }
 }
