@@ -35,7 +35,7 @@ protected:
 };
 
 /**
- * SingleServerRequest is used as a base class for commands that hash to a single backend.
+ * SingleServerRequest is a base class for commands that hash to a single backend.
  */
 class SingleServerRequest : public SplitRequest, public ConnPool::PoolCallbacks {
 public:
@@ -80,9 +80,9 @@ private:
 };
 
 /**
- * FragmentedRequest is a request that contains multiple keys. An individual request is sent to the
- * appropriate server for each key. The responses from all servers are combined and returned to the
- * client.
+ * FragmentedRequest is a base class for requests that contains multiple keys. An individual request
+ * is sent to the appropriate server for each key. The responses from all servers are combined and
+ * returned to the client.
  */
 class FragmentedRequest : public SplitRequest {
 public:

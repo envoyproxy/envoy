@@ -105,7 +105,7 @@ struct SupportedCommands {
   }
 
   /**
-   * @return eval commands are treated as simple but hash on the second argument
+   * @return commands which hash on the fourth argument
    */
   static const std::vector<std::string>& evalCommands() {
     static const std::vector<std::string>* commands =
