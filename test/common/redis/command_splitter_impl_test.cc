@@ -95,8 +95,8 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
 
-class RedisSimpleRequestCommandHandlerTest : public RedisCommandSplitterImplTest,
-                                             public testing::WithParamInterface<std::string> {
+class RedisSingleServerRequestTest : public RedisCommandSplitterImplTest,
+                                     public testing::WithParamInterface<std::string> {
 public:
   void makeRequest(const std::string& hash_key, const RespValue& request) {
     EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
@@ -123,7 +123,7 @@ public:
   ConnPool::MockPoolRequest pool_request_;
 };
 
-TEST_P(RedisSimpleRequestCommandHandlerTest, Success) {
+TEST_P(RedisSingleServerRequestTest, Success) {
   InSequence s;
 
   RespValue request;
@@ -140,7 +140,7 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, Success) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_P(RedisSimpleRequestCommandHandlerTest, SuccessMultipleArgs) {
+TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
   InSequence s;
 
   RespValue request;
@@ -157,7 +157,7 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, SuccessMultipleArgs) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_P(RedisSimpleRequestCommandHandlerTest, Fail) {
+TEST_P(RedisSingleServerRequestTest, Fail) {
   InSequence s;
 
   RespValue request;
@@ -168,7 +168,7 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, Fail) {
   fail();
 };
 
-TEST_P(RedisSimpleRequestCommandHandlerTest, Cancel) {
+TEST_P(RedisSingleServerRequestTest, Cancel) {
   InSequence s;
 
   RespValue request;
@@ -180,7 +180,7 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, Cancel) {
   handle_->cancel();
 };
 
-TEST_P(RedisSimpleRequestCommandHandlerTest, NoUpstream) {
+TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   InSequence s;
 
   RespValue request;
@@ -194,13 +194,13 @@ TEST_P(RedisSimpleRequestCommandHandlerTest, NoUpstream) {
   EXPECT_EQ(nullptr, handle_);
 };
 
-INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerTest, RedisSimpleRequestCommandHandlerTest,
+INSTANTIATE_TEST_CASE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
                         testing::ValuesIn(SupportedCommands::simpleCommands()));
 
 INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
-                        RedisSimpleRequestCommandHandlerTest, testing::Values("INCR", "inCrBY"));
+                        RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
-TEST_F(RedisSimpleRequestCommandHandlerTest, EvalSuccess) {
+TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   InSequence s;
 
   RespValue request;
@@ -217,7 +217,7 @@ TEST_F(RedisSimpleRequestCommandHandlerTest, EvalSuccess) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_F(RedisSimpleRequestCommandHandlerTest, EvalShaSuccess) {
+TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
   InSequence s;
 
   RespValue request;
@@ -234,7 +234,7 @@ TEST_F(RedisSimpleRequestCommandHandlerTest, EvalShaSuccess) {
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
 };
 
-TEST_F(RedisSimpleRequestCommandHandlerTest, EvalWrongNumberOfArgs) {
+TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
   InSequence s;
 
   RespValue response;
@@ -252,7 +252,7 @@ TEST_F(RedisSimpleRequestCommandHandlerTest, EvalWrongNumberOfArgs) {
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
 };
 
-TEST_F(RedisSimpleRequestCommandHandlerTest, EvalNoUpstream) {
+TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   InSequence s;
 
   RespValue request;
