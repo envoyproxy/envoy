@@ -92,7 +92,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
-      request_headers_parser_(RequestHeaderParser::parse(route)),	
+      request_headers_parser_(RequestHeaderParser::parseRoute(route)),
       opaque_config_(parseOpaqueConfig(route)) {
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
@@ -391,7 +391,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config),
-      request_headers_parser_(RequestHeaderParser::parse(virtual_host)){
+      request_headers_parser_(RequestHeaderParser::parseVirtualHost(virtual_host)) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -607,7 +607,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
     request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
                                        header_value_option.header().value()});
   }
-  request_headers_parser_ = RequestHeaderParser::parse(config);
+  request_headers_parser_ = RequestHeaderParser::parseRouteConfiguration(config);
 }
 
 } // namespace Router

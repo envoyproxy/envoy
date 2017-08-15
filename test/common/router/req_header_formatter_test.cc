@@ -2,6 +2,7 @@
 
 #include "envoy/http/protocol.h"
 
+#include "common/config/rds_json.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/router/req_header_formatter.h"
 
@@ -18,6 +19,13 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::_;
+
+static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) {
+  envoy::api::v2::Route route;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
+  return route;
+}
 
 TEST(RequestHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
@@ -56,8 +64,8 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
 	    	}
 	   	]
 	  })EOF";
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(*loader.get());
+  RequestHeaderParserPtr req_header_parser =
+      Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::string s1 = "127.0.0.1";
@@ -81,7 +89,8 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
 	   	]
 	  })EOF";
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(*loader.get());
+  RequestHeaderParserPtr req_header_parser =
+      Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::pair<Http::LowerCaseString, std::string> static_req_header(
@@ -91,6 +100,5 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
   req_header_parser->evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
   EXPECT_TRUE(headerMap.has("static-header"));
 }
-
 } // namespace Router
 } // namespace Envoy

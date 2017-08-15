@@ -9,6 +9,8 @@
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/json/json_loader.h"
 
+#include "api/rds.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -67,7 +69,12 @@ class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
 public:
   virtual ~RequestHeaderParser() {}
 
-  static RequestHeaderParserPtr parse(const Json::Object& config);
+  static RequestHeaderParserPtr parseRoute(const envoy::api::v2::Route& route);
+
+  static RequestHeaderParserPtr parseVirtualHost(const envoy::api::v2::VirtualHost& virtualHost);
+
+  static RequestHeaderParserPtr
+  parseRouteConfiguration(const envoy::api::v2::RouteConfiguration& routeConfig);
 
   static HeaderFormatterPtr parseInternal(const std::string& format);
 

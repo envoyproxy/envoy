@@ -183,6 +183,7 @@ envoy_cc_library(
     srcs = ["req_header_formatter.cc"],
     hdrs = ["req_header_formatter.h"],
     deps = [
+        "//source/common/config:rds_json_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:json_loader_lib",

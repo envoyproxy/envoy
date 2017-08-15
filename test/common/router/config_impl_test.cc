@@ -2036,9 +2036,6 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-<<<<<<< ac16d35e8cd21d745dc752199841d9a130ca8b15
-} // namespace
-=======
 TEST(CustomRequestHeadersTest, AddNewHeader) {
   const std::string json = R"EOF(
 	{
@@ -2133,11 +2130,10 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   ]
 }
 	  )EOF";
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-  ConfigImpl config(*loader, runtime, cm, true);
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Request header manipulation testing.
   {
@@ -2251,17 +2247,17 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   ]
 }
 	  )EOF";
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-  ASSERT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
+  ASSERT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true),
+               EnvoyException);
   try {
-    ConfigImpl config(*loader, runtime, cm, true);
+    ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
   } catch (EnvoyException& ex) {
     EXPECT_PRED1(CheckFormatMessage, ex.what());
   }
 }
-
+} // namespace
 } // namespace Router
 } // namespace Envoy
