@@ -35,10 +35,13 @@ public:
 
     tracing_config_ = {Tracing::OperationName::Ingress, {}};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
+
+    ON_CALL(random_, uuid()).WillByDefault(Return(random_uuid_));
   }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  const std::string random_uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   Optional<std::string> user_agent_;
@@ -62,11 +65,9 @@ TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
   Network::Address::Ipv4Instance not_local_host_remote_address("12.12.12.12");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress())
       .WillRepeatedly(ReturnRef(not_local_host_remote_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -80,12 +81,10 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) {
   Network::Address::Ipv4Instance local_host_remote_address("127.0.0.1");
   Network::Address::Ipv4Instance local_address("10.3.2.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(local_host_remote_address));
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(config_, localAddress()).WillRepeatedly(ReturnRef(local_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -97,11 +96,9 @@ TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) 
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"user-agent", "foo"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -115,11 +112,9 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
@@ -142,11 +137,13 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     // Internal request, make traceable
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                    route_config_, random_, runtime_, local_info_);
 
+    // Traceable (forced trace) variant of uuid
     EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get_(Headers::get().RequestId));
   }
 
@@ -154,6 +151,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     // Not internal request, force trace header should be cleaned.
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "34.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -165,7 +163,6 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   Network::Address::Ipv4Instance external_remote_address("34.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
@@ -175,7 +172,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   {
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid()).Times(1);
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -183,8 +180,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
-    // No changes to generated_uuid as x-client-trace-id is missing.
-    EXPECT_EQ(generated_uuid, headers.get_(Headers::get().RequestId));
+    // No changes to uuid as x-client-trace-id is missing.
+    EXPECT_EQ(random_uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -192,7 +189,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid()).Times(1);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(false));
 
@@ -200,7 +197,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-4307-8002-969403baf480", headers.get_(Headers::get().RequestId));
+    EXPECT_EQ(random_uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -209,7 +206,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid()).Times(1);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(true));
 
@@ -217,7 +214,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-b307-8002-969403baf480", headers.get_(Headers::get().RequestId));
+    // Traceable (client trace) variant of random_uuid_
+    EXPECT_EQ("a121e9e1-feae-b136-9e0e-6fac343d56c9", headers.get_(Headers::get().RequestId));
   }
 }
 
@@ -240,11 +238,9 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
@@ -260,11 +256,9 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{};
@@ -331,8 +325,6 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   Network::Address::Ipv4Instance external_ip("50.0.0.1");
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_ip));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
 
@@ -360,8 +352,6 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   Network::Address::Ipv4Instance external_ip("60.0.0.1");
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_ip));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-forwarded-for", "60.0.0.1"}};
@@ -376,8 +366,6 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   Network::Address::Ipv4Instance local_remote_address("10.0.0.1");
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(local_remote_address));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-envoy-expected-rq-timeout-ms", "10"}};
@@ -390,10 +378,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
-
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
+
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http11, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
   EXPECT_EQ("upgrade", headers.get_("connection"));
@@ -401,10 +387,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
-
   TestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
+
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http11, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
   EXPECT_FALSE(headers.has("connection"));
@@ -412,10 +396,8 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
-
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
+
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
   EXPECT_FALSE(headers.has("connection"));
@@ -423,9 +405,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
-
   route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
   route_config_.response_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
 
@@ -441,9 +420,6 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
-
   TestHeaderMapImpl response_headers;
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
@@ -460,8 +436,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -477,8 +451,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -504,8 +476,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -533,8 +503,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;Hash=xyz;SAN=test://bar.com/be"}};
@@ -565,8 +533,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -597,8 +563,6 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -619,8 +583,6 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -637,8 +599,6 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
@@ -655,8 +615,6 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -671,8 +629,6 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-  ON_CALL(random_, uuid()).WillByDefault(Return(generated_uuid));
 
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
