@@ -28,7 +28,7 @@ public:
 typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
 
 /**
- * a formatter that expands the request header variable to a value based on info in RequestInfo.
+ * A formatter that expands the request header variable to a value based on info in RequestInfo.
  */
 class RequestHeaderFormatter : public HeaderFormatter, Logger::Loggable<Logger::Id::config> {
 public:
@@ -81,19 +81,15 @@ public:
   void evaluateRequestHeaders(
       Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
       const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
-
-  const std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>&
-  headerFormatterMap() {
-    return header_formatter_map_;
-  };
-
-private:
-  /**
-   * building a map of request header formatters.
-   */
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-      header_formatter_map_;
 };
 
-} // namespace Router
+private:
+/**
+ * Building a map of request header formatters.
+ */
+std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
+    header_formatter_map_;
+}; // namespace Router
+
+} // namespace Envoy
 } // namespace Envoy

@@ -26,11 +26,11 @@ HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format)
     variable_name = format.substr(1, last_occ_pos - 1);
 
   } else {
-    HeaderFormatterPtr plain_header_formatter_shared_ptr(new PlainHeaderFormatter(format));
-    return plain_header_formatter_shared_ptr;
+    HeaderFormatterPtr plain_header_formatter_ptr(new PlainHeaderFormatter(format));
+    return plain_header_formatter_ptr;
   }
-  HeaderFormatterPtr request_header_formatter_shared_ptr(new RequestHeaderFormatter(variable_name));
-  return request_header_formatter_shared_ptr;
+  HeaderFormatterPtr request_header_formatter_ptr(new RequestHeaderFormatter(variable_name));
+  return request_header_formatter_ptr;
 }
 
 RequestHeaderParserPtr RequestHeaderParser::parseRoute(const envoy::api::v2::Route& route) {
