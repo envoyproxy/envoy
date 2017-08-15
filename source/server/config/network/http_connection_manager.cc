@@ -198,8 +198,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // This should always succeed unless something crash-worthy such as out-of-memory.
     RELEASE_ASSERT(status.ok());
     UNREFERENCED_PARAMETER(status);
-    const Json::ObjectSharedPtr filter_config =
-        Json::Factory::loadFromString(ProtobufTypes::FromString(json_config));
+    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
 
     const HttpFilterType type = stringToType(string_type);
 
