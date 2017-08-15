@@ -150,9 +150,8 @@ Address::InstanceConstSharedPtr
 Utility::fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address) {
   switch (resolved_address.address_case()) {
   case envoy::api::v2::ResolvedAddress::kSocketAddress:
-    return parseInternetAddress(
-        ProtobufTypes::FromString(resolved_address.socket_address().ip_address()),
-        resolved_address.socket_address().port().value());
+    return parseInternetAddress(resolved_address.socket_address().ip_address(),
+                                resolved_address.socket_address().port().value());
   case envoy::api::v2::ResolvedAddress::kPipe:
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(resolved_address.pipe().path())};

@@ -42,8 +42,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       ca_cert_file_(config.validation_context().ca_cert().filename()),
       cert_chain_file_(cert.cert_chain().filename()),
       private_key_file_(cert.private_key().filename()),
-      verify_subject_alt_name_list_(
-          ProtobufTypes::stringVector(config.validation_context().verify_subject_alt_name())),
+      verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
+                                    config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
                                    ? ""
                                    : config.validation_context().verify_certificate_hash()[0]) {
