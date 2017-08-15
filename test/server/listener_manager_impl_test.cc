@@ -213,24 +213,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
                             EnvoyException, "unable to create filter factory for 'invalid'");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterType) {
-  const std::string json = R"EOF(
-  {
-    "address": "tcp://127.0.0.1:1234",
-    "filters": [
-      {
-        "type" : "write",
-        "name" : "echo",
-        "config" : {}
-      }
-    ]
-  }
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json)),
-                            EnvoyException, "unable to create filter factory for 'echo'");
-}
-
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
