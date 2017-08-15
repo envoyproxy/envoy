@@ -1104,6 +1104,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
+  UNREFERENCED_PARAMETER(watermark_callbacks);
   parent_.watermark_callbacks_ = nullptr;
 }
 
