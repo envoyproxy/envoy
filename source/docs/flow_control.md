@@ -92,6 +92,10 @@ the router filter only subscribes to notifications when it has an upstream
 connection, the connection manager tracks how many outstanding high watermark
 events have occurred and passes any on to the router filter when it subscribes.
 
+It is worth noting that the router does not unwind `readDisable(true)` calls on
+destruction.  The codecs are responsible for tracking that a given stream no
+longer contributes to the read blocked state and unwinding.
+
 ## HTTP/2 codec recv buffer
 
 Given the HTTP/2 `Envoy::Http::Http2::ConnectionImpl::StreamImpl::pending_recv_data_` is processed immediately

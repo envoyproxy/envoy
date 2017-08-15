@@ -290,13 +290,11 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    ASSERT(codec_);
     ASSERT(!underlying_connection_above_high_watermark_);
     underlying_connection_above_high_watermark_ = true;
     codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
   void onBelowWriteBufferLowWatermark() override {
-    ASSERT(codec_);
     ASSERT(underlying_connection_above_high_watermark_);
     underlying_connection_above_high_watermark_ = false;
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();

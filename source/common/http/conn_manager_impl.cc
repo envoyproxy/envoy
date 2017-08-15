@@ -1103,9 +1103,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
-  for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
-    watermark_callbacks.onBelowWriteBufferLowWatermark();
-  }
   parent_.watermark_callbacks_ = nullptr;
 }
 

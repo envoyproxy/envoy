@@ -232,9 +232,6 @@ public:
    * downstream stream and downstream connection.
    *
    * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
-   *
-   * Immediately prior to removal, the filter will get a low watermark callback for every high
-   * watermark callback it has outstanding.
    */
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };

@@ -1262,8 +1262,8 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
 
-  // Now unsubscribe and verify the 2 outstanding callbacks are cleared.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(2);
+  // Now unsubscribe and verify no further callbacks are called.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
 }
 
