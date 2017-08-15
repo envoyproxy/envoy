@@ -49,7 +49,7 @@ TEST(RandomBytes, sanityCheckOfUniqueness) {
   RandomGeneratorImpl random;
   for (size_t i = 0; i < num_of_calls; ++i) {
     random.random_bytes(rand, 16);
-    results.insert(std::string(reinterpret_cast<char *>(rand), 16));
+    results.insert(std::string(reinterpret_cast<char*>(rand), 16));
   }
 
   EXPECT_EQ(num_of_calls, results.size());
