@@ -57,9 +57,10 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks) {
 
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
-  // Ensure there are at least three args to the command be able to hash it.
+  // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request.asArray().size() < 4) {
-    callbacks.onResponse(Utility::makeError("wrong number of arguments for command"));
+    callbacks.onResponse(Utility::makeError(fmt::format(
+        "wrong number of arguments for '{}' command", incoming_request.asArray()[0].asString())));
     return nullptr;
   }
 
@@ -166,7 +167,8 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks) {
   if ((incoming_request.asArray().size() - 1) % 2 != 0) {
-    callbacks.onResponse(Utility::makeError("wrong number of arguments for command"));
+    callbacks.onResponse(Utility::makeError(fmt::format(
+        "wrong number of arguments for '{}' command", incoming_request.asArray()[0].asString())));
     return nullptr;
   }
 

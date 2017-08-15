@@ -237,16 +237,16 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
 TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
   InSequence s;
 
+  RespValue request;
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "wrong number of arguments for command";
 
-  RespValue request;
-
+  response.asString() = "wrong number of arguments for 'eval' command";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(request, {"eval", "return {ARGV[1]}"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
 
+  response.asString() = "wrong number of arguments for 'evalsha' command";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(request, {"evalsha", "return {ARGV[1]}", "1"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
@@ -555,7 +555,7 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
 
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "wrong number of arguments for command";
+  response.asString() = "wrong number of arguments for 'mset' command";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"mset", "foo", "bar", "fizz"});
