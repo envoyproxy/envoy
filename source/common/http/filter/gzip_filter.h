@@ -2,8 +2,12 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/zlib/zlib_impl.h"
+
+#include "zlib.h"
 
 namespace Envoy {
 namespace Http {
@@ -33,6 +37,10 @@ private:
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   Http::HeaderEntry* content_encoding_header_{nullptr};
+  std::unique_ptr<Zlib::Impl> ZlibPtr_{nullptr};
+  
+  
+
   bool deflate_{false};
   bool is_compressed_{true};
 

@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/zlib:zlib_lib",
     ],
 )
 
