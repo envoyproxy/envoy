@@ -64,7 +64,7 @@ std::string RandomGeneratorImpl::uuid() {
 
   // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
   static const char* const hex = "0123456789abcdef";
-  static thread_local char uuid[] = "------------------------------------";
+  char uuid[UUID_LENGTH];
 
   for (uint8_t i = 0; i < 4; i++) {
     const uint8_t d = rand[i];
@@ -72,11 +72,15 @@ std::string RandomGeneratorImpl::uuid() {
     uuid[2 * i + 1] = hex[d & 0x0f];
   }
 
+  uuid[8] = '-';
+
   for (uint8_t i = 4; i < 6; i++) {
     const uint8_t d = rand[i];
     uuid[2 * i + 1] = hex[d >> 4];
     uuid[2 * i + 2] = hex[d & 0x0f];
   }
+
+  uuid[13] = '-';
 
   for (uint8_t i = 6; i < 8; i++) {
     const uint8_t d = rand[i];
@@ -84,11 +88,15 @@ std::string RandomGeneratorImpl::uuid() {
     uuid[2 * i + 3] = hex[d & 0x0f];
   }
 
+  uuid[18] = '-';
+
   for (uint8_t i = 8; i < 10; i++) {
     const uint8_t d = rand[i];
     uuid[2 * i + 3] = hex[d >> 4];
     uuid[2 * i + 4] = hex[d & 0x0f];
   }
+
+  uuid[23] = '-';
 
   for (uint8_t i = 10; i < 16; i++) {
     const uint8_t d = rand[i];
