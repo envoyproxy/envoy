@@ -6,6 +6,7 @@
 #include "server/listener_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -52,16 +53,17 @@ public:
     EXPECT_CALL(listener_factory_, createDrainManager_())
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillOnce(Invoke([raw_listener, need_init](const std::vector<Json::ObjectSharedPtr>&,
-                                                   Configuration::FactoryContext& context)
-                             -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          std::shared_ptr<ListenerHandle> notifier(raw_listener);
-          raw_listener->context_ = &context;
-          if (need_init) {
-            context.initManager().registerTarget(notifier->target_);
-          }
-          return {[notifier](Network::FilterManager&) -> void {}};
-        }));
+        .WillOnce(Invoke(
+            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
+                                      Configuration::FactoryContext& context)
+                -> std::vector<Configuration::NetworkFilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &context;
+              if (need_init) {
+                context.initManager().registerTarget(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
 
     return raw_listener;
   }
@@ -92,8 +94,9 @@ public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(Invoke([this](const std::vector<Json::ObjectSharedPtr>& filters,
-                                     Configuration::FactoryContext& context)
+        .WillByDefault(Invoke([this](
+                                  const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                  Configuration::FactoryContext& context)
                                   -> std::vector<Configuration::NetworkFilterFactoryCb> {
           return ProdListenerComponentFactory::createFilterFactoryList_(filters, server_, context);
         }));
@@ -101,36 +104,34 @@ public:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": []
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": []
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
   EXPECT_EQ(1024 * 1024U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [],
@@ -138,14 +139,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLim
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
-  std::string json = R"EOF(
+  const std::string json = TestEnvironment::substitute(R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters" : [],
@@ -158,16 +158,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
       ]
     }
   }
-  )EOF";
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
   EXPECT_NE(nullptr, manager_->listeners().back().get().sslContext());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [],
@@ -175,12 +175,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(manager_->addOrUpdateListener(*loader), Json::Exception);
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json)), Json::Exception);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
@@ -193,12 +192,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(manager_->addOrUpdateListener(*loader), Json::Exception);
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json)), Json::Exception);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
@@ -211,13 +209,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(*loader), EnvoyException,
-                            "unable to create filter factory for 'invalid'/'write'");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json)),
+                            EnvoyException, "unable to create filter factory for 'invalid'");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterType) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
@@ -230,9 +227,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterType) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(*loader), EnvoyException,
-                            "unable to create filter factory for 'echo'/'write'");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json)),
+                            EnvoyException, "unable to create filter factory for 'echo'");
 }
 
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
@@ -253,7 +249,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   Registry::RegisterFactory<TestStatsConfigFactory, Configuration::NamedNetworkFilterConfigFactory>
       registered;
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "bind_to_port": false,
@@ -267,9 +263,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createListenSocket(_, false));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
   manager_->listeners().front().get().listenerScope().counter("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
@@ -299,7 +294,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, DeprecatedFilterConfigFactoryRegi
   // Register the config factory
   Configuration::RegisterNetworkFilterConfigFactory<TestDeprecatedEchoConfigFactory> registered;
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "address": "tcp://127.0.0.1:1234",
     "filters": [
@@ -312,16 +307,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, DeprecatedFilterConfigFactoryRegi
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(*loader);
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   InSequence s;
 
   // Add foo listener.
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -329,14 +323,13 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener, but with a different address. Should throw.
-  std::string listener_foo_different_address_json = R"EOF(
+  const std::string listener_foo_different_address_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1235",
@@ -344,12 +337,13 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_foo_different_address_json);
   ListenerHandle* listener_foo_different_address = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(*loader), EnvoyException,
-                            "error updating listener: 'foo' has a different address "
-                            "'127.0.0.1:1235' from existing listener");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_different_address_json)),
+      EnvoyException,
+      "error updating listener: 'foo' has a different address "
+      "'127.0.0.1:1235' from existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -358,7 +352,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   InSequence s;
 
   // Add foo listener.
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -366,18 +360,17 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update duplicate should be a NOP.
-  EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener. Should share socket.
-  std::string listener_foo_update1_json = R"EOF(
+  const std::string listener_foo_update1_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -387,10 +380,9 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_foo_update1_json);
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
   checkStats(1, 1, 0, 0, 1, 0);
 
   // Start workers.
@@ -400,17 +392,16 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   worker_->callAddCompletion(true);
 
   // Update duplicate should be a NOP.
-  EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
   checkStats(1, 1, 0, 0, 1, 0);
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
-  loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false);
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   worker_->callAddCompletion(true);
   checkStats(1, 2, 0, 0, 1, 1);
 
@@ -422,7 +413,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   checkStats(1, 2, 0, 0, 1, 0);
 
   // Add bar listener.
-  std::string listener_bar_json = R"EOF(
+  const std::string listener_bar_json = R"EOF(
   {
     "name": "bar",
     "address": "tcp://127.0.0.1:1235",
@@ -430,17 +421,16 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_bar_json);
   ListenerHandle* listener_bar = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)));
   EXPECT_EQ(2UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
 
   // Add baz listener, this time requiring initializing.
-  std::string listener_baz_json = R"EOF(
+  const std::string listener_baz_json = R"EOF(
   {
     "name": "baz",
     "address": "tcp://127.0.0.1:1236",
@@ -448,20 +438,19 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_baz_json);
   ListenerHandle* listener_baz = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_baz->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json)));
   EXPECT_EQ(2UL, manager_->listeners().size());
   checkStats(3, 2, 0, 1, 2, 0);
 
   // Update a duplicate baz that is currently warming.
-  EXPECT_FALSE(manager_->addOrUpdateListener(*loader));
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json)));
   checkStats(3, 2, 0, 1, 2, 0);
 
   // Update baz while it is warming.
-  std::string listener_baz_update1_json = R"EOF(
+  const std::string listener_baz_update1_json = R"EOF(
   {
     "name": "baz",
     "address": "tcp://127.0.0.1:1236",
@@ -471,14 +460,13 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_baz_update1_json);
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
   EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
     listener_baz->target_.callback_();
   }));
   EXPECT_CALL(listener_baz_update1->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_update1_json)));
   EXPECT_EQ(2UL, manager_->listeners().size());
   checkStats(3, 3, 0, 1, 2, 0);
 
@@ -501,7 +489,7 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   manager_->startWorkers(guard_dog_);
 
   // Add foo listener directly into active.
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -513,11 +501,10 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(Return(local_address));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -531,10 +518,9 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   checkStats(1, 0, 1, 0, 0, 1);
 
   // Add foo again. We should use the socket from draining.
-  loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo2 = expectListenerCreate(false);
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   worker_->callAddCompletion(true);
   checkStats(2, 0, 1, 0, 1, 1);
 
@@ -551,7 +537,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
 
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -559,12 +545,12 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_THROW(manager_->addOrUpdateListener(*loader), EnvoyException);
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)),
+               EnvoyException);
 }
 
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
@@ -573,7 +559,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
 
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -581,11 +567,10 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -626,7 +611,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   EXPECT_FALSE(manager_->removeListener("unknown"));
 
   // Add foo listener into warming.
-  std::string listener_foo_json = R"EOF(
+  const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -634,11 +619,10 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(1, 0, 0, 1, 0, 0);
 
@@ -652,7 +636,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
   checkStats(2, 0, 1, 1, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _));
   listener_foo->target_.callback_();
@@ -661,7 +645,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   checkStats(2, 0, 1, 0, 1, 0);
 
   // Update foo into warming.
-  std::string listener_foo_update1_json = R"EOF(
+  const std::string listener_foo_update1_json = R"EOF(
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
@@ -671,10 +655,9 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_foo_update1_json);
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true);
   EXPECT_CALL(listener_foo_update1->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(2, 1, 1, 1, 1, 0);
 
@@ -708,11 +691,10 @@ TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
@@ -743,11 +725,10 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(listener_foo_json);
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, false));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(*loader));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
 
   // Add bar with same non-binding address. Should fail.
   const std::string listener_bar_json = R"EOF(
@@ -759,11 +740,10 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   }
   )EOF";
 
-  loader = Json::Factory::loadFromString(listener_bar_json);
   ListenerHandle* listener_bar = expectListenerCreate(true);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(*loader), EnvoyException,
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)), EnvoyException,
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   // Move foo to active and then try to add again. This should still fail.
@@ -774,7 +754,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   listener_bar = expectListenerCreate(true);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(*loader), EnvoyException,
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)), EnvoyException,
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());

@@ -65,19 +65,21 @@ ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config)
         return upstream_tls_context;
       }()) {}
 
+ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config)
+    : ContextConfigImpl(config.common_tls_context(), config.tls_certificates()[0]),
+      require_client_certificate_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)) {
+  // TODO(htuch): Handle multiple certs #1319, add constraint for now to ensure we have at least one
+  // cert #1308.
+  ASSERT(config.tls_certificates().size() == 1);
+}
+
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
-    : ContextConfigImpl(
-          [&config] {
-            envoy::api::v2::CommonTlsContext common_tls_context;
-            Config::TlsContextJson::translateCommonTlsContext(config, common_tls_context);
-            return common_tls_context;
-          }(),
-          [&config] {
-            envoy::api::v2::TlsCertificate tls_certificate;
-            Config::TlsContextJson::translateTlsCertificate(config, tls_certificate);
-            return tls_certificate;
-          }()),
-      require_client_certificate_(config.getBoolean("require_client_certificate", false)) {}
+    : ServerContextConfigImpl([&config] {
+        envoy::api::v2::DownstreamTlsContext downstream_tls_context;
+        Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
+        return downstream_tls_context;
+      }()) {}
 
 } // namespace Ssl
 } // namespace Envoy
