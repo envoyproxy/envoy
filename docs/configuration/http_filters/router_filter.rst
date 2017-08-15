@@ -28,7 +28,7 @@ dynamic_stats
 HTTP headers
 ------------
 
-The router responds to various HTTP headers both on the egress/request path as well as on the
+The router consumes and sets various HTTP headers both on the egress/request path as well as on the
 ingress/response path. They are documented in this section.
 
 .. contents::
@@ -48,9 +48,9 @@ timeout, e.g., early exit. This is set on internal requests and is either taken 
 x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
 
-If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is in place, Envoy will default to retrying one 
-time unless explicitly specified. The number of retries can be explicitly set in the 
-:ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header. 
+If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is in place, Envoy will default to retrying one
+time unless explicitly specified. The number of retries can be explicitly set in the
+:ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header.
 If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured and
 :ref:`config_http_filters_router_x-envoy-retry-on` or
 :ref:`config_http_filters_router_x-envoy-grpc-retry-on` headers are not specified, Envoy will not retry a failed request.
@@ -73,8 +73,8 @@ A few notes on how Envoy does retries:
 x-envoy-retry-on
 ^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number 
-of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>` 
+Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number
+of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
 header or the :ref:`route config retry policy <config_http_conn_man_route_table_route_retry>`). The
 value to which the x-envoy-retry-on header is set indicates the retry policy. One or more policies can be specified
 using a ',' delimited list. The supported policies are:
@@ -199,6 +199,15 @@ x-envoy-upstream-service-time
 Contains the time in milliseconds spent by the upstream host processing the request. This is useful
 if the client wants to determine service time compared to network latency. This header is set on
 responses.
+
+.. _config_http_filters_router_x-envoy-original-path:
+
+x-envoy-original-path
+^^^^^^^^^^^^^^^^^^^^^
+
+If the route utilizes :ref:`prefix_rewrite <config_http_conn_man_route_table_route_prefix_rewrite>`,
+Envoy will put the original path header in this header. This can be useful for logging and
+debugging.
 
 .. _config_http_filters_router_stats:
 

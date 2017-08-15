@@ -77,6 +77,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",

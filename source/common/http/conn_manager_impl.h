@@ -290,18 +290,16 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
+    ASSERT(codec_);
     ASSERT(!underlying_connection_above_high_watermark_);
     underlying_connection_above_high_watermark_ = true;
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callHighWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
   void onBelowWriteBufferLowWatermark() override {
+    ASSERT(codec_);
     ASSERT(underlying_connection_above_high_watermark_);
     underlying_connection_above_high_watermark_ = false;
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callLowWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
 private:
@@ -334,6 +332,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    void clearRouteCache() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;

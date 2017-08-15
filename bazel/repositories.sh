@@ -36,7 +36,7 @@ done
 
 set -o pipefail
 BUILD_LOG="${BASEDIR}"/build.log
-(time ./build_and_install_deps.sh ${DEPS}) 2>&1 | tee "${BUILD_LOG}"
+(time ./build_and_install_deps.sh ${DEPS}) 2>&1 | tee "${BUILD_LOG}" >&2
 
 ln -sf "$(realpath "${THIRDPARTY_SRC}")" thirdparty
 ln -sf "$(realpath "${THIRDPARTY_BUILD}")" thirdparty_build

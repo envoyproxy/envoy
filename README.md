@@ -9,6 +9,7 @@ C++ L7 proxy and communication bus
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy.
 * [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model.
+* [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart.
 
 ## Related
 

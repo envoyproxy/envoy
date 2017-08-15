@@ -1041,7 +1041,16 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+  if (!parent_.cached_route_.valid()) {
+    parent_.cached_route_.value(
+        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));
+  }
+
   return parent_.cached_route_.value();
+}
+
+void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
+  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data) {

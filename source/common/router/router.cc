@@ -696,7 +696,9 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 void Filter::UpstreamRequest::onPerTryTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
   parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
-  upstream_host_->stats().rq_timeout_.inc();
+  if (upstream_host_) {
+    upstream_host_->stats().rq_timeout_.inc();
+  }
   resetStream();
   parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
                           Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));

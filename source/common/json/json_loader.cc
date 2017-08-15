@@ -71,12 +71,14 @@ public:
   int64_t getInteger(const std::string& name) const override;
   int64_t getInteger(const std::string& name, int64_t default_value) const override;
   ObjectSharedPtr getObject(const std::string& name, bool allow_empty) const override;
-  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const override;
+  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
+                                              bool allow_empty) const override;
   std::string getString(const std::string& name) const override;
   std::string getString(const std::string& name, const std::string& default_value) const override;
   std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
+  std::string asJsonString() const override;
 
   bool empty() const override;
   bool hasObject(const std::string& name) const override;
@@ -397,10 +399,14 @@ ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) cons
   }
 }
 
-std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name) const {
+std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
+                                                   bool allow_empty) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
+    if (allow_empty && value_itr == value_.object_value_.end()) {
+      return std::vector<ObjectSharedPtr>();
+    }
     throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
@@ -457,6 +463,14 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
 std::vector<ObjectSharedPtr> Field::asObjectArray() const {
   checkType(Type::Array);
   return {value_.array_value_.begin(), value_.array_value_.end()};
+}
+
+std::string Field::asJsonString() const {
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  rapidjson::Document document = asRapidJsonDocument();
+  document.Accept(writer);
+  return buffer.GetString();
 }
 
 bool Field::empty() const {

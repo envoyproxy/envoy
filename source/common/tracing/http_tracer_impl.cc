@@ -147,6 +147,10 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
   }
   span.setTag("request_size", std::to_string(request_info_.bytesReceived()));
 
+  if (nullptr != request_info_.upstreamHost()) {
+    span.setTag("upstream_cluster", request_info_.upstreamHost()->cluster().name());
+  }
+
   // Post response data.
   span.setTag("response_code", buildResponseCode(request_info_));
   span.setTag("response_size", std::to_string(request_info_.bytesSent()));

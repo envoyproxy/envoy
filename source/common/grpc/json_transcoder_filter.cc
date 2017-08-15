@@ -202,9 +202,12 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
 
   headers.removeContentLength();
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertEnvoyOriginalPath().value(*headers.Path());
   headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
   headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+
+  decoder_callbacks_->clearRouteCache();
 
   if (end_stream) {
     request_in_.finish();

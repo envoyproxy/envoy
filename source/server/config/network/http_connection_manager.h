@@ -12,7 +12,6 @@
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
-#include "common/json/json_validator.h"
 
 namespace Envoy {
 namespace Server {
@@ -61,15 +60,14 @@ public:
 };
 
 /**
- * Maps JSON config to runtime config for an HTTP connection manager network filter.
+ * Maps proto config to runtime config for an HTTP connection manager network filter.
  */
 class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::FilterChainFactory,
-                                    public Http::ConnectionManagerConfig,
-                                    Json::Validator {
+                                    public Http::ConnectionManagerConfig {
 public:
-  HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context,
-                              Http::DateProvider& date_provider);
+  HttpConnectionManagerConfig(const envoy::api::v2::filter::HttpConnectionManager& config,
+                              FactoryContext& context, Http::DateProvider& date_provider);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -133,7 +131,7 @@ private:
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
-  bool use_remote_address_{};
+  const bool use_remote_address_{};
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   CodecType codec_type_;
@@ -143,7 +141,7 @@ private:
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
-  Router::RouteConfigProviderPtr route_config_provider_;
+  Router::RouteConfigProviderSharedPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
