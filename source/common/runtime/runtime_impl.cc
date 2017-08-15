@@ -32,6 +32,8 @@ void RandomGeneratorImpl::random_bytes(uint8_t* out, size_t out_len) {
   }
 
   static thread_local uint8_t buffered[2048];
+  // Initialize to sizeof(buffered), i.e. out-of-range value,
+  // in order to fill buffer with randomness on the first pass.
   static thread_local size_t buffered_idx = sizeof(buffered);
 
   do {
