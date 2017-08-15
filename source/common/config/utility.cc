@@ -11,6 +11,18 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+
+void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                              envoy::api::v2::ApiConfigSource& api_config_source) {
+  api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  api_config_source.add_cluster_name(cluster);
+  api_config_source.mutable_refresh_delay()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
+}
+
+} // namespace
+
 void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
                            Upstream::ClusterManager& cm) {
   Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
@@ -58,23 +70,25 @@ void Utility::sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
 
 void Utility::translateCdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::ConfigSource& cds_config) {
-  auto* api_config_source = cds_config.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_name(json_config.getObject("cluster")->getString("name"));
-  api_config_source->mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(
-          json_config.getInteger("refresh_delay_ms", 30000)));
+  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
+                           json_config.getInteger("refresh_delay_ms", 30000),
+                           *cds_config.mutable_api_config_source());
 }
 
 void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-  auto* api_config_source = rds.mutable_config_source()->mutable_api_config_source();
-  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_name(json_rds.getString("cluster"));
-  api_config_source->mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(
-          json_rds.getInteger("refresh_delay_ms", 30000)));
+  translateApiConfigSource(json_rds.getString("cluster"),
+                           json_rds.getInteger("refresh_delay_ms", 30000),
+                           *rds.mutable_config_source()->mutable_api_config_source());
   JSON_UTIL_SET_STRING(json_rds, rds, route_config_name);
+}
+
+void Utility::translateLdsConfig(const Json::Object& json_lds,
+                                 envoy::api::v2::ConfigSource& lds_config) {
+  json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
+  translateApiConfigSource(json_lds.getString("cluster"),
+                           json_lds.getInteger("refresh_delay_ms", 30000),
+                           *lds_config.mutable_api_config_source());
 }
 
 } // namespace Config

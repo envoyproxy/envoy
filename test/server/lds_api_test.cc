@@ -1,3 +1,4 @@
+#include "common/config/utility.h"
 #include "common/http/message_impl.h"
 
 #include "server/lds_api.h"
@@ -29,8 +30,10 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+    envoy::api::v2::ConfigSource lds_config;
+    Config::Utility::translateLdsConfig(*config, lds_config);
     EXPECT_CALL(init_, registerTarget(_));
-    lds_.reset(new LdsApi(*config, cluster_manager_, dispatcher_, random_, init_, local_info_,
+    lds_.reset(new LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_,
                           store_, listener_manager_));
 
     expectRequest();
@@ -96,8 +99,10 @@ TEST_F(LdsApiTest, UnknownCluster) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+  envoy::api::v2::ConfigSource lds_config;
+  Config::Utility::translateLdsConfig(*config, lds_config);
   ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
+  EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
                             EnvoyException, "lds: unknown cluster 'foo_cluster'");
 }
@@ -111,8 +116,10 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+  envoy::api::v2::ConfigSource lds_config;
+  Config::Utility::translateLdsConfig(*config, lds_config);
   ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRefOfCopy(std::string()));
-  EXPECT_THROW_WITH_MESSAGE(LdsApi(*config, cluster_manager_, dispatcher_, random_, init_,
+  EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
                             EnvoyException,
                             "lds: setting --service-cluster and --service-node is required");
