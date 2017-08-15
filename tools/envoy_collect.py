@@ -4,7 +4,7 @@
 Example use:
 
   ./tools/envoy_collect.py --output-path=./envoy.tar -c
-  ./configs/google_com_proxy.json --service-node foo
+  ./configs/google_com_proxy.json --service-node foo -e /path/to/envoy-static
   <Ctrl-C>
   tar -tvf ./envoy.tar
   -rw------- htuch/eng         0 2017-08-13 21:13 access_0.log
@@ -13,7 +13,6 @@ Example use:
   -rw------- htuch/eng        70 2017-08-13 21:13 server_info.txt
   -rw------- htuch/eng      8443 2017-08-13 21:13 stats.txt
   -rw------- htuch/eng      1551 2017-08-13 21:13 config.json
-  -rw------- htuch/eng     72432 2017-08-13 21:13 perf.data
   -rw------- htuch/eng     32681 2017-08-13 21:13 envoy.log
 
 The Envoy process will execute as normal and will terminate when interrupted
@@ -31,8 +30,8 @@ TODO(htuch):
   - Validate in performance mode that we're using an opt binary.
   - Consider handling other signals.
   - bz2 compress tar ball.
-  - Use freeze or something similar to build a static binary with embedded Python, ending need to
-    have Python on remote host.
+  - Use freeze or something similar to build a static binary with embedded
+    Python, ending need to have Python on remote host (and care about version).
 """
 from __future__ import print_function
 
@@ -51,9 +50,8 @@ import tarfile
 import tempfile
 from six.moves import urllib
 
-DEFAULT_ENVOY_PATH = os.getenv(
-    'ENVOY_PATH',
-    'bazel-out/local-fastbuild/genfiles/source/exe/envoy-static.stamped')
+DEFAULT_ENVOY_PATH = os.getenv('ENVOY_PATH',
+                               'bazel-bin/source/exe/envoy-static')
 PERF_PATH = os.getenv('PERF_PATH', 'perf')
 
 PR_SET_PDEATHSIG = 1  # See prtcl(2).
@@ -66,6 +64,16 @@ def FetchUrl(url):
 
 
 def ModifyEnvoyconfig(config_path, perf, output_directory):
+  """Modify Envoy config to support gathering logs, etc.
+
+  Args:
+    config_path: the command-line specified Envoy config path.
+    perf: boolean indicating whether in performance mode.
+    output_directory: directory path for additional generated files.
+  Returns:
+    (modified Envoy config path, list of additional files to collect)
+  """
+
   # No modifications yet when in performance profiling mode.
   if perf:
     return config_path, []
@@ -97,10 +105,17 @@ def ModifyEnvoyconfig(config_path, perf, output_directory):
 
 
 def EnvoyCollect(parse_result, unknown_args):
+  """Run Envoy and collect its artifacts.
+
+  Args:
+    parse_result: Namespace object with envoy_collect.py's args.
+    unknown_args: list of remaining args to pass to Envoy binary.
+  """
+  # Are we in performance mode? Otherwise, debug.
   perf = parse_result.performance
   envoy_tmpdir = tempfile.mkdtemp()
-  manifest = []
-  return_code = 1
+  return_code = 1  # Non-zero default return.
+  # Try and do stuff with envoy_tmpdir, rm -rf regardless of success/failure.
   try:
     # Setup Envoy config and determine the paths of the files we're going to
     # generate.
@@ -115,25 +130,24 @@ def EnvoyCollect(parse_result, unknown_args):
     manifest = access_log_paths + list(dump_handlers_paths.values()) + [
         modified_envoy_config_path, envoy_log_path
     ]
-
     # This is where we will find out where the admin endpoint is listening.
     admin_address_path = os.path.join(envoy_tmpdir, 'admin_address.txt')
 
+    # Only run under 'perf record' in performance mode.
     if perf:
       perf_data_path = os.path.join(envoy_tmpdir, 'perf.data')
       perf_record_args = [
-            PERF_PATH,
-            'record',
-            '-o',
-            perf_data_path,
-            '-g',
-            '--',
+          PERF_PATH,
+          'record',
+          '-o',
+          perf_data_path,
+          '-g',
+          '--',
       ]
     else:
       perf_record_args = []
 
     # This is how we will invoke the wrapped envoy.
-    # TODO(htuch): Only run under perf when we want a profile, not during debug.
     envoy_shcmd = ' '.join(
         map(pipes.quote, perf_record_args + [
             parse_result.envoy_binary,
@@ -153,7 +167,7 @@ def EnvoyCollect(parse_result, unknown_args):
       libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
       libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
 
-    # Launch Envoy, and register for SIGINT.
+    # Launch Envoy, register for SIGINT, and wait for the child process to exit.
     with open(envoy_log_path, 'w') as envoy_log:
       envoy_proc = sp.Popen(
           envoy_shcmd,
@@ -163,14 +177,18 @@ def EnvoyCollect(parse_result, unknown_args):
           shell=True)
 
       def SignalHandler(signum, frame):
-        # Defer until the signal so that the Envoy process gets a chance to write the file out.
+        # The read is deferred until the signal so that the Envoy process gets a
+        # chance to write the file out.
         with open(admin_address_path, 'r') as f:
           admin_address = 'http://%s' % f.read()
+        # Fetch from the admin endpoint.
         for handler, path in dump_handlers_paths.items():
           handler_url = '%s/%s' % (admin_address, handler)
           print('Fetching %s' % handler_url)
           with open(path, 'w') as f:
             f.write(FetchUrl(handler_url))
+        # Send SIGINT to Envoy process, it should exit and execution will
+        # continue from the envoy_proc.wait() below.
         print('Sending Envoy process (PID=%d) SIGINT...' % envoy_proc.pid)
         envoy_proc.send_signal(signal.SIGINT)
 
@@ -183,8 +201,12 @@ def EnvoyCollect(parse_result, unknown_args):
         if os.path.exists(path):
           output_tar.add(path, arcname=os.path.basename(path))
 
+    # Dump the Envoy log to stdout, this is usful when debugging
+    # envoy_collect.py itself.
     with open(envoy_log_path, 'r') as f:
       sys.stderr.write(f.read())
+
+    print('Wrote Envoy artifacts to %s' % parse_result.output_path)
   finally:
     shutil.rmtree(envoy_tmpdir)
   return return_code
