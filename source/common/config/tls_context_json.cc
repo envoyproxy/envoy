@@ -1,9 +1,19 @@
 #include "common/config/tls_context_json.h"
 
 #include "common/common/utility.h"
+#include "common/config/json_utility.h"
 
 namespace Envoy {
 namespace Config {
+
+void TlsContextJson::translateDownstreamTlsContext(
+    const Json::Object& json_tls_context,
+    envoy::api::v2::DownstreamTlsContext& downstream_tls_context) {
+  translateCommonTlsContext(json_tls_context, *downstream_tls_context.mutable_common_tls_context());
+  translateTlsCertificate(json_tls_context,
+                          *downstream_tls_context.mutable_tls_certificates()->Add());
+  JSON_UTIL_SET_BOOL(json_tls_context, downstream_tls_context, require_client_certificate);
+}
 
 void TlsContextJson::translateUpstreamTlsContext(
     const Json::Object& json_tls_context,

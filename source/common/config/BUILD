@@ -125,6 +125,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lds_json_lib",
+    srcs = ["lds_json.cc"],
+    hdrs = ["lds_json.h"],
+    external_deps = ["envoy_lds"],
+    deps = [
+        ":json_utility_lib",
+        ":tls_context_json_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_lib",
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
@@ -181,6 +196,7 @@ envoy_cc_library(
     hdrs = ["tls_context_json.h"],
     external_deps = ["envoy_tls_context"],
     deps = [
+        ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:utility_lib",
     ],

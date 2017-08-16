@@ -201,6 +201,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//test/server:utility_lib",
     ],
 )
 

@@ -2,10 +2,13 @@
 
 #include <functional>
 
+#include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -49,10 +52,12 @@ void LdsApi::parseResponse(const Http::Message& response) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
 
-  for (const auto& listener : json_listeners) {
-    const std::string listener_name = listener->getString("name");
+  for (const auto& json_listener : json_listeners) {
+    const std::string listener_name = json_listener->getString("name");
     listeners_to_remove.erase(listener_name);
-    if (listener_manager_.addOrUpdateListener(*listener)) {
+    envoy::api::v2::Listener listener;
+    Config::LdsJson::translateListener(*json_listener, listener);
+    if (listener_manager_.addOrUpdateListener(listener)) {
       ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
     } else {
       ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
