@@ -40,6 +40,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:lds_json_lib",
+        "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
@@ -154,9 +155,23 @@ envoy_cc_library(
     hdrs = ["lds_api.h"],
     external_deps = ["envoy_lds"],
     deps = [
+        ":lds_subscription_lib",
+        "//include/envoy/config:subscription_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/server:listener_manager_interface",
-        "//include/envoy/stats:stats_macros",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "lds_subscription_lib",
+    srcs = ["lds_subscription.cc"],
+    hdrs = ["lds_subscription.h"],
+    external_deps = ["envoy_lds"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
         "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:rest_api_fetcher_lib",

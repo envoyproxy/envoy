@@ -2,59 +2,42 @@
 
 #include <functional>
 
+#include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
-#include "common/http/rest_api_fetcher.h"
-#include "common/json/json_validator.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
 
 /**
- * All LDS stats. @see stats_macros.h
+ * LDS API implementation that fetches via Subscription.
  */
-// clang-format off
-#define ALL_LDS_STATS(COUNTER)                                                                     \
-  COUNTER(update_attempt)                                                                          \
-  COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)
-// clang-format on
-
-/**
- * Struct definition for all LDS stats. @see stats_macros.h
- */
-struct LdsStats {
-  ALL_LDS_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-/**
- * v1 implementation of the LDS REST API.
- */
-class LdsApi : Json::Validator,
-               public Init::Target,
-               public Http::RestApiFetcher,
+class LdsApi : public Init::Target,
+               Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
                Logger::Loggable<Logger::Id::upstream> {
 public:
-  LdsApi(const Json::Object& config, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-         Runtime::RandomGenerator& random, Init::Manager& init_manager,
-         const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, ListenerManager& lm);
+  LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::ClusterManager& cm,
+         Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+         Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+         ListenerManager& lm);
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
 
 private:
-  // Http::RestApiFetcher
-  void createRequest(Http::Message& request) override;
-  void parseResponse(const Http::Message& response) override;
-  void onFetchComplete() override;
-  void onFetchFailure(const EnvoyException* e) override;
+  void runInitializeCallbackIfAny();
 
-  const LocalInfo::LocalInfo& local_info_;
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
+
+  std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
   ListenerManager& listener_manager_;
-  LdsStats stats_;
+  Stats::ScopePtr scope_;
   std::function<void()> initialize_callback_;
 };
 
