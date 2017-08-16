@@ -300,8 +300,6 @@ private:
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
-  void resetActiveRequest();
-
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;

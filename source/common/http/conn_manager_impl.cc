@@ -140,7 +140,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // Reading may have been disabled for the non-multiplexing case, so enable it again.
   if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2 &&
       !read_callbacks_->connection().readEnabled()) {
-    read_callbacks_->connection().readDisable(false);
+    while (!read_callbacks_->connection().readEnabled()) {
+      read_callbacks_->connection().readDisable(false);
+    }
   }
 
   if (idle_timer_ && streams_.empty()) {

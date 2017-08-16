@@ -75,6 +75,10 @@ Once the upstream peer sends window updates, the stream buffer will drain and
 the second `readDisable(false)` will be called on the downstream data source,
 which will finally result in data flowing from downstream again.
 
+Streams may be deleted when read disabled.  If this happens, the
+`Envoy::Http::Http2::ConnectionImpl` will consume any outstanding flow control
+window on stream deletion to avoid leaking the connection-level window.
+
 The two main parties involved in flow control are the router filter (`Envoy::Router::Filter`) and
 the connection manager (`Envoy::Http::ConnectionManagerImpl`).  The router is
 responsible for intercepting watermark events for its own buffers, the individual upstream streams
@@ -256,6 +260,11 @@ HTTP flow control is extremely similar to HTTP/2 flow control, with the main exc
 the method used to halt the flow of downstream/upstream data is to disable reads on the underlying
 Network::Connection.  As the TCP data stops being consumed the peer will eventually fill their
 congestion window and stop sending.
+
+As with HTTP, a given stream may end in a state where the connection has had
+`readDisable(true)` called.   When a new stream is created on that connection
+for a subsequent request, any outstanding `readDisable(true)` calls are unwound
+in `Http::Http1::ConnectionImpl::newStream()`.
 
 Filter and network backups are identical in the HTTP and HTTP/2 cases and are
 documented above.  Codec backup is slightly different and is documented below.
