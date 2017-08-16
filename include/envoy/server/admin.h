@@ -36,6 +36,12 @@ public:
                           HandlerCb callback) PURE;
 
   /**
+   * Remove an admin handler.
+   * @param prefix supplies the URL prefix of the handler to delete.
+   */
+  virtual void removeHandler(const std::string& prefix) PURE;
+
+  /**
    * Obtain socket the admin endpoint is bound to.
    * @return Network::ListenSocket& socket reference.
    */

@@ -42,6 +42,7 @@ public:
                   HandlerCb callback) override {
     handlers_.push_back({prefix, help_text, callback});
   }
+  void removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;

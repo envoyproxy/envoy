@@ -127,6 +127,9 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   admin_.addHandler("/foo/bar", "hello", callback);
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+
+  admin_.removeHandler("/foo/bar");
+  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", response));
 }
 
 } // namespace Server

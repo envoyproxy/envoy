@@ -425,5 +425,13 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
+void AdminImpl::removeHandler(const std::string& prefix) {
+  auto it = std::find_if(handlers_.begin(), handlers_.end(),
+                         [prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
+  if (it != handlers_.end()) {
+    handlers_.erase(it);
+  }
+}
+
 } // Server
 } // namespace Envoy
