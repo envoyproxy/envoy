@@ -29,7 +29,7 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-// Singleton registration via macro defined in envoy/registry/registry.h
+// Singleton registration via macro defined in envoy/singleton/instance.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
