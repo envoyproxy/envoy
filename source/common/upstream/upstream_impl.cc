@@ -431,10 +431,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
   }
 
   for (const auto& host : cluster.dns_hosts().addresses()) {
-    resolve_targets_.emplace_back(new ResolveTarget(
-        *this, dispatcher,
-        fmt::format("tcp://{}:{}", ProtobufTypes::FromString(host.named_address().address()),
-                    host.named_address().port().value())));
+    resolve_targets_.emplace_back(
+        new ResolveTarget(*this, dispatcher,
+                          fmt::format("tcp://{}:{}", host.named_address().address(),
+                                      host.named_address().port().value())));
   }
 
   // We have to first construct resolve_targets_ before invoking startResolve(),

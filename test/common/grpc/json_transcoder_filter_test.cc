@@ -210,6 +210,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
                                                    {":method", "POST"},
                                                    {":path", "/grpc.service/UnknownGrpcMethod"}};
 
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache()).Times(0);
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(expected_request_headers, request_headers);
 
@@ -237,8 +239,11 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::TestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
 
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
   EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
   EXPECT_EQ("trailers", request_headers.get_("te"));
 
@@ -319,10 +324,15 @@ public:
   GrpcJsonTranscoderFilterPrintTest()
       : config_(
             *Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_))),
-        filter_(config_) {}
+        filter_(config_) {
+    filter_.setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_.setEncoderFilterCallbacks(encoder_callbacks_);
+  }
 
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
 TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {

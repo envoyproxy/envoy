@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -99,6 +100,7 @@ envoy_cc_test(
     srcs = ["listener_manager_impl_test.cc"],
     data = ["//test/common/ssl/test_data:certs"],
     deps = [
+        ":utility_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -120,6 +122,15 @@ envoy_cc_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "utility_lib",
+    hdrs = ["utility.h"],
+    deps = [
+        "//source/common/config:lds_json_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )
 

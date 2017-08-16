@@ -173,6 +173,10 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   config_.filterFactory().createFilterChain(*new_stream);
+  // Make sure new streams are apprised that the underlying connection is blocked.
+  if (read_callbacks_->connection().aboveHighWatermark()) {
+    new_stream->callHighWatermarkCallbacks();
+  }
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
@@ -902,14 +906,17 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
-  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
-    callbacks->onAboveWriteBufferHighWatermark();
+  ++high_watermark_count_;
+  if (watermark_callbacks_) {
+    watermark_callbacks_->onAboveWriteBufferHighWatermark();
   }
 }
 
 void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
-  for (DownstreamWatermarkCallbacks* callbacks : watermark_callbacks_) {
-    callbacks->onBelowWriteBufferLowWatermark();
+  ASSERT(high_watermark_count_ > 0);
+  --high_watermark_count_;
+  if (watermark_callbacks_) {
+    watermark_callbacks_->onBelowWriteBufferLowWatermark();
   }
 }
 
@@ -1035,7 +1042,16 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+  if (!parent_.cached_route_.valid()) {
+    parent_.cached_route_.value(
+        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));
+  }
+
   return parent_.cached_route_.value();
+}
+
+void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
+  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data) {
@@ -1072,6 +1088,24 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
   parent_.response_encoder_->getStream().readDisable(false);
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
+    DownstreamWatermarkCallbacks& watermark_callbacks) {
+  // This is called exactly once per stream, by the router filter.
+  // If there's ever a need for another filter to subscribe to watermark callbacks this can be
+  // turned into a vector.
+  ASSERT(parent_.watermark_callbacks_ == nullptr);
+  parent_.watermark_callbacks_ = &watermark_callbacks;
+  for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
+    watermark_callbacks.onAboveWriteBufferHighWatermark();
+  }
+}
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
+    DownstreamWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
+  UNREFERENCED_PARAMETER(watermark_callbacks);
+  parent_.watermark_callbacks_ = nullptr;
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {

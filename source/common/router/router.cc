@@ -303,22 +303,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
-void Filter::onBelowWriteBufferLowWatermark() {
-  // The downstream connection has buffer available.  Resume reads from upstream.
-  cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
-  if (upstream_request_) {
-    upstream_request_->request_encoder_->getStream().readDisable(false);
-  }
-}
-
-void Filter::onAboveWriteBufferHighWatermark() {
-  // The downstream connection is overrun.  Pause reads from upstream.
-  cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
-  if (upstream_request_) {
-    upstream_request_->request_encoder_->getStream().readDisable(true);
-  }
-}
-
 void Filter::cleanup() {
   upstream_request_.reset();
   retry_state_.reset();
@@ -618,6 +602,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+  clearRequestEncoder();
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -676,7 +661,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
 }
 
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
-  request_encoder_ = nullptr;
+  clearRequestEncoder();
   if (!calling_encode_headers_) {
     parent_.onUpstreamReset(UpstreamResetType::Reset, Optional<Http::StreamResetReason>(reason));
   } else {
@@ -743,7 +728,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   request_encoder.getStream().addCallbacks(*this);
 
   conn_pool_stream_handle_ = nullptr;
-  request_encoder_ = &request_encoder;
+  setRequestEncoder(request_encoder);
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
@@ -778,6 +763,36 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                              Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,
                                 priority);
+}
+
+void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
+  request_encoder_ = &request_encoder;
+  // Now that there is an encoder, have the connection manager inform the manager when the
+  // downstream buffers are overrun.  This may result in immediate watermark callbacks referencing
+  // the encoder.
+  parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+}
+
+void Filter::UpstreamRequest::clearRequestEncoder() {
+  // Before clearing the encoder, unsubscribe from callbacks.
+  if (request_encoder_) {
+    parent_.callbacks_->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+  }
+  request_encoder_ = nullptr;
+}
+
+void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
+  ASSERT(parent_.request_encoder_);
+  // The downstream connection is overrun.  Pause reads from upstream.
+  parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
+  parent_.request_encoder_->getStream().readDisable(true);
+}
+
+void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
+  ASSERT(parent_.request_encoder_);
+  // The downstream connection has buffer available.  Resume reads from upstream.
+  parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
+  parent_.request_encoder_->getStream().readDisable(false);
 }
 
 } // namespace Router

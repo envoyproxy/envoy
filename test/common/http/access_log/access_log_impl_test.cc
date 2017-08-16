@@ -6,6 +6,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/config/filter_json.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -35,6 +36,14 @@ using testing::_;
 
 namespace Http {
 namespace AccessLog {
+namespace {
+
+envoy::api::v2::filter::AccessLog parseAccessLogFromJson(const std::string& json_string) {
+  envoy::api::v2::filter::AccessLog access_log;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::FilterJson::translateAccessLog(*json_object_ptr, access_log);
+  return access_log;
+}
 
 class TestRequestInfo : public RequestInfo {
 public:
@@ -92,14 +101,14 @@ public:
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null"
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
@@ -115,14 +124,14 @@ TEST_F(AccessLogImplTest, LogMoreData) {
 }
 
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null"
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
@@ -134,14 +143,14 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
 }
 
 TEST_F(AccessLogImplTest, NoFilter) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
     {
       "path": "/dev/null"
     }
     )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -155,14 +164,14 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
   request_info_.upstream_host_ = std::make_shared<Upstream::HostDescriptionImpl>(
       cluster, "", Network::Utility::resolveUrl("tcp://10.0.0.5:1234"), false, "");
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
       {
         "path": "/dev/null"
       }
       )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -172,7 +181,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
 }
 
 TEST_F(AccessLogImplTest, WithFilterMiss) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type":"logical_or", "filters": [
@@ -183,8 +192,8 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -194,7 +203,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
 }
 
 TEST_F(AccessLogImplTest, WithFilterHit) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "logical_or", "filters": [
@@ -206,8 +215,8 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -221,15 +230,15 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
 }
 
 TEST_F(AccessLogImplTest, RuntimeFilter) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "runtime", "key": "access_log.test_key"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   // Value is taken from random generator.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
@@ -254,14 +263,15 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
 TEST_F(AccessLogImplTest, PathRewrite) {
   request_headers_ = {{":method", "GET"}, {":path", "/foo"}, {"x-envoy-original-path", "/bar"}};
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
       {
         "path": "/dev/null"
       }
       )EOF";
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -271,15 +281,15 @@ TEST_F(AccessLogImplTest, PathRewrite) {
 }
 
 TEST_F(AccessLogImplTest, healthCheckTrue) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "not_healthcheck"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
@@ -289,15 +299,15 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
 }
 
 TEST_F(AccessLogImplTest, healthCheckFalse) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "not_healthcheck"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
@@ -315,15 +325,15 @@ TEST_F(AccessLogImplTest, requestTracing) {
   std::string sample_tracing_guid = random.uuid();
   UuidUtils::setTraceableUuid(sample_tracing_guid, UuidTraceStatus::Sampled);
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "traceable_request"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   {
     TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
@@ -349,32 +359,32 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   Envoy::AccessLog::MockAccessLogManager log_manager;
 
   {
-    std::string json = R"EOF(
+    const std::string json = R"EOF(
       {
         "path": "/dev/null",
         "filter": {"type": "logical_or"}
       }
     )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
+    EXPECT_THROW(InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
+                 EnvoyException);
   }
 
   {
-    std::string json = R"EOF(
+    const std::string json = R"EOF(
       {
         "path": "/dev/null",
         "filter": {"type": "logical_and"}
       }
     )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
+    EXPECT_THROW(InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
+                 EnvoyException);
   }
 }
 
 TEST_F(AccessLogImplTest, andFilter) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "logical_and", "filters": [
@@ -385,8 +395,8 @@ TEST_F(AccessLogImplTest, andFilter) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -405,7 +415,7 @@ TEST_F(AccessLogImplTest, andFilter) {
 }
 
 TEST_F(AccessLogImplTest, orFilter) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "logical_or", "filters": [
@@ -416,8 +426,8 @@ TEST_F(AccessLogImplTest, orFilter) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -435,7 +445,7 @@ TEST_F(AccessLogImplTest, orFilter) {
 }
 
 TEST_F(AccessLogImplTest, multipleOperators) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "path": "/dev/null",
     "filter": {"type": "logical_and", "filters": [
@@ -450,8 +460,8 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log =
+      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -481,7 +491,9 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  DurationFilter filter(*filter_object, runtime);
+  envoy::api::v2::filter::AccessLogFilter config;
+  Config::FilterJson::translateAccessLogFilter(*filter_object, config);
+  DurationFilter filter(config.duration_filter(), runtime);
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
@@ -513,7 +525,9 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  StatusCodeFilter filter(*filter_object, runtime);
+  envoy::api::v2::filter::AccessLogFilter config;
+  Config::FilterJson::translateAccessLogFilter(*filter_object, config);
+  StatusCodeFilter filter(config.status_code_filter(), runtime);
 
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
@@ -526,6 +540,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   EXPECT_FALSE(filter.evaluate(info, request_headers));
 }
 
+} // namespace
 } // namespace AccessLog
 } // namespace Http
 } // namespace Envoy

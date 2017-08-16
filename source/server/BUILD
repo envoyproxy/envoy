@@ -21,7 +21,10 @@ envoy_cc_library(
     name = "configuration_lib",
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
-    external_deps = ["envoy_bootstrap"],
+    external_deps = [
+        "envoy_bootstrap",
+        "envoy_lds",
+    ],
     deps = [
         ":lds_api_lib",
         "//include/envoy/http:filter_interface",
@@ -36,6 +39,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:lds_json_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
@@ -148,10 +152,12 @@ envoy_cc_library(
     name = "lds_api_lib",
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
+    external_deps = ["envoy_lds"],
     deps = [
         "//include/envoy/init:init_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
@@ -163,6 +169,7 @@ envoy_cc_library(
     name = "listener_manager_lib",
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
+    external_deps = ["envoy_lds"],
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
@@ -171,10 +178,9 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:worker_interface",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
     ],
 )

@@ -366,6 +366,16 @@ TEST(JsonLoaderTest, AsString) {
   });
 }
 
+TEST(JsonLoaderTest, AsJsonString) {
+  // We can't do simply equality of asJsonString(), since there is a reliance on internal ordering,
+  // e.g. of map traversal, in the output.
+  const std::string json_string = "{\"name1\": \"value1\", \"name2\": true}";
+  const ObjectSharedPtr json = Factory::loadFromString(json_string);
+  const ObjectSharedPtr json2 = Factory::loadFromString(json->asJsonString());
+  EXPECT_EQ("value1", json2->getString("name1"));
+  EXPECT_TRUE(json2->getBoolean("name2"));
+}
+
 TEST(JsonLoaderTest, ListAsString) {
   {
     std::list<std::string> list = {};

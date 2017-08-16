@@ -3,9 +3,9 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
-#include "common/json/config_schemas.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
 
 #include "server/configuration_impl.h" // TODO(mattklein123): Remove post 1.4.0
@@ -16,16 +16,24 @@ namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createFilterFactoryList_(
-    const std::vector<Json::ObjectSharedPtr>& filters, Server::Instance& server,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters, Server::Instance& server,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
-  for (size_t i = 0; i < filters.size(); i++) {
-    const std::string string_type = filters[i]->getString("type");
-    const std::string string_name = filters[i]->getString("name");
-    Json::ObjectSharedPtr config = filters[i]->getObject("config");
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const std::string string_type = filters[i].deprecated_v1().type();
+    const std::string string_name = filters[i].name();
+    const auto& proto_config = filters[i].config();
     ENVOY_LOG(info, "  filter #{}:", i);
-    ENVOY_LOG(info, "    type: {}", string_type);
     ENVOY_LOG(info, "    name: {}", string_name);
+
+    Protobuf::util::JsonOptions json_options;
+    ProtobufTypes::String json_config;
+    const auto status =
+        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
+    // This should always succeed unless something crash-worthy such as out-of-memory.
+    RELEASE_ASSERT(status.ok());
+    UNREFERENCED_PARAMETER(status);
+    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
 
     // Map filter type string to enum.
     Configuration::NetworkFilterType type;
@@ -42,9 +50,9 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     Configuration::NamedNetworkFilterConfigFactory* factory =
         Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
             string_name);
-    if (factory != nullptr && factory->type() == type) {
+    if (factory != nullptr) {
       Configuration::NetworkFilterFactoryCb callback =
-          factory->createFilterFactory(*config, context);
+          factory->createFilterFactory(*filter_config, context);
       ret.push_back(callback);
     } else {
       // DEPRECATED
@@ -53,7 +61,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       for (Configuration::NetworkFilterConfigFactory* config_factory :
            Configuration::MainImpl::filterConfigFactories()) {
         Configuration::NetworkFilterFactoryCb callback =
-            config_factory->tryCreateFilterFactory(type, string_name, *config, server);
+            config_factory->tryCreateFilterFactory(type, string_name, *filter_config, server);
         if (callback) {
           ret.push_back(callback);
           found_filter = true;
@@ -62,8 +70,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       }
 
       if (!found_filter) {
-        throw EnvoyException(
-            fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
+        throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
       }
     }
   }
@@ -92,19 +99,28 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager() {
   return DrainManagerPtr{new DrainManagerImpl(server_)};
 }
 
-ListenerImpl::ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent,
+ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool workers_started, uint64_t hash)
-    : Json::Validator(json, Json::Schema::LISTENER_SCHEMA), parent_(parent),
-      address_(Network::Utility::resolveUrl(json.getString("address"))),
+    : parent_(parent),
+      // TODO(htuch): Cleanup this translation, does it need to be UnresolvedAddress? Validate not
+      // pipe.
+      address_(
+          Network::Utility::parseInternetAddress(config.address().named_address().address(),
+                                                 config.address().named_address().port().value())),
       global_scope_(parent_.server_.stats().createScope("")),
-      bind_to_port_(json.getBoolean("bind_to_port", true)),
-      use_proxy_proto_(json.getBoolean("use_proxy_proto", false)),
-      use_original_dst_(json.getBoolean("use_original_dst", false)),
+      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+      use_proxy_proto_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)),
+      use_original_dst_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
-          json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
       workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager()) {
+  // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
+  // filter chain #1308.
+  ASSERT(config.filter_chains().size() == 1);
+  const auto& filter_chain = config.filter_chains()[0];
 
   // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
   // later.
@@ -112,14 +128,13 @@ ListenerImpl::ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent
   std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
   listener_scope_ = parent_.server_.stats().createScope(final_stat_name);
 
-  if (json.hasObject("ssl_context")) {
-    Ssl::ServerContextConfigImpl context_config(*json.getObject("ssl_context"));
+  if (filter_chain.has_tls_context()) {
+    Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
     ssl_context_ = parent_.server_.sslContextManager().createSslServerContext(*listener_scope_,
                                                                               context_config);
   }
 
-  filter_factories_ =
-      parent_.factory_.createFilterFactoryList(json.getObjectArray("filters"), *this);
+  filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
 }
 
 ListenerImpl::~ListenerImpl() {
@@ -189,9 +204,14 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
-  const std::string name = json.getString("name", server_.random().uuid());
-  const uint64_t hash = json.hash();
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config) {
+  std::string name;
+  if (!config.name().empty()) {
+    name = config.name();
+  } else {
+    name = server_.random().uuid();
+  }
+  const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
@@ -208,7 +228,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const Json::Object& json) {
     return false;
   }
 
-  ListenerImplPtr new_listener(new ListenerImpl(json, *this, name, workers_started_, hash));
+  ListenerImplPtr new_listener(new ListenerImpl(config, *this, name, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
