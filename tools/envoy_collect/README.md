@@ -17,10 +17,10 @@ Envoy will run as normal, but when interrupted by SIGINT (e.g. via `kill -s INT`
 stdin), it will write to `/path/to/debug.tar` a dump of various logs and the admin endpoint
 handlers. The wrapper configures Envoy for maximum logging verbosity.
 
-This tarball may be useful to attach to issues when reporting. However, a high degree of caution
-is recommended here, as the logs are verbose and will reveal low level traffic details. It is 
-NOT recommended to attach a tarball with any real traffic to an Envoy issue, as it will be placed
-in public view.
+This tarball may be useful to attach to issues when reporting. However, a high degree of caution is
+recommended here, as the logs are verbose and will reveal low level traffic details. It is **NOT**
+recommended to attach this to a GitHub issue if there are any privacy concerns whatsoever, otherwise
+the data should be manually sanitized prior to posting in public view.
 
 ## Performance
 
