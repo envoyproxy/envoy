@@ -132,6 +132,8 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
                 valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
 
+    span.setTag("http.method", request_headers_->Method()->value().c_str());
+
     if (request_headers_->ClientTraceId()) {
       span.setTag("guid:x-client-trace-id",
                   std::string(request_headers_->ClientTraceId()->value().c_str()));
@@ -152,7 +154,9 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
   }
 
   // Post response data.
-  span.setTag("response_code", buildResponseCode(request_info_));
+  std::string responseCode = buildResponseCode(request_info_);
+  span.setTag("http.status_code", responseCode);
+  span.setTag("response_code", responseCode);
   span.setTag("response_size", std::to_string(request_info_.bytesSent()));
   span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info_));
 

@@ -252,6 +252,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
   NiceMock<MockConfig> config;
 
   HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
@@ -269,6 +270,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -293,6 +295,7 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
 
   EXPECT_CALL(*span, setTag("upstream_cluster", "my_upstream_cluster"));
   EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -322,6 +325,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("user_agent", "-"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
 
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
@@ -329,6 +333,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -364,6 +369,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("downstream_cluster", "downstream_cluster"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
 
   // Check that span has tags from custom headers.
   request_headers.addCopy(Http::LowerCaseString("aa"), "a");
@@ -386,6 +392,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
 
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_code", "503"));
+  EXPECT_CALL(*span, setTag("http.status_code", "503"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
   EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
