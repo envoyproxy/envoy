@@ -108,6 +108,13 @@ public:
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
+
+  /**
+   * Returns an optional source address for upstream connections to bind to.
+   *
+   * @return an optional source address to bind to.
+   */
+  virtual const Optional<Network::Address::InstanceConstSharedPtr>& sourceAddress() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

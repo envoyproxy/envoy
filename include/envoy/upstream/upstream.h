@@ -318,6 +318,13 @@ public:
    *         stats that will be freed when the cluster is removed.
    */
   virtual Stats::Scope& statsScope() const PURE;
+
+  /**
+   * Returns an optional source address for upstream connections to bind to.
+   *
+   * @return an optional source address to bind to.
+   */
+  virtual const Optional<Network::Address::InstanceConstSharedPtr>& sourceAddress() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

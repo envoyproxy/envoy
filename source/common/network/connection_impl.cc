@@ -34,6 +34,16 @@ Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& add
 }
 } // namespace
 
+int ConnectionImplUtility::createSocket(Address::InstanceConstSharedPtr address,
+                                        Optional<Address::InstanceConstSharedPtr> source_address) {
+  int fd = address->socket(Address::SocketType::Stream);
+  if (fd >= 0 && source_address.valid()) {
+    int rc = source_address.value()->bind(fd);
+    ASSERT(rc >= 0);
+  }
+  return fd;
+}
+
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
                                               Stats::Gauge& stat_current) {
@@ -531,10 +541,11 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            buffer_stats_->write_current_);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                           Address::InstanceConstSharedPtr address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false, false) {}
+ClientConnectionImpl::ClientConnectionImpl(
+    Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
+    Optional<Network::Address::InstanceConstSharedPtr> source_address)
+    : ConnectionImpl(dispatcher, ConnectionImplUtility::createSocket(address, source_address),
+                     address, getNullLocalAddress(*address), false, false) {}
 
 } // namespace Network
 } // namespace Envoy

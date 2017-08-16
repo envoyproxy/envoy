@@ -17,7 +17,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
+    : BaseDynamicClusterImpl(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+                             added_via_api),
       local_info_(local_info), cluster_name_(cluster.eds_cluster_config().service_name().empty()
                                                  ? cluster.name()
                                                  : cluster.eds_cluster_config().service_name()) {

@@ -246,4 +246,58 @@ TEST_P(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
+
+class BindIntegrationTest : public IntegrationTest {
+public:
+  void SetUp() override {
+    envoy::api::v2::Bootstrap bootstrap;
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      address_string_ = "127.0.0.5";
+    }
+    bootstrap.mutable_upstream_bind_config()
+        ->mutable_source_address()
+        ->mutable_socket_address()
+        ->set_ip_address(address_string_);
+
+    api_filesystem_config_.bootstrap_path_ =
+        TestEnvironment::writeStringToFileForTest("bootstrap.pb", bootstrap.SerializeAsString());
+    IntegrationTest::SetUp();
+  }
+
+  std::string address_string_ = "::1";
+};
+
+TEST_P(BindIntegrationTest, TestBind) {
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr request;
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+       },
+       // Request 1.
+       [&]() -> void {
+         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}},
+                                           1024, *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         std::string address =
+             fake_upstream_connection->connection().remoteAddress().ip()->addressAsString();
+         EXPECT_EQ(address, address_string_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+INSTANTIATE_TEST_CASE_P(IpVersions, BindIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 } // namespace Envoy

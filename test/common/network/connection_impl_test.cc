@@ -82,7 +82,8 @@ public:
         dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                     Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-    client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
+    client_connection_ =
+        dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
   }
@@ -147,6 +148,7 @@ protected:
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockBuffer* client_write_buffer_ = nullptr;
+  Optional<Address::InstanceConstSharedPtr> source_address_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
@@ -463,6 +465,23 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     client_connection_->write(buffer_to_write);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+
+  disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, BindTest) {
+  std::string address_string = "127.0.0.9";
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+  setUpBasicConnection();
+  connect();
+  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
 
   disconnect(true);
 }
