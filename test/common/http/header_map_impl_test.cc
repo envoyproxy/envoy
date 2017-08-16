@@ -319,112 +319,54 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   EXPECT_EQ(1UL, headers.size());
 }
 
-struct HeaderBrutalityResult {
-  const HeaderString& val;
-  const void* keyPtr;
-};
-
-const HeaderBrutalityResult doHeaderBrutality(HeaderMapImpl& headers, LowerCaseString& lcKey) {
-  HeaderBrutalityResult result{headers.get(lcKey)->value(),
-                               static_cast<const void*>(lcKey.get().data())};
-
-  // This is... not exactly legal, but let's do it anyway. It should
-  // safe, since lcKey is still in scope here.
-  memcpy(const_cast<void*>(result.keyPtr), static_cast<const void*>("XXXXX"), 5);
-
-  // Make sure our brutality worked.
-  EXPECT_STREQ("XXXXX", lcKey.get().c_str());
-
-  return result;
-}
-
-const HeaderBrutalityResult addAHeaderString(HeaderMapImpl& headers) {
-  // This needs to not be a parameter. Part of the test is that the
-  // key we're using actually goes out of scope before we check the
-  // HeaderMap for the value we need.
-  LowerCaseString lcKey("hello");
-
-  headers.addCopy(lcKey, "world");
-
-  return doHeaderBrutality(headers, lcKey);
-}
-
-const HeaderBrutalityResult addAHeaderInt(HeaderMapImpl& headers) {
-  // This needs to not be a parameter. Part of the test is that the
-  // key we're using actually goes out of scope before we check the
-  // HeaderMap for the value we need.
-  LowerCaseString lcKey("hello");
-
-  headers.addCopy(lcKey, 42);
-
-  return doHeaderBrutality(headers, lcKey);
-}
-
-// void dumpHeaders(HeaderMapImpl& headers, int idx) {
-//   std::cerr << "---- dumpHeaders " << idx << std::endl;
-
-//   headers.iterate(
-//     [](const HeaderEntry& header, void* ctx) -> void {
-//       (void)ctx;  // Shut up the "unused parameter" error
-
-//       std::string key(header.key().c_str());
-//       std::string value(header.value().c_str());
-
-//       std::cerr << key << ": "
-//                 << value
-//                 << std::endl;
-//     },
-//     nullptr
-//   );
-// }
-
 TEST(HeaderMapImplTest, AddCopy) {
   HeaderMapImpl headers;
 
   // Start with a string value.
-  HeaderBrutalityResult v1 = addAHeaderString(headers);
-  // dumpHeaders(headers, 1);
+  LowerCaseString* lcKeyPtr(new LowerCaseString("hello"));
 
-  EXPECT_STREQ("world", v1.val.c_str());
-  EXPECT_EQ(5UL, v1.val.size());
+  headers.addCopy(*lcKeyPtr, "world");
+
+  const HeaderString& value = headers.get(*lcKeyPtr)->value();
+
+  EXPECT_STREQ("world", value.c_str());
+  EXPECT_EQ(5UL, value.size());
+
+  delete lcKeyPtr;
+
+  const HeaderString& value2 = headers.get(LowerCaseString("hello"))->value();
+
+  EXPECT_STREQ("world", value2.c_str());
+  EXPECT_EQ(5UL, value2.size());
+  EXPECT_EQ(value.c_str(), value2.c_str());
   EXPECT_EQ(1UL, headers.size());
-
-  // The LowerCaseString "hello" we used in addAHeader should be out of
-  // scope and thus destroyed by now. Build up another string with the same
-  // value (deliberately use concatenation to try to prevent issues with the
-  // compiler being too clever with string constants)...
-
-  std::string hrm("he");
-
-  LowerCaseString lcKey2(hrm + "llo"); // Try to force the compiler's hand here.
-
-  // ...and try making sure that that did what we want. It has the string value
-  // "hello", but it's not at the same address as our previous "hello".
-
-  EXPECT_STREQ("hello", lcKey2.get().c_str());
-  EXPECT_NE(v1.keyPtr, static_cast<const void*>(lcKey2.get().data()));
-
-  EXPECT_STREQ("world", headers.get(lcKey2)->value().c_str());
-  EXPECT_EQ(5UL, headers.get(lcKey2)->value().size());
 
   // Repeat with an int value.
   //
   // @kflynn: addReferenceKey and addCopy can both add multiple instances of a
   // given header, so we need to delete the old "hello" header.
-  headers.remove(lcKey2);
+  headers.remove(LowerCaseString("hello"));
 
-  HeaderBrutalityResult v2 = addAHeaderInt(headers);
-  // dumpHeaders(headers, 2);
+  lcKeyPtr = new LowerCaseString("hello");
 
-  EXPECT_STREQ("42", v2.val.c_str());
-  EXPECT_EQ(2UL, v2.val.size());
+  headers.addCopy(*lcKeyPtr, 42);
+
+  const HeaderString& value3 = headers.get(*lcKeyPtr)->value();
+
+  EXPECT_STREQ("42", value3.c_str());
+  EXPECT_EQ(2UL, value3.size());
+
+  delete lcKeyPtr;
+
+  const HeaderString& value4 = headers.get(LowerCaseString("hello"))->value();
+
+  EXPECT_STREQ("42", value4.c_str());
+  EXPECT_EQ(2UL, value4.size());
   EXPECT_EQ(1UL, headers.size());
 
   // We can make yet another different key to look up here.
-  LowerCaseString lcKey3(hrm + "ll" + "o"); // Try to force the compiler's hand here.
+  LowerCaseString lcKey3(std::string("he") + "ll" + "o"); // Try to force the compiler's hand here.
   EXPECT_STREQ("hello", lcKey3.get().c_str());
-  EXPECT_NE(v1.keyPtr, static_cast<const void*>(lcKey3.get().data()));
-  EXPECT_NE(v2.keyPtr, static_cast<const void*>(lcKey3.get().data()));
 
   EXPECT_STREQ("42", headers.get(lcKey3)->value().c_str());
   EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
