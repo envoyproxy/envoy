@@ -39,12 +39,11 @@ public:
   /**
    * Creates a network socket, optionally bound to a specific address
    * @param peer_address supplies the address of the peer.
-   * @param source_address supplies an optional local address to attempt to bind to.  The bind is
-   *  best-effort, and on failure the fd will still be returned.
+   * @param source_address supplies an optional local address to bind to.
    * @return the file descriptor or -1 on error.
    */
   static int createSocket(Address::InstanceConstSharedPtr peer_address,
-                          Optional<Address::InstanceConstSharedPtr> source_address);
+                          const Optional<Address::InstanceConstSharedPtr> source_address);
 };
 
 /**
@@ -169,7 +168,7 @@ class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnect
 public:
   ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                        Address::InstanceConstSharedPtr remote_address,
-                       Optional<Address::InstanceConstSharedPtr> source_address);
+                       const Optional<Address::InstanceConstSharedPtr> source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

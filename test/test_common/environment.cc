@@ -214,9 +214,7 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents) {
-  // We rather unfortunately have to use runfilesPath becauase many consumers of
-  // these files use temporaryFileSubstitute, which assumes runfilesPath.
-  const std::string out_path = TestEnvironment::runfilesPath(filename);
+  const std::string out_path = TestEnvironment::temporaryPath(filename);
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_path + ")").c_str()) == 0);
   {
     std::ofstream out_file(out_path);

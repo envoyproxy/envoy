@@ -19,6 +19,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (status) {
       return;
     }
+    // If parsing fails, fall through and attempt to parse the file as json.
   }
   const auto status = Protobuf::util::JsonStringToMessage(file_contents, &message);
   if (!status.ok()) {
