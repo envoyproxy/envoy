@@ -450,7 +450,7 @@ bool VirtualHostImpl::usesRuntime() const {
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::VirtualCluster& virtual_cluster) {
   if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
-    method_.value(envoy::api::v2::RequestMethod_Name(virtual_cluster.method()));
+    method_ = envoy::api::v2::RequestMethod_Name(virtual_cluster.method());
   }
 
   pattern_ = std::regex{virtual_cluster.pattern(), std::regex::optimize};

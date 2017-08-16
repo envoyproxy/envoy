@@ -11,6 +11,12 @@ public:
   Optional() {}
   Optional(const T& value) : value_(value), valid_(true) {}
 
+  const T& operator=(const T& new_value) {
+    value_ = new_value;
+    valid_ = true;
+    return value_;
+  }
+
   bool operator==(const Optional<T>& rhs) const {
     if (valid_) {
       return valid_ == rhs.valid_ && value_ == rhs.value_;
