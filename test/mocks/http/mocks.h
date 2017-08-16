@@ -237,6 +237,7 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
+  MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
@@ -274,6 +275,7 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
+  MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());

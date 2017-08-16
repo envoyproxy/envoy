@@ -82,9 +82,11 @@ public:
   /**
    * Get an array by name.
    * @param name supplies the key name.
+   * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<ObjectSharedPtr> the array of JSON  objects.
    */
-  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const PURE;
+  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
+                                                      bool allow_empty = false) const PURE;
 
   /**
    * Get a string value by name.
@@ -152,9 +154,14 @@ public:
   virtual void validateSchema(const std::string& schema) const PURE;
 
   /**
-   * @return the value of the object as a string
+   * @return the value of the object as a string (where the object is a string).
    */
   virtual std::string asString() const PURE;
+
+  /**
+   * @return the JSON string representation of the object.
+   */
+  virtual std::string asJsonString() const PURE;
 
   /**
    * @return true if the JSON object is empty;

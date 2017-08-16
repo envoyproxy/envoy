@@ -385,6 +385,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         callbacks.addStreamDecoderFilter(filter);
       }));
 
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -514,6 +518,10 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         filter->callbacks_->requestInfo().healthCheck(true);
         return FilterHeadersStatus::StopIteration;
       }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1166,6 +1174,36 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 
   decoder_filters_[1]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+}
+
+TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->route();
+        decoder_filters_[0]->callbacks_->clearRouteCache();
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[1]->callbacks_->route();
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
 }
 
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {

@@ -31,7 +31,10 @@ TEST(StatsIsolatedStoreImplTest, All) {
   scope1->deliverHistogramToSinks("h", 100);
   scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
 
-  EXPECT_EQ(2UL, store.counters().size());
+  ScopePtr scope2 = scope1->createScope("foo.");
+  EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
+
+  EXPECT_EQ(3UL, store.counters().size());
   EXPECT_EQ(2UL, store.gauges().size());
 }
 

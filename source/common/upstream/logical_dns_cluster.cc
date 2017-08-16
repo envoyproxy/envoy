@@ -48,8 +48,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
   }
 
   const auto& named_address = hosts[0].named_address();
-  dns_url_ = fmt::format("tcp://{}:{}", ProtobufTypes::FromString(named_address.address()),
-                         named_address.port().value());
+  dns_url_ = fmt::format("tcp://{}:{}", named_address.address(), named_address.port().value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 

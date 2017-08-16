@@ -12,6 +12,7 @@
 #include "google/protobuf/message.h"
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/service.h"
+#include "google/protobuf/struct.pb.h"
 #include "google/protobuf/stubs/status.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/json_util.h"
@@ -42,17 +43,6 @@ namespace ProtobufWkt = google::protobuf;
 namespace ProtobufTypes {
 
 typedef std::string String;
-
-inline String ToString(const std::string& s) { return s; }
-inline std::string FromString(const String& s) { return s; }
-
-inline std::vector<std::string>
-stringVector(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source) {
-  std::vector<std::string> result;
-  std::transform(source.begin(), source.end(), std::back_inserter(result), FromString);
-  return result;
-}
-
 typedef int64_t Int64;
 
 } // namespace ProtobufTypes

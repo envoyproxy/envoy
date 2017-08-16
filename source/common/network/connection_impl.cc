@@ -57,7 +57,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
-                               bool using_original_dst)
+                               bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
       write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
@@ -69,6 +69,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd_ != -1);
+
+  if (!connected) {
+    state_ |= InternalState::Connecting;
+  }
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
@@ -179,6 +183,14 @@ void ConnectionImpl::noDelay(bool enable) {
   // Set NODELAY
   int new_value = enable;
   rc = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+#ifdef __APPLE__
+  if (-1 == rc && errno == EINVAL) {
+    // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
+    // enabled despite this result.
+    return;
+  }
+#endif
+
   RELEASE_ASSERT(0 == rc);
   UNREFERENCED_PARAMETER(rc);
 }
@@ -273,6 +285,9 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // to SSL_write(). That code will have to change if we ever copy here.
     write_buffer_.move(data);
 
+    // Activating a write event before the socket is connected has the side-effect of tricking
+    // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
+    // with a connection error if a call to write(2) occurs before the connection is completed.
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
     }
@@ -476,15 +491,16 @@ void ConnectionImpl::doConnect() {
   int rc = remote_address_->connect(fd_);
   if (rc == 0) {
     // write will become ready.
-    state_ |= InternalState::Connecting;
+    ASSERT(state_ & InternalState::Connecting);
   } else {
     ASSERT(rc == -1);
     if (errno == EINPROGRESS) {
-      state_ |= InternalState::Connecting;
+      ASSERT(state_ & InternalState::Connecting);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
       state_ |= InternalState::ImmediateConnectionError;
+      state_ &= ~InternalState::Connecting;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
@@ -518,7 +534,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                            Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false) {}
+                     getNullLocalAddress(*address), false, false) {}
 
 } // namespace Network
 } // namespace Envoy

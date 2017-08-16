@@ -32,8 +32,10 @@ getNullLocalAddress(const Network::Address::Instance& address) {
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
                                Network::Address::InstanceConstSharedPtr local_address,
-                               bool using_original_dst, Context& ctx, InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, using_original_dst),
+                               bool using_original_dst, bool connected, Context& ctx,
+                               InitialState state)
+    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, using_original_dst,
+                              connected),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -251,8 +253,19 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   if (!cert) {
     return "";
   }
-  bssl::UniquePtr<char> buf(X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0));
-  return std::string(buf.get());
+
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
+
+  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
+
+  const uint8_t* data;
+  size_t data_len;
+  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
+  ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
+  return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
@@ -294,7 +307,7 @@ std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false, ctx, InitialState::Client) {}
+                     getNullLocalAddress(*address), false, false, ctx, InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 

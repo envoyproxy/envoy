@@ -50,12 +50,6 @@ public:
    * In Zipkin, binary annotations of the type "string" allow arbitrary key-value pairs
    * to be associated with a span.
    *
-   * This function will only add the binary annotation to the span IF
-   * it contains the CS (Client Send) basic annotation. If this span contains the CS basic
-   * annotation then this Envoy instance initiated the span. Only the Envoy that initiates a Zipkin
-   * span should add binary annotations to it; otherwise, duplicate binary annotations
-   * would be created.
-   *
    * Note that Tracing::HttpTracerUtility::finalizeSpan() makes several calls to this function,
    * associating several key-value pairs with this span.
    */
@@ -63,10 +57,6 @@ public:
 
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const std::string& name, SystemTime start_time) override;
-  /**
-   * @return true if this span has a CS (Client Send) basic annotation, or false otherwise.
-   */
-  bool hasCSAnnotation();
 
   /**
    * @return a reference to the Zipkin::Span object.
