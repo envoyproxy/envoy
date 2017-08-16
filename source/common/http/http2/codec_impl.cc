@@ -62,8 +62,6 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   }
 }
 
-ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(unconsumed_bytes_ == 0); }
-
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
   uint8_t flags = 0;
   if (header.key().type() == HeaderString::Type::Reference) {
@@ -134,11 +132,13 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
   }
 }
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
-  ENVOY_CONN_LOG(debug, "Stream {} disabled: disable {}, unconsumed_bytes {}", parent_.connection_,
-                 stream_id_, disable, unconsumed_bytes_);
+  ENVOY_CONN_LOG(debug, "Stream {} {}, unconsumed_bytes {} read_disable_count {}",
+                 parent_.connection_, stream_id_, (disable ? "disabled" : "enabled"),
+                 unconsumed_bytes_, read_disable_count_);
   if (disable) {
     ++read_disable_count_;
   } else {
+    ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffers_overrun()) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
@@ -747,6 +747,12 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
   StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &decoder;
+  // If the connection is currently above the high watermark, make sure to inform the new stream.
+  // The connection can not pass this on automatically as it has no awareness that a new stream is
+  // created.
+  if (connection_.aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   stream->moveIntoList(std::move(stream), active_streams_);
   return *active_streams_.front();
 }

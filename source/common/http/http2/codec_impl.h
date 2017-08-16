@@ -67,7 +67,7 @@ public:
 /**
  * Base class for HTTP/2 client and server codecs.
  */
-class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::http2> {
+class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                  const Http2Settings& http2_settings)
@@ -135,7 +135,6 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
-    ~StreamImpl();
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);

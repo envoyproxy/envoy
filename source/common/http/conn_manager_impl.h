@@ -371,13 +371,9 @@ private:
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
-    addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override {
-      // Sanity check this is called exactly once per stream, by the router filter.
-      // If there's ever a need for another filter to subscribe to watermark callbacks this can be
-      // removed.
-      ASSERT(parent_.watermark_callbacks_.empty())
-      parent_.watermark_callbacks_.push_back(&watermark_callbacks);
-    }
+    addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+    void
+    removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -533,7 +529,8 @@ private:
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
-    std::vector<DownstreamWatermarkCallbacks*> watermark_callbacks_;
+    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    uint32_t high_watermark_count_{0};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
