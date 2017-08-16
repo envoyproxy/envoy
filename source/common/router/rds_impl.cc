@@ -84,6 +84,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
     throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
   }
   const auto& route_config = resources[0];
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(route_config.name() == route_config_name_)) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
