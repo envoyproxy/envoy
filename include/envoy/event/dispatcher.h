@@ -41,13 +41,13 @@ public:
   /**
    * Create a client connection.
    * @param address supplies the address to connect to.
-   * @source_address supplies an optional address to bind to.
+   * @param source_address supplies an optional address to bind to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Optional<Network::Address::InstanceConstSharedPtr> source_address =
-                             Optional<Network::Address::InstanceConstSharedPtr>()) PURE;
+                         Network::Address::InstanceConstSharedPtr source_address =
+                             Network::Address::InstanceConstSharedPtr()) PURE;
 
   /**
    * Create an SSL client connection.
@@ -59,8 +59,8 @@ public:
   virtual Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                             Network::Address::InstanceConstSharedPtr address,
-                            Optional<Network::Address::InstanceConstSharedPtr> source_address =
-                                Optional<Network::Address::InstanceConstSharedPtr>()) PURE;
+                            Network::Address::InstanceConstSharedPtr source_address =
+                                Network::Address::InstanceConstSharedPtr()) PURE;
 
   /**
    * Create an async DNS resolver. The resolver should only be used on the thread that runs this

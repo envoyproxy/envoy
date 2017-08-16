@@ -148,7 +148,7 @@ protected:
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockBuffer* client_write_buffer_ = nullptr;
-  Optional<Address::InstanceConstSharedPtr> source_address_;
+  Address::InstanceConstSharedPtr source_address_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,

@@ -28,13 +28,13 @@ public:
 
   Network::ClientConnectionPtr createClientConnection(
       Network::Address::InstanceConstSharedPtr address,
-      Optional<Network::Address::InstanceConstSharedPtr> source_address) override {
+      Network::Address::InstanceConstSharedPtr source_address) override {
     return Network::ClientConnectionPtr{createClientConnection_(address, source_address)};
   }
 
   Network::ClientConnectionPtr createSslClientConnection(
       Ssl::ClientContext& ssl_ctx, Network::Address::InstanceConstSharedPtr address,
-      Optional<Network::Address::InstanceConstSharedPtr> source_address) override {
+      Network::Address::InstanceConstSharedPtr source_address) override {
     return Network::ClientConnectionPtr{
         createSslClientConnection_(ssl_ctx, address, source_address)};
   }
@@ -82,11 +82,11 @@ public:
   MOCK_METHOD2(createClientConnection_,
                Network::ClientConnection*(
                    Network::Address::InstanceConstSharedPtr address,
-                   Optional<Network::Address::InstanceConstSharedPtr> source_address));
+                   Network::Address::InstanceConstSharedPtr source_address));
   MOCK_METHOD3(createSslClientConnection_,
                Network::ClientConnection*(
                    Ssl::ClientContext& ssl_ctx, Network::Address::InstanceConstSharedPtr address,
-                   Optional<Network::Address::InstanceConstSharedPtr> source_address));
+                   Network::Address::InstanceConstSharedPtr source_address));
   MOCK_METHOD1(createDnsResolver,
                Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));

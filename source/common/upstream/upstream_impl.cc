@@ -60,7 +60,7 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
 
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config,
-    const Optional<Network::Address::InstanceConstSharedPtr> source_address,
+    const Network::Address::InstanceConstSharedPtr source_address,
     Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
     bool added_via_api)
     : runtime_(runtime), name_(config.name()),
@@ -188,7 +188,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 
 ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster,
-    const Optional<Network::Address::InstanceConstSharedPtr> source_address,
+    const Network::Address::InstanceConstSharedPtr source_address,
     Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
     bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,

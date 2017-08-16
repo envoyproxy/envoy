@@ -610,7 +610,7 @@ public:
   NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
-  Optional<Network::Address::InstanceConstSharedPtr> source_address_;
+  Network::Address::InstanceConstSharedPtr source_address_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,

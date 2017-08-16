@@ -36,10 +36,11 @@ Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& add
 
 int ConnectionImplUtility::createSocket(
     Address::InstanceConstSharedPtr address,
-    const Optional<Address::InstanceConstSharedPtr> source_address) {
-  int fd = address->socket(Address::SocketType::Stream);
-  if (fd >= 0 && source_address.valid()) {
-    int rc = source_address.value()->bind(fd);
+    const Address::InstanceConstSharedPtr source_address) {
+  const int fd = address->socket(Address::SocketType::Stream);
+  if (fd >= 0 && source_address != nullptr) {
+    int rc = source_address->bind(fd);
+    // TODO(alyssawilk) make this a non-fatal connect failure in a follow-up comimit on this PR
     ASSERT(rc >= 0);
   }
   return fd;
@@ -544,7 +545,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
-    const Optional<Network::Address::InstanceConstSharedPtr> source_address)
+    const Network::Address::InstanceConstSharedPtr source_address)
     : ConnectionImpl(dispatcher, ConnectionImplUtility::createSocket(address, source_address),
                      address, getNullLocalAddress(*address), false, false) {}
 

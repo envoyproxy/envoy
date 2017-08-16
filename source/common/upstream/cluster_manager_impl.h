@@ -153,7 +153,7 @@ public:
     primary_clusters_.clear();
   }
 
-  const Optional<Network::Address::InstanceConstSharedPtr>& sourceAddress() const override {
+  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   }
 
@@ -237,7 +237,7 @@ private:
   Runtime::RandomGenerator& random_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
   Optional<SdsConfig> sds_config_;
-  Optional<Network::Address::InstanceConstSharedPtr> source_address_;
+  Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;

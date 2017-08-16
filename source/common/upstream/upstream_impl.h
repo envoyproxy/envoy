@@ -178,7 +178,7 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 class ClusterInfoImpl : public ClusterInfo {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                  const Optional<Network::Address::InstanceConstSharedPtr> source_address,
+                  const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
@@ -200,7 +200,7 @@ public:
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
-  const Optional<Network::Address::InstanceConstSharedPtr>& sourceAddress() const override {
+  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
 
@@ -231,7 +231,7 @@ private:
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Optional<Network::Address::InstanceConstSharedPtr> source_address_;
+  const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   const bool added_via_api_;
 };
@@ -272,7 +272,7 @@ public:
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                  const Optional<Network::Address::InstanceConstSharedPtr> source_address,
+                  const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 

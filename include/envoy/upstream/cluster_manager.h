@@ -112,9 +112,10 @@ public:
   /**
    * Returns an optional source address for upstream connections to bind to.
    *
-   * @return an optional source address to bind to.
+   * @return Network::Address::InstanceConstSharedPtr a source address to bind to or nullptr if no
+   * bind need occur.
    */
-  virtual const Optional<Network::Address::InstanceConstSharedPtr>& sourceAddress() const PURE;
+  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

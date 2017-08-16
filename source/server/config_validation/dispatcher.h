@@ -16,10 +16,10 @@ class ValidationDispatcher : public DispatcherImpl {
 public:
   Network::ClientConnectionPtr
       createClientConnection(Network::Address::InstanceConstSharedPtr,
-                             Optional<Network::Address::InstanceConstSharedPtr>) override;
+                             Network::Address::InstanceConstSharedPtr) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext&, Network::Address::InstanceConstSharedPtr,
-                            Optional<Network::Address::InstanceConstSharedPtr>) override;
+                            Network::Address::InstanceConstSharedPtr) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   Network::ListenerPtr createListener(Network::ConnectionHandler&, Network::ListenSocket&,

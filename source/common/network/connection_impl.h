@@ -43,7 +43,7 @@ public:
    * @return the file descriptor or -1 on error.
    */
   static int createSocket(Address::InstanceConstSharedPtr peer_address,
-                          const Optional<Address::InstanceConstSharedPtr> source_address);
+                          Address::InstanceConstSharedPtr source_address);
 };
 
 /**
@@ -168,7 +168,7 @@ class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnect
 public:
   ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                        Address::InstanceConstSharedPtr remote_address,
-                       const Optional<Address::InstanceConstSharedPtr> source_address);
+                       const Address::InstanceConstSharedPtr source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }
