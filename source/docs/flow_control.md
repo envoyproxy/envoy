@@ -162,7 +162,7 @@ The high watermark path is as follows:
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * When `Envoy::Http::CodecClient` receives `onAboveWriteBufferHighWatermark()` it
    calls `onUnderlyingConnectionAboveWriteBufferHighWatermark()` on `codec_`.
- * When `Envoy::Http::ConnectionManagerImpll` receives `onAboveWriteBufferHighWatermark()` it calls
+ * When `Envoy::Http::ConnectionManagerImpl` receives `onAboveWriteBufferHighWatermark()` it calls
    `runHighWatermarkCallbacks()` for each stream of the connection.
  * `runHighWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallback`
  receiving an `onAboveWriteBufferHighWatermark()` callback.
