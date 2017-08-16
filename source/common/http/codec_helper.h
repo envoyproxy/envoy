@@ -49,11 +49,10 @@ protected:
   }
 
   void addCallbacks_(StreamCallbacks& callbacks) {
+    ASSERT(!reset_callbacks_started_);
     callbacks_.push_back(&callbacks);
-    if (!reset_callbacks_started_) {
-      for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
-        callbacks.onAboveWriteBufferHighWatermark();
-      }
+    for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
+      callbacks.onAboveWriteBufferHighWatermark();
     }
   }
 
