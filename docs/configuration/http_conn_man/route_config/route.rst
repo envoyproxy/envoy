@@ -400,7 +400,8 @@ specified in the following form:
     {"key": "header2", "value": "value2"}
   ]
 
-Envoy also supports adding the Original Client IP and Protocol to the request that matches a specific route:
+Envoy also supports adding the Original Client IP and Protocol to the request headers that matches a 
+specific route:
 
 .. code-block:: json
 

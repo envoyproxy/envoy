@@ -187,5 +187,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )

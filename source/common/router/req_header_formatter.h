@@ -8,6 +8,7 @@
 #include "common/common/logger.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/rds.pb.h"
 
@@ -75,6 +76,9 @@ public:
 
   static RequestHeaderParserPtr
   parseRouteConfiguration(const envoy::api::v2::RouteConfiguration& routeConfig);
+
+  static RequestHeaderParserPtr
+  parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
   static HeaderFormatterPtr parseInternal(const std::string& format);
 

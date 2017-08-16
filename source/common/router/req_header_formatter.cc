@@ -15,7 +15,6 @@ namespace Envoy {
 namespace Router {
 
 HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format) {
-  std::string variable_name;
   if (format.find("%") == 0) {
     size_t last_occ_pos = format.rfind("%");
     if (last_occ_pos == std::string::npos || last_occ_pos <= 1) {
@@ -23,53 +22,33 @@ HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format)
           "Incorrect configuration: {}. Expected the variable to be of format %<variable_name>%",
           format));
     }
-    variable_name = format.substr(1, last_occ_pos - 1);
-
+    const std::string variable_name = format.substr(1, last_occ_pos - 1);
+    HeaderFormatterPtr request_header_formatter_ptr(new RequestHeaderFormatter(variable_name));
+    return request_header_formatter_ptr;
   } else {
     HeaderFormatterPtr plain_header_formatter_ptr(new PlainHeaderFormatter(format));
     return plain_header_formatter_ptr;
   }
-  HeaderFormatterPtr request_header_formatter_ptr(new RequestHeaderFormatter(variable_name));
-  return request_header_formatter_ptr;
 }
 
 RequestHeaderParserPtr RequestHeaderParser::parseRoute(const envoy::api::v2::Route& route) {
-  RequestHeaderParserPtr request_header_parser(new RequestHeaderParser());
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-      header_formatter_map;
-  for (const auto& header_value_option : route.route().request_headers_to_add()) {
-    ENVOY_LOG(debug, "adding key {} to header formatter map", header_value_option.header().key());
-    HeaderFormatterPtr header_formatter =
-        RequestHeaderParser::parseInternal(header_value_option.header().value());
-    request_header_parser->header_formatter_map_.emplace(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
-  }
-
-  return request_header_parser;
+  return parse(route.route().request_headers_to_add());
 }
 
 RequestHeaderParserPtr
 RequestHeaderParser::parseVirtualHost(const envoy::api::v2::VirtualHost& virtualHost) {
-  RequestHeaderParserPtr request_header_parser(new RequestHeaderParser());
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-      header_formatter_map;
-  for (const auto& header_value_option : virtualHost.request_headers_to_add()) {
-    ENVOY_LOG(debug, "adding key {} to header formatter map", header_value_option.header().key());
-    HeaderFormatterPtr header_formatter =
-        RequestHeaderParser::parseInternal(header_value_option.header().value());
-    request_header_parser->header_formatter_map_.emplace(
-        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
-  }
-
-  return request_header_parser;
+  return parse(virtualHost.request_headers_to_add());
 }
 
 RequestHeaderParserPtr RequestHeaderParser::parseRouteConfiguration(
     const envoy::api::v2::RouteConfiguration& routeConfig) {
+  return parse(routeConfig.request_headers_to_add());
+}
+
+RequestHeaderParserPtr RequestHeaderParser::parse(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers) {
   RequestHeaderParserPtr request_header_parser(new RequestHeaderParser());
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-      header_formatter_map;
-  for (const auto& header_value_option : routeConfig.request_headers_to_add()) {
+  for (const auto& header_value_option : headers) {
     ENVOY_LOG(debug, "adding key {} to header formatter map", header_value_option.header().key());
     HeaderFormatterPtr header_formatter =
         RequestHeaderParser::parseInternal(header_value_option.header().value());
