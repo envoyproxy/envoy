@@ -254,6 +254,17 @@ public:
    *              reasons (e.g, needing window updates).
    */
   virtual bool wantsToWrite() PURE;
+
+  /**
+   * Called when the underlying Network::Connection goes over its high watermark.
+   */
+  virtual void onUnderlyingConnectionAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the underlying Network::Connection goes from over its high watermark to under its
+   * low watermark.
+   */
+  virtual void onUnderlyingConnectionBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -307,17 +318,6 @@ public:
    * @return StreamEncoder& supplies the encoder to write the request into.
    */
   virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
-
-  /**
-   * Called when the underlying Network::Connection goes over its high watermark.
-   */
-  virtual void onUnderlyingConnectionAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when the underlying Network::Connection goes from over its high watermark to under its
-   * low watermark.
-   */
-  virtual void onUnderlyingConnectionBelowWriteBufferLowWatermark() PURE;
 };
 
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;

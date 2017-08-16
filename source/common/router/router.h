@@ -106,8 +106,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
-               public Upstream::LoadBalancerContext,
-               public Http::DownstreamWatermarkCallbacks {
+               public Upstream::LoadBalancerContext {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
@@ -124,13 +123,7 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
-    // Have the connection manager inform the router when the downstream buffers are overrun.
-    callbacks.addDownstreamWatermarkCallbacks(*this);
   }
-
-  // Http::DownstreamWatermarkCallbacks
-  void onBelowWriteBufferLowWatermark() override;
-  void onAboveWriteBufferHighWatermark() override;
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> hashKey() const override {
@@ -192,6 +185,21 @@ private:
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
+    void setRequestEncoder(Http::StreamEncoder& request_encoder);
+    void clearRequestEncoder();
+
+    struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
+      DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
+
+      // Http::DownstreamWatermarkCallbacks
+      void onBelowWriteBufferLowWatermark() override;
+      void onAboveWriteBufferHighWatermark() override;
+
+      UpstreamRequest& parent_;
+    };
+
+    void readEnable();
+
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
     Event::TimerPtr per_try_timeout_;
@@ -200,6 +208,7 @@ private:
     Optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::InstancePtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
+    DownstreamWatermarkManager downstream_watermark_manager_{*this};
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;

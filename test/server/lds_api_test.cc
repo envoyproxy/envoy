@@ -39,8 +39,8 @@ public:
 
   void expectAdd(const std::string& listener_name, bool updated) {
     EXPECT_CALL(listener_manager_, addOrUpdateListener(_))
-        .WillOnce(Invoke([listener_name, updated](const Json::Object& config) -> bool {
-          EXPECT_EQ(listener_name, config.getString("name"));
+        .WillOnce(Invoke([listener_name, updated](const envoy::api::v2::Listener& config) -> bool {
+          EXPECT_EQ(listener_name, config.name());
           return updated;
         }));
   }
@@ -127,10 +127,14 @@ TEST_F(LdsApiTest, Basic) {
   {
     "listeners": [
     {
-      "name": "listener1"
+      "name": "listener1",
+      "address": "tcp://0.0.0.0:1",
+      "filters": []
     },
     {
-      "name": "listener2"
+      "name": "listener2",
+      "address": "tcp://0.0.0.0:2",
+      "filters": []
     }
     ]
   }
@@ -154,10 +158,14 @@ TEST_F(LdsApiTest, Basic) {
   {
     "listeners": [
     {
-      "name": "listener1"
+      "name": "listener1",
+      "address": "tcp://0.0.0.0:1",
+      "filters": []
     },
     {
-      "name": "listener3"
+      "name": "listener3",
+      "address": "tcp://0.0.0.0:3",
+      "filters": []
     }
     ]
   }

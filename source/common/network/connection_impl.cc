@@ -322,6 +322,8 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
 
 void ConnectionImpl::onLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
+  ASSERT(above_high_watermark_);
+  above_high_watermark_ = false;
   for (ConnectionCallbacks* callback : callbacks_) {
     callback->onBelowWriteBufferLowWatermark();
   }
@@ -329,6 +331,8 @@ void ConnectionImpl::onLowWatermark() {
 
 void ConnectionImpl::onHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
+  ASSERT(!above_high_watermark_);
+  above_high_watermark_ = true;
   for (ConnectionCallbacks* callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
   }

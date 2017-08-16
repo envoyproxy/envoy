@@ -139,9 +139,10 @@ public:
 
   DrainManagerPtr createDrainManager() override { return DrainManagerPtr{createDrainManager_()}; }
 
-  MOCK_METHOD2(createFilterFactoryList, std::vector<Configuration::NetworkFilterFactoryCb>(
-                                            const std::vector<Json::ObjectSharedPtr>& filters,
-                                            Configuration::FactoryContext& context));
+  MOCK_METHOD2(createFilterFactoryList,
+               std::vector<Configuration::NetworkFilterFactoryCb>(
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                   Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port));
@@ -156,7 +157,7 @@ public:
   MockListenerManager();
   ~MockListenerManager();
 
-  MOCK_METHOD1(addOrUpdateListener, bool(const Json::Object& json));
+  MOCK_METHOD1(addOrUpdateListener, bool(const envoy::api::v2::Listener& config));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Listener>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
