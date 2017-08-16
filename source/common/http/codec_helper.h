@@ -71,7 +71,7 @@ protected:
 private:
   std::vector<StreamCallbacks*> callbacks_;
   bool reset_callbacks_started_{};
-  uint32_t high_watermark_callbacks_{0};
+  uint32_t high_watermark_callbacks_{};
 };
 
 } // namespace Http

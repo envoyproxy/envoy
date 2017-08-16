@@ -94,7 +94,9 @@ events have occurred and passes any on to the router filter when it subscribes.
 
 It is worth noting that the router does not unwind `readDisable(true)` calls on
 destruction.  The codecs are responsible for tracking that a given stream no
-longer contributes to the read blocked state and unwinding.
+longer contributes to the read blocked state and unwinding.  In the case of
+HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume any outstanding flow control
+window on stream deletion to avoid leaking the connection-level window.
 
 ## HTTP/2 codec recv buffer
 
@@ -257,13 +259,13 @@ The low watermark path is as follows:
 
  * The downstream `Network::ConnectionImpl::write_buffer_` drains.  It calls
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
- * `Envoy::Http::Http2::ConnectionManagerImpl::onBelowWriteBufferHighWatermark()`
-   calls `ConnectionImpl::onUnderlyingConnectionBelowWriteBufferHighWatermark()`
+ * `Envoy::Http::Http2::ConnectionManagerImpl::onBelowWriteBufferLowWatermark()`
+   calls `ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark()`
    on `codec_`.
- * When `Envoy::Http::Http2::ConnectionImpl` receives `onBelowWriteBufferHighWatermark()` it calls
-   `runHighWatermarkCallbacks()` for each stream of the connection.
- * When `ConnectionManagerImpl::ActiveStream::onBelowWriteBufferHighWatermark()` is
-   called it calls `ConnectionImpl::ActiveStream::callHighWatermarkCallbacks()`
+ * When `Envoy::Http::Http2::ConnectionImpl` receives `onBelowWriteBufferLowWatermark()` it calls
+   `runLowWatermarkCallbacks()` for each stream of the connection.
+ * When `ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark()` is
+   called it calls `ConnectionImpl::ActiveStream::callLowWatermarkCallbacks()`
 
 From this point on, the flow is the same as when the downstream codec buffer
 goes under its low watermark.

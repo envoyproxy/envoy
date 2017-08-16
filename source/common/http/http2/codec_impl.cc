@@ -748,6 +748,8 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
   StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
   stream->decoder_ = &decoder;
   // If the connection is currently above the high watermark, make sure to inform the new stream.
+  // The connection can not pass this on automatically as it has no awareness that a new stream is
+  // created.
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }

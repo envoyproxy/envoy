@@ -173,7 +173,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   config_.filterFactory().createFilterChain(*new_stream);
-  // Make sure new streams are appraised that the underlying connection is blocked.
+  // Make sure new streams are apprised that the underlying connection is blocked.
   if (read_callbacks_->connection().aboveHighWatermark()) {
     new_stream->callHighWatermarkCallbacks();
   }
