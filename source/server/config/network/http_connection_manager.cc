@@ -37,14 +37,14 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
     const Json::Object& json_http_connection_manager, FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          date_provider_singleton_name, [&context] {
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
             return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
                                                                       context.threadLocal());
           });
 
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          route_config_provider_manager_singleton_name, [&context] {
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
                 context.threadLocal());

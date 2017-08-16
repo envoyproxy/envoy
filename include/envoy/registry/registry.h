@@ -11,16 +11,6 @@ namespace Envoy {
 namespace Registry {
 
 /**
- * Macro used to statically register singletons managed by the singleton manager
- * defined in envoy/singleton/manager.h.
- */
-#define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
-  static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Registry::RegisterFactory<Singleton::RegistrationImpl<NAME##_singleton_name>,             \
-                                   Singleton::Registration>                                        \
-      NAME##_singleton_registered_;
-
-/**
  * General registry for implementation factories. The registry is templated by the Base class that a
  * set of factories conforms to.
  *
