@@ -34,7 +34,7 @@ protected:
   ConnPool::Instance& conn_pool_;
 };
 
-class SplitRequestImpl : public SplitRequest {
+class SplitRequestBase : public SplitRequest {
 protected:
   static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const RespValue& request);
 };
@@ -42,7 +42,7 @@ protected:
 /**
  * SingleServerRequest is a base class for commands that hash to a single backend.
  */
-class SingleServerRequest : public SplitRequestImpl, public ConnPool::PoolCallbacks {
+class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
 public:
   ~SingleServerRequest();
 
@@ -89,7 +89,7 @@ private:
  * is sent to the appropriate server for each key. The responses from all servers are combined and
  * returned to the client.
  */
-class FragmentedRequest : public SplitRequestImpl {
+class FragmentedRequest : public SplitRequestBase {
 public:
   ~FragmentedRequest();
 

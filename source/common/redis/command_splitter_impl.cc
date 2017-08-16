@@ -21,7 +21,7 @@ RespValuePtr Utility::makeError(const std::string& error) {
   return response;
 }
 
-void SplitRequestImpl::onWrongNumberOfArguments(SplitCallbacks& callbacks,
+void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
                                                 const RespValue& request) {
   callbacks.onResponse(Utility::makeError(
       fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
