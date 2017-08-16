@@ -3,6 +3,7 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
+#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
@@ -63,6 +64,17 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
   api_config_source->mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(
           json_config.getInteger("refresh_delay_ms", 30000)));
+}
+
+void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds) {
+  json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
+  auto* api_config_source = rds.mutable_config_source()->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  api_config_source->add_cluster_name(json_rds.getString("cluster"));
+  api_config_source->mutable_refresh_delay()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(
+          json_rds.getInteger("refresh_delay_ms", 30000)));
+  JSON_UTIL_SET_STRING(json_rds, rds, route_config_name);
 }
 
 } // namespace Config

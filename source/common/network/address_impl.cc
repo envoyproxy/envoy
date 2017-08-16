@@ -64,7 +64,11 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   if (rc != 0) {
     throw EnvoyException(fmt::format("getpeername failed for '{}': {}", fd, strerror(errno)));
   }
+#ifdef __APPLE__
+  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX) {
+#else
   if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX) {
+#endif
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
@@ -77,14 +81,42 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::flagsFromSocketType(SocketType type) const {
+int InstanceBase::socketFromSocketType(SocketType socketType) const {
+#if defined(__APPLE__)
+  int flags = 0;
+#else
   int flags = SOCK_NONBLOCK;
-  if (type == SocketType::Stream) {
+#endif
+
+  if (socketType == SocketType::Stream) {
     flags |= SOCK_STREAM;
   } else {
     flags |= SOCK_DGRAM;
   }
-  return flags;
+
+  int domain;
+  if (type() == Type::Ip) {
+    IpVersion version = ip()->version();
+    if (version == IpVersion::v6) {
+      domain = AF_INET6;
+    } else {
+      ASSERT(version == IpVersion::v4);
+      domain = AF_INET;
+    }
+  } else {
+    ASSERT(type() == Type::Pipe);
+    domain = AF_UNIX;
+  }
+
+  int fd = ::socket(domain, flags, 0);
+  RELEASE_ASSERT(fd != -1);
+
+#ifdef __APPLE__
+  // Cannot set SOCK_NONBLOCK as a ::socket flag.
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+#endif
+
+  return fd;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -129,9 +161,7 @@ int Ipv4Instance::connect(int fd) const {
                    sizeof(ip_.ipv4_.address_));
 }
 
-int Ipv4Instance::socket(SocketType type) const {
-  return ::socket(AF_INET, flagsFromSocketType(type), 0);
-}
+int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
   std::array<uint8_t, 16> result;
@@ -186,8 +216,8 @@ int Ipv6Instance::connect(int fd) const {
 }
 
 int Ipv6Instance::socket(SocketType type) const {
-  const int fd = ::socket(AF_INET6, flagsFromSocketType(type), 0);
-  RELEASE_ASSERT(fd != -1);
+  const int fd = socketFromSocketType(type);
+
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = 1;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1);
@@ -217,9 +247,7 @@ int PipeInstance::connect(int fd) const {
   return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 
-int PipeInstance::socket(SocketType type) const {
-  return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
-}
+int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network

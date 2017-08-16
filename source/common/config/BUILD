@@ -21,6 +21,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "base_json_lib",
+    srcs = ["base_json.cc"],
+    hdrs = ["base_json.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        "//include/envoy/json:json_object_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_json_lib",
     srcs = ["cds_json.cc"],
     hdrs = ["cds_json.h"],
@@ -49,6 +59,25 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_json_lib",
+    srcs = ["filter_json.cc"],
+    hdrs = ["filter_json.h"],
+    external_deps = ["envoy_filter_http_connection_manager"],
+    deps = [
+        ":json_utility_lib",
+        ":protocol_json_lib",
+        ":rds_json_lib",
+        ":utility_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
     ],
@@ -96,6 +125,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lds_json_lib",
+    srcs = ["lds_json.cc"],
+    hdrs = ["lds_json.h"],
+    external_deps = ["envoy_lds"],
+    deps = [
+        ":json_utility_lib",
+        ":tls_context_json_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_lib",
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
@@ -114,6 +158,21 @@ envoy_cc_library(
     deps = [
         ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_json_lib",
+    srcs = ["rds_json.cc"],
+    hdrs = ["rds_json.h"],
+    external_deps = ["envoy_rds"],
+    deps = [
+        ":base_json_lib",
+        ":json_utility_lib",
+        ":metadata_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
     ],
 )
 
@@ -137,6 +196,7 @@ envoy_cc_library(
     hdrs = ["tls_context_json.h"],
     external_deps = ["envoy_tls_context"],
     deps = [
+        ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:utility_lib",
     ],
@@ -146,7 +206,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "envoy_filter_http_connection_manager",
+    ],
     deps = [
         ":json_utility_lib",
         "//include/envoy/config:subscription_interface",
@@ -154,5 +217,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/common/json:config_schemas_lib",
     ],
 )

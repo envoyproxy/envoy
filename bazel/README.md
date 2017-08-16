@@ -33,10 +33,18 @@ On Ubuntu, run the following commands:
  apt-get install realpath
 ```
 
-On OS X, you'll need to install realpath. This can be accomplished via Homebrew:
+On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:
 ```
 brew install coreutils # for realpath
+brew install wget
+brew install cmake
+brew install libtool
+brew install go
+brew install bazel
 ```
+
+Envoy compiles and passes tests with the version of clang installed by XCode 8.3.3:
+Apple LLVM version 8.1.0 (clang-802.0.42).
 
 3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.

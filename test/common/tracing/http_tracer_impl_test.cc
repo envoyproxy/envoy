@@ -266,7 +266,32 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
+  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("error", "true"));
+  EXPECT_CALL(*span, setTag("response_size", "11"));
+  EXPECT_CALL(*span, setTag("response_flags", "-"));
+  EXPECT_CALL(*span, setTag("request_size", "10"));
+  EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
+  NiceMock<MockConfig> config;
+
+  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
+  finalizer.finalize(*span);
+}
+
+TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  request_info.host_->cluster_.name_ = "my_upstream_cluster";
+
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
+  Optional<uint32_t> response_code;
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, upstreamHost()).Times(2);
+
+  EXPECT_CALL(*span, setTag("upstream_cluster", "my_upstream_cluster"));
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
@@ -301,11 +326,13 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
+  EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
 
   NiceMock<MockConfig> config;
 
@@ -355,11 +382,13 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
   ON_CALL(request_info, getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
+  EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_code", "503"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
+  EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
 
   HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
   finalizer.finalize(*span);

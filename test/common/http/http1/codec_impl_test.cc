@@ -500,10 +500,18 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
   Http::MockStreamCallbacks stream_callbacks;
   response_encoder->getStream().addCallbacks(stream_callbacks);
 
+  // Fake a call from the underlying Network::Connection and verify the stream is notified.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  static_cast<ServerConnection*>(codec_.get())->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
   TestHeaderMapImpl headers{{":status", "200"}};
-  response_encoder->encodeHeaders(headers, true);
+  response_encoder->encodeHeaders(headers, false);
+
+  // Fake out the underlying Network::Connection buffer being drained.
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  static_cast<ServerConnection*>(codec_.get())->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
 class Http1ClientConnectionImplTest : public testing::Test {
@@ -687,7 +695,7 @@ TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
 
   // Fake a call from the underlying Network::Connection and verify the stream is notified.
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
-  codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  static_cast<ClientConnection*>(codec_.get())->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
   // Do a large write. This will result in the buffer temporarily going over the
   // high watermark and then draining.
@@ -698,7 +706,7 @@ TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
 
   // Fake out the underlying Network::Connection buffer being drained.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
-  codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  static_cast<ClientConnection*>(codec_.get())->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
 } // namespace Http1

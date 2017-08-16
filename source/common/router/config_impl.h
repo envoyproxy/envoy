@@ -18,6 +18,8 @@
 #include "common/router/config_utility.h"
 #include "common/router/router_ratelimit.h"
 
+#include "api/rds.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -67,8 +69,9 @@ class ConfigImpl;
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const Json::Object& virtual_host, const ConfigImpl& global_route_config,
-                  Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
+  VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host,
+                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
+                  Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
@@ -87,7 +90,7 @@ private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
   struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const Json::Object& virtual_cluster);
+    VirtualClusterEntry(const envoy::api::v2::VirtualCluster& virtual_cluster);
 
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
@@ -119,11 +122,11 @@ private:
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 
 /**
- * Implementation of RetryPolicy that reads from the JSON route config.
+ * Implementation of RetryPolicy that reads from the proto route config.
  */
 class RetryPolicyImpl : public RetryPolicy {
 public:
-  RetryPolicyImpl(const Json::Object& config);
+  RetryPolicyImpl(const envoy::api::v2::RouteAction& config);
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -137,11 +140,11 @@ private:
 };
 
 /**
- * Implementation of ShadowPolicy that reads from the JSON route config.
+ * Implementation of ShadowPolicy that reads from the proto route config.
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  ShadowPolicyImpl(const Json::Object& config);
+  ShadowPolicyImpl(const envoy::api::v2::RouteAction& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -153,12 +156,13 @@ private:
 };
 
 /**
- * Implementation of HashPolicy that reads from the JSON route config and only currently supports
+ * Implementation of HashPolicy that reads from the proto route config and only currently supports
  * hashing on an HTTP header.
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  HashPolicyImpl(const Json::Object& config);
+  HashPolicyImpl(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy);
 
   // Router::HashPolicy
   Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const override;
@@ -176,7 +180,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
-  RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
+  RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
@@ -300,9 +304,10 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
+  static Optional<RuntimeData> loadRuntimeData(const envoy::api::v2::RouteMatch& route);
 
-  static std::multimap<std::string, std::string> parseOpaqueConfig(const Json::Object& route);
+  static std::multimap<std::string, std::string>
+  parseOpaqueConfig(const envoy::api::v2::Route& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -335,7 +340,7 @@ private:
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
+  PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                        Runtime::Loader& loader);
 
   // Router::RouteEntry
@@ -353,7 +358,7 @@ private:
  */
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
+  PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                      Runtime::Loader& loader);
 
   // Router::RouteEntry
@@ -372,8 +377,9 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const Json::Object& config, const ConfigImpl& global_http_config,
-               Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
+  RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
+               const ConfigImpl& global_http_config, Runtime::Loader& runtime,
+               Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
@@ -399,12 +405,12 @@ private:
 };
 
 /**
- * Implementation of Config that reads from a JSON file.
+ * Implementation of Config that reads from a proto file.
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-             bool validate_clusters_default);
+  ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
+             Upstream::ClusterManager& cm, bool validate_clusters_default);
 
   const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
     return request_headers_to_add_;

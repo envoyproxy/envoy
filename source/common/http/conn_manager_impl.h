@@ -78,8 +78,7 @@ namespace Http {
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
-  TIMER  (downstream_rq_time)                                                                      \
-  COUNTER(failed_generate_uuid)
+  TIMER  (downstream_rq_time)
 // clang-format on
 
 /**
@@ -290,14 +289,10 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callHighWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
   void onBelowWriteBufferLowWatermark() override {
-    for (ActiveStreamPtr& stream : streams_) {
-      stream->callLowWatermarkCallbacks();
-    }
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
 private:
@@ -330,6 +325,7 @@ private:
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    void clearRouteCache() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;

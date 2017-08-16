@@ -96,6 +96,11 @@ public:
   TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
+  ScopePtr createScope(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+  }
+
   void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
     std::unique_lock<std::mutex> lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(name, value);
@@ -137,6 +142,10 @@ public:
     std::unique_lock<std::mutex> lock(lock_);
     return store_.counter(name);
   }
+  ScopePtr createScope(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+  }
   void deliverHistogramToSinks(const std::string&, uint64_t) override {}
   void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
   Gauge& gauge(const std::string& name) override {
@@ -156,10 +165,6 @@ public:
   std::list<GaugeSharedPtr> gauges() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauges();
-  }
-  ScopePtr createScope(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
 
   // Stats::StoreRoot

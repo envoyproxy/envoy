@@ -134,11 +134,13 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     // Internal request, make traceable
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                    route_config_, random_, runtime_, local_info_);
 
+    // Traceable (forced trace) variant of uuid
     EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get_(Headers::get().RequestId));
   }
 
@@ -146,6 +148,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     // Not internal request, force trace header should be cleaned.
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "34.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -157,7 +160,6 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   Network::Address::Ipv4Instance external_remote_address("34.0.0.1");
-  const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
@@ -167,7 +169,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   {
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid());
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
     ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -175,8 +177,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
-    // No changes to generated_uuid as x-client-trace-id is missing.
-    EXPECT_EQ(generated_uuid, headers.get_(Headers::get().RequestId));
+    // No changes to uuid as x-client-trace-id is missing.
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -184,7 +186,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(false));
 
@@ -192,7 +194,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-4307-8002-969403baf480", headers.get_(Headers::get().RequestId));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
 
   {
@@ -201,7 +203,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
-    EXPECT_CALL(random_, uuid()).WillOnce(Return(generated_uuid));
+    EXPECT_CALL(random_, uuid());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(true));
 
@@ -209,7 +211,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    route_config_, random_, runtime_, local_info_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-b307-8002-969403baf480", headers.get_(Headers::get().RequestId));
+    // Traceable (client trace) variant of random_.uuid_
+    EXPECT_EQ("a121e9e1-feae-b136-9e0e-6fac343d56c9", headers.get_(Headers::get().RequestId));
   }
 }
 

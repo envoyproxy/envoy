@@ -52,6 +52,7 @@ public:
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(name, value);
   }
@@ -63,7 +64,6 @@ public:
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override;
-  ScopePtr createScope(const std::string& name) override;
   std::list<GaugeSharedPtr> gauges() const override;
 
   // Stats::StoreRoot
@@ -86,6 +86,9 @@ private:
 
     // Stats::Scope
     Counter& counter(const std::string& name) override;
+    ScopePtr createScope(const std::string& name) override {
+      return parent_.createScope(prefix_ + name);
+    }
     void deliverHistogramToSinks(const std::string& name, uint64_t value) override;
     void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override;
     Gauge& gauge(const std::string& name) override;

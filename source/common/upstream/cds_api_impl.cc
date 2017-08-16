@@ -12,16 +12,16 @@ namespace Upstream {
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::ConfigSource& cds_config,
                              const Optional<SdsConfig>& sds_config, ClusterManager& cm,
                              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Store& store) {
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
   return CdsApiPtr{
-      new CdsApiImpl(cds_config, sds_config, cm, dispatcher, random, local_info, store)};
+      new CdsApiImpl(cds_config, sds_config, cm, dispatcher, random, local_info, scope)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
                        const Optional<SdsConfig>& sds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const LocalInfo::LocalInfo& local_info, Stats::Store& store)
-    : cm_(cm), scope_(store.createScope("cluster_manager.cds.")) {
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(

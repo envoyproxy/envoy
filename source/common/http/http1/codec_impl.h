@@ -107,7 +107,6 @@ private:
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http> {
 public:
-  ~ConnectionImpl();
   /**
    * @return Network::Connection& the backing network connection.
    */
@@ -143,6 +142,8 @@ public:
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
   void readDisable(bool disable) { connection_.readDisable(disable); }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
@@ -156,7 +157,6 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
-  bool codec_high_watermark_called_{false};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -232,14 +232,16 @@ private:
   virtual void sendProtocolError() PURE;
 
   /**
-   * Called when output_buffer_ goes from below its low watermark to over its high watermark.
+   * Called when output_buffer_ or the underlying connection go from below a low watermark to over
+   * a high watermark.
    */
-  virtual void onOutputBufferAboveHighWatermark() PURE;
+  virtual void onAboveHighWatermark() PURE;
 
   /**
-   * Called when output_buffer_ goes from above its high watermark to below its low watermark.
+   * Called when output_buffer_ or the underlying connection  go from above a high watermark to
+   * below a low watermark.
    */
-  virtual void onOutputBufferBelowLowWatermark() PURE;
+  virtual void onBelowLowWatermark() PURE;
 
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
@@ -295,8 +297,8 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
-  void onOutputBufferAboveHighWatermark() override;
-  void onOutputBufferBelowLowWatermark() override;
+  void onAboveHighWatermark() override;
+  void onBelowLowWatermark() override;
 
   void resetActiveRequest();
 
@@ -314,8 +316,6 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
 private:
   struct PendingResponse {
@@ -336,12 +336,11 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
-  void onOutputBufferAboveHighWatermark() override;
-  void onOutputBufferBelowLowWatermark() override;
+  void onAboveHighWatermark() override;
+  void onBelowLowWatermark() override;
 
   std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
   std::list<PendingResponse> pending_responses_;
-  bool connection_high_watermark_called_{false};
 };
 
 } // namespace Http1

@@ -23,6 +23,7 @@ envoy_cc_test_library(
         "router_check.cc",
     ],
     deps = [
+        "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",

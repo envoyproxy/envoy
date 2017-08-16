@@ -108,13 +108,32 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "7fbbd2a46b545bf6ab6418d43262297bf832faba",
+        commit = "86de1f257534b931232629b855a3ddbabda7bdc5",
     )
-    bind_targets = ["address", "base", "bootstrap", "cds", "eds", "health_check", "protocol", "tls_context"]
-    for t in bind_targets:
+    api_bind_targets = [
+        "address",
+        "base",
+        "bootstrap",
+        "cds",
+        "eds",
+        "health_check",
+        "lds",
+        "protocol",
+        "rds",
+        "tls_context",
+    ]
+    for t in api_bind_targets:
         native.bind(
             name = "envoy_" + t,
             actual = "@envoy_api//api:" + t + "_cc",
+        )
+    filter_bind_targets = [
+        "http_connection_manager",
+    ]
+    for t in filter_bind_targets:
+        native.bind(
+            name = "envoy_filter_" + t,
+            actual = "@envoy_api//api/filter:" + t + "_cc",
         )
     native.bind(
         name = "http_api_protos",

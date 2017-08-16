@@ -187,6 +187,16 @@ TEST(JsonLoaderTest, Basic) {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[null]}");
     EXPECT_THROW(json->getObjectArray("hello").at(0)->getDouble("foo"), Exception);
   }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{}");
+    EXPECT_THROW(json->getObjectArray("hello").empty(), Exception);
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{}");
+    EXPECT_TRUE(json->getObjectArray("hello", true).empty());
+  }
 }
 
 TEST(JsonLoaderTest, Integer) {
@@ -354,6 +364,16 @@ TEST(JsonLoaderTest, AsString) {
     }
     return true;
   });
+}
+
+TEST(JsonLoaderTest, AsJsonString) {
+  // We can't do simply equality of asJsonString(), since there is a reliance on internal ordering,
+  // e.g. of map traversal, in the output.
+  const std::string json_string = "{\"name1\": \"value1\", \"name2\": true}";
+  const ObjectSharedPtr json = Factory::loadFromString(json_string);
+  const ObjectSharedPtr json2 = Factory::loadFromString(json->asJsonString());
+  EXPECT_EQ("value1", json2->getString("name1"));
+  EXPECT_TRUE(json2->getBoolean("name2"));
 }
 
 TEST(JsonLoaderTest, ListAsString) {

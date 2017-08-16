@@ -84,6 +84,17 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
+  // Propogate network connection watermark events to each stream on the connection.
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runHighWatermarkCallbacks();
+    }
+  }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runLowWatermarkCallbacks();
+    }
+  }
 
 protected:
   /**
@@ -262,18 +273,6 @@ public:
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  // Propogate network connection watermark events to each stream on the connection.
-  // The router will propogate it downstream.
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runHighWatermarkCallbacks();
-    }
-  }
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
-    }
-  }
 
 private:
   // ConnectionImpl
