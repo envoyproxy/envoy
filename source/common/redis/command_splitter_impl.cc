@@ -21,6 +21,12 @@ RespValuePtr Utility::makeError(const std::string& error) {
   return response;
 }
 
+void SplitRequestImpl::onWrongNumberOfArguments(SplitCallbacks& callbacks,
+                                                const RespValue& request) {
+  callbacks.onResponse(Utility::makeError(
+      fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
+}
+
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
 
 void SingleServerRequest::onResponse(RespValuePtr&& response) {
@@ -59,8 +65,7 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request.asArray().size() < 4) {
-    callbacks.onResponse(Utility::makeError(fmt::format(
-        "wrong number of arguments for '{}' command", incoming_request.asArray()[0].asString())));
+    onWrongNumberOfArguments(callbacks, incoming_request);
     return nullptr;
   }
 
@@ -167,8 +172,7 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
                                     const RespValue& incoming_request, SplitCallbacks& callbacks) {
   if ((incoming_request.asArray().size() - 1) % 2 != 0) {
-    callbacks.onResponse(Utility::makeError(fmt::format(
-        "wrong number of arguments for '{}' command", incoming_request.asArray()[0].asString())));
+    onWrongNumberOfArguments(callbacks, incoming_request);
     return nullptr;
   }
 

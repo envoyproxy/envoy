@@ -137,8 +137,6 @@ struct SupportedCommands {
     static const std::string* command = new std::string("mset");
     return *command;
   }
-
-  // TODO(danielhochman): support for EVAL with argument enforcement
 };
 
 } // namespace Redis
