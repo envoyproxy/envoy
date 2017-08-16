@@ -14,10 +14,12 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/lds_json.h"
 #include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "api/lds.pb.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -44,7 +46,9 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(info, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(*listeners[i]);
+    envoy::api::v2::Listener listener;
+    Config::LdsJson::translateListener(*listeners[i], listener);
+    server.listenerManager().addOrUpdateListener(listener);
   }
 
   if (json.hasObject("lds")) {

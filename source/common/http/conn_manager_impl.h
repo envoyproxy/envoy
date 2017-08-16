@@ -78,8 +78,7 @@ namespace Http {
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
-  TIMER  (downstream_rq_time)                                                                      \
-  COUNTER(failed_generate_uuid)
+  TIMER  (downstream_rq_time)
 // clang-format on
 
 /**
