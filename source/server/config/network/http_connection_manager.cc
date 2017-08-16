@@ -29,17 +29,9 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-static constexpr char date_provider_singleton_name[] = "date_provider_singleton";
-static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singleton_name>,
-                                 Singleton::Registration>
-    date_provider_singleton_registered_;
-
-static constexpr char route_config_provider_manager_singleton_name[] =
-    "route_config_provider_manager_singleton_name";
-static Registry::RegisterFactory<
-    Singleton::RegistrationImpl<route_config_provider_manager_singleton_name>,
-    Singleton::Registration>
-    route_config_provider_manager_singleton_registered_;
+// Singleton registration via macro defined in envoy/registry/registry.h
+SINGLETON_MANAGER_REGISTRATION(date_provider);
+SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
 NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_http_connection_manager, FactoryContext& context) {
@@ -65,7 +57,8 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
       http_connection_manager, context, *date_provider, *route_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
-  // reference count.
+  // reference count. Moreover, keep in mind the capture list determines
+  // destruction order.
   return [route_config_provider_manager, http_config, &context,
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
