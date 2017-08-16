@@ -66,8 +66,8 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
-  return [http_config, &context, date_provider,
-          route_config_provider_manager](Network::FilterManager& filter_manager) -> void {
+  return [route_config_provider_manager, http_config, &context,
+          date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
