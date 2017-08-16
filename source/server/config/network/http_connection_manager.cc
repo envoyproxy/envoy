@@ -166,7 +166,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
-  server_name_ = config.server_name().empty() ? DEFAULT_SERVER_STRING : config.server_name();
+  if (!config.server_name().empty()) {
+    server_name_ = config.server_name();
+  } else {
+    server_name_ = DEFAULT_SERVER_STRING;
+  }
 
   switch (config.codec_type()) {
   case envoy::api::v2::filter::HttpConnectionManager::AUTO:

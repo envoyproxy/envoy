@@ -205,7 +205,12 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config) {
-  const std::string name = config.name().empty() ? server_.random().uuid() : config.name();
+  std::string name;
+  if (!config.name().empty()) {
+    name = config.name();
+  } else {
+    name = server_.random().uuid();
+  }
   const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 

@@ -42,7 +42,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
-  if (cluster_load_assignment.cluster_name() != cluster_name_) {
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
+  if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
