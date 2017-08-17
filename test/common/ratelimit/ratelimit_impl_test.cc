@@ -62,7 +62,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         }));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING,
-                  NullSpanInstance::get());
+                  NullSpan::instance());
 
     client_.onCreateInitialMetadata(headers);
     EXPECT_EQ(nullptr, headers.RequestId());
@@ -101,7 +101,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     client_.limit(request_callbacks_, "foo",
                   {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
-                  EMPTY_STRING, Tracing::NullSpanInstance::get());
+                  EMPTY_STRING, Tracing::NullSpan::instance());
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::Error));
@@ -115,7 +115,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   EXPECT_CALL(*async_client_, send(_, _, _, _)).WillOnce(Return(&async_request_));
 
   client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING,
-                Tracing::NullSpanInstance::get());
+                Tracing::NullSpan::instance());
 
   EXPECT_CALL(async_request_, cancel());
   client_.cancel();
@@ -156,7 +156,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete(LimitStatus::OK));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING,
-                Tracing::NullSpanInstance::get());
+                Tracing::NullSpan::instance());
   client->cancel();
 }
 

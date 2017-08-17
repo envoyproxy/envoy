@@ -51,7 +51,7 @@ Network::FilterStatus Instance::onNewConnection() {
     config_->stats().total_.inc();
     calling_limit_ = true;
     client_->limit(*this, config_->domain(), config_->descriptors(), EMPTY_STRING,
-                   Tracing::NullSpanInstance::get());
+                   Tracing::NullSpan::instance());
     calling_limit_ = false;
   }
 

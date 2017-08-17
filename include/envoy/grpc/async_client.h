@@ -156,7 +156,7 @@ public:
    */
   virtual AsyncRequest*
   send(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
-       AsyncRequestCallbacks<ResponseType>& callbacks, const Tracing::Span& parent_span,
+       AsyncRequestCallbacks<ResponseType>& callbacks, Tracing::Span& parent_span,
        AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory,
        const Optional<std::chrono::milliseconds>& timeout) PURE;
 

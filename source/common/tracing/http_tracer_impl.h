@@ -64,14 +64,17 @@ public:
 
 class NullSpan : public Span {
 public:
+  static NullSpan& instance() {
+    static NullSpan* instance = new NullSpan();
+    return *instance;
+  }
+
   // Tracing::Span
   void setTag(const std::string&, const std::string&) override {}
   void finishSpan(SpanFinalizer&) override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const std::string&, SystemTime) override { return SpanPtr{new NullSpan()}; }
 };
-
-typedef ConstSingleton<NullSpan> NullSpanInstance;
 
 class NullFinalizer : public SpanFinalizer {
 public:
