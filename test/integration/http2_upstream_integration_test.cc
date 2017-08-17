@@ -409,7 +409,11 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamResetWithManyStreams) {
                                                                    {":scheme", "http"},
                                                                    {":authority", "host"}},
                                            *responses[i]));
-           codec_client->sendData(*encoders[i], 0, true);
+           if (i % 15 == 0) {
+             codec_client->sendReset(*encoders[i]);
+           } else {
+             codec_client->sendData(*encoders[i], 0, true);
+           }
          }
        },
        [&]() -> void {
@@ -418,15 +422,20 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamResetWithManyStreams) {
            upstream_requests.push_back(fake_upstream_connection->waitForNewStream());
          }
          for (uint32_t i = 0; i < num_requests; ++i) {
-           upstream_requests[i]->waitForEndStream(*dispatcher_);
-           upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-           upstream_requests[i]->encodeData(100, false);
+           if (i % 15 != 0) {
+             upstream_requests[i]->waitForEndStream(*dispatcher_);
+             upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}},
+                                                 false);
+             upstream_requests[i]->encodeData(100, false);
+           }
          }
          fake_upstream_connection->close();
        },
        [&]() -> void {
          for (uint32_t i = 0; i < num_requests; ++i) {
-           responses[i]->waitForReset();
+           if (i % 15 != 0) {
+             responses[i]->waitForReset();
+           }
          }
        },
 
