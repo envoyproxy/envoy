@@ -92,6 +92,14 @@ public:
   static void translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds);
 
   /**
+   * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::ConfigSource.
+   * @param json_lds source v1 LDS JSON config.
+   * @param lds_config destination v2 LDS envoy::api::v2::ConfigSource.
+   */
+  static void translateLdsConfig(const Json::Object& json_lds,
+                                 envoy::api::v2::ConfigSource& lds_config);
+
+  /**
    * Generate a SubscriptionStats object from stats scope.
    * @param scope for stats.
    * @return SubscriptionStats for scope.

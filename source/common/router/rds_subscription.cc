@@ -25,8 +25,8 @@ RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_name().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());
-  Envoy::Config::Utility::checkClusterAndLocalInfo(
-      "rds", rds.config_source().api_config_source().cluster_name()[0], cm, local_info);
+  Envoy::Config::Utility::checkClusterAndLocalInfo("rds", api_config_source.cluster_name()[0], cm,
+                                                   local_info);
 }
 
 void RdsSubscription::createRequest(Http::Message& request) {
