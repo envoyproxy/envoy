@@ -87,9 +87,7 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
-  void setDecoderBufferLimit(BufferLimitSettings& settings) override {
-    limiting_buffers_ = settings.buffer_limit_ > 0;
-  }
+  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
   // RateLimit::RequestCallbacks
   void complete(Envoy::RateLimit::LimitStatus status) override;
@@ -109,7 +107,6 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  bool limiting_buffers_{false};
   bool high_watermark_called_{false};
 };
 

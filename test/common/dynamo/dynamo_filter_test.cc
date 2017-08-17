@@ -83,17 +83,18 @@ TEST_F(DynamoFilterTest, jsonBodyNotWellFormed) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-setup(true);
+TEST_F(DynamoFilterTest, bothOperationAndTableIncorrect) {
+  setup(true);
 
-Http::TestHeaderMapImpl request_headers{{"x-amz-target", "version"}, {"random", "random"}};
-EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  Http::TestHeaderMapImpl request_headers{{"x-amz-target", "version"}, {"random", "random"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-EXPECT_CALL(stats_, counter("prefix.dynamodb.operation_missing"));
-EXPECT_CALL(stats_, counter("prefix.dynamodb.table_missing"));
+  EXPECT_CALL(stats_, counter("prefix.dynamodb.operation_missing"));
+  EXPECT_CALL(stats_, counter("prefix.dynamodb.table_missing"));
 
-Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-} // namespace Dynamo
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+}
 
 TEST_F(DynamoFilterTest, handleErrorTypeTableMissing) {
   setup(true);
@@ -627,5 +628,5 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
-} // namespace Envoy
+} // namespace Dynamo
 } // namespace Envoy

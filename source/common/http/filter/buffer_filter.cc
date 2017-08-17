@@ -45,6 +45,7 @@ FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
     config_->stats_.rq_too_large_.inc();
   }
 
+  // Buffer until the complete request has been processed.
   return FilterDataStatus::StopIterationAndBuffer;
 }
 

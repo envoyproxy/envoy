@@ -155,7 +155,7 @@ public:
   /*
    * Return the number of bytes this stream is allowed to buffer, or 0 if there is no limit
    * configured.
-   * @return the stream's configured buffer limits.
+   * @return uint32_t the stream's configured buffer limits.
    */
   virtual uint32_t bufferLimit() PURE;
 };

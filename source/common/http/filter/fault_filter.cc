@@ -212,7 +212,8 @@ FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
   if (delay_timer_ == nullptr) {
     return FilterDataStatus::Continue;
   }
-  return FilterDataStatus::StopIterationAndBuffer;
+  // If the request is too large, stop reading new data until the buffer drains.
+  return FilterDataStatus::StopIterationAndWatermark;
 }
 
 FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {

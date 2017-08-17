@@ -125,8 +125,9 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
-  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    buffer_limit_ = settings.buffer_limit_;
+  uint32_t setDecoderBufferLimit(uint32_t limit) override {
+    buffer_limit_ = limit;
+    return limit;
   }
 
   // Upstream::LoadBalancerContext

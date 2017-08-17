@@ -308,7 +308,8 @@ private:
 
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
     void commonHandleBufferData(Buffer::Instance& provided_data);
-    bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data);
+    bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
+                                       bool& buffer_was_streaming);
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
     void commonContinue();
@@ -558,8 +559,8 @@ private:
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
-    bool encoder_filters_all_streaming_{true};
-    bool decoder_filters_all_streaming_{true};
+    bool encoder_filters_streaming_{true};
+    bool decoder_filters_streaming_{true};
     bool destroyed_{false};
   };
 

@@ -87,13 +87,8 @@ FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   if (state_ != State::Calling) {
     return FilterDataStatus::Continue;
   }
-  // The fault filter minimizes buffering even more aggressively than configured, to avoid
-  // accumulating data for rate limited requests.
-  if (limiting_buffers_ && !high_watermark_called_) {
-    high_watermark_called_ = true;
-    callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
-  }
-  return FilterDataStatus::StopIterationAndBuffer;
+  // If the request is too large, stop reading new data until the buffer drains.
+  return FilterDataStatus::StopIterationAndWatermark;
 }
 
 FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {

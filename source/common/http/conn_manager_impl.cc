@@ -374,14 +374,9 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
 
-  BufferLimitSettings settings{buffer_limit_, Http::FilterType::STREAMING};
-  filter->setDecoderBufferLimit(settings);
-  // FIXME corner cases with 0 here and below.
-  if (settings.buffer_limit_ > buffer_limit_) {
-    buffer_limit_ = settings.buffer_limit_;
-  }
-  if (settings.filter_type_ == Http::FilterType::BUFFERING) {
-    decoder_filters_all_streaming_ = false;
+  uint32_t filter_limit = filter->setDecoderBufferLimit(buffer_limit_);
+  if (filter_limit == 0 || (filter_limit != 0 && filter_limit > buffer_limit_)) {
+    buffer_limit_ = filter_limit;
   }
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
@@ -390,13 +385,9 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  BufferLimitSettings settings{buffer_limit_, Http::FilterType::STREAMING};
-  filter->setEncoderBufferLimit(settings);
-  if (settings.buffer_limit_ > buffer_limit_) {
-    buffer_limit_ = settings.buffer_limit_;
-  }
-  if (settings.filter_type_ == Http::FilterType::BUFFERING) {
-    encoder_filters_all_streaming_ = false;
+  uint32_t filter_limit = filter->setEncoderBufferLimit(buffer_limit_);
+  if (filter_limit == 0 || (filter_limit != 0 && filter_limit > buffer_limit_)) {
+    buffer_limit_ = filter_limit;
   }
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
@@ -642,7 +633,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, decoder_filters_streaming_)) {
       return;
     }
   }
@@ -847,7 +838,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, encoder_filters_streaming_)) {
       return;
     }
   }
@@ -1000,7 +991,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallback(
-    FilterDataStatus status, Buffer::Instance& provided_data) {
+    FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming) {
 
   if (status == FilterDataStatus::Continue) {
     if (stopped_) {
@@ -1012,7 +1003,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     }
   } else {
     stopped_ = true;
-    if (status == FilterDataStatus::StopIterationAndBuffer) {
+    if (status == FilterDataStatus::StopIterationAndBuffer ||
+        status == FilterDataStatus::StopIterationAndWatermark) {
+      buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
     }
 
@@ -1104,27 +1097,18 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
-  if (parent_.encoder_filters_all_streaming_) {
+  if (parent_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
-    HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::PayloadTooLarge))}}};
-    std::string body_text = CodeUtility::toString(Http::Code::PayloadTooLarge);
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
-
-    encodeHeaders(std::move(response_headers), false);
-    if (!parent_.destroyed_) {
-      Buffer::OwnedImpl buffer(body_text);
-      encodeData(buffer, true);
-    }
+    Http::Utility::sendLocalReply(*this, parent_.destroyed_, Http::Code::PayloadTooLarge,
+                                  CodeUtility::toString(Http::Code::PayloadTooLarge));
   }
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
-  if (parent_.encoder_filters_all_streaming_) {
-    onDecoderFilterBelowWriteBufferLowWatermark();
-  }
+  // If this is called it means the call to requestDataTooLarge() was a
+  // streaming call, or a 413 would have been sent.
+  onDecoderFilterBelowWriteBufferLowWatermark();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
@@ -1171,10 +1155,9 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
-  if (parent_.encoder_filters_all_streaming_) {
+  if (parent_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
-    // FIXME 500
     HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::InternalServerError))}}};
     std::string body_text = CodeUtility::toString(Http::Code::InternalServerError);
@@ -1190,9 +1173,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   }
 }
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataDrained() {
-  if (parent_.encoder_filters_all_streaming_) {
-    onEncoderFilterBelowWriteBufferLowWatermark();
-  }
+  onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {

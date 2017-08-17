@@ -29,9 +29,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
-  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::BUFFERING;
-  }
+  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -40,9 +38,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
-  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::BUFFERING;
-  }
+  uint32_t setEncoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   void chargeStat(const Http::HeaderMap& headers);

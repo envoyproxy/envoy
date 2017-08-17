@@ -88,18 +88,14 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::STREAMING;
-  }
+  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
-  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::BUFFERING;
-  }
+  uint32_t setEncoderBufferLimit(uint32_t limit) override { return limit; }
 
   // Http::StreamFilterBase
   void onDestroy() override { stream_reset_ = true; }

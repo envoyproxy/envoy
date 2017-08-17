@@ -1258,39 +1258,39 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  router_.setBufferLimit(BufferLimitSettings:10, FilterType::STREAMING});
-// Send the headers sans-fin, and don't flag the pool as ready.
-sendRequest(false, false);
+  router_.setDecoderBufferLimit(10);
+  // Send the headers sans-fin, and don't flag the pool as ready.
+  sendRequest(false, false);
 
-// Send 10 bytes of body to fill the 10 byte buffer.
-Buffer::OwnedImpl data("1234567890");
-router_.decodeData(data, false);
-EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                  .counter("upstream_flow_control_backed_up_total")
-                  .value());
+  // Send 10 bytes of body to fill the 10 byte buffer.
+  Buffer::OwnedImpl data("1234567890");
+  router_.decodeData(data, false);
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
 
-// Send one extra byte.  This should cause the buffer to go over the limit and pause downstream
-// data.
-Buffer::OwnedImpl last_byte("!");
-router_.decodeData(last_byte, true);
-EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                  .counter("upstream_flow_control_backed_up_total")
-                  .value());
+  // Send one extra byte.  This should cause the buffer to go over the limit and pause downstream
+  // data.
+  Buffer::OwnedImpl last_byte("!");
+  router_.decodeData(last_byte, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
 
-// Now set up the downstream connection.  The encoder will be given the buffered request body,
-// The mock invocation below drains it, and the buffer will go under the watermark limit again.
-EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                  .counter("upstream_flow_control_drained_total")
-                  .value());
-EXPECT_CALL(encoder_, encodeData(_, true))
-    .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
-pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_);
-EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                  .counter("upstream_flow_control_drained_total")
-                  .value());
+  // Now set up the downstream connection.  The encoder will be given the buffered request body,
+  // The mock invocation below drains it, and the buffer will go under the watermark limit again.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
+  EXPECT_CALL(encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
+  pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
 
-sendResponse();
+  sendResponse();
 } // namespace Router
 
-} // namespace Envoy
+} // namespace Router
 } // namespace Envoy

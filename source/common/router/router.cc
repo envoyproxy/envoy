@@ -26,6 +26,9 @@
 
 namespace Envoy {
 namespace Router {
+namespace {
+uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
+} // namespace
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
                                       const Upstream::ClusterInfo& cluster) {
@@ -278,9 +281,20 @@ void Filter::sendNoHealthyUpstreamResponse() {
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
 
+  // TODO(alyssawilk) Test.  A lot.
+  if (buffering && buffer_limit_ > 0 &&
+      getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
+    // The request is larger than we should buffer.  Give up on the retry/shadow
+    retry_state_.reset();
+    buffering = false;
+    do_shadowing_ = false;
+    // TODO(alyssawilk) can we drain the decodingBuffer?  Currently it's const.  We could
+    // continue() and delete but that's hacky and scary.
+    // callbacks_->decodingBuffer()->drain(callbacks_->decodingBuffer()->length());
+  }
+
   // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
   // since it's all moves from here on.
-  // FIXME(alyssawilk) figure out how to limit this.
   if (buffering) {
     Buffer::OwnedImpl copy(data);
     upstream_request_->encodeData(copy, end_stream);
@@ -293,6 +307,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   // If we are potentially going to retry or shadow this request we need to buffer.
+  // This will not cause the connection manager to 413 because before we hit the
+  // buffer limit we give up on retries and buffering.
   return buffering ? Http::FilterDataStatus::StopIterationAndBuffer
                    : Http::FilterDataStatus::StopIterationNoBuffer;
 }

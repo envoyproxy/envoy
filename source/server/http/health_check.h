@@ -73,9 +73,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
-  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::STREAMING;
-  }
+  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -86,9 +84,7 @@ public:
     return Http::FilterTrailersStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
-  void setEncoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::STREAMING;
-  }
+  uint32_t setEncoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   void onComplete();

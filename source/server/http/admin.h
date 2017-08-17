@@ -159,9 +159,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
-  void setDecoderBufferLimit(Http::BufferLimitSettings& settings) override {
-    settings.filter_type_ = Http::FilterType::STREAMING;
-  }
+  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   /**

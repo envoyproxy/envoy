@@ -42,7 +42,24 @@ enum class FilterDataStatus {
   // Do not iterate to any of the remaining filters in the chain, and buffer body data for later
   // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // This should be called by buffers which must parse a larger block of the incoming data before
+  // contuing processing and so can not push back on streaming data via watermarks.
+  //
+  // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
+  // be sent to the user.  On the response path exceeding buffer limits will result in a 500.
   StopIterationAndBuffer,
+  // Do not iterate to any of the remaining filters in the chain, and buffer body data for later
+  // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // This will cause the flow of incoming data to cease until one of the continue.*() functions is
+  // called.
+  //
+  // This should be returned by filters which can nominally stream data but have a transient back-up
+  // such as the configured delay of the fault filter, or if the router filter is still fetching an
+  // upstream connection.
+  StopIterationAndWatermark,
   // Do not iterate to any of the remaining filters in the chain, but do not buffer any of the
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
@@ -236,14 +253,6 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
-// FIXME alyssar doxygen.
-enum class FilterType { STREAMING, BUFFERING };
-
-struct BufferLimitSettings {
-  uint32_t buffer_limit_;
-  FilterType filter_type_;
-};
-
 /**
  * Common base class for both decoder and encoder filters.
  */
@@ -273,16 +282,10 @@ public:
    * filter.  Filters should abide by these limits unless custom configuration
    * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
    *
-   * If filters buffer enough bytes to hit the high watermark, it should either
-   * call on[Encoder|Decoder]FilterAboveWriteBufferHighWatermark to halt the
-   * flow of data or send an error response such as 413 (Payload Too Large).
-   *
-   * If the filter will return StopIterationAndBuffer it may override the buffer
-   * limit in settings, or the filter type.
-   *
    * @param settings supplies the default buffer limit and filter type for this filter.
+   * @return the buffer limit the filter will apply.
    */
-  virtual void setDecoderBufferLimit(BufferLimitSettings& settings) PURE;
+  virtual uint32_t setDecoderBufferLimit(uint32_t limit) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -407,9 +410,10 @@ public:
    * filter.  Filters should abide by these limits unless custom configuration
    * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
    *
-   * FIXME(alyssar) comment.
+   * @param settings supplies the default buffer limit and filter type for this filter.
+   * @return the buffer limit the filter will apply.
    */
-  virtual void setEncoderBufferLimit(BufferLimitSettings& settings) PURE;
+  virtual uint32_t setEncoderBufferLimit(uint32_t limit) PURE;
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
