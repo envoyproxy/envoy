@@ -323,8 +323,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   HeaderMapImpl headers;
 
   // Start with a string value.
-  LowerCaseString* lcKeyPtr(new LowerCaseString("hello"));
-
+  std::unique_ptr<LowerCaseString> lcKeyPtr(new LowerCaseString("hello"));
   headers.addCopy(*lcKeyPtr, "world");
 
   const HeaderString& value = headers.get(*lcKeyPtr)->value();
@@ -332,7 +331,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_STREQ("world", value.c_str());
   EXPECT_EQ(5UL, value.size());
 
-  delete lcKeyPtr;
+  lcKeyPtr.reset(nullptr);
 
   const HeaderString& value2 = headers.get(LowerCaseString("hello"))->value();
 
@@ -347,7 +346,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   // given header, so we need to delete the old "hello" header.
   headers.remove(LowerCaseString("hello"));
 
-  lcKeyPtr = new LowerCaseString("hello");
+  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo")); // Try to force the compiler's hand here.
 
   headers.addCopy(*lcKeyPtr, 42);
 
@@ -356,7 +355,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_STREQ("42", value3.c_str());
   EXPECT_EQ(2UL, value3.size());
 
-  delete lcKeyPtr;
+  lcKeyPtr.reset(nullptr);
 
   const HeaderString& value4 = headers.get(LowerCaseString("hello"))->value();
 

@@ -53,15 +53,10 @@ public:
    */
   bool operator==(const HeaderMapImpl& rhs) const;
 
-  // Http::HeaderMap
-  // Add without copying either key or value.
+  // Http::HeaderMap -- read comments there about what's copied and what's not!
   void addReference(const LowerCaseString& key, const std::string& value) override;
-
-  // Add without copying the key, but copying the value.
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override;
   void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
-
-  // Add copying both key and value.
   void addCopy(const LowerCaseString& key, uint64_t value) override;
   void addCopy(const LowerCaseString& key, const std::string& value) override;
 
