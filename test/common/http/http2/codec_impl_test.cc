@@ -469,6 +469,8 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset))
       .WillOnce(Invoke([&](StreamResetReason) -> void {
         // Test the case where the reset callbacks cause the socket to fill up,
@@ -477,11 +479,57 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
         // above)
         client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
         client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+        server_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+        server_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 
   // Regression test that the window is consumed even if the stream is destroyed early.
   EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
+}
+
+TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // The 'true' on encodeData will set local_end_stream_ on the client but not
+  // the server.  Verify that client watermark callbacks will not be called, but
+  // server callbacks may be called by simulating connection overflow on both
+  // ends.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    server_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    server_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  }));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, true);
+
+  // The 'true' on encodeData will set local_end_stream_ on the server.  Verify
+  // that neither client nor server watermark callbacks will be called again.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), true))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+        client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+        server_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+        server_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+      }));
+  response_encoder_->encodeHeaders(response_headers, true);
 }
 
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
