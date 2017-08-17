@@ -129,7 +129,7 @@ TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
   initialize();
 
   TestHeaderMapImpl request_headers;
-  request_headers.addViaCopy("expect", "100-continue");
+  request_headers.addCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
   TestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
@@ -152,7 +152,7 @@ TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
   initialize();
 
   TestHeaderMapImpl request_headers;
-  request_headers.addViaCopy("expect", "100-continue");
+  request_headers.addCopy("expect", "100-continue");
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
 
