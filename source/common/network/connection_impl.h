@@ -40,7 +40,7 @@ public:
    * Creates a network socket, optionally bound to a specific address
    * @param peer_address supplies the address of the peer.
    * @param source_address supplies an optional local address to bind to.
-   * @return the file descriptor or -1 on error.
+   * @return int the file descriptor or -1 on error.
    */
   static int createSocket(Address::InstanceConstSharedPtr peer_address,
                           Address::InstanceConstSharedPtr source_address);

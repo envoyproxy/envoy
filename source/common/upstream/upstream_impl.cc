@@ -58,11 +58,10 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(
-    const envoy::api::v2::Cluster& config,
-    const Network::Address::InstanceConstSharedPtr source_address,
-    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-    bool added_via_api)
+ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -186,11 +185,10 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-ClusterImplBase::ClusterImplBase(
-    const envoy::api::v2::Cluster& cluster,
-    const Network::Address::InstanceConstSharedPtr source_address,
-    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-    bool added_via_api)
+ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
                                                    ssl_context_manager, added_via_api)) {}
 

@@ -34,14 +34,14 @@ Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& add
 }
 } // namespace
 
-int ConnectionImplUtility::createSocket(
-    Address::InstanceConstSharedPtr address,
-    const Address::InstanceConstSharedPtr source_address) {
+int ConnectionImplUtility::createSocket(Address::InstanceConstSharedPtr address,
+                                        const Address::InstanceConstSharedPtr source_address) {
   const int fd = address->socket(Address::SocketType::Stream);
   if (fd >= 0 && source_address != nullptr) {
     int rc = source_address->bind(fd);
-    // TODO(alyssawilk) make this a non-fatal connect failure in a follow-up comimit on this PR
+    // TODO(alyssawilk) make this a non-fatal connect failure.
     ASSERT(rc >= 0);
+    UNREFERENCED_PARAMETER(rc);
   }
   return fd;
 }

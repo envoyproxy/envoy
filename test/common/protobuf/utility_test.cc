@@ -23,4 +23,19 @@ TEST(UtilityTest, LoadProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
+TEST(UtilityTest, LoadHumanReadableProtoFromFile) {
+  envoy::api::v2::Bootstrap bootstrap;
+  bootstrap.mutable_upstream_bind_config()
+      ->mutable_source_address()
+      ->mutable_socket_address()
+      ->set_ip_address("1.1.1.1");
+
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.DebugString());
+
+  envoy::api::v2::Bootstrap proto_from_file;
+  MessageUtil::loadFromFile(filename, proto_from_file);
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
 } // namespace Envoy

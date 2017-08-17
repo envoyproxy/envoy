@@ -1,6 +1,7 @@
 #include "common/protobuf/utility.h"
 
 #include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
 
@@ -15,8 +16,14 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   const std::string file_contents = Filesystem::fileReadToEnd(path);
   // If the filename ends with .pb, do a best-effort attempt to parse it as a proto.
   if (path.size() > 3 && path.substr(path.size() - 3) == ".pb") {
+    // Attempt to parse the binary format.
     bool status = message.ParseFromString(file_contents);
     if (status) {
+      return;
+    }
+    // Try parsing the humam-readable version.
+    Protobuf::TextFormat::Parser parser;
+    if (parser.ParseFromString(file_contents, &message)) {
       return;
     }
     // If parsing fails, fall through and attempt to parse the file as json.

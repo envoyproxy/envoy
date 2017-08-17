@@ -11,9 +11,10 @@ ValidationDispatcher::createClientConnection(Network::Address::InstanceConstShar
   NOT_IMPLEMENTED;
 }
 
-Network::ClientConnectionPtr ValidationDispatcher::createSslClientConnection(
-    Ssl::ClientContext&, Network::Address::InstanceConstSharedPtr,
-    Network::Address::InstanceConstSharedPtr) {
+Network::ClientConnectionPtr
+ValidationDispatcher::createSslClientConnection(Ssl::ClientContext&,
+                                                Network::Address::InstanceConstSharedPtr,
+                                                Network::Address::InstanceConstSharedPtr) {
   NOT_IMPLEMENTED;
 }
 
