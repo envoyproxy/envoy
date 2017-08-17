@@ -155,6 +155,8 @@ struct ApiFilesystemConfig {
   std::string bootstrap_path_;
   std::string cds_path_;
   std::string eds_path_;
+  std::string lds_path_;
+  std::string rds_path_;
 };
 
 /**
