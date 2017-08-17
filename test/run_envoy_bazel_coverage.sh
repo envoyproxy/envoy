@@ -70,7 +70,7 @@ time "${GCOVR}" --gcov-exclude="${GCOVR_EXCLUDE_REGEX}" \
 # Clean up the generated test/coverage/BUILD file: subsequent bazel invocations
 # can choke on it if it references things that changed since the last coverage
 # run.
-rm ${SRCDIR}/test/coverage/BUILD
+rm "${SRCDIR}"/test/coverage/BUILD
 
 COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
 COVERAGE_THRESHOLD=98.0
