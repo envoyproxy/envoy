@@ -108,7 +108,7 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "32b1173cce4d49e9f26026f503d39a1192b98428",
+        commit = "d1608a1dcbef1a8acfdb1655f28772687ac6763e",
     )
     api_bind_targets = [
         "address",

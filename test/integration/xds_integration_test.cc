@@ -20,6 +20,8 @@ public:
                             .bootstrap_path_ = "test/config/integration/server_xds.bootstrap.json",
                             .cds_path_ = "test/config/integration/server_xds.cds.json",
                             .eds_path_ = "test/config/integration/server_xds.eds.json",
+                            .lds_path_ = "test/config/integration/server_xds.lds.json",
+                            .rds_path_ = "test/config/integration/server_xds.rds.json",
                         },
                         {"http"});
   }
