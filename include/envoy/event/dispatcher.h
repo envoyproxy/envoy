@@ -53,7 +53,7 @@ public:
    * Create an SSL client connection.
    * @param ssl_ctx supplies the SSL context to use.
    * @param address supplies the address to connect to.
-   * @source_address supplies an optional address to bind to.
+   * @param source_address supplies an optional address to bind to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr
