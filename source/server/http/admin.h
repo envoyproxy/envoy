@@ -140,7 +140,7 @@ private:
   Optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-}; // namespace Server
+};
 
 /**
  * A terminal HTTP filter that implements server admin functionality.
