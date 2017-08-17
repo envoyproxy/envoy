@@ -331,7 +331,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_STREQ("world", value.c_str());
   EXPECT_EQ(5UL, value.size());
 
-  lcKeyPtr.reset(nullptr);
+  lcKeyPtr.reset();
 
   const HeaderString& value2 = headers.get(LowerCaseString("hello"))->value();
 
@@ -355,7 +355,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_STREQ("42", value3.c_str());
   EXPECT_EQ(2UL, value3.size());
 
-  lcKeyPtr.reset(nullptr);
+  lcKeyPtr.reset();
 
   const HeaderString& value4 = headers.get(LowerCaseString("hello"))->value();
 
