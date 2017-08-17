@@ -429,7 +429,7 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable) {
-  auto it = std::find_if(handlers_.begin(), handlers_.end(),
+  auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
                          [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {
     handlers_.push_back({prefix, help_text, callback, removable});
