@@ -75,7 +75,7 @@ public:
 
   // Server::Admin
   MOCK_METHOD4(addHandler, bool(const std::string& prefix, const std::string& help_text,
-                                HandlerCb callback, const bool removable));
+                                HandlerCb callback, bool removable));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::ListenSocket&());
 };

@@ -39,7 +39,7 @@ public:
 
   // Server::Admin
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  const bool removable) override;
+                  bool removable) override;
   bool removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory

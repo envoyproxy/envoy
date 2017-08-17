@@ -428,9 +428,9 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, const bool removable) {
+                           HandlerCb callback, bool removable) {
   auto it = std::find_if(handlers_.begin(), handlers_.end(),
-                         [prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
+                         [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {
     handlers_.push_back({prefix, help_text, callback, removable});
     return true;
@@ -439,11 +439,10 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
-  auto it = std::find_if(handlers_.begin(), handlers_.end(), [prefix](const UrlHandler& entry) {
-    return prefix == entry.prefix_ && entry.removable_;
-  });
-  if (it != handlers_.end()) {
-    handlers_.erase(it);
+  uint size_before_removal = handlers_.size();
+  handlers_.remove_if(
+      [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_ && entry.removable_; });
+  if (handlers_.size() == --size_before_removal) {
     return true;
   }
   return false;

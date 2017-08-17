@@ -35,7 +35,7 @@ public:
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback, const bool removable) PURE;
+                          HandlerCb callback, bool removable) PURE;
 
   /**
    * Remove an admin handler if it is removable.
