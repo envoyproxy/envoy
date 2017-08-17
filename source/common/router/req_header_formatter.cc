@@ -62,7 +62,6 @@ RequestHeaderParserPtr RequestHeaderParser::parse(
 void RequestHeaderParser::evaluateRequestHeaders(
     Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
     const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const {
-
   for (const auto& to_add : requestHeadersToAdd) {
     ENVOY_LOG(debug, "request headers key {}", to_add.first.get());
     auto search = header_formatter_map_.find(to_add.first);

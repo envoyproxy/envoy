@@ -234,7 +234,7 @@ protected:
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
-  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  RequestHeaderParser& requestHeaderParser() { return *request_headers_parser_; };
 
 private:
   struct RuntimeData {

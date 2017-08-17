@@ -27,6 +27,11 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
   return route;
 }
 
+bool CheckFormatMessage(const std::string errorMessage, const std::string expectedMessage) {
+  std::size_t found = errorMessage.find(expectedMessage);
+  return (found != std::string::npos);
+}
+
 TEST(RequestHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::string s1 = "127.0.0.1";
@@ -52,6 +57,32 @@ TEST(RequestHeaderFormatterTest, WrongVariableToFormat) {
   ON_CALL(requestInfo, getDownstreamAddress()).WillByDefault(ReturnRef(s1));
   std::string variable = "INVALID_VARIABLE";
   ASSERT_THROW(RequestHeaderFormatter requestHeaderFormatter(variable), EnvoyException);
+  try {
+    RequestHeaderFormatter requestHeaderFormatter(variable);
+  } catch (EnvoyException& ex) {
+    EXPECT_PRED2(CheckFormatMessage, ex.what(), "not supported");
+  }
+}
+
+TEST(RequestHeaderFormatterTest, WrongFormatOnVariable) {
+  std::string json = R"EOF({
+          "prefix": "/new_endpoint",
+          "prefix_rewrite": "/api/new_endpoint",
+          "cluster": "www2",
+          "request_headers_to_add": [
+            {
+              "key": "x-client-ip",
+              "value": "%CLIENT_IP"
+            }
+          ]
+        })EOF";
+  ASSERT_THROW(Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json)),
+               EnvoyException);
+  try {
+    Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
+  } catch (EnvoyException& ex) {
+    EXPECT_PRED2(CheckFormatMessage, ex.what(), "Incorrect configuration");
+  }
 }
 
 TEST(RequestHeaderParserTest, EvaluateHeaders) {
