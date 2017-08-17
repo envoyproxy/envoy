@@ -15,9 +15,9 @@ Envoy has the following requirements:
 * `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.23.1)
 * `libevent <http://libevent.org/>`_ (last tested with 2.1.8)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
-* `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.5.0)
+* `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.6.1)
 * `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ (last tested with sha 68f84f5c40644e029ed066999448696b01caba7a).
-* `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.3.0)
+* `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.4.0)
 * `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.36)
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.13.0)
