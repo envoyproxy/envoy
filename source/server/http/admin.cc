@@ -439,10 +439,10 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
-  uint size_before_removal = handlers_.size();
+  const uint size_before_removal = handlers_.size();
   handlers_.remove_if(
       [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_ && entry.removable_; });
-  if (handlers_.size() == --size_before_removal) {
+  if (handlers_.size() != size_before_removal) {
     return true;
   }
   return false;
