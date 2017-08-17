@@ -342,11 +342,14 @@ TEST(HeaderMapImplTest, AddCopy) {
 
   // Repeat with an int value.
   //
-  // @kflynn: addReferenceKey and addCopy can both add multiple instances of a
+  // addReferenceKey and addCopy can both add multiple instances of a
   // given header, so we need to delete the old "hello" header.
   headers.remove(LowerCaseString("hello"));
 
-  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo")); // Try to force the compiler's hand here.
+  // Build "hello" with string concatenation to make it unlikely that the
+  // compiler is just reusing the same string constant for everything.
+  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo"));
+  EXPECT_STREQ("hello", lcKeyPtr->get().c_str());
 
   headers.addCopy(*lcKeyPtr, 42);
 
@@ -363,8 +366,8 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_EQ(2UL, value4.size());
   EXPECT_EQ(1UL, headers.size());
 
-  // We can make yet another different key to look up here.
-  LowerCaseString lcKey3(std::string("he") + "ll" + "o"); // Try to force the compiler's hand here.
+  // Here, again, we'll build yet another key string.
+  LowerCaseString lcKey3(std::string("he") + "ll" + "o");
   EXPECT_STREQ("hello", lcKey3.get().c_str());
 
   EXPECT_STREQ("42", headers.get(lcKey3)->value().c_str());
