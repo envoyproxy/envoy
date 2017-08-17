@@ -142,6 +142,14 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathWithPort) {
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com:4532"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer(
+      "GET http://www.somewhere.com:4532/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
 TEST_F(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
   TestHeaderMapImpl expected_headers{
       {":authority", "bah"}, {":path", "/foo/bar"}, {":method", "GET"}};
