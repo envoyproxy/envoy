@@ -388,7 +388,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
   manySimultaneousRequests(lookupPort("http_with_buffer_limits"), 1024 * 20, 1024 * 20);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, UpstreamResetWithManyStreams) {
+TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   uint32_t port = lookupPort("http_with_buffer_limits");
   TestRandomGenerator rand;
   const uint32_t num_requests = rand.random() % 50 + 1;
@@ -409,6 +409,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamResetWithManyStreams) {
                                                                    {":scheme", "http"},
                                                                    {":authority", "host"}},
                                            *responses[i]));
+           // Reset a few streams to test how reset and watermark interact.
            if (i % 15 == 0) {
              codec_client->sendReset(*encoders[i]);
            } else {
@@ -429,9 +430,11 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamResetWithManyStreams) {
              upstream_requests[i]->encodeData(100, false);
            }
          }
+         // Close the connection.
          fake_upstream_connection->close();
        },
        [&]() -> void {
+         // Ensure the streams are all reset successfully.
          for (uint32_t i = 0; i < num_requests; ++i) {
            if (i % 15 != 0) {
              responses[i]->waitForReset();

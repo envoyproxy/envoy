@@ -498,7 +498,7 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
 
-  // The 'true' on decodeData will set local_end_stream_ on the client but not
+  // The 'true' on encodeData will set local_end_stream_ on the client but not
   // the server.  Verify that client watermark callbacks will not be called, but
   // server callbacks may be called by simulating connection overflow on both
   // ends.
