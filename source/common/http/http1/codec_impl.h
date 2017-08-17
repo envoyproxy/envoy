@@ -144,6 +144,8 @@ public:
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
 
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
@@ -297,8 +299,6 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {}
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {}
 
 private:
   struct PendingResponse {

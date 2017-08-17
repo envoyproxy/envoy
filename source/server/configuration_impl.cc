@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
+#include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -52,9 +53,11 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
   }
 
   if (json.hasObject("lds")) {
-    lds_api_.reset(new LdsApi(*json.getObject("lds"), *cluster_manager_, server.dispatcher(),
-                              server.random(), server.initManager(), server.localInfo(),
-                              server.stats(), server.listenerManager()));
+    envoy::api::v2::ConfigSource lds_config;
+    Config::Utility::translateLdsConfig(*json.getObject("lds"), lds_config);
+    lds_api_.reset(new LdsApi(lds_config, *cluster_manager_, server.dispatcher(), server.random(),
+                              server.initManager(), server.localInfo(), server.stats(),
+                              server.listenerManager()));
   }
 
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {

@@ -397,9 +397,31 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   request_encoder_->encodeData(last_byte, false);
   EXPECT_EQ(initial_stream_window + 1, client_.getStream(1)->pending_send_data_.length());
 
+  // Now create a second stream on the connection.
+  MockStreamDecoder response_decoder2;
+  StreamEncoder* request_encoder2 = &client_.newStream(response_decoder_);
+  StreamEncoder* response_encoder2;
+  MockStreamCallbacks server_stream_callbacks2;
+  MockStreamDecoder request_decoder2;
+  EXPECT_CALL(server_callbacks_, newStream(_))
+      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        response_encoder2 = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks2);
+        return request_decoder2;
+      }));
+  request_encoder2->encodeHeaders(request_headers, false);
+
+  // Add the stream callbacks belatedly.  On creation the stream should have
+  // been noticed that the connection was backed up.  Any new subscriber to
+  // stream callbacks should get a callback when they addCallbacks.
+  MockStreamCallbacks callbacks2;
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark()).Times(1);
+  request_encoder_->getStream().addCallbacks(callbacks2);
+
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
   server_.getStream(1)->readDisable(false);
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
@@ -449,7 +471,17 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_GT(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
 
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset))
+      .WillOnce(Invoke([&](StreamResetReason) -> void {
+        // Test the case where the reset callbacks cause the socket to fill up,
+        // causing the underlying connection to back up.  Given the stream is
+        // being destroyed the watermark callbacks should not fire (mocks for Times(0)
+        // above)
+        client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
+        client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+      }));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 
   // Regression test that the window is consumed even if the stream is destroyed early.

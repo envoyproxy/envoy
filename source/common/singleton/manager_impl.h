@@ -19,7 +19,7 @@ public:
   ManagerImpl() : run_tid_(Thread::Thread::currentThreadId()) {}
 
   // Singleton::Manager
-  InstancePtr get(const std::string& name, SingletonFactoryCb cb) override;
+  InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
 
 private:
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;

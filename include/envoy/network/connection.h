@@ -189,6 +189,11 @@ public:
    * rather than the listener's address.
    */
   virtual bool usingOriginalDst() const PURE;
+
+  /**
+   * @return boolean telling if the connection is currently above the high watermark.
+   */
+  virtual bool aboveHighWatermark() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

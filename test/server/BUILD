@@ -89,6 +89,7 @@ envoy_cc_test(
     name = "lds_api_test",
     srcs = ["lds_api_test.cc"],
     deps = [
+        "//source/common/config:utility_lib",
         "//source/server:lds_api_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",

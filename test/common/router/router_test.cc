@@ -34,7 +34,6 @@ namespace Router {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::ClusterInfo&,
                                  Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
@@ -250,6 +249,8 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
         return nullptr;
       }));
 
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
@@ -1236,16 +1237,19 @@ TEST_F(WatermarkTest, DownstreamWatermarks) {
 TEST_F(WatermarkTest, UpstreamWatermarks) {
   sendRequest();
 
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(_));
-  router_.onAboveWriteBufferHighWatermark();
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_paused_reading_total")
                     .value());
 
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(_));
-  router_.onBelowWriteBufferLowWatermark();
+  watermark_callbacks->onBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());

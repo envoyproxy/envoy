@@ -12,6 +12,7 @@ specify miscellaneous configuration.
 
   {
     "listeners": [],
+    "lds": "{...}",
     "admin": "{...}",
     "cluster_manager": "{...}",
     "flags_path": "...",
@@ -31,6 +32,12 @@ specify miscellaneous configuration.
 :ref:`listeners <config_listeners>`
   *(required, array)* An array of :ref:`listeners <arch_overview_listeners>` that will be
   instantiated by the server. A single Envoy process can contain any number of listeners.
+
+.. _config_overview_lds:
+
+:ref:`lds <config_listeners_lds>`
+  *(optional, object)* Configuration for the Listener Discovery Service (LDS). If not specified
+  only static listeners are loaded.
 
 :ref:`admin <config_admin>`
   *(required, object)* Configuration for the :ref:`local administration HTTP server
