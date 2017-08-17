@@ -102,8 +102,6 @@ MockInstance::MockInstance()
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
-  ON_CALL(*this, routeConfigProviderManager())
-      .WillByDefault(ReturnRef(route_config_provider_manager_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
 }
 
@@ -133,8 +131,6 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, server()).WillByDefault(ReturnRef(server_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-  ON_CALL(*this, routeConfigProviderManager())
-      .WillByDefault(ReturnRef(route_config_provider_manager_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}

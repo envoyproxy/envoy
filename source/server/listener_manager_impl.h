@@ -222,9 +222,6 @@ public:
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
-  Router::RouteConfigProviderManager& routeConfigProviderManager() override {
-    return parent_.server_.routeConfigProviderManager();
-  }
 
   // Network::DrainDecision
   bool drainClose() const override;

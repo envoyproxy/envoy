@@ -10,7 +10,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
@@ -180,11 +179,6 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
-
-  /**
-   * @return the server's http route manager.
-   */
-  virtual Router::ServerRouteConfigProviderManager& routeConfigProviderManager() PURE;
 };
 
 } // namespace Server
