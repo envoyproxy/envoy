@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/http/filter.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
@@ -67,7 +68,8 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::ConnectionManagerConfig {
 public:
   HttpConnectionManagerConfig(const envoy::api::v2::filter::HttpConnectionManager& config,
-                              FactoryContext& context, Http::DateProvider& date_provider);
+                              FactoryContext& context, Http::DateProvider& date_provider,
+                              Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -134,6 +136,7 @@ private:
   const bool use_remote_address_{};
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Router::RouteConfigProviderManager& route_config_provider_manager_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;

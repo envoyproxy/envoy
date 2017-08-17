@@ -7,14 +7,14 @@
 namespace Envoy {
 namespace Singleton {
 
-InstancePtr ManagerImpl::get(const std::string& name, SingletonFactoryCb cb) {
+InstanceSharedPtr ManagerImpl::get(const std::string& name, SingletonFactoryCb cb) {
   ASSERT(run_tid_ == Thread::Thread::currentThreadId());
   if (nullptr == Registry::FactoryRegistry<Registration>::getFactory(name)) {
     PANIC(fmt::format("invalid singleton name '{}'. Make sure it is registered.", name));
   }
 
   if (nullptr == singletons_[name].lock()) {
-    InstancePtr singleton = cb();
+    InstanceSharedPtr singleton = cb();
     singletons_[name] = singleton;
     return singleton;
   } else {
