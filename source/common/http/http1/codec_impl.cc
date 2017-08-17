@@ -264,10 +264,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
     : connection_(connection), output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
                                               [&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }) {
-  uint32_t buffer_limit = connection.bufferLimit();
-  if (buffer_limit > 0) {
-    output_buffer_.setWatermarks(buffer_limit);
-  }
+  output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
