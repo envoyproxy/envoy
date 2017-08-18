@@ -28,6 +28,8 @@ filegroup(
         "server_xds.cds.json",
         "server_xds.eds.json",
         "server_xds.json",
+        "server_xds.lds.json",
+        "server_xds.rds.json",
     ],
 )
 

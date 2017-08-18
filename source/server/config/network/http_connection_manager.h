@@ -27,6 +27,8 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const ProtobufWkt::Any& config,
+                                                      FactoryContext& context) override;
 
   std::string name() override { return "http_connection_manager"; }
   NetworkFilterType type() override { return NetworkFilterType::Read; }

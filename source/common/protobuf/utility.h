@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/json/json_object.h"
 
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -51,7 +52,19 @@ public:
     return std::hash<std::string>{}(message.SerializeAsString());
   }
 
+  static void loadFromJson(const std::string json, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
+};
+
+class WktUtil {
+public:
+  /**
+   * Extract JSON object from a google.protobuf.Any message of type
+   * type.googleapis.com/google.protobuf.Struct.
+   * @param message message of type type.googleapis.com/google.protobuf.Struct.
+   * @return Json::ObjectSharedPtr of embedded JSON object or nullptr if unable to extract.
+   */
+  static Json::ObjectSharedPtr getJsonObjectFromAny(const google::protobuf::Any& message);
 };
 
 } // namespace Envoy
