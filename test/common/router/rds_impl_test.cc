@@ -93,8 +93,8 @@ public:
   NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
   NiceMock<Server::MockAdmin> admin_;
-  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
-                                                                local_info_, tls_, admin_};
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_,    dispatcher_, random_,
+                                                                local_info_, tls_,        admin_};
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
@@ -324,8 +324,8 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
-                                                                local_info_, tls_, admin_};
+  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_,    dispatcher_, random_,
+                                                                local_info_, tls_,        admin_};
 };
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {

@@ -3,18 +3,13 @@
 namespace Envoy {
 namespace Server {
 
-bool ValidationAdmin::addHandler(const std::string&, const std::string&,
-                        HandlerCb, bool) {
-                          return false;
-};
-
-bool ValidationAdmin::removeHandler(const std::string&) {
+bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool) {
   return false;
 };
 
-const Network::ListenSocket& ValidationAdmin::socket() {
-  NOT_IMPLEMENTED;
-};
+bool ValidationAdmin::removeHandler(const std::string&) { return false; };
+
+const Network::ListenSocket& ValidationAdmin::socket() { NOT_IMPLEMENTED; };
 
 } // namespace Server
 } // namespace Envoy

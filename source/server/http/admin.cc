@@ -445,5 +445,5 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
   return false;
 }
 
-} // Server
+} // namespace Server
 } // namespace Envoy

@@ -126,8 +126,9 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls), admin_(admin) {
-        admin_.addHandler("/routes", "print out currently loaded dynamic route tables", MAKE_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
-      }
+  admin_.addHandler("/routes", "print out currently loaded dynamic route tables",
+                    MAKE_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
+}
 
 RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
   // delete routes handler
@@ -182,11 +183,15 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string&, Buffer::Instance& response) {
+Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string&,
+                                                         Buffer::Instance& response) {
   for (auto provider : routeConfigProviders()) {
-    response.add(fmt::format("route_config_name: {}\n", std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->route_config_name_));
+    response.add(fmt::format(
+        "route_config_name: {}\n",
+        std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->route_config_name_));
     response.add("config dump: \n");
-    response.add(fmt::format("{}\n", std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->route_config_proto_.DebugString()));
+    response.add(fmt::format("{}\n", std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)
+                                         ->route_config_proto_.DebugString()));
   }
   return Http::Code::OK;
 }
