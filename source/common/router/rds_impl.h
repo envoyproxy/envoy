@@ -6,10 +6,12 @@
 #include <unordered_map>
 
 #include "envoy/config/subscription.h"
+#include "envoy/http/codes.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/server/admin.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -123,6 +125,7 @@ private:
   std::function<void()> initialize_callback_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -133,8 +136,8 @@ public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
-                                 ThreadLocal::SlotAllocator& tls);
-  ~RouteConfigProviderManagerImpl() {}
+                                 ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
+  ~RouteConfigProviderManagerImpl();
 
   // ServerRouteConfigProviderManager
   std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() override;
@@ -146,12 +149,15 @@ public:
                                                       Init::Manager& init_manager) override;
 
 private:
+  Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
+
   std::unordered_map<std::string, std::weak_ptr<RouteConfigProvider>> route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotAllocator& tls_;
+  Server::Admin& admin_;
 
   friend class RdsRouteConfigProviderImpl;
 };

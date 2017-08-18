@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/common/router:rds_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

@@ -8,6 +8,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -47,7 +48,7 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal());
+                context.threadLocal(), context.admin());
           });
 
   envoy::api::v2::filter::HttpConnectionManager http_connection_manager;

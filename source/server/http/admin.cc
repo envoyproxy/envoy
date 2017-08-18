@@ -35,9 +35,6 @@
 namespace Envoy {
 namespace Server {
 
-#define MAKE_HANDLER(X)                                                                            \
-  [this](const std::string& url, Buffer::Instance& data) -> Http::Code { return X(url, data); }
-
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {

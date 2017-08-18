@@ -9,6 +9,7 @@
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -91,8 +92,9 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
+  NiceMock<Server::MockAdmin> admin_;
   RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
-                                                                local_info_, tls_};
+                                                                local_info_, tls_, admin_};
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
@@ -321,8 +323,9 @@ public:
   Stats::IsolatedStoreImpl store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
+  NiceMock<Server::MockAdmin> admin_;
   RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_, dispatcher_, random_,
-                                                                local_info_, tls_};
+                                                                local_info_, tls_, admin_};
 };
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {
