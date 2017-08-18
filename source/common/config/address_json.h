@@ -14,7 +14,7 @@ public:
    * @param json_address source address.
    * @param url is json_address a URL? E.g. tcp://<ip>:<port>. If not, it is
    *            treated as <ip>:<port>.
-   * @param ip is json_address a concrete IP or unresolved hostname?
+   * @param resolved is json_address a concrete IP/pipe or unresolved hostname?
    * @param address destination envoy::api::v2::Address.
    */
   static void translateAddress(const std::string& json_address, bool url, bool resolved,
