@@ -102,11 +102,10 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager() {
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool workers_started, uint64_t hash)
     : parent_(parent),
-      // TODO(htuch): Cleanup this translation, does it need to be UnresolvedAddress? Validate not
-      // pipe.
+      // TODO(htuch): Validate not pipe when doing v2.
       address_(
-          Network::Utility::parseInternetAddress(config.address().named_address().address(),
-                                                 config.address().named_address().port().value())),
+          Network::Utility::parseInternetAddress(config.address().socket_address().address(),
+                                                 config.address().socket_address().port_value())),
       global_scope_(parent_.server_.stats().createScope("")),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       use_proxy_proto_(

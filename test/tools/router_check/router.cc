@@ -17,18 +17,18 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
 
   // Add header field values
   std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addViaCopy(":authority", input->getString(":authority", ""));
-  headers->addViaCopy(":path", input->getString(":path", ""));
-  headers->addViaCopy(":method", input->getString(":method", "GET"));
-  headers->addViaCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
+  headers->addCopy(":authority", input->getString(":authority", ""));
+  headers->addCopy(":path", input->getString(":path", ""));
+  headers->addCopy(":method", input->getString(":method", "GET"));
+  headers->addCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
 
   if (input->getBoolean("internal", false)) {
-    headers->addViaCopy("x-envoy-internal", "true");
+    headers->addCopy("x-envoy-internal", "true");
   }
 
   if (input->hasObject("additional_headers")) {
     for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_headers")) {
-      headers->addViaCopy(header_config->getString("field"), header_config->getString("value"));
+      headers->addCopy(header_config->getString("field"), header_config->getString("value"));
     }
   }
 

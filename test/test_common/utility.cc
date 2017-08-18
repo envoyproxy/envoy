@@ -167,22 +167,14 @@ TestHeaderMapImpl::TestHeaderMapImpl(
     const std::initializer_list<std::pair<std::string, std::string>>& values)
     : HeaderMapImpl() {
   for (auto& value : values) {
-    addViaCopy(value.first, value.second);
+    addCopy(value.first, value.second);
   }
 }
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
 
-void TestHeaderMapImpl::addViaCopy(const std::string& key, const std::string& value) {
-  addViaCopy(LowerCaseString(key), value);
-}
-
-void TestHeaderMapImpl::addViaCopy(const LowerCaseString& key, const std::string& value) {
-  HeaderString key_string;
-  key_string.setCopy(key.get().c_str(), key.get().size());
-  HeaderString value_string;
-  value_string.setCopy(value.c_str(), value.size());
-  addViaMove(std::move(key_string), std::move(value_string));
+void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
+  addCopy(LowerCaseString(key), value);
 }
 
 std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }

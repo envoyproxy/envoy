@@ -112,10 +112,10 @@ TEST_F(AccessLogImplTest, LogMoreData) {
 
   EXPECT_CALL(*file_, write(_));
   request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
-  request_headers_.addViaCopy(Http::Headers::get().UserAgent, "user-agent-set");
-  request_headers_.addViaCopy(Http::Headers::get().RequestId, "id");
-  request_headers_.addViaCopy(Http::Headers::get().Host, "host");
-  request_headers_.addViaCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
+  request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
+  request_headers_.addCopy(Http::Headers::get().RequestId, "id");
+  request_headers_.addCopy(Http::Headers::get().Host, "host");
+  request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
 
   log->log(&request_headers_, &response_headers_, request_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF 1 2 3 - \"x.x.x.x\" "
@@ -134,7 +134,7 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
       InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
-  response_headers_.addViaCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
+  response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
 
   log->log(&request_headers_, &response_headers_, request_info_);
   EXPECT_EQ(
@@ -250,7 +250,7 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   log->log(&request_headers_, &response_headers_, request_info_);
 
   // Value is taken from x-request-id.
-  request_headers_.addViaCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime_.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(56));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);

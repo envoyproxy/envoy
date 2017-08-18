@@ -67,7 +67,7 @@ public:
 /**
  * Base class for HTTP/2 client and server codecs.
  */
-class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::http2> {
+class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                  const Http2Settings& http2_settings)
@@ -84,6 +84,17 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
+  // Propogate network connection watermark events to each stream on the connection.
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runHighWatermarkCallbacks();
+    }
+  }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
+    for (auto& stream : active_streams_) {
+      stream->runLowWatermarkCallbacks();
+    }
+  }
 
 protected:
   /**
@@ -124,7 +135,6 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
-    ~StreamImpl();
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -186,7 +196,6 @@ protected:
     HeaderMapPtr pending_trailers_;
     Optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
-    bool local_end_stream_ : 1;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
@@ -262,18 +271,6 @@ public:
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
-  // Propogate network connection watermark events to each stream on the connection.
-  // The router will propogate it downstream.
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runHighWatermarkCallbacks();
-    }
-  }
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
-    }
-  }
 
 private:
   // ConnectionImpl

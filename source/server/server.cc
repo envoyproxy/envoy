@@ -201,9 +201,6 @@ void InstanceImpl::initialize(Options& options,
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo()));
 
-  route_config_provider_manager_.reset(new Router::RouteConfigProviderManagerImpl(
-      runtime(), dispatcher(), random(), localInfo(), threadLocal()));
-
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
