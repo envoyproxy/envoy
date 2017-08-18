@@ -38,10 +38,9 @@ public:
   Network::ListenSocket& mutable_socket() { return *socket_; }
 
   // Server::Admin
-  void addHandler(const std::string& prefix, const std::string& help_text,
-                  HandlerCb callback) override {
-    handlers_.push_back({prefix, help_text, callback});
-  }
+  bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
+                  bool removable) override;
+  bool removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
@@ -86,6 +85,7 @@ private:
     const std::string prefix_;
     const std::string help_text_;
     const HandlerCb handler_;
+    const bool removable_;
   };
 
   /**
