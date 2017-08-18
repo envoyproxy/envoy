@@ -8,8 +8,8 @@
         "endpoint": {
           "address": {
             "socketAddress": {
-              "ipAddress": "{{ ntop_ip_loopback_address }}",
-              "port": {"value": {{ upstream_0 }} }
+              "address": "{{ ntop_ip_loopback_address }}",
+              "port_value": {{ upstream_0 }}
             }
           }
         }
