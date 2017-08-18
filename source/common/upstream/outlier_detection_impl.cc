@@ -57,6 +57,11 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
     if (++consecutive_5xx_ ==
         detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
                                                   detector->config().consecutive5xx())) {
+      // There are two outcomes here. The ejection will be enforced,
+      // or it won't. Either way the host won't trigger the check above if it keeps been
+      // charged with only 5xx ResponseCodes without an intervening non-5xx code. Therefore,
+      // the consecutive5xx counter should be reset to allow the host to be ejected again.
+      consecutive_5xx_ = 0;
       detector->onConsecutive5xx(host_.lock());
     }
   } else {

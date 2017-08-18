@@ -209,8 +209,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_TRUE(cluster_.hosts_[0]->outlierDetector().lastUnejectionTime().valid());
 
   // Eject host again to cause an ejection after an unejection has taken place
-  loadRq(cluster_.hosts_[0], 1, 503);
-  loadRq(cluster_.hosts_[0], 1, 200);
   cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(cluster_.hosts_[0], 4, 503);
 
@@ -254,13 +252,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   // Turn off 5xx detection to test SR detection in isolation.
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
-  // Expect non-enforcing logging
+  // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
+  // gets saturated (every 5 times).
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]), _,
                        EjectionType::Consecutive5xx, false))
-      .Times(2);
+      .Times(40);
 
-  // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
+  // Cause a SR error on one host. First have 4 of the hosts have perfect SR.
   loadRq(cluster_.hosts_, 200, 200);
   loadRq(cluster_.hosts_[4], 200, 503);
 
@@ -299,6 +298,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   interval_timer_->callback_();
   EXPECT_FALSE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
+  // gets saturated (every 5 times).
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]), _,
+                       EjectionType::Consecutive5xx, false))
+      .Times(5);
 
   // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
   loadRq(cluster_.hosts_, 25, 200);
