@@ -25,9 +25,9 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::string& zoneName() const override { return node_.locality().zone(); }
-  const std::string& clusterName() const override { return node_.cluster(); }
-  const std::string& nodeName() const override { return node_.id(); }
+  const std::string zoneName() const override { return node_.locality().zone(); }
+  const std::string clusterName() const override { return node_.cluster(); }
+  const std::string nodeName() const override { return node_.id(); }
   const envoy::api::v2::Node& node() const override { return node_; }
 
 private:
