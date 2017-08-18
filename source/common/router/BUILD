@@ -30,7 +30,6 @@ envoy_cc_library(
         "//source/common/config:rds_json_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",

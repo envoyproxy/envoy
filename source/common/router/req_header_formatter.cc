@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "common/config/rds_json.h"
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 
@@ -16,33 +15,17 @@ namespace Router {
 
 HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format) {
   if (format.find("%") == 0) {
-    size_t last_occ_pos = format.rfind("%");
+    const size_t last_occ_pos = format.rfind("%");
     if (last_occ_pos == std::string::npos || last_occ_pos <= 1) {
       throw EnvoyException(fmt::format(
           "Incorrect configuration: {}. Expected the variable to be of format %<variable_name>%",
           format));
     }
     const std::string variable_name = format.substr(1, last_occ_pos - 1);
-    HeaderFormatterPtr request_header_formatter_ptr(new RequestHeaderFormatter(variable_name));
-    return request_header_formatter_ptr;
+    return HeaderFormatterPtr{new RequestHeaderFormatter(variable_name)};
   } else {
-    HeaderFormatterPtr plain_header_formatter_ptr(new PlainHeaderFormatter(format));
-    return plain_header_formatter_ptr;
+    return HeaderFormatterPtr{new PlainHeaderFormatter(format)};
   }
-}
-
-RequestHeaderParserPtr RequestHeaderParser::parseRoute(const envoy::api::v2::Route& route) {
-  return parse(route.route().request_headers_to_add());
-}
-
-RequestHeaderParserPtr
-RequestHeaderParser::parseVirtualHost(const envoy::api::v2::VirtualHost& virtualHost) {
-  return parse(virtualHost.request_headers_to_add());
-}
-
-RequestHeaderParserPtr RequestHeaderParser::parseRouteConfiguration(
-    const envoy::api::v2::RouteConfiguration& routeConfig) {
-  return parse(routeConfig.request_headers_to_add());
 }
 
 RequestHeaderParserPtr RequestHeaderParser::parse(

@@ -14,12 +14,12 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Router {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
+namespace Router {
 static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) {
   envoy::api::v2::Route route;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
@@ -27,8 +27,9 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
   return route;
 }
 
-bool CheckFormatMessage(const std::string errorMessage, const std::string expectedMessage) {
-  std::size_t found = errorMessage.find(expectedMessage);
+static bool CheckFormatMessage(const std::string error_message,
+                               const std::string expected_message) {
+  std::size_t found = error_message.find(expected_message);
   return (found != std::string::npos);
 }
 
@@ -76,10 +77,12 @@ TEST(RequestHeaderFormatterTest, WrongFormatOnVariable) {
             }
           ]
         })EOF";
-  ASSERT_THROW(Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json)),
+  ASSERT_THROW(Envoy::Router::RequestHeaderParser::parse(
+                   parseRouteFromJson(json).route().request_headers_to_add()),
                EnvoyException);
   try {
-    Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
+    Envoy::Router::RequestHeaderParser::parse(
+        parseRouteFromJson(json).route().request_headers_to_add());
   } catch (EnvoyException& ex) {
     EXPECT_PRED2(CheckFormatMessage, ex.what(), "Incorrect configuration");
   }
@@ -95,8 +98,8 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
 	    	}
 	   	]
 	  })EOF";
-  RequestHeaderParserPtr req_header_parser =
-      Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
+  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(
+      parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::string s1 = "127.0.0.1";
@@ -120,8 +123,8 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
 	   	]
 	  })EOF";
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  RequestHeaderParserPtr req_header_parser =
-      Envoy::Router::RequestHeaderParser::parseRoute(parseRouteFromJson(json));
+  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(
+      parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
   std::pair<Http::LowerCaseString, std::string> static_req_header(

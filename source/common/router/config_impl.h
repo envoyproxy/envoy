@@ -15,7 +15,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/router/config_utility.h"
 #include "common/router/req_header_formatter.h"
 #include "common/router/router_ratelimit.h"

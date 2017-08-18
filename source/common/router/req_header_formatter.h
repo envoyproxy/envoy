@@ -70,26 +70,16 @@ class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
 public:
   virtual ~RequestHeaderParser() {}
 
-  static RequestHeaderParserPtr parseRoute(const envoy::api::v2::Route& route);
-
-  static RequestHeaderParserPtr parseVirtualHost(const envoy::api::v2::VirtualHost& virtualHost);
-
   static RequestHeaderParserPtr
-  parseRouteConfiguration(const envoy::api::v2::RouteConfiguration& routeConfig);
+  parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
   void evaluateRequestHeaders(
       Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
       const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
 
 private:
-  /**
-   * Building a map of request header formatters.
-   */
   std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
       header_formatter_map_;
-
-  static RequestHeaderParserPtr
-  parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
   static HeaderFormatterPtr parseInternal(const std::string& format);
 };

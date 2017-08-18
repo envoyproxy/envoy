@@ -2250,7 +2250,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> requestInfo;
-  ASSERT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true),
+  EXPECT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true),
                EnvoyException);
   try {
     ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
