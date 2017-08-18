@@ -23,7 +23,6 @@
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
-#include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -133,7 +132,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
+  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
@@ -223,7 +222,9 @@ void InstanceImpl::initialize(Options& options,
     ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
-  initializeStatSinks();
+  for (Stats::SinkPtr& sink : main_config->statsSinks()) {
+    stats_store_.addSink(*sink);
+  }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
@@ -260,33 +261,6 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random())};
   } else {
     return Runtime::LoaderPtr{new Runtime::NullLoaderImpl(server.random())};
-  }
-}
-
-void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpIpAddress().valid()) {
-    ENVOY_LOG(info, "statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(
-        thread_local_,
-        Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
-    stats_store_.addSink(*stat_sinks_.back());
-  } else if (config_->statsdUdpPort().valid()) {
-    // TODO(hennna): DEPRECATED - statsdUdpPort will be removed in 1.4.0.
-    ENVOY_LOG(warn, "statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0. "
-                    "Consider setting statsd_udp_ip_address instead.");
-    ENVOY_LOG(info, "statsd UDP port: {}", config_->statsdUdpPort().value());
-    Network::Address::InstanceConstSharedPtr address(
-        new Network::Address::Ipv4Instance(config_->statsdUdpPort().value()));
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(thread_local_, address));
-    stats_store_.addSink(*stat_sinks_.back());
-  }
-
-  if (config_->statsdTcpClusterName().valid()) {
-    ENVOY_LOG(info, "statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
-    stat_sinks_.emplace_back(
-        new Stats::Statsd::TcpStatsdSink(*local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager(), stats_store_));
-    stats_store_.addSink(*stat_sinks_.back());
   }
 }
 

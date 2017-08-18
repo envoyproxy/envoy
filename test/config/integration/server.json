@@ -363,8 +363,21 @@
 	     "profile_path": "{{ test_tmpdir }}/envoy.prof",
 	     "address": "tcp://{{ ip_loopback_address }}:0" },
   "flags_path": "/invalid_flags",
-  "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
-  "statsd_tcp_cluster_name": "statsd",
+
+  "stats_sinks": [
+    {
+      "name": "statsd_udp",
+      "config": {
+        "ip_address": "{{ ip_loopback_address }}:8125"
+      }
+    },
+    {
+      "name": "statsd_tcp",
+      "config": {
+        "cluster_name": "statsd"
+      }
+    }
+  ],
 
   "lds": {
     "cluster": "lds"

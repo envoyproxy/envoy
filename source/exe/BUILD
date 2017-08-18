@@ -47,6 +47,8 @@ envoy_cc_library(
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
+        "//source/server/config/stats:tcp_statsd_lib",
+        "//source/server/config/stats:udp_statsd_lib",
         "//source/server/http:health_check_lib",
     ],
 )

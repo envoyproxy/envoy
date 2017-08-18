@@ -60,24 +60,6 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
                               server.listenerManager()));
   }
 
-  if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
-    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
-                         "are mutually exclusive.");
-  }
-
-  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
-  if (json.hasObject("statsd_local_udp_port")) {
-    statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
-  }
-
-  if (json.hasObject("statsd_udp_ip_address")) {
-    statsd_udp_ip_address_.value(json.getString("statsd_udp_ip_address"));
-  }
-
-  if (json.hasObject("statsd_tcp_cluster_name")) {
-    statsd_tcp_cluster_name_.value(json.getString("statsd_tcp_cluster_name"));
-  }
-
   stats_flush_interval_ =
       std::chrono::milliseconds(json.getInteger("stats_flush_interval_ms", 5000));
 
@@ -102,6 +84,8 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }
+
+  initializeStatsSinks(json, server);
 }
 
 void MainImpl::initializeTracers(const Json::Object& configuration, Instance& server) {
@@ -138,6 +122,76 @@ void MainImpl::initializeTracers(const Json::Object& configuration, Instance& se
     http_tracer_ = factory->createHttpTracer(*driver_config, server, *cluster_manager_);
   } else {
     throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
+  }
+}
+
+void MainImpl::initializeStatsSinks(const Json::Object& configuration, Instance& server) {
+  ENVOY_LOG(info, "loading stats sink configuration");
+
+  // TODO(mrice32): DEPRECATED - statsd_local_udp_port, statsd_udp_ip_address,
+  // statsd_tcp_cluster_name fields in the base json configuration will be moved to subobjects
+  // inside the stats_sinks array for 1.5.0.
+  if (configuration.hasObject("statsd_local_udp_port") &&
+      configuration.hasObject("statsd_udp_ip_address")) {
+    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
+                         "are mutually exclusive.");
+  }
+
+  std::vector<Json::ObjectSharedPtr> sinks = configuration.getObjectArray("stats_sinks", true);
+
+  // Used to convert the deprecated statsd configuration into a json snippet for consumption by the
+  // new sink config parsing logic.
+  const std::string statsd_json = R"EOF(
+    {{
+      "name": "{}",
+      "config": {{
+        "{}": {}
+      }}
+    }}
+    )EOF";
+
+  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
+  if (configuration.hasObject("statsd_local_udp_port")) {
+    Json::ObjectSharedPtr json_obj = Json::Factory::loadFromString(
+        fmt::format(statsd_json, "statsd_udp", "local_port",
+                    configuration.getInteger("statsd_local_udp_port")));
+    sinks.emplace_back(std::move(json_obj));
+  }
+
+  if (configuration.hasObject("statsd_udp_ip_address")) {
+    Json::ObjectSharedPtr json_obj = Json::Factory::loadFromString(
+        fmt::format(statsd_json, "statsd_udp", "ip_address",
+                    "\"" + configuration.getString("statsd_udp_ip_address") + "\""));
+    sinks.emplace_back(std::move(json_obj));
+  }
+
+  if (configuration.hasObject("statsd_tcp_cluster_name")) {
+    Json::ObjectSharedPtr json_obj = Json::Factory::loadFromString(
+        fmt::format(statsd_json, "statsd_tcp", "cluster_name",
+                    "\"" + configuration.getString("statsd_tcp_cluster_name") + "\""));
+    sinks.emplace_back(std::move(json_obj));
+  }
+
+  for (const auto& sink_object : sinks) {
+    if (!sink_object->hasObject("name")) {
+      throw EnvoyException(
+          "sink object does not have 'name' attribute to look up the implementation");
+    }
+
+    if (!sink_object->hasObject("config")) {
+      throw EnvoyException(
+          "sink object does not contain the 'config' object to configure the implementation");
+    }
+
+    std::string name = sink_object->getString("name");
+    Json::ObjectSharedPtr sink_config = sink_object->getObject("config");
+
+    StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
+    if (factory != nullptr) {
+      stats_sinks_.emplace_back(factory->createStatsSink(*sink_config, server, *cluster_manager_));
+    } else {
+      throw EnvoyException(fmt::format("No Stats::Sink found for name: {}", name));
+    }
   }
 }
 

@@ -235,7 +235,6 @@ envoy_cc_library(
         "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/singleton:manager_impl_lib",
-        "//source/common/stats:statsd_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/server/http:admin_lib",
     ],

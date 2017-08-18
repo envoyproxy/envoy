@@ -164,6 +164,8 @@ envoy_cc_test_library(
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
+        "//source/server/config/stats:tcp_statsd_lib",
+        "//source/server/config/stats:udp_statsd_lib",
         "//source/server/http:health_check_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -187,6 +189,8 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/server/config/stats:tcp_statsd_lib",
+        "//source/server/config/stats:udp_statsd_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -216,7 +220,6 @@ envoy_cc_test(
         ":integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/stats:stats_lib",
     ],
 )
 

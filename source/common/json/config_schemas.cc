@@ -1187,6 +1187,10 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
+      "stats_sinks" : {
+        "type" : "array",
+        "items" : {"type": "object"}
+      },
       "watchdog_miss_timeout_ms" : {"type" : "integer"},
       "watchdog_megamiss_timeout_ms" : {"type" : "integer"},
       "watchdog_kill_timeout_ms" : {"type" : "integer"},

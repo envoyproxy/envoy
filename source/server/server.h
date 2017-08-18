@@ -138,7 +138,6 @@ private:
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
-  void initializeStatSinks();
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
@@ -148,7 +147,6 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
