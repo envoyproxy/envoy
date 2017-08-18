@@ -60,7 +60,8 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
       // There are two outcomes here. The ejection will be enforced,
       // or it won't. Either way the host won't trigger the check above if it keeps been
       // charged with only 5xx ResponseCodes without an intervening non-5xx code. Therefore,
-      // the consecutive5xx counter should be reset to allow the host to be ejected again.
+      // the consecutive_5xx_ counter should be reset to allow the Sink to detect another bout
+      // of 5xx from this host.
       consecutive_5xx_ = 0;
       detector->onConsecutive5xx(host_.lock());
     }
