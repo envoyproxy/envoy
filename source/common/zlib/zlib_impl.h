@@ -13,15 +13,17 @@ namespace Zlib {
 class Impl : public Zlib {
 public:
   Impl();
-  bool deflateData(Buffer::Instance& data) override;
+  bool deflateData(Buffer::Instance& in) override;
+  Buffer::Instance& moveOut();
   uint64_t getTotalIn();
   uint64_t getTotalOut();
+  void endStream();
 
 private:
-  std::unique_ptr<z_stream> ZstreamPtr_{nullptr};
+  std::unique_ptr<z_stream> ZstreamPtr_{std::unique_ptr<z_stream>(new z_stream())};
   Buffer::InstancePtr buffer_{nullptr};
-  uint64_t total_in_{};
-  uint64_t total_out_{};
+  Buffer::RawSlice out_slice{};
+  const uint CHUNK_{1024};
 };
 
 } // namespace zlib

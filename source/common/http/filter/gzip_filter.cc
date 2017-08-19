@@ -76,7 +76,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   is_compressed_ = false;
 
   headers.removeContentLength();
-  headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Deflate);
+  headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
   headers.removeEtag();
 
   return Http::FilterHeadersStatus::Continue;
@@ -84,6 +84,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
+    ZlibPtr_->endStream();
     std::cout << "total in: " << ZlibPtr_->getTotalIn() << std::endl;
     std::cout << "total out: " << ZlibPtr_->getTotalOut() << std::endl;
     return Http::FilterDataStatus::Continue;
@@ -94,6 +95,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   }
 
   if (ZlibPtr_->deflateData(data)) {
+    data.move(ZlibPtr_->moveOut());
     return Http::FilterDataStatus::Continue;
   } else { 
     return Http::FilterDataStatus::StopIterationNoBuffer;

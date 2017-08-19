@@ -38,8 +38,6 @@ private:
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   Http::HeaderEntry* content_encoding_header_{nullptr};
   std::unique_ptr<Zlib::Impl> ZlibPtr_{nullptr};
-  
-  
 
   bool deflate_{false};
   bool is_compressed_{true};

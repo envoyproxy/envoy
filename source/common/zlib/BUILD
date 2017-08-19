@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["zlib_impl.h"],
     external_deps = ["zlib"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/buffer:buffer_lib",
         "//include/envoy/zlib:zlib_interface",
     ],

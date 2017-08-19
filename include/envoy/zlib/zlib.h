@@ -20,7 +20,7 @@ public:
    * @param data supplies the buffer with data to be deflated.
    * @return bool indicates whether operation succeeds or not.
    */
-  virtual bool deflateData(Buffer::Instance& data) PURE;
+  virtual bool deflateData(Buffer::Instance& in) PURE;
 
 };
 
