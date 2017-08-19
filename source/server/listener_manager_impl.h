@@ -6,9 +6,10 @@
 #include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
-#include "common/json/json_validator.h"
 
 #include "server/init_manager_impl.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,12 +28,12 @@ public:
    * Static worker for createFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList_(const std::vector<Json::ObjectSharedPtr>& filters,
+  createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                            Server::Instance& server, Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, server_, context);
   }
@@ -81,7 +82,7 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const Json::Object& json) override;
+  bool addOrUpdateListener(const envoy::api::v2::Listener& config) override;
   std::vector<std::reference_wrapper<Listener>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
@@ -149,26 +150,25 @@ private:
 //                     initializing all listeners after workers are started.
 
 /**
- * Maps JSON config to runtime config for a listener with a network filter chain.
+ * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Listener,
                      public Configuration::FactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
-                     Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Create a new listener.
-   * @param json supplies the configuration JSON.
+   * @param config supplies the configuration proto.
    * @param parent supplies the owning manager.
    * @param name supplies the listener name.
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
    */
-  ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent, const std::string& name,
-               bool workers_started, uint64_t hash);
+  ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
+               const std::string& name, bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
   /**
@@ -222,9 +222,6 @@ public:
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
-  Router::RouteConfigProviderManager& routeConfigProviderManager() override {
-    return parent_.server_.routeConfigProviderManager();
-  }
 
   // Network::DrainDecision
   bool drainClose() const override;

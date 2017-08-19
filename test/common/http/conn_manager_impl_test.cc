@@ -385,6 +385,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         callbacks.addStreamDecoderFilter(filter);
       }));
 
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -514,6 +518,10 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         filter->callbacks_->requestInfo().healthCheck(true);
         return FilterHeadersStatus::StopIteration;
       }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1168,6 +1176,36 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
+TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->route();
+        decoder_filters_[0]->callbacks_->clearRouteCache();
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[1]->callbacks_->route();
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder();
@@ -1196,20 +1234,22 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
 
   // Test what happens when there are no subscribers.
   conn_manager_->onAboveWriteBufferHighWatermark();
+  conn_manager_->onBelowWriteBufferLowWatermark();
 
   // The connection manger will outlive callbacks but never reference them once deleted.
   MockDownstreamWatermarkCallbacks callbacks;
 
-  ASSERT_NE(0, decoder_filters_.size());
+  // Network::Connection callbacks are passed through the codec
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
-  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
-  // propogated.
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
   conn_manager_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
   conn_manager_->onBelowWriteBufferLowWatermark();
 
+  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
+  // propogated.
+  ASSERT_NE(0, decoder_filters_.size());
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
   // Make sure encoder filter callbacks are propogated to the watermark subscriber.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
@@ -1223,6 +1263,39 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   stream_callbacks_->onAboveWriteBufferHighWatermark();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   stream_callbacks_->onBelowWriteBufferLowWatermark();
+
+  // Set things up so the callbacks have been called twice.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  stream_callbacks_->onAboveWriteBufferHighWatermark();
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+
+  // Now unsubscribe and verify no further callbacks are called.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+}
+
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
+  setup(false, "");
+
+  // Make sure codec_ is created.
+  EXPECT_CALL(*codec_, dispatch(_));
+  Buffer::OwnedImpl fake_input("");
+  conn_manager_->onData(fake_input);
+
+  // Mark the connection manger as backed up before the stream is created.
+  ASSERT_EQ(decoder_filters_.size(), 0);
+  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
+  conn_manager_->onAboveWriteBufferHighWatermark();
+
+  // Now when the stream is created, it should be informed of the connection
+  // callbacks immediately.
+  EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
+  setUpEncoderAndDecoder();
+  ASSERT_GE(decoder_filters_.size(), 1);
+  MockDownstreamWatermarkCallbacks callbacks;
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {

@@ -5,6 +5,12 @@
 namespace Envoy {
 namespace Config {
 
+void ProtocolJson::translateHttp1ProtocolOptions(
+    const Json::Object& json_http1_settings,
+    envoy::api::v2::Http1ProtocolOptions& http1_protocol_options) {
+  JSON_UTIL_SET_BOOL(json_http1_settings, http1_protocol_options, allow_absolute_url);
+}
+
 void ProtocolJson::translateHttp2ProtocolOptions(
     const std::string& json_http_codec_options, const Json::Object& json_http2_settings,
     envoy::api::v2::Http2ProtocolOptions& http2_protocol_options) {

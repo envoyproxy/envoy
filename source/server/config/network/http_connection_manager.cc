@@ -11,13 +11,14 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
-#include "common/config/protocol_json.h"
+#include "common/config/filter_json.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -28,24 +29,38 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-static constexpr char date_provider_singleton_name[] = "date_provider_singleton";
-static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singleton_name>,
-                                 Singleton::Registration>
-    date_provider_singleton_registered_;
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(date_provider);
+SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& config,
-                                                              FactoryContext& context) {
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    const Json::Object& json_http_connection_manager, FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          date_provider_singleton_name, [&context] {
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
             return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
                                                                       context.threadLocal());
           });
 
-  std::shared_ptr<HttpConnectionManagerConfig> http_config(
-      new HttpConnectionManagerConfig(config, context, *date_provider));
-  return [http_config, &context, date_provider](Network::FilterManager& filter_manager) -> void {
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
+                context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
+                context.threadLocal());
+          });
+
+  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
+  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
+                                                     http_connection_manager);
+  std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
+      http_connection_manager, context, *date_provider, *route_config_provider_manager));
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count. Moreover, keep in mind the capture list determines
+  // destruction order.
+  return [route_config_provider_manager, http_config, &context,
+          date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
@@ -77,130 +92,141 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   return "";
 }
 
-HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
-                                                         FactoryContext& context,
-                                                         Http::DateProvider& date_provider)
-    : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), context_(context),
-      stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
+HttpConnectionManagerConfig::HttpConnectionManagerConfig(
+    const envoy::api::v2::filter::HttpConnectionManager& config, FactoryContext& context,
+    Http::DateProvider& date_provider,
+    Router::RouteConfigProviderManager& route_config_provider_manager)
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
-      http2_settings_([&config] {
-        envoy::api::v2::Http2ProtocolOptions http2_protocol_options;
-        Config::ProtocolJson::translateHttp2ProtocolOptions(
-            config.getString("http_codec_options", ""), *config.getObject("http2_settings", true),
-            http2_protocol_options);
-        return Http::Utility::parseHttp2Settings(http2_protocol_options);
-      }()),
-      http1_settings_(Http::Utility::parseHttp1Settings(config)),
-      drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
-      generate_request_id_(config.getBoolean("generate_request_id", true)),
+      use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      route_config_provider_manager_(route_config_provider_manager),
+      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
+      generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
+
       date_provider_(date_provider) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
-      context_.initManager(), context_.routeConfigProviderManager());
+      context_.initManager(), route_config_provider_manager_);
 
-  if (config.hasObject("use_remote_address")) {
-    use_remote_address_ = config.getBoolean("use_remote_address");
-  }
-
-  const std::string forward_client_cert = config.getString("forward_client_cert", "sanitize");
-  if (forward_client_cert == "forward_only") {
-    forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
-  } else if (forward_client_cert == "append_forward") {
-    forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
-  } else if (forward_client_cert == "sanitize_set") {
-    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
-  } else if (forward_client_cert == "always_forward_only") {
-    forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
-  } else {
-    ASSERT(forward_client_cert == "sanitize");
+  switch (config.forward_client_cert_details()) {
+  case envoy::api::v2::filter::HttpConnectionManager::SANITIZE:
     forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::FORWARD_ONLY:
+    forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::APPEND_FORWARD:
+    forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::SANITIZE_SET:
+    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::ALWAYS_FORWARD_ONLY:
+    forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
+    break;
+  default:
+    NOT_REACHED;
   }
 
-  if (config.hasObject("set_current_client_cert_details")) {
-    for (const std::string& detail : config.getStringArray("set_current_client_cert_details")) {
-      if (detail == "Subject") {
-        set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
-      } else {
-        ASSERT(detail == "SAN");
-        set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
-      }
-    }
+  const auto& set_current_client_cert_details = config.set_current_client_cert_details();
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
+  }
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
   }
 
-  if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
+  if (config.has_add_user_agent() && config.add_user_agent().value()) {
     user_agent_.value(context_.localInfo().clusterName());
   }
 
-  if (config.hasObject("tracing")) {
-    Json::ObjectSharedPtr tracing_config = config.getObject("tracing");
+  if (config.has_tracing()) {
+    const auto& tracing_config = config.tracing();
 
-    const std::string operation_name = tracing_config->getString("operation_name");
     Tracing::OperationName tracing_operation_name;
     std::vector<Http::LowerCaseString> request_headers_for_tags;
 
-    if (operation_name == "ingress") {
+    switch (tracing_config.operation_name()) {
+    case envoy::api::v2::filter::HttpConnectionManager::Tracing::INGRESS:
       tracing_operation_name = Tracing::OperationName::Ingress;
-    } else {
-      ASSERT(operation_name == "egress");
+      break;
+    case envoy::api::v2::filter::HttpConnectionManager::Tracing::EGRESS:
       tracing_operation_name = Tracing::OperationName::Egress;
+      break;
+    default:
+      NOT_REACHED;
     }
 
-    if (tracing_config->hasObject("request_headers_for_tags")) {
-      for (const std::string& header : tracing_config->getStringArray("request_headers_for_tags")) {
-        request_headers_for_tags.push_back(Http::LowerCaseString(header));
-      }
+    for (const std::string& header : tracing_config.request_headers_for_tags()) {
+      request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
         {tracing_operation_name, request_headers_for_tags}));
   }
 
-  if (config.hasObject("idle_timeout_s")) {
-    idle_timeout_.value(std::chrono::seconds(config.getInteger("idle_timeout_s")));
+  if (config.has_idle_timeout()) {
+    idle_timeout_.value(std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, idle_timeout)));
   }
 
-  if (config.hasObject("access_log")) {
-    for (const Json::ObjectSharedPtr& access_log : config.getObjectArray("access_log")) {
-      Http::AccessLog::InstanceSharedPtr current_access_log =
-          Http::AccessLog::InstanceImpl::fromJson(*access_log, context_.runtime(),
-                                                  context_.accessLogManager());
-      access_logs_.push_back(current_access_log);
-    }
+  for (const auto& access_log : config.access_log()) {
+    Http::AccessLog::InstanceSharedPtr current_access_log =
+        Http::AccessLog::InstanceImpl::fromProto(access_log, context_.runtime(),
+                                                 context_.accessLogManager());
+    access_logs_.push_back(current_access_log);
   }
 
-  server_name_ = config.getString("server_name", DEFAULT_SERVER_STRING);
-
-  std::string codec_type = config.getString("codec_type");
-  if (codec_type == "http1") {
-    codec_type_ = CodecType::HTTP1;
-  } else if (codec_type == "http2") {
-    codec_type_ = CodecType::HTTP2;
+  if (!config.server_name().empty()) {
+    server_name_ = config.server_name();
   } else {
-    ASSERT(codec_type == "auto");
-    codec_type_ = CodecType::AUTO;
+    server_name_ = DEFAULT_SERVER_STRING;
   }
 
-  std::vector<Json::ObjectSharedPtr> filters = config.getObjectArray("filters");
-  for (size_t i = 0; i < filters.size(); i++) {
-    std::string string_type = filters[i]->getString("type");
-    std::string string_name = filters[i]->getString("name");
-    Json::ObjectSharedPtr config_object = filters[i]->getObject("config");
+  switch (config.codec_type()) {
+  case envoy::api::v2::filter::HttpConnectionManager::AUTO:
+    codec_type_ = CodecType::AUTO;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::HTTP1:
+    codec_type_ = CodecType::HTTP1;
+    break;
+  case envoy::api::v2::filter::HttpConnectionManager::HTTP2:
+    codec_type_ = CodecType::HTTP2;
+    break;
+  default:
+    NOT_REACHED;
+  }
+
+  const auto& filters = config.http_filters();
+  for (int32_t i = 0; i < filters.size(); i++) {
+    const std::string& string_type = filters[i].deprecated_v1().type();
+    const std::string& string_name = filters[i].name();
+    const auto& proto_config = filters[i].config();
 
     ENVOY_LOG(info, "    filter #{}", i);
-    ENVOY_LOG(info, "      type: {}", string_type);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    HttpFilterType type = stringToType(string_type);
+    Protobuf::util::JsonOptions json_options;
+    ProtobufTypes::String json_config;
+    const auto status =
+        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
+    // This should always succeed unless something crash-worthy such as out-of-memory.
+    RELEASE_ASSERT(status.ok());
+    UNREFERENCED_PARAMETER(status);
+    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
+
+    const HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
     NamedHttpFilterConfigFactory* factory =
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
-    if (factory != nullptr && factory->type() == type) {
+    if (factory != nullptr) {
       HttpFilterFactoryCb callback =
-          factory->createFilterFactory(*config_object, stats_prefix_, context_);
+          factory->createFilterFactory(*filter_config, stats_prefix_, context_);
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED
@@ -208,7 +234,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       bool found_filter = false;
       for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
         HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *config_object, stats_prefix_, context_.server());
+            type, string_name, *filter_config, stats_prefix_, context_.server());
         if (callback) {
           filter_factories_.push_back(callback);
           found_filter = true;
@@ -217,8 +243,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       }
 
       if (!found_filter) {
-        throw EnvoyException(fmt::format("unable to create http filter factory for '{}'/'{}'",
-                                         string_name, string_type));
+        throw EnvoyException(
+            fmt::format("unable to create http filter factory for '{}'", string_name));
       }
     }
   }

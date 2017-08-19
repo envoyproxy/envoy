@@ -45,8 +45,7 @@ public:
   void setRetryTimer() { retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS)); }
 
   void establishNewStream() {
-    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}",
-              ProtobufTypes::FromString(service_method_.DebugString()));
+    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     stats_.update_attempt_.inc();
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
@@ -95,18 +94,16 @@ public:
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(ProtobufTypes::FromString(message->version_info()));
+      request_.set_version_info(message->version_info());
       stats_.update_success_.inc();
-      ENVOY_LOG(debug, "gRPC config update accepted: {}",
-                ProtobufTypes::FromString(message->DebugString()));
+      ENVOY_LOG(debug, "gRPC config update accepted: {}", message->DebugString());
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "gRPC config update rejected: {}", e.what());
       stats_.update_rejected_.inc();
       callbacks_->onConfigUpdateFailed(&e);
     }
     // This effectively ACK/NACKs the accepted configuration.
-    ENVOY_LOG(debug, "Sending version update: {}",
-              ProtobufTypes::FromString(message->version_info()));
+    ENVOY_LOG(debug, "Sending version update: {}", message->version_info());
     stats_.update_attempt_.inc();
     sendDiscoveryRequest();
   }

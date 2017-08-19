@@ -51,7 +51,6 @@ statistics:
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
    downstream_rq_non_ws_on_ws_route, Counter, Total HTTP requests rejected by WebSocket enabled routes due to missing upgrade header
    downstream_rq_time, Timer, Request time milliseconds
-   failed_generate_uuid, Counter, Total UUID generation failures
 
 Per user agent statistics
 -------------------------

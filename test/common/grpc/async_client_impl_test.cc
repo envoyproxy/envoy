@@ -94,10 +94,10 @@ public:
     auto* reply_trailers =
         new Http::TestHeaderMapImpl{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (trailers_only) {
-      reply_trailers->addViaCopy(":status", "200");
+      reply_trailers->addCopy(":status", "200");
     }
     for (const auto& value : metadata) {
-      reply_trailers->addViaCopy(value.first, value.second);
+      reply_trailers->addCopy(value.first, value.second);
     }
     Http::HeaderMapPtr reply_trailers_ptr{reply_trailers};
     if (grpc_status == Status::GrpcStatus::Ok) {

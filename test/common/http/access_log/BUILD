@@ -27,6 +27,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/access_log:access_log_lib",

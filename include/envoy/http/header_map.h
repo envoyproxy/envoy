@@ -281,6 +281,12 @@ public:
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). Nothing will be copied.
+   *
+   * Calling addReference multiple times for the same header will result in multiple headers being
+   * present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to add; it WILL NOT be copied.
+   * @param value specifies the value of the header to add; it WILL NOT be copied.
    */
   virtual void addReference(const LowerCaseString& key, const std::string& value) PURE;
 
@@ -288,6 +294,12 @@ public:
    * Add a header with a reference key to the map. The key MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The value will be copied.
+   *
+   * Calling addReferenceKey multiple times for the same header will result in multiple headers
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to add; it WILL NOT be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
    */
   virtual void addReferenceKey(const LowerCaseString& key, uint64_t value) PURE;
 
@@ -295,8 +307,36 @@ public:
    * Add a header with a reference key to the map. The key MUST point to point to data that will
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
+   *
+   * Calling addReferenceKey multiple times for the same header will result in multiple headers
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to add; it WILL NOT be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
    */
   virtual void addReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
+   * Add a header by copying both the header key and the value.
+   *
+   * Calling addCopy multiple times for the same header will result in multiple headers being
+   * present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to add; it WILL be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
+   */
+  virtual void addCopy(const LowerCaseString& key, uint64_t value) PURE;
+
+  /**
+   * Add a header by copying both the header key and the value.
+   *
+   * Calling addCopy multiple times for the same header will result in multiple headers being
+   * present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to add; it WILL be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
+   */
+  virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
    * @return uint64_t the approximate size of the header map in bytes.

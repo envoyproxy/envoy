@@ -99,15 +99,18 @@ public:
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
-   * caching where applicable to avoid multiple lookups.
+   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
+   * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
-   *       routing (such as the request headers). In practice, we don't do this anywhere currently,
-   *       but in the future we might need to provide the ability to clear the cache if a filter
-   *       knows that it has modified the headers in a way that would affect routing. In the future
-   *       we may also want to allow the filter to override the route entry.
+   * NOTE: In the future we may want to allow the filter to override the route entry.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Clears the route cache for the current request. This must be called when a filter has modified
+   * the headers in a way that would affect routing.
+   */
+  virtual void clearRouteCache() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -218,8 +221,19 @@ public:
   /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream
    * stream and downstream connection.
+   *
+   * Immediately after subscribing, the filter will get a high watermark callback for each
+   * outstanding backed up buffer.
    */
   virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine can be called by a filter to stop subscribing to watermark events on the
+   * downstream stream and downstream connection.
+   *
+   * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
+   */
+  virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**

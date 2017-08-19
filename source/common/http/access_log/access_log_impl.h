@@ -8,44 +8,47 @@
 #include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
+
+#include "api/filter/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
 /**
- * Type of filter comparison operation to perform.
+ * Access log filter factory that reads from proto.
  */
-enum class FilterOperation { GreaterEqual, Equal };
-
-/**
- * Base implementation of an access log filter that reads from JSON.
- */
-class FilterImpl : public Filter {
+class FilterFactory {
 public:
   /**
-   * Read a filter definition from JSON and instantiate a concrete filter class.
+   * Read a filter definition from proto and instantiate a concrete filter class.
    */
-  static FilterPtr fromJson(Json::Object& json, Runtime::Loader& runtime);
+  static FilterPtr fromProto(const envoy::api::v2::filter::AccessLogFilter& config,
+                             Runtime::Loader& runtime);
+};
 
+/**
+ * Base implementation of an access log filter that performs comparisons.
+ */
+class ComparisonFilter : public Filter {
 protected:
-  FilterImpl(Json::Object& json, Runtime::Loader& runtime);
+  ComparisonFilter(const envoy::api::v2::filter::ComparisonFilter& config,
+                   Runtime::Loader& runtime);
 
   bool compareAgainstValue(uint64_t lhs);
 
-  FilterOperation op_;
-  uint64_t value_;
+  envoy::api::v2::filter::ComparisonFilter config_;
   Runtime::Loader& runtime_;
-  Optional<std::string> runtime_key_;
 };
 
 /**
  * Filter on response status code.
  */
-class StatusCodeFilter : public FilterImpl {
+class StatusCodeFilter : public ComparisonFilter {
 public:
-  StatusCodeFilter(Json::Object& json, Runtime::Loader& runtime) : FilterImpl(json, runtime) {}
+  StatusCodeFilter(const envoy::api::v2::filter::StatusCodeFilter& config, Runtime::Loader& runtime)
+      : ComparisonFilter(config.comparison(), runtime) {}
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -54,9 +57,10 @@ public:
 /**
  * Filter on total request/response duration.
  */
-class DurationFilter : public FilterImpl {
+class DurationFilter : public ComparisonFilter {
 public:
-  DurationFilter(Json::Object& json, Runtime::Loader& runtime) : FilterImpl(json, runtime) {}
+  DurationFilter(const envoy::api::v2::filter::DurationFilter& config, Runtime::Loader& runtime)
+      : ComparisonFilter(config.comparison(), runtime) {}
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -67,7 +71,8 @@ public:
  */
 class OperatorFilter : public Filter {
 public:
-  OperatorFilter(const Json::Object& json, Runtime::Loader& runtime);
+  OperatorFilter(const Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& configs,
+                 Runtime::Loader& runtime);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -78,7 +83,7 @@ protected:
  */
 class AndFilter : public OperatorFilter {
 public:
-  AndFilter(const Json::Object& json, Runtime::Loader& runtime);
+  AndFilter(const envoy::api::v2::filter::AndFilter& config, Runtime::Loader& runtime);
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -89,7 +94,7 @@ public:
  */
 class OrFilter : public OperatorFilter {
 public:
-  OrFilter(const Json::Object& json, Runtime::Loader& runtime);
+  OrFilter(const envoy::api::v2::filter::OrFilter& config, Runtime::Loader& runtime);
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -120,7 +125,7 @@ public:
  */
 class RuntimeFilter : public Filter {
 public:
-  RuntimeFilter(Json::Object& json, Runtime::Loader& runtime);
+  RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config, Runtime::Loader& runtime);
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -135,8 +140,9 @@ public:
   InstanceImpl(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
                Envoy::AccessLog::AccessLogManager& log_manager);
 
-  static InstanceSharedPtr fromJson(Json::Object& json, Runtime::Loader& runtime,
-                                    Envoy::AccessLog::AccessLogManager& log_manager);
+  static InstanceSharedPtr fromProto(const envoy::api::v2::filter::AccessLog& config,
+                                     Runtime::Loader& runtime,
+                                     Envoy::AccessLog::AccessLogManager& log_manager);
 
   // Http::AccessLog::Instance
   void log(const HeaderMap* request_headers, const HeaderMap* response_headers,

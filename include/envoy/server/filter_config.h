@@ -9,7 +9,6 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
@@ -117,11 +116,6 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-
-  /**
-   * @return RouteConfigProviderManager& singleton for use by the entire server.
-   */
-  virtual Router::RouteConfigProviderManager& routeConfigProviderManager() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };

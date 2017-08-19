@@ -42,10 +42,10 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
-  if (ProtobufTypes::FromString(cluster_load_assignment.cluster_name()) != cluster_name_) {
-    throw EnvoyException(
-        fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
-                    ProtobufTypes::FromString(cluster_load_assignment.cluster_name())));
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
+  if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
+    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
+                                     cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
@@ -56,8 +56,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                                           Config::MetadataEnvoyLbKeys::get().CANARY)
                               .bool_value();
       new_hosts.emplace_back(new HostImpl(
-          info_, "", Network::Utility::fromProtoResolvedAddress(lb_endpoint.endpoint().address()),
-          canary, lb_endpoint.load_balancing_weight().value(), zone));
+          info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()), canary,
+          lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

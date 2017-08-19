@@ -60,6 +60,7 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
+  ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config);
   ServerContextConfigImpl(const Json::Object& config);
 
   // Ssl::ServerContextConfig

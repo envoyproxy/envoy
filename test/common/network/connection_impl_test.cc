@@ -273,6 +273,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
   useMockBuffer();
 
   setUpBasicConnection();
+  EXPECT_FALSE(client_connection_->aboveHighWatermark());
 
   // Stick 5 bytes in the connection buffer.
   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
@@ -287,6 +288,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
     client_connection_->setBufferLimits(buffer_len - 3);
+    EXPECT_TRUE(client_connection_->aboveHighWatermark());
   }
 
   {
@@ -294,6 +296,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
     client_connection_->setBufferLimits(buffer_len + 1);
+    EXPECT_TRUE(client_connection_->aboveHighWatermark());
   }
 
   {
@@ -301,6 +304,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
     client_connection_->setBufferLimits(buffer_len * 3);
+    EXPECT_FALSE(client_connection_->aboveHighWatermark());
   }
 
   {
@@ -308,6 +312,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
     client_connection_->setBufferLimits(buffer_len * 2);
+    EXPECT_FALSE(client_connection_->aboveHighWatermark());
   }
 
   disconnect(false);

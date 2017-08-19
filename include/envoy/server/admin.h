@@ -31,9 +31,18 @@ public:
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
    * @param callback supplies the callback to invoke when the prefix matches.
+   * @param removable if true allows the handler to be removed via removeHandler.
+   * @return bool true if the handler was added, false if it was not added.
    */
-  virtual void addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback) PURE;
+  virtual bool addHandler(const std::string& prefix, const std::string& help_text,
+                          HandlerCb callback, bool removable) PURE;
+
+  /**
+   * Remove an admin handler if it is removable.
+   * @param prefix supplies the URL prefix of the handler to delete.
+   * @return bool true if the handler was removed, false if it was not removed.
+   */
+  virtual bool removeHandler(const std::string& prefix) PURE;
 
   /**
    * Obtain socket the admin endpoint is bound to.
