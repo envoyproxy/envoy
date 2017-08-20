@@ -165,11 +165,11 @@ public:
   }
 
   /**
-   * @return std::unique_ptr<Protobuf::Message> Empty config proto for v2. This provides sufficient
-   *         type information such that the opaque config can be parsed and placed in the created
-   *         config. Optional today, will be compulsory when v1 is deprecated.
+   * @return std::unique_ptr<Protobuf::Message> create empty config proto message for v2. The filter
+   *         config will be parsed into the result of this method. Optional today, will be
+   *         compulsory when v1 is deprecated.
    */
-  virtual std::unique_ptr<Protobuf::Message> createEmptyConfig() { return nullptr; }
+  virtual std::unique_ptr<Protobuf::Message> createConfigProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -233,11 +233,11 @@ public:
   }
 
   /**
-   * @return std::unique_ptr<Protobuf::Message> Empty config proto for v2. This provides sufficient
-   *         type information such that the opaque config can be parsed and placed in the created
-   *         config. Optional today, will be compulsory when v1 is deprecated.
+   * @return std::unique_ptr<Protobuf::Message> create empty config proto message for v2. The filter
+   *         config will be parsed into the result of this method. Optional today, will be
+   *         compulsory when v1 is deprecated.
    */
-  virtual std::unique_ptr<Protobuf::Message> createEmptyConfig() { return nullptr; }
+  virtual std::unique_ptr<Protobuf::Message> createConfigProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter

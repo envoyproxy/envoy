@@ -47,10 +47,10 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       if (filter_config->getBoolean("deprecatedV1", false)) {
         callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
       } else {
-        auto message = factory->createEmptyConfig();
+        auto message = factory->createConfigProto();
         if (!message) {
           throw EnvoyException(
-              fmt::format("Filter factory for '{}' unexpected proto config", string_name));
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
         }
         MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
         callback = factory->createFilterFactoryFromProto(*message, context);
@@ -413,6 +413,9 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
                   listener.name(), listener.socket().localAddress()->asString());
         stats_.listener_create_failure_.inc();
         removeListener(listener.name());
+      }
+      if (success) {
+        stats_.listener_create_success_.inc();
       }
     });
   });

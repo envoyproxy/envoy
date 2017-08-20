@@ -344,7 +344,7 @@ void BaseIntegrationTest::createApiTestServer(const std::string& json_path,
         version_);
     // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
     // needs to know about the bound listener ports.
-    test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   }
   registerTestServerPorts(port_names);
 }

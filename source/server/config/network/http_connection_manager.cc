@@ -238,10 +238,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         callback = factory->createFilterFactory(*filter_config->getObject("value", true),
                                                 stats_prefix_, context);
       } else {
-        auto message = factory->createEmptyConfig();
+        auto message = factory->createConfigProto();
         if (!message) {
           throw EnvoyException(
-              fmt::format("Filter factory for '{}' unexpected proto config", string_name));
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
         }
         MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
         callback = factory->createFilterFactoryFromProto(*message, stats_prefix_, context);
