@@ -21,7 +21,13 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 }
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
-  loadFromJson(Filesystem::fileReadToEnd(path), message);
+  const std::string contents = Filesystem::fileReadToEnd(path);
+  if (StringUtil::endsWith(path, ".yaml")) {
+    const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();
+    loadFromJson(json, message);
+  } else {
+    loadFromJson(contents, message);
+  }
 }
 
 Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {

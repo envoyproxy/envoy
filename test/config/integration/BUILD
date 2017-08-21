@@ -24,9 +24,9 @@ exports_files([
 filegroup(
     name = "server_xds_files",
     srcs = [
-        "server_xds.bootstrap.json",
-        "server_xds.cds.json",
-        "server_xds.eds.json",
+        "server_xds.bootstrap.yaml",
+        "server_xds.cds.yaml",
+        "server_xds.eds.yaml",
         "server_xds.json",
         "server_xds.lds.json",
         "server_xds.rds.json",
