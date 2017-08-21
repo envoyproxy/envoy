@@ -124,8 +124,25 @@ TEST_P(AdminInstanceTest, CustomHandler) {
     return Http::Code::Accepted;
   };
 
-  admin_.addHandler("/foo/bar", "hello", callback);
+  // Test removable handler.
+  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true));
   Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+
+  // Test that removable handler gets removed.
+  EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
+  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", response));
+  EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
+
+  // Add non removable handler.
+  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false));
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+
+  // Add again and make sure it is not there twice.
+  EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false));
+
+  // Try to remove non removable handler, and make sure it is not removed.
+  EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
 }
 

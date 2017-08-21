@@ -366,9 +366,9 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
 
   // Check that span has tags from custom headers.
-  request_headers.addViaCopy(Http::LowerCaseString("aa"), "a");
-  request_headers.addViaCopy(Http::LowerCaseString("bb"), "b");
-  request_headers.addViaCopy(Http::LowerCaseString("cc"), "c");
+  request_headers.addCopy(Http::LowerCaseString("aa"), "a");
+  request_headers.addCopy(Http::LowerCaseString("bb"), "b");
+  request_headers.addCopy(Http::LowerCaseString("cc"), "c");
   MockConfig config;
   config.headers_.push_back(Http::LowerCaseString("aa"));
   config.headers_.push_back(Http::LowerCaseString("cc"));

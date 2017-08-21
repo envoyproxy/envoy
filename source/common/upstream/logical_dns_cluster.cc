@@ -29,7 +29,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()), initialized_(false),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  const auto& hosts = cluster.dns_hosts().addresses();
+  const auto& hosts = cluster.hosts();
   if (hosts.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
@@ -48,8 +48,8 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& named_address = hosts[0].named_address();
-  dns_url_ = fmt::format("tcp://{}:{}", named_address.address(), named_address.port().value());
+  const auto& socket_address = hosts[0].socket_address();
+  dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 

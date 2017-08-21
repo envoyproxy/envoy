@@ -1,6 +1,7 @@
 #include "common/config/lds_json.h"
 
 #include "common/common/assert.h"
+#include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
 #include "common/json/config_schemas.h"
@@ -13,12 +14,8 @@ void LdsJson::translateListener(const Json::Object& json_listener,
                                 envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
-  // TODO(htuch): Figure out if we really want UnresolvedAddress here...
-  Network::Address::InstanceConstSharedPtr listener_address =
-      Network::Utility::resolveUrl(json_listener.getString("address"));
-  auto* named_address = listener.mutable_address()->mutable_named_address();
-  named_address->set_address(listener_address->ip()->addressAsString());
-  named_address->mutable_port()->set_value(listener_address->ip()->port());
+  AddressJson::translateAddress(json_listener.getString("address"), true, true,
+                                *listener.mutable_address());
 
   auto* filter_chain = listener.mutable_filter_chains()->Add();
   if (json_listener.hasObject("ssl_context")) {

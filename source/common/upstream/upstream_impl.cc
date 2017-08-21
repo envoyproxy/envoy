@@ -127,12 +127,12 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
   auto selected_dns_resolver = dns_resolver;
-  if (cluster.has_dns_resolvers()) {
-    const auto& resolver_addrs = cluster.dns_resolvers().addresses();
+  if (!cluster.dns_resolvers().empty()) {
+    const auto& resolver_addrs = cluster.dns_resolvers();
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
     resolvers.reserve(resolver_addrs.size());
     for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Utility::fromProtoResolvedAddress(resolver_addr));
+      resolvers.push_back(Network::Utility::fromProtoAddress(resolver_addr));
     }
     selected_dns_resolver = dispatcher.createDnsResolver(resolvers);
   }
@@ -322,9 +322,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
     : ClusterImplBase(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
                       added_via_api) {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
-  for (const auto& host : cluster.static_hosts().addresses()) {
+  for (const auto& host : cluster.hosts()) {
     new_hosts->emplace_back(HostSharedPtr{
-        new HostImpl(info_, "", Network::Utility::fromProtoResolvedAddress(host), false, 1, "")});
+        new HostImpl(info_, "", Network::Utility::fromProtoAddress(host), false, 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
@@ -439,11 +439,11 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     NOT_REACHED;
   }
 
-  for (const auto& host : cluster.dns_hosts().addresses()) {
+  for (const auto& host : cluster.hosts()) {
     resolve_targets_.emplace_back(
         new ResolveTarget(*this, dispatcher,
-                          fmt::format("tcp://{}:{}", host.named_address().address(),
-                                      host.named_address().port().value())));
+                          fmt::format("tcp://{}:{}", host.socket_address().address(),
+                                      host.socket_address().port_value())));
   }
 
   // We have to first construct resolve_targets_ before invoking startResolve(),
