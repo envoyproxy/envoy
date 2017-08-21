@@ -734,6 +734,7 @@ FieldSharedPtr parseYamlNode(YAML::Node node) {
   case YAML::NodeType::Undefined:
     throw EnvoyException("Undefined YAML value");
   }
+  NOT_REACHED;
 }
 
 } // namespace
