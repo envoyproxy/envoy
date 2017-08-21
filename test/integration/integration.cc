@@ -710,7 +710,7 @@ void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
   executeActions(
       {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
        [&]() -> void {
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                    {":path", "/test/long/url"},
                                                                    {":scheme", "http"},
                                                                    {":authority", "host"},
@@ -815,6 +815,48 @@ void BaseIntegrationTest::testGrpcRetry() {
          if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
            EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
          }
+       },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+// Very similar set-up to testRetry but with a 16k request the request will not
+// be buffered and the 503 will be returned to the user.
+void BaseIntegrationTest::testRetryHittingBufferLimit(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr request;
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("http_with_buffer_limits"), type);
+       },
+       [&]() -> void {
+         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"},
+                                                                   {"x-forwarded-for", "10.0.0.1"},
+                                                                   {"x-envoy-retry-on", "5xx"}},
+                                           1024 * 65, *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void {
+         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+       },
+       [&]() -> void {
+         response->waitForEndStream();
+         EXPECT_TRUE(request->complete());
+         EXPECT_EQ(66560U, request->bodyLength());
+
+         EXPECT_TRUE(response->complete());
+         EXPECT_STREQ("503", response->headers().Status()->value().c_str());
        },
        // Cleanup both downstream and upstream
        [&]() -> void { codec_client->close(); },

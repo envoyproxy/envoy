@@ -280,17 +280,12 @@ void Filter::sendNoHealthyUpstreamResponse() {
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
-
-  // TODO(alyssawilk) Test.  A lot.
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
     // The request is larger than we should buffer.  Give up on the retry/shadow
     retry_state_.reset();
     buffering = false;
     do_shadowing_ = false;
-    // TODO(alyssawilk) can we drain the decodingBuffer?  Currently it's const.  We could
-    // continue() and delete but that's hacky and scary.
-    // callbacks_->decodingBuffer()->drain(callbacks_->decodingBuffer()->length());
   }
 
   // If we are going to buffer for retries or shadowing, we need to make a copy before encoding

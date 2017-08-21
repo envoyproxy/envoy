@@ -138,6 +138,9 @@ public:
     return callbacks_->connection();
   }
 
+protected:
+  RetryStatePtr retry_state_;
+
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
@@ -259,7 +262,6 @@ private:
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
-  RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;

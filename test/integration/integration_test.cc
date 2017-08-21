@@ -66,6 +66,12 @@ TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
                                        4 * 1024 * 1024, false);
 }
 
+TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
+                                       Http::CodecClient::Type::HTTP1, 1024 * 1024, 1024 * 1024,
+                                       false);
+}
+
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, true);
@@ -112,6 +118,10 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
+
+TEST_P(IntegrationTest, RetryHittingBufferLimit) {
+  testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP1);
+}
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
 

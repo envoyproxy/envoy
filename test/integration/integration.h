@@ -234,6 +234,7 @@ protected:
   void testMultipleContentLengths(Http::CodecClient::Type type);
   void testDrainClose(Http::CodecClient::Type type);
   void testRetry(Http::CodecClient::Type type);
+  void testRetryHittingBufferLimit(Http::CodecClient::Type type);
   void testGrpcRetry();
 
   // HTTP/2 client tests.

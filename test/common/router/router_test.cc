@@ -1293,5 +1293,41 @@ TEST_F(WatermarkTest, FilterWatermarks) {
   sendResponse();
 } // namespace Router
 
+// Same as RetryRequestNotComplete but with decodeData larger than the buffer
+// limit, no retry will occur.
+TEST_F(WatermarkTest, RetryRequestNotComplete) {
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillOnce(Return(10));
+  router_.setDecoderFilterCallbacks(callbacks_);
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillRepeatedly(Invoke(
+          [&](Http::StreamDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+            return nullptr;
+          }));
+  EXPECT_CALL(callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillRepeatedly(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data("1234567890123");
+  EXPECT_CALL(*router_.retry_state_, enabled()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).Times(0);
+  // This will result in retry_state_ being deleted.
+  router_.decodeData(data, false);
+
+  // This should not trigger a retry as the retry state has been deleted.
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+}
+
 } // namespace Router
 } // namespace Envoy

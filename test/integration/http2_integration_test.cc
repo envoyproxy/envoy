@@ -60,7 +60,7 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer_limits")),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
                                        Http::CodecClient::Type::HTTP2, 1024 * 1024, 1024 * 1024,
                                        false);
 }
@@ -113,6 +113,10 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP2); }
 
 TEST_P(Http2IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
+
+TEST_P(Http2IntegrationTest, RetryHittingBufferLimit) {
+  testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP2);
+}
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
@@ -289,7 +293,7 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) {
 }
 
 TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
-  simultaneousRequest(lookupPort("http_buffer_limits"), 1024 * 32, 1024 * 16);
+  simultaneousRequest(lookupPort("http_with_buffer_limits"), 1024 * 32, 1024 * 16);
 }
 
 } // namespace Envoy

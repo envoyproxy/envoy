@@ -150,6 +150,13 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.setWatermarks(8, 20);
   buffer_.setWatermarks(10, 20);
   EXPECT_EQ(1, times_low_watermark_called_);
+
+  EXPECT_EQ(1, times_high_watermark_called_);
+  buffer_.setWatermarks(2);
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(0);
+  EXPECT_EQ(2, times_low_watermark_called_);
 }
 
 TEST_F(WatermarkBufferTest, GetRawSlices) {
