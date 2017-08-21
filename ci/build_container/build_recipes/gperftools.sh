@@ -11,7 +11,7 @@ cd gperftools-$VERSION
 if [[ `uname` == "Darwin" ]];
 then
   # enable ucontext(3) and syscall
-  export CPPFLAGS="-D_XOPEN_SOURCE=500 -D_DARWIN_C_SOURCE"
+  export CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE=500 -D_DARWIN_C_SOURCE"
 fi
 
 LDFLAGS="-lpthread" ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-frame-pointers --disable-libunwind
