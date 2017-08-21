@@ -127,7 +127,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls), admin_(admin) {
-  admin_.addHandler("/routes", "print out currently loaded dynamic route tables",
+  admin_.addHandler("/routes", "print out currently loaded dynamic HTTP route tables",
                     MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
 }
 
@@ -136,7 +136,7 @@ RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
 }
 
 std::vector<RdsRouteConfigProviderSharedPtr>
-RouteConfigProviderManagerImpl::routeConfigProviders() {
+RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
   std::vector<RdsRouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
@@ -183,33 +183,27 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-void RouteConfigProviderManagerImpl::addRouteInfo(RouteConfigProviderSharedPtr provider,
+void RouteConfigProviderManagerImpl::addRouteInfo(RdsRouteConfigProviderSharedPtr provider,
                                                   Buffer::Instance& response) {
-  response.add(fmt::format(
-      "route_config_name: {}\n",
-      std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->route_config_name_));
-  response.add(
-      fmt::format("cluster_name",
-                  std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->cluster_name_));
+  response.add(fmt::format("route_config_name: {}\n", provider->routeConfigName()));
+  response.add(fmt::format("cluster_name", provider->clusterName()));
   response.add("config dump: \n");
-  response.add(fmt::format("{}\n", std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)
-                                       ->route_config_proto_.DebugString()));
+  response.add(fmt::format("{}\n", provider->configAsString()));
 }
 
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() == 0) {
-    for (auto provider : routeConfigProviders()) {
+    for (auto provider : rdsRouteConfigProviders()) {
       addRouteInfo(provider, response);
     }
     return Http::Code::OK;
   }
   auto it = query_params.find("route_config_name");
   if (it != query_params.end()) {
-    for (auto provider : routeConfigProviders()) {
-      if (std::static_pointer_cast<RdsRouteConfigProviderImpl>(provider)->route_config_name_ ==
-          it->second) {
+    for (auto provider : rdsRouteConfigProviders()) {
+      if (provider->routeConfigName() == it->second) {
         addRouteInfo(provider, response);
       }
     }

@@ -373,7 +373,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(1UL, provider3.use_count());
 
   std::vector<RdsRouteConfigProviderSharedPtr> configured_providers =
-      route_config_provider_manager_.routeConfigProviders();
+      route_config_provider_manager_.rdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
   EXPECT_EQ(3UL, provider.use_count());
   EXPECT_EQ(2UL, provider3.use_count());
@@ -384,14 +384,14 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider pointed at by provider3.
-  configured_providers = route_config_provider_manager_.routeConfigProviders();
+  configured_providers = route_config_provider_manager_.rdsRouteConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
   EXPECT_EQ(provider3, configured_providers.front());
 
   provider3.reset();
   configured_providers.clear();
 
-  configured_providers = route_config_provider_manager_.routeConfigProviders();
+  configured_providers = route_config_provider_manager_.rdsRouteConfigProviders();
   EXPECT_EQ(0UL, configured_providers.size());
 }
 

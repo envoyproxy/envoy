@@ -94,6 +94,8 @@ public:
 
   // Router::RdsRouteConfigProvider
   std::string configAsString() override { return route_config_proto_.DebugString(); }
+  std::string routeConfigName() override { return route_config_name_; }
+  std::string clusterName() override { return cluster_name_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
@@ -144,7 +146,7 @@ public:
   ~RouteConfigProviderManagerImpl();
 
   // ServerRouteConfigProviderManager
-  std::vector<RdsRouteConfigProviderSharedPtr> routeConfigProviders() override;
+  std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::Rds& rds,
                                                       Upstream::ClusterManager& cm,
@@ -153,7 +155,7 @@ public:
                                                       Init::Manager& init_manager) override;
 
 private:
-  void addRouteInfo(RouteConfigProviderSharedPtr provider, Buffer::Instance& response);
+  void addRouteInfo(RdsRouteConfigProviderSharedPtr provider, Buffer::Instance& response);
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
