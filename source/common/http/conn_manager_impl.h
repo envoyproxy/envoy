@@ -352,13 +352,14 @@ private:
 
     // ActiveStreamFilterBase
     Buffer::WatermarkBufferPtr createBuffer() override {
-      auto buffer = new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                                [this]() -> void { this->requestDataTooLarge(); },
-                                                [this]() -> void { this->requestDataDrained(); });
+      auto buffer = Buffer::WatermarkBufferPtr{
+          new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                      [this]() -> void { this->requestDataTooLarge(); },
+                                      [this]() -> void { this->requestDataDrained(); })};
       if (parent_.buffer_limit_ > 0) {
         buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
       }
-      return Buffer::WatermarkBufferPtr{buffer};
+      return buffer;
     }
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
