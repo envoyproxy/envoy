@@ -229,7 +229,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
 
   if (bootstrap.has_upstream_bind_config()) {
     if (bootstrap.upstream_bind_config().has_source_address()) {
-      source_address_ = Network::Utility::fromProtoResolvedAddress(
+      source_address_ = Network::Utility::fromProtoSocketAddress(
           bootstrap.upstream_bind_config().source_address());
     }
   }

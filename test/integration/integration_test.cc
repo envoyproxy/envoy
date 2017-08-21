@@ -254,10 +254,8 @@ public:
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = "127.0.0.5";
     }
-    bootstrap.mutable_upstream_bind_config()
-        ->mutable_source_address()
-        ->mutable_socket_address()
-        ->set_ip_address(address_string_);
+    bootstrap.mutable_upstream_bind_config()->mutable_source_address()->set_address(
+        address_string_);
 
     api_filesystem_config_.bootstrap_path_ =
         TestEnvironment::writeStringToFileForTest("bootstrap.pb", bootstrap.SerializeAsString());

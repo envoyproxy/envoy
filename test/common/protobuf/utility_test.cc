@@ -10,10 +10,7 @@ namespace Envoy {
 
 TEST(UtilityTest, LoadProtoFromFile) {
   envoy::api::v2::Bootstrap bootstrap;
-  bootstrap.mutable_upstream_bind_config()
-      ->mutable_source_address()
-      ->mutable_socket_address()
-      ->set_ip_address("1.1.1.1");
+  bootstrap.mutable_upstream_bind_config()->mutable_source_address()->set_address("1.1.1.1");
 
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
