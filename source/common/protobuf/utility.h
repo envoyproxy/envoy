@@ -49,6 +49,8 @@ public:
 class MessageUtil {
 public:
   static std::size_t hash(const Protobuf::Message& message) {
+    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
+    // message doesn't hash to different values.
     std::string text;
     Protobuf::io::StringOutputStream string_stream(&text);
     Protobuf::io::CodedOutputStream coded_stream(&string_stream);
@@ -57,7 +59,7 @@ public:
     return std::hash<std::string>{}(text);
   }
 
-  static void loadFromJson(const std::string json, Protobuf::Message& message);
+  static void loadFromJson(const std::string& json, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 };
 

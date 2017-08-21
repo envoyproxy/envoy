@@ -13,7 +13,7 @@ MissingFieldException::MissingFieldException(const std::string& field_name,
     : EnvoyException(
           fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
 
-void MessageUtil::loadFromJson(const std::string json, Protobuf::Message& message) {
+void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
   const auto status = Protobuf::util::JsonStringToMessage(json, &message);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
