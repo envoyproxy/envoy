@@ -87,7 +87,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
-  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -233,7 +233,7 @@ protected:
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
-  RequestHeaderParser& requestHeaderParser() { return *request_headers_parser_; };
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   struct RuntimeData {
@@ -447,7 +447,7 @@ public:
 
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
-  RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;

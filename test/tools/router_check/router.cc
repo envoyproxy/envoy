@@ -60,6 +60,7 @@ RouterCheckTool::RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> 
     : runtime_(std::move(runtime)), cm_(std::move(cm)), config_(std::move(config)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
+
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
@@ -120,6 +121,17 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
         if (!compareHeaderField(tool_config, header_field->getString("field"),
                                 header_field->getString("value"))) {
+          no_failures = false;
+        }
+      }
+    }
+
+    if (validate->hasObject("custom_header_fields")) {
+      ENVOY_LOG(info, "processing custom_header_fields.");
+      for (const Json::ObjectSharedPtr& header_field :
+           validate->getObjectArray("custom_header_fields")) {
+        if (!compareCustomHeaderField(tool_config, header_field->getString("field"),
+                                      header_field->getString("value"))) {
           no_failures = false;
         }
       }
@@ -189,8 +201,19 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
 bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
                                          const std::string& expected) {
   std::string actual = tool_config.headers_->get_(field);
-
   return compareResults(actual, expected, "check_header");
+}
+
+bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
+                                               const std::string& expected) {
+  std::string actual = "";
+  Envoy::Http::AccessLog::RequestInfoImpl requestInfo(Envoy::Http::Protocol::Http11);
+  requestInfo.downstream_address_ = "127.0.0.1";
+  if (tool_config.route_->routeEntry() != nullptr) {
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, requestInfo);
+    actual = tool_config.headers_->get_(field);
+  }
+  return compareResults(actual, expected, "custom_header");
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,

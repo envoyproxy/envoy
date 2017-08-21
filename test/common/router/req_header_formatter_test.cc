@@ -29,7 +29,7 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
 
 static bool CheckFormatMessage(const std::string error_message,
                                const std::string expected_message) {
-  std::size_t found = error_message.find(expected_message);
+  const std::size_t found = error_message.find(expected_message);
   return (found != std::string::npos);
 }
 
@@ -134,5 +134,6 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
   req_header_parser->evaluateRequestHeaders(headerMap, requestInfo, requestHeadersToAdd);
   EXPECT_TRUE(headerMap.has("static-header"));
 }
+
 } // namespace Router
 } // namespace Envoy
