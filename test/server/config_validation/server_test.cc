@@ -39,7 +39,8 @@ TEST_P(ValidationServerTest, Validate) {
 // as-is.
 INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
                         ::testing::Values("front-envoy.json", "google_com_proxy.json",
-                                          "s2s-grpc-envoy.json", "service-envoy.json"));
+                                          "google_com_proxy.yaml", "s2s-grpc-envoy.json",
+                                          "service-envoy.json"));
 
 } // namespace Server
 } // namespace Envoy

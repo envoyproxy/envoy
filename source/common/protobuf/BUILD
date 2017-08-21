@@ -23,5 +23,6 @@ envoy_cc_library(
         ":protobuf",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )
