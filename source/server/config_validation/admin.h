@@ -8,13 +8,12 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Config-validation-only implementation Server::Admin
+ * Config-validation-only implementation Server::Admin. This implementation is
+ * needed because Admin is referenced by components of the server that add and
+ * remove handlers.
  */
 class ValidationAdmin : public Admin {
 public:
-  ValidationAdmin() {}
-  ~ValidationAdmin() {}
-
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::ListenSocket& socket() override;

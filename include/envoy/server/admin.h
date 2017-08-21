@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Server {
 
-#define MAKE_HANDLER(X)                                                                            \
+#define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](const std::string& url, Buffer::Instance& data) -> Http::Code { return X(url, data); }
 
 /**

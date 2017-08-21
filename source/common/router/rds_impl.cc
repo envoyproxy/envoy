@@ -128,23 +128,22 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls), admin_(admin) {
   admin_.addHandler("/routes", "print out currently loaded dynamic route tables",
-                    MAKE_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
+                    MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
 }
 
 RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
-  // delete routes handler
   admin_.removeHandler("/routes");
 }
 
-std::vector<Router::RouteConfigProviderSharedPtr>
+std::vector<RdsRouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::routeConfigProviders() {
-  std::vector<Router::RouteConfigProviderSharedPtr> ret;
+  std::vector<RdsRouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigProviderImpl destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
-    Router::RouteConfigProviderSharedPtr provider = element.second.lock();
+    std::shared_ptr<RdsRouteConfigProviderImpl> provider = element.second.lock();
     ASSERT(provider)
     ret.push_back(provider);
   }
@@ -216,9 +215,9 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
     }
     return Http::Code::OK;
   } else {
-    response.add("usage: /routes? (dump all dynamic route tables)\n");
+    response.add("usage: /routes (dump all dynamic route tables).\n");
     response.add("usage: /routes?route_config_name=<name> (dump all dynamic route tables with the "
-                 "route_config_name if any)\n");
+                 "<name> if any).\n");
     return Http::Code::NotFound;
   }
 }

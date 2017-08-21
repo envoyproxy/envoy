@@ -72,11 +72,11 @@ struct RdsStats {
 class RouteConfigProviderManagerImpl;
 
 /**
- * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
+ * Implementation of RdsRouteConfigProvider that fetches the route configuration dynamically using
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl
-    : public RouteConfigProvider,
+    : public RdsRouteConfigProvider,
       public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
@@ -91,6 +91,9 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
+
+  // Router::RdsRouteConfigProvider
+  std::string configAsString() override { return route_config_proto_.DebugString(); }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
@@ -141,7 +144,7 @@ public:
   ~RouteConfigProviderManagerImpl();
 
   // ServerRouteConfigProviderManager
-  std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() override;
+  std::vector<RdsRouteConfigProviderSharedPtr> routeConfigProviders() override;
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::Rds& rds,
                                                       Upstream::ClusterManager& cm,
@@ -153,7 +156,8 @@ private:
   void addRouteInfo(RouteConfigProviderSharedPtr provider, Buffer::Instance& response);
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 
-  std::unordered_map<std::string, std::weak_ptr<RouteConfigProvider>> route_config_providers_;
+  std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
+      route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;

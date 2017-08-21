@@ -56,7 +56,7 @@ public:
    * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
    * RouteConfigProviders currently loaded.
    */
-  virtual std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() PURE;
+  virtual std::vector<RdsRouteConfigProviderSharedPtr> routeConfigProviders() PURE;
 };
 
 } // namespace Router

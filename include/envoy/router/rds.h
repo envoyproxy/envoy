@@ -23,7 +23,21 @@ public:
   virtual Router::ConfigConstSharedPtr config() PURE;
 };
 
+/**
+ * A provider for dynamic route configurations.
+ */
+class RdsRouteConfigProvider : public RouteConfigProvider {
+public:
+  virtual ~RdsRouteConfigProvider() {}
+
+  /**
+   * @return string the loaded route table.
+   */
+  virtual std::string configAsString() PURE;
+};
+
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
+typedef std::shared_ptr<RdsRouteConfigProvider> RdsRouteConfigProviderSharedPtr;
 
 } // namespace Router
 } // namespace Envoy
