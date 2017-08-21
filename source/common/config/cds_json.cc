@@ -88,26 +88,24 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   const std::string string_type = json_cluster.getString("type");
   auto set_dns_hosts = [&json_cluster, &cluster] {
     const auto hosts = json_cluster.getObjectArray("hosts");
-    std::transform(
-        hosts.cbegin(), hosts.cend(),
-        Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_dns_hosts()->mutable_addresses()),
-        [](const Json::ObjectSharedPtr& host) {
-          envoy::api::v2::UnresolvedAddress unresolved_address;
-          AddressJson::translateUnresolvedAddress(host->getString("url"), true, unresolved_address);
-          return unresolved_address;
-        });
+    std::transform(hosts.cbegin(), hosts.cend(),
+                   Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_hosts()),
+                   [](const Json::ObjectSharedPtr& host) {
+                     envoy::api::v2::Address address;
+                     AddressJson::translateAddress(host->getString("url"), true, false, address);
+                     return address;
+                   });
   };
   if (string_type == "static") {
     cluster.set_type(envoy::api::v2::Cluster::STATIC);
     const auto hosts = json_cluster.getObjectArray("hosts");
-    std::transform(
-        hosts.cbegin(), hosts.cend(),
-        Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_static_hosts()->mutable_addresses()),
-        [](const Json::ObjectSharedPtr& host) {
-          envoy::api::v2::ResolvedAddress resolved_address;
-          AddressJson::translateResolvedAddress(host->getString("url"), true, resolved_address);
-          return resolved_address;
-        });
+    std::transform(hosts.cbegin(), hosts.cend(),
+                   Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_hosts()),
+                   [](const Json::ObjectSharedPtr& host) {
+                     envoy::api::v2::Address address;
+                     AddressJson::translateAddress(host->getString("url"), true, true, address);
+                     return address;
+                   });
   } else if (string_type == "strict_dns") {
     cluster.set_type(envoy::api::v2::Cluster::STRICT_DNS);
     set_dns_hosts();
@@ -181,12 +179,11 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   if (json_cluster.hasObject("dns_resolvers")) {
     const auto dns_resolvers = json_cluster.getStringArray("dns_resolvers");
     std::transform(dns_resolvers.cbegin(), dns_resolvers.cend(),
-                   Protobuf::RepeatedPtrFieldBackInserter(
-                       cluster.mutable_dns_resolvers()->mutable_addresses()),
-                   [](const std::string& address) {
-                     envoy::api::v2::ResolvedAddress resolved_address;
-                     AddressJson::translateResolvedAddress(address, false, resolved_address);
-                     return resolved_address;
+                   Protobuf::RepeatedPtrFieldBackInserter(cluster.mutable_dns_resolvers()),
+                   [](const std::string& json_address) {
+                     envoy::api::v2::Address address;
+                     AddressJson::translateAddress(json_address, false, true, address);
+                     return address;
                    });
   }
 

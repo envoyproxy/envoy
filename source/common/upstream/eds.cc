@@ -56,8 +56,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                                           Config::MetadataEnvoyLbKeys::get().CANARY)
                               .bool_value();
       new_hosts.emplace_back(new HostImpl(
-          info_, "", Network::Utility::fromProtoResolvedAddress(lb_endpoint.endpoint().address()),
-          canary, lb_endpoint.load_balancing_weight().value(), zone));
+          info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()), canary,
+          lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

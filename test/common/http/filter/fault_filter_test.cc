@@ -347,7 +347,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
 TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   SetUpTest(fixed_delay_only_json);
 
-  request_headers_.addViaCopy("x-envoy-downstream-service-cluster", "cluster");
+  request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
 
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
@@ -395,7 +395,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   SetUpTest(fixed_delay_and_abort_json);
 
-  request_headers_.addViaCopy("x-envoy-downstream-service-cluster", "cluster");
+  request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
 
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
@@ -501,7 +501,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
 
-  request_headers_.addViaCopy("x-envoy-downstream-service-node", "canary");
+  request_headers_.addCopy("x-envoy-downstream-service-node", "canary");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
@@ -531,8 +531,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   SetUpTest(fixed_delay_and_abort_match_headers_json);
-  request_headers_.addViaCopy("x-foo1", "Bar");
-  request_headers_.addViaCopy("x-foo2", "RandomValue");
+  request_headers_.addCopy("x-foo1", "Bar");
+  request_headers_.addCopy("x-foo2", "RandomValue");
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
@@ -574,8 +574,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
   SetUpTest(fixed_delay_and_abort_match_headers_json);
-  request_headers_.addViaCopy("x-foo1", "Bar");
-  request_headers_.addViaCopy("x-foo3", "Baz");
+  request_headers_.addCopy("x-foo1", "Bar");
+  request_headers_.addCopy("x-foo3", "Baz");
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);

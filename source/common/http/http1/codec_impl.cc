@@ -177,6 +177,10 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
+
+uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -259,7 +263,10 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
-    : connection_(connection) {
+    : connection_(connection), output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                              [&]() -> void { this->onBelowLowWatermark(); },
+                                              [&]() -> void { this->onAboveHighWatermark(); }) {
+  output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
@@ -559,6 +566,17 @@ void ServerConnectionImpl::sendProtocolError() {
   }
 }
 
+void ServerConnectionImpl::onAboveHighWatermark() {
+  if (active_request_) {
+    active_request_->response_encoder_.runHighWatermarkCallbacks();
+  }
+}
+void ServerConnectionImpl::onBelowLowWatermark() {
+  if (active_request_) {
+    active_request_->response_encoder_.runLowWatermarkCallbacks();
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
     : ConnectionImpl(connection, HTTP_RESPONSE) {}
 
@@ -575,7 +593,13 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
-
+  // Streams are responsible for unwinding any outstanding readDisable(true)
+  // calls done on the underlying connection as they are destroyed. As this is
+  // the only place a HTTP/1 stream is destroyed where the Network::Connection is
+  // reused, unwind any outstanding readDisable() calls here.
+  while (!connection_.readEnabled()) {
+    connection_.readDisable(false);
+  }
   request_encoder_.reset(new RequestStreamEncoderImpl(*this));
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
@@ -639,6 +663,10 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     request_encoder_->runResetCallbacks(reason);
   }
 }
+
+void ClientConnectionImpl::onAboveHighWatermark() { request_encoder_->runHighWatermarkCallbacks(); }
+
+void ClientConnectionImpl::onBelowLowWatermark() { request_encoder_->runLowWatermarkCallbacks(); }
 
 } // namespace Http1
 } // namespace Http

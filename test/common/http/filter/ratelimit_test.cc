@@ -167,8 +167,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
         request_callbacks_ = &callbacks;
       })));
 
-  request_headers_.addViaCopy(Http::Headers::get().RequestId, "requestid");
-  request_headers_.addViaCopy(Http::Headers::get().OtSpanContext, "context");
+  request_headers_.addCopy(Http::Headers::get().RequestId, "requestid");
+  request_headers_.addCopy(Http::Headers::get().OtSpanContext, "context");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));

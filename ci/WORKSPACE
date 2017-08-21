@@ -3,8 +3,14 @@ workspace(name = "ci")
 load("//bazel:repositories.bzl", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
+# We shouldn't need this, but it's a workaround for https://github.com/bazelbuild/bazel/issues/3580.
+local_repository(
+    name = "envoy",
+    path = "/source",
+)
+
 envoy_dependencies(
-    path = "//ci/prebuilt",
+    path = "@envoy//ci/prebuilt",
 )
 
 cc_configure()
