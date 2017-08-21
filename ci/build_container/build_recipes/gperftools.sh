@@ -8,9 +8,9 @@ wget -O gperftools-$VERSION.tar.gz https://github.com/gperftools/gperftools/rele
 tar xf gperftools-$VERSION.tar.gz
 cd gperftools-$VERSION
 
+# TODO(zuercher): Remove this workaround for https://github.com/gperftools/gperftools/issues/910
 if [[ `uname` == "Darwin" ]];
 then
-  # enable ucontext(3) and syscall
   export CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE=500 -D_DARWIN_C_SOURCE"
 fi
 
