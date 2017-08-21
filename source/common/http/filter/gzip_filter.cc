@@ -3,16 +3,17 @@
 
 #include <iostream>
 
+#include <chrono>
+
+
 namespace Envoy {
 namespace Http {
 
-GzipFilter::GzipFilter() {
-  this->ZlibPtr_ = std::unique_ptr<Zlib::Impl>(new Zlib::Impl());
-}
+GzipFilter::GzipFilter() { }
 
-GzipFilter::~GzipFilter() {}
+GzipFilter::~GzipFilter() { }
 
-void GzipFilter::onDestroy() {}
+void GzipFilter::onDestroy() { }
 
 FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
   Http::HeaderEntry* content_encoding_header = headers.AcceptEncoding();
@@ -79,27 +80,24 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
   headers.removeEtag();
 
+  compressor_.init(Compressor::Impl::CompressionLevel::best);
+  
   return Http::FilterHeadersStatus::Continue;
 }
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (end_stream) {
-    ZlibPtr_->endStream();
-    std::cout << "total in: " << ZlibPtr_->getTotalIn() << std::endl;
-    std::cout << "total out: " << ZlibPtr_->getTotalOut() << std::endl;
-    return Http::FilterDataStatus::Continue;
-  }
-  
   if (!deflate_ || is_compressed_) {
     return Http::FilterDataStatus::Continue;
   }
 
-  if (ZlibPtr_->deflateData(data)) {
-    data.move(ZlibPtr_->moveOut());
-    return Http::FilterDataStatus::Continue;
-  } else { 
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+  compressor_.compress(data, buffer_);
+  data.move(buffer_);
+  
+  if (data.length() == 0 || end_stream) {
+    compressor_.finish();
   }
+
+  return Http::FilterDataStatus::Continue;
 }
 
 FilterTrailersStatus GzipFilter::encodeTrailers(HeaderMap&) {

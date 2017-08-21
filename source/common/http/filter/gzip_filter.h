@@ -5,9 +5,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/zlib/zlib_impl.h"
-
-#include "zlib.h"
+#include "common/compressor/compressor_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -33,12 +31,13 @@ public:
   void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
-  bool compress(Buffer::Instance& data);
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   Http::HeaderEntry* content_encoding_header_{nullptr};
-  std::unique_ptr<Zlib::Impl> ZlibPtr_{nullptr};
-
+  Compressor::Impl compressor_;
+  Buffer::OwnedImpl buffer_;
+  Event::TimerPtr request_timeout_;
+  
   bool deflate_{false};
   bool is_compressed_{true};
 
