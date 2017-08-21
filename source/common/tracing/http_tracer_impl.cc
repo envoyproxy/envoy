@@ -17,27 +17,28 @@
 namespace Envoy {
 namespace Tracing {
 
-static std::string buildRequestLine(const Http::HeaderMap& request_headers,
-                                    const Http::AccessLog::RequestInfo& info) {
-  std::string path = request_headers.EnvoyOriginalPath()
-                         ? request_headers.EnvoyOriginalPath()->value().c_str()
-                         : request_headers.Path()->value().c_str();
-  static const size_t max_path_length = 128;
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path,
-                     Http::AccessLog::AccessLogFormatUtils::protocolToString(info.protocol()));
-}
-
 static std::string buildResponseCode(const Http::AccessLog::RequestInfo& info) {
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
 static std::string valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
   return header ? header->value().c_str() : default_value;
+}
+
+static std::string buildUrl(const Http::HeaderMap& request_headers) {
+  std::string path = request_headers.EnvoyOriginalPath()
+                         ? request_headers.EnvoyOriginalPath()->value().c_str()
+                         : request_headers.Path()->value().c_str();
+  std::string url = fmt::format("{}://{}{}",
+                     "http",
+                     valueOrDefault(request_headers.Host(), ""),
+                     path);
+  static const size_t max_path_length = 128;
+  if (url.length() > max_path_length) {
+    return url.substr(0, max_path_length);
+  }
+
+  return url;
 }
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
@@ -126,13 +127,12 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
   // Pre response data.
   if (request_headers_) {
     span.setTag("guid:x-request-id", std::string(request_headers_->RequestId()->value().c_str()));
-    span.setTag("request_line", buildRequestLine(*request_headers_, request_info_));
+    span.setTag("http.url", buildUrl(*request_headers_));
+    span.setTag("http.method", request_headers_->Method()->value().c_str());
     span.setTag("host_header", valueOrDefault(request_headers_->Host(), "-"));
     span.setTag("downstream_cluster",
                 valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
-
-    span.setTag("http.method", request_headers_->Method()->value().c_str());
 
     if (request_headers_->ClientTraceId()) {
       span.setTag("guid:x-client-trace-id",
@@ -154,9 +154,7 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
   }
 
   // Post response data.
-  std::string responseCode = buildResponseCode(request_info_);
-  span.setTag("http.status_code", responseCode);
-  span.setTag("response_code", responseCode);
+  span.setTag("http.status_code", buildResponseCode(request_info_));
   span.setTag("response_size", std::to_string(request_info_.bytesSent()));
   span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info_));
 
