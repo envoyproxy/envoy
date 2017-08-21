@@ -58,15 +58,13 @@ statsd_local_udp_port (Warning: DEPRECATED and will be removed in 1.4.0)
   *(optional, integer)* The UDP port of a locally running statsd compliant listener. If specified,
   :ref:`statistics <arch_overview_statistics>` will be flushed to this port.
 
-statsd_udp_ip_address (Warning: DEPRECATED and will be removed in 1.5.0 in favor of an entry in
-stats_sinks)
+statsd_udp_ip_address (Warning: DEPRECATED and will be removed in 1.5.0)
   *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
   :ref:`statistics <arch_overview_statistics>` will be flushed to this address. IPv4 addresses should
   have format host:port (ex: 127.0.0.1:855). IPv6 addresses should have URL format [host]:port
   (ex: [::1]:855).
 
-statsd_tcp_cluster_name (Warning: DEPRECATED and will be removed in 1.5.0 in favor of an entry in
-stats_sinks)
+statsd_tcp_cluster_name (Warning: DEPRECATED and will be removed in 1.5.0)
   *(optional, string)* The name of a cluster manager cluster that is running a TCP statsd compliant
   listener. If specified, Envoy will connect to this cluster to flush :ref:`statistics
   <arch_overview_statistics>`.
