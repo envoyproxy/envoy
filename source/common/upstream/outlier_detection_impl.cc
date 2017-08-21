@@ -57,12 +57,6 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
     if (++consecutive_5xx_ ==
         detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
                                                   detector->config().consecutive5xx())) {
-      // There are two outcomes here. The ejection will be enforced,
-      // or it won't. Either way the host won't trigger the check above if it keeps been
-      // charged with only 5xx ResponseCodes without an intervening non-5xx code. Therefore,
-      // the consecutive_5xx_ counter should be reset to allow the Sink to detect another bout
-      // of 5xx from this host.
-      consecutive_5xx_ = 0;
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
@@ -253,6 +247,13 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
   if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
     return;
   }
+
+  // There are two outcomes here. The ejection will be enforced,
+  // or it won't. Either way the host won't trigger the check above if it keeps been
+  // charged with only 5xx ResponseCodes without an intervening non-5xx code. Therefore,
+  // the consecutive_5xx_ counter should be reset to allow the Sink to detect another bout
+  // of 5xx from this host.
+  host_sinks_[host]->resetConsecutive5xx();
 
   stats_.ejections_consecutive_5xx_.inc();
   ejectHost(host, EjectionType::Consecutive5xx);
