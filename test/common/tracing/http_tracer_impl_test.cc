@@ -317,7 +317,6 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
   EXPECT_CALL(*span, setTag("http.url", "http:///test"));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
-  EXPECT_CALL(*span, setTag("host_header", "-"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
@@ -357,7 +356,6 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
   EXPECT_CALL(*span, setTag("http.url", "http://api/test"));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
-  EXPECT_CALL(*span, setTag("host_header", "api"));
   EXPECT_CALL(*span, setTag("user_agent", "agent"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "downstream_cluster"));
   EXPECT_CALL(*span, setTag("request_size", "10"));

@@ -29,10 +29,8 @@ static std::string buildUrl(const Http::HeaderMap& request_headers) {
   std::string path = request_headers.EnvoyOriginalPath()
                          ? request_headers.EnvoyOriginalPath()->value().c_str()
                          : request_headers.Path()->value().c_str();
-  std::string url = fmt::format("{}://{}{}",
-                     "http",
-                     valueOrDefault(request_headers.Host(), ""),
-                     path);
+  std::string url =
+      fmt::format("{}://{}{}", "http", valueOrDefault(request_headers.Host(), ""), path);
   static const size_t max_path_length = 128;
   if (url.length() > max_path_length) {
     return url.substr(0, max_path_length);
@@ -129,7 +127,6 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
     span.setTag("guid:x-request-id", std::string(request_headers_->RequestId()->value().c_str()));
     span.setTag("http.url", buildUrl(*request_headers_));
     span.setTag("http.method", request_headers_->Method()->value().c_str());
-    span.setTag("host_header", valueOrDefault(request_headers_->Host(), "-"));
     span.setTag("downstream_cluster",
                 valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
