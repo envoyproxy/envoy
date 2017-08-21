@@ -32,8 +32,6 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
-  // Ignore buffer limits: see ASSERT in decodeData: decoding_buffer_ buffers less than 4 bytes.
-  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
   // Implements StreamEncoderFilter.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
@@ -42,7 +40,6 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
-  uint32_t setEncoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   friend class GrpcWebFilterTest;

@@ -58,7 +58,6 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
-  uint32_t setDecoderBufferLimit(uint32_t) override { return config_->max_request_bytes_; }
 
 private:
   void onRequestTimeout();

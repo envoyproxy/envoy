@@ -65,7 +65,6 @@ public:
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
-  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   IpTaggingFilterConfigSharedPtr config_;

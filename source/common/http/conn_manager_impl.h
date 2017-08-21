@@ -386,6 +386,8 @@ private:
     addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+    void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+    uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
 
     void requestDataTooLarge();
     void requestDataDrained();
@@ -430,6 +432,8 @@ private:
     void addEncodedData(Buffer::Instance& data) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
+    void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+    uint32_t encoderBufferLimit() override { return parent_.buffer_limit_; }
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
@@ -536,6 +540,9 @@ private:
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
     };
+
+    // Possibly increases buffer_limit_ to the value of limit.
+    void setBufferLimit(uint32_t limit);
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;

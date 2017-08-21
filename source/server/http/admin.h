@@ -159,7 +159,6 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
-  uint32_t setDecoderBufferLimit(uint32_t limit) override { return limit; }
 
 private:
   /**

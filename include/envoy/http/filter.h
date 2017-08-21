@@ -251,6 +251,23 @@ public:
    * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
    */
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine may be called to increase the buffer limit for decoder filters.
+   * If the limit set would lower the buffer limit it will be ignored.
+   *
+   * @limit settings supplies the desired buffer limit.
+   */
+  virtual void setDecoderBufferLimit(uint32_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for decoder filters. Filters should abide by
+   * this limit or change it via setDecoderBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint32_t decoderBufferLimit() PURE;
 };
 
 /**
@@ -277,16 +294,6 @@ public:
  */
 class StreamDecoderFilter : public StreamFilterBase {
 public:
-  /**
-   * This routine is called on filter creation, setting the buffer limit for the
-   * filter.  Filters should abide by these limits unless custom configuration
-   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @param settings supplies the default buffer limit and filter type for this filter.
-   * @return the buffer limit the filter will apply.
-   */
-  virtual uint32_t setDecoderBufferLimit(uint32_t limit) PURE;
-
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -370,6 +377,23 @@ public:
    * Called when a encoder filter goes from over its high watermark to under its low watermark.
    */
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * This routine may be called to increase the buffer limit for encoder filters.
+   * If the limit set would lower the buffer limit it will be ignored.
+   *
+   * @limit settings supplies the desired buffer limit.
+   */
+  virtual void setEncoderBufferLimit(uint32_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for encoder filters. Filters should abide by
+   * this limit or change it via setEncoderBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint32_t encoderBufferLimit() PURE;
 };
 
 /**
@@ -404,16 +428,6 @@ public:
    * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
-
-  /**
-   * This routine is called on filter creation, setting the buffer limit for the
-   * filter.  Filters should abide by these limits unless custom configuration
-   * overrides the limit.  A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @param settings supplies the default buffer limit and filter type for this filter.
-   * @return the buffer limit the filter will apply.
-   */
-  virtual uint32_t setEncoderBufferLimit(uint32_t limit) PURE;
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;

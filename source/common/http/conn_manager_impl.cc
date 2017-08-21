@@ -33,6 +33,12 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+uint32_t morePermissiveLimit(uint32_t limit1, uint32_t limit2) {
+  if (limit1 == 0 || limit2 == 0) return 0;
+  return std::max(limit1, limit2);
+}
+}  // namespace
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
@@ -373,11 +379,6 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
-
-  uint32_t filter_limit = filter->setDecoderBufferLimit(buffer_limit_);
-  if (filter_limit == 0 || (filter_limit != 0 && filter_limit > buffer_limit_)) {
-    buffer_limit_ = filter_limit;
-  }
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
@@ -385,10 +386,10 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  uint32_t filter_limit = filter->setEncoderBufferLimit(buffer_limit_);
+/*  uint32_t filter_limit = filter->setEncoderBufferLimit(buffer_limit_);
   if (filter_limit == 0 || (filter_limit != 0 && filter_limit > buffer_limit_)) {
     buffer_limit_ = filter_limit;
-  }
+  }*/
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
@@ -928,6 +929,19 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
   --high_watermark_count_;
   if (watermark_callbacks_) {
     watermark_callbacks_->onBelowWriteBufferLowWatermark();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t limit) {
+  uint32_t new_limit = morePermissiveLimit(limit, buffer_limit_);
+  if (new_limit == buffer_limit_) return;
+
+  buffer_limit_ = limit;
+  if (buffered_response_data_)  {
+    buffered_response_data_->setWatermarks(buffer_limit_);
+  }
+  if (buffered_response_data_) {
+    buffered_response_data_->setWatermarks(buffer_limit_);
   }
 }
 

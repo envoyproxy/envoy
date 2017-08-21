@@ -1258,7 +1258,8 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  router_.setDecoderBufferLimit(10);
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillOnce(Return(10));
+  router_.setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
 

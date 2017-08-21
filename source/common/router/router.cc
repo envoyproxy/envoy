@@ -320,6 +320,14 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+  // As the decoder filter only pushes back via watermarks once data has reached
+  // it, it can latch the current buffer limit and does not need to update the
+  // limit if another filter increases it.
+  buffer_limit_ = callbacks_->decoderBufferLimit();
+}
+
 void Filter::cleanup() {
   upstream_request_.reset();
   retry_state_.reset();

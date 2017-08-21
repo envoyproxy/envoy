@@ -76,6 +76,7 @@ void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
 }
 
 } // namespace Http

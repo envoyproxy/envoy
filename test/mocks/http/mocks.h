@@ -248,6 +248,8 @@ public:
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
   MOCK_METHOD1(removeDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
+  MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
+  MOCK_METHOD0(decoderBufferLimit, uint32_t());
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -286,6 +288,8 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD1(setEncoderBufferLimit, void(uint32_t));
+  MOCK_METHOD0(encoderBufferLimit, uint32_t());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));
@@ -308,7 +312,6 @@ public:
   MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
   MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
-  MOCK_METHOD1(setDecoderBufferLimit, uint32_t(uint32_t));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
@@ -326,7 +329,6 @@ public:
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
-  MOCK_METHOD1(setEncoderBufferLimit, uint32_t(uint32_t));
 
   Http::StreamEncoderFilterCallbacks* callbacks_{};
 };
@@ -344,14 +346,12 @@ public:
   MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
   MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
-  MOCK_METHOD1(setDecoderBufferLimit, uint32_t(uint32_t));
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
-  MOCK_METHOD1(setEncoderBufferLimit, uint32_t(uint32_t));
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
