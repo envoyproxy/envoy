@@ -49,7 +49,12 @@ public:
 class MessageUtil {
 public:
   static std::size_t hash(const Protobuf::Message& message) {
-    return std::hash<std::string>{}(message.SerializeAsString());
+    std::string text;
+    Protobuf::io::StringOutputStream string_stream(&text);
+    Protobuf::io::CodedOutputStream coded_stream(&string_stream);
+    coded_stream.SetSerializationDeterministic(true);
+    message.SerializeToCodedStream(&coded_stream);
+    return std::hash<std::string>{}(text);
   }
 
   static void loadFromJson(const std::string json, Protobuf::Message& message);
