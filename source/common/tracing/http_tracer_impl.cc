@@ -29,8 +29,8 @@ static std::string buildUrl(const Http::HeaderMap& request_headers) {
   std::string path = request_headers.EnvoyOriginalPath()
                          ? request_headers.EnvoyOriginalPath()->value().c_str()
                          : request_headers.Path()->value().c_str();
-  std::string url =
-      fmt::format("{}://{}{}", "http", valueOrDefault(request_headers.Host(), ""), path);
+  std::string url = fmt::format("{}://{}{}", valueOrDefault(request_headers.Scheme(), ""),
+                                valueOrDefault(request_headers.Host(), ""), path);
   static const size_t max_path_length = 128;
   if (url.length() > max_path_length) {
     return url.substr(0, max_path_length);

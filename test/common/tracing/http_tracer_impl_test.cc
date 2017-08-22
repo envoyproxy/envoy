@@ -241,7 +241,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}};
+      {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}, {":scheme", "http"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
@@ -307,7 +307,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "https"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
@@ -315,7 +315,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("http.url", "http:///test"));
+  EXPECT_CALL(*span, setTag("http.url", "https:///test"));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
@@ -341,7 +341,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "http"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   request_headers.insertHost().value(std::string("api"));
