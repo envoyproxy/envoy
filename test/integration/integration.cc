@@ -974,6 +974,36 @@ void BaseIntegrationTest::testAbsolutePath() {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
+void BaseIntegrationTest::testAbsolutePathWithPort() {
+  Buffer::OwnedImpl buffer("GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http_forward"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection.run();
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void BaseIntegrationTest::testAbsolutePathWithoutPort() {
+  Buffer::OwnedImpl buffer("GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http_forward"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection.run();
+  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
 void BaseIntegrationTest::testAllowAbsoluteSameRelative() {
   // Ensure that relative urls behave the same with allow_absolute_url enabled and without
   testEquivalent("GET /foo/bar HTTP/1.1\r\nHost: host\r\n\r\n");
