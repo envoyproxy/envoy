@@ -99,8 +99,9 @@ modify different aspects of the server.
 
 .. http:get:: /routes?route_config_name=<name>
 
-  This endpoint is only available if envoy has HTTP routes configured via RDS. The endpoint dumps
-  all the configured route tables, or only ones that match the route_config_name query, if a query is specified.
+  This endpoint is only available if envoy has HTTP routes configured via RDS.
+  The endpoint dumps all the configured HTTP route tables, or only ones that
+  match the ``route_config_name`` query, if a query is specified.
 
 .. http:get:: /server_info
 

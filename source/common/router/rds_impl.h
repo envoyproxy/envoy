@@ -155,7 +155,20 @@ public:
                                                       Init::Manager& init_manager) override;
 
 private:
+  /**
+   * Add the RdsRouteConfigProvider information to the buffer.
+   * @param provider supplies the Provider to extract information from.
+   * @param response supplies the buffer to fill with information.
+   */
   void addRouteInfo(RdsRouteConfigProviderSharedPtr provider, Buffer::Instance& response);
+
+  /**
+   * The handler used in the Admin /routes endpoint. This handler is used to
+   * populate the response Buffer::Instance with information about the currently
+   * loaded dynamic HTTP Route Tables.
+   * @param url supplies the url sent to the Admin endpoint.
+   * @param response supplies the buffer to fill with information.
+   */
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>

@@ -143,7 +143,7 @@ RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigProviderImpl destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
-    std::shared_ptr<RdsRouteConfigProviderImpl> provider = element.second.lock();
+    RdsRouteConfigProviderSharedPtr provider = element.second.lock();
     ASSERT(provider)
     ret.push_back(provider);
   }
@@ -194,27 +194,30 @@ void RouteConfigProviderManagerImpl::addRouteInfo(RdsRouteConfigProviderSharedPt
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  // If there are no query params, print out all the configured route tables.
   if (query_params.size() == 0) {
     for (auto provider : rdsRouteConfigProviders()) {
       addRouteInfo(provider, response);
     }
     return Http::Code::OK;
   }
+
+  // If there are query params, make sure it is only the route_config_name param.
   auto it = query_params.find("route_config_name");
-  if (it != query_params.end()) {
+  if (query_params.size() == 1 && it != query_params.end()) {
     for (auto provider : rdsRouteConfigProviders()) {
       if (provider->routeConfigName() == it->second) {
         addRouteInfo(provider, response);
       }
     }
     return Http::Code::OK;
-  } else {
-    response.add("usage: /routes (dump all dynamic HTTP route tables).\n");
-    response.add(
-        "usage: /routes?route_config_name=<name> (dump all dynamic HTTP route tables with the "
-        "<name> if any).\n");
-    return Http::Code::NotFound;
   }
+
+  response.add("usage: /routes (dump all dynamic HTTP route tables).\n");
+  response.add(
+      "usage: /routes?route_config_name=<name> (dump all dynamic HTTP route tables with the "
+      "<name> if any).\n");
+  return Http::Code::NotFound;
 }
 
 } // namespace Router

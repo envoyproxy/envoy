@@ -43,6 +43,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 
 class RdsImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  // TODO(junr03): Switch to mocks and do not bind to a real port.
   RdsImplTest()
       : request_(&cm_.async_client_),
         admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
