@@ -20,6 +20,8 @@ public:
                             .bootstrap_path_ = "test/config/integration/server_xds.bootstrap.yaml",
                             .cds_path_ = "test/config/integration/server_xds.cds.yaml",
                             .eds_path_ = "test/config/integration/server_xds.eds.yaml",
+                            .lds_path_ = "test/config/integration/server_xds.lds.yaml",
+                            .rds_path_ = "test/config/integration/server_xds.rds.yaml",
                         },
                         {"http"});
   }

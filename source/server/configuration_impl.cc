@@ -52,7 +52,11 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
     server.listenerManager().addOrUpdateListener(listener);
   }
 
-  if (json.hasObject("lds")) {
+  if (bootstrap.has_lds_config()) {
+    lds_api_.reset(new LdsApi(bootstrap.lds_config(), *cluster_manager_, server.dispatcher(),
+                              server.random(), server.initManager(), server.localInfo(),
+                              server.stats(), server.listenerManager()));
+  } else if (json.hasObject("lds")) {
     envoy::api::v2::ConfigSource lds_config;
     Config::Utility::translateLdsConfig(*json.getObject("lds"), lds_config);
     lds_api_.reset(new LdsApi(lds_config, *cluster_manager_, server.dispatcher(), server.random(),

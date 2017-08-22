@@ -90,6 +90,8 @@ statistics:
   listener_added, Counter, Total listeners added (either via static config or LDS)
   listener_modified, Counter, Total listeners modified (via LDS)
   listener_removed, Counter, Total listeners removed (via LDS)
+  listener_create_success, Counter, Total listener objects successfully added to workers.
+  listener_create_failure, Counter, Total failed listener object additions to workers.
   total_listeners_warming, Gauge, Number of currently warming listeners
   total_listeners_active, Gauge, Number of currently active listeners
   total_listeners_draining, Gauge, Number of currently draining listeners
