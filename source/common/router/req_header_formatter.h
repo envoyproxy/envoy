@@ -73,13 +73,11 @@ public:
   static RequestHeaderParserPtr
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
-  void evaluateRequestHeaders(
-      Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo,
-      const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd) const;
+  void evaluateRequestHeaders(Http::HeaderMap& headers,
+                              const Http::AccessLog::RequestInfo& request_info) const;
 
 private:
-  std::unordered_map<Http::LowerCaseString, HeaderFormatterPtr, Http::LowerCaseStringHasher>
-      header_formatter_map_;
+  std::list<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
 
   static HeaderFormatterPtr parseInternal(const std::string& format);
 };

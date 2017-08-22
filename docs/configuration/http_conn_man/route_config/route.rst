@@ -403,11 +403,11 @@ specified in the following form:
 Envoy supports adding static and dynamic values to the request headers. The dynamic values supported are:
 
 %CLIENT_IP%
-   The Original Client IP which is already added by envoy as an  
+   The Original client IP which is already added by envoy as an  
    :ref:`X-Forwarded-For <config_http_conn_man_headers_x-forwarded-for>` request header. 
 
 %PROTOCOL%
-    The Original Protocol which is already added by envoy as an 
+    The Original protocol which is already added by envoy as an 
     :ref:`X-Forwarded-Proto <config_http_conn_man_headers_x-forwarded-proto>` request header. 
 
 An example for adding dynamic value to the request headers would be as follows:

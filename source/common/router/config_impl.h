@@ -199,7 +199,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& request_info) const override;
 
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
@@ -250,8 +250,8 @@ private:
     const std::string& clusterName() const override { return cluster_name_; }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const Http::AccessLog::RequestInfo& requestInfo) const override {
-      return parent_->finalizeRequestHeaders(headers, requestInfo);
+                                const Http::AccessLog::RequestInfo& request_info) const override {
+      return parent_->finalizeRequestHeaders(headers, request_info);
     }
 
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
@@ -354,7 +354,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -373,7 +373,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const Http::AccessLog::RequestInfo& requestInfo) const override;
+                              const Http::AccessLog::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;

@@ -151,15 +151,13 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
-  request_headers_parser_->evaluateRequestHeaders(headers, requestInfo, requestHeadersToAdd());
+  request_headers_parser_->evaluateRequestHeaders(headers, request_info);
 
-  vhost_.requestHeaderParser().evaluateRequestHeaders(headers, requestInfo,
-                                                      vhost_.requestHeadersToAdd());
-  vhost_.globalRouteConfig().requestHeaderParser().evaluateRequestHeaders(
-      headers, requestInfo, vhost_.globalRouteConfig().requestHeadersToAdd());
+  vhost_.requestHeaderParser().evaluateRequestHeaders(headers, request_info);
+  vhost_.globalRouteConfig().requestHeaderParser().evaluateRequestHeaders(headers, request_info);
 
   if (host_rewrite_.empty()) {
     return;
@@ -331,8 +329,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, prefix_);
 }
@@ -351,8 +349,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
 void PathRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& requestInfo) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, requestInfo);
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, path_);
 }

@@ -187,9 +187,10 @@ public:
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
+   * @param request_info holds additional information about the request.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const Http::AccessLog::RequestInfo& requestInfo) const PURE;
+                                      const Http::AccessLog::RequestInfo& request_info) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

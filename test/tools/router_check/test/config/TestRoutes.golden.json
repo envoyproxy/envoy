@@ -289,7 +289,7 @@
       ]
     }
   },
- {
+  {
     "test_name": "CustomHeaderFields",
     "input": {
       ":authority": "api.lyft.com",
@@ -304,5 +304,5 @@
         }
       ]
     }
- }
+  }
 ]

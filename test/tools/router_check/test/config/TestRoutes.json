@@ -100,7 +100,7 @@
           "cluster": "instant-server",
           "timeout_ms": 30000
         }
-        ],
+       ],
       "virtual_clusters": [
         {"pattern": "^/rides$", "method": "POST", "name": "ride_request"},
         {"pattern": "^/rides/\\d+$", "method": "PUT", "name": "update_ride"},
