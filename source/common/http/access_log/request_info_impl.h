@@ -16,6 +16,12 @@ struct RequestInfoImpl : public RequestInfo {
   // Http::AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
+  SystemTime requestReceivedTime() const override { return request_received_time_; }
+  void requestReceivedTime(SystemTime time) override { request_received_time_ = time; }
+
+  SystemTime responseReceivedTime() const override { return response_received_time_; }
+  void responseReceivedTime(SystemTime time) override { response_received_time_ = time; }
+
   uint64_t bytesReceived() const override { return bytes_received_; }
 
   Protocol protocol() const override { return protocol_; }
@@ -48,6 +54,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   Protocol protocol_;
   const SystemTime start_time_;
+  SystemTime request_received_time_{};
+  SystemTime response_received_time_{};
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};

@@ -48,6 +48,10 @@ public:
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
+  MOCK_CONST_METHOD0(requestReceivedTime, SystemTime());
+  MOCK_METHOD1(requestReceivedTime, void(SystemTime time));
+  MOCK_CONST_METHOD0(responseReceivedTime, SystemTime());
+  MOCK_METHOD1(responseReceivedTime, void(SystemTime time));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, Protocol());
   MOCK_METHOD1(protocol, void(Protocol protocol));
@@ -62,6 +66,8 @@ public:
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
+  SystemTime request_received_time_{};
+  SystemTime response_received_time_{};
 };
 
 } // namespace AccessLog

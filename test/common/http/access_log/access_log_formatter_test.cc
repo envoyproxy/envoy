@@ -93,6 +93,22 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
+    RequestInfoFormatter start_time_format("REQUEST_TIME");
+    SystemTime time;
+    EXPECT_CALL(request_info, requestReceivedTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter start_time_format("RESPONSE_TIME");
+    SystemTime time;
+    EXPECT_CALL(request_info, responseReceivedTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(header, header, request_info));

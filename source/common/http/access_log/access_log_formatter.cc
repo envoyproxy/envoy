@@ -231,6 +231,14 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo& request_info) {
       return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
     };
+  } else if (field_name == "REQUEST_TIME") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return AccessLogDateTimeFormatter::fromTime(request_info.requestReceivedTime());
+    };
+  } else if (field_name == "RESPONSE_TIME") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return AccessLogDateTimeFormatter::fromTime(request_info.responseReceivedTime());
+    };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.bytesReceived());

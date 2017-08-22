@@ -56,6 +56,10 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
+  SystemTime requestReceivedTime() const override { return request_received_time_; }
+  void requestReceivedTime(SystemTime time) override { request_received_time_ = time; }
+  SystemTime responseReceivedTime() const override { return response_received_time_; }
+  void responseReceivedTime(SystemTime time) override { response_received_time_ = time; }
   uint64_t bytesReceived() const override { return 1; }
   Protocol protocol() const override { return protocol_; }
   void protocol(Protocol protocol) override { protocol_ = protocol; }
@@ -76,6 +80,8 @@ public:
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   SystemTime start_time_;
+  SystemTime request_received_time_{};
+  SystemTime response_received_time_{};
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};

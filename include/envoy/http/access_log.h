@@ -66,6 +66,28 @@ public:
   virtual SystemTime startTime() const PURE;
 
   /**
+   * @return the time that the entire request was received from the downstream client.  Note: if
+   * unset, will return unix epoch.
+   */
+  virtual SystemTime requestReceivedTime() const PURE;
+
+  /**
+   * Set the time that the entire request was received from the downstream client.
+   */
+  virtual void requestReceivedTime(SystemTime time) PURE;
+
+  /**
+   * @return the time that the entire response was received from the upstream host.  Note: if unset,
+   * will return unix epoch.
+   */
+  virtual SystemTime responseReceivedTime() const PURE;
+
+  /**
+   * Set the time that the entire response was received from the upstream host.
+   */
+  virtual void responseReceivedTime(SystemTime time) PURE;
+
+  /**
    * @return the # of body bytes received in the request.
    */
   virtual uint64_t bytesReceived() const PURE;
