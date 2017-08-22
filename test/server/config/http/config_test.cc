@@ -290,7 +290,7 @@ TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
 TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
-      "Double registration for name: 'zipkin'");
+      "Double registration for name: 'envoy.zipkin'");
 }
 
 } // namespace Configuration

@@ -107,22 +107,21 @@ public:
    * Initialize the configuration. This happens here vs. the constructor because the initialization
    * will call through the server into the config to get the cluster manager so the config object
    * must be created already.
-   * @param json supplies the configuration JSON.
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
-                  Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory);
+  void initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
+                  Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
-  // TODO(hennna): DEPRECATED - statsdUdpPort() will be removed in 1.4.0
-  Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
-  Optional<std::string> statsdUdpIpAddress() override { return statsd_udp_ip_address_; }
+  Network::Address::InstanceConstSharedPtr statsdUdpIpAddress() override {
+    return statsd_udp_ip_address_;
+  }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
   std::chrono::milliseconds wdMegaMissTimeout() const override {
@@ -137,7 +136,7 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const Json::Object& tracing_configuration, Instance& server);
+  void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
 
   /**
    * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
@@ -152,8 +151,7 @@ private:
   std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
   Optional<std::string> statsd_tcp_cluster_name_;
-  Optional<uint32_t> statsd_udp_port_;
-  Optional<std::string> statsd_udp_ip_address_;
+  Network::Address::InstanceConstSharedPtr statsd_udp_ip_address_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
   std::chrono::milliseconds watchdog_miss_timeout_;
@@ -183,7 +181,7 @@ public:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const Json::Object& json);
+  InitialImpl(const envoy::api::v2::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }

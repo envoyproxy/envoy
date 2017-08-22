@@ -61,6 +61,14 @@ public:
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
+
+  /**
+   * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
+   * messages to/from google.protobuf.Struct.
+   * @param source message.
+   * @param dest message.
+   */
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
 };
 
 class WktUtil {

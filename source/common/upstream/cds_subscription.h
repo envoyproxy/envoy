@@ -24,7 +24,7 @@ class CdsSubscription : public Http::RestApiFetcher,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
   CdsSubscription(Config::SubscriptionStats stats, const envoy::api::v2::ConfigSource& cds_config,
-                  const Optional<SdsConfig>& sds_config, ClusterManager& cm,
+                  const Optional<envoy::api::v2::ConfigSource>& eds_config, ClusterManager& cm,
                   Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                   const LocalInfo::LocalInfo& local_info);
 
@@ -55,7 +55,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Config::SubscriptionCallbacks<envoy::api::v2::Cluster>* callbacks_;
   Config::SubscriptionStats stats_;
-  const Optional<SdsConfig>& sds_config_;
+  const Optional<envoy::api::v2::ConfigSource>& eds_config_;
 };
 
 } // namespace Upstream

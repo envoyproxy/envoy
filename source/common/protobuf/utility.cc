@@ -43,4 +43,14 @@ Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& m
   return Json::Factory::loadFromString(json);
 }
 
+void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
+  // TODO(htuch): Consolidate with the inflight cleanups here.
+  Protobuf::util::JsonOptions json_options;
+  ProtobufTypes::String json;
+  const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  // This should always succeed unless something crash-worthy such as out-of-memory.
+  RELEASE_ASSERT(status.ok());
+  MessageUtil::loadFromJson(json, dest);
+}
+
 } // namespace Envoy

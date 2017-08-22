@@ -85,8 +85,9 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status) {
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)
-    : cluster_name_(config.getString("cluster_name")), cm_(cm) {
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitService& config,
+                                 Upstream::ClusterManager& cm)
+    : cluster_name_(config.cluster_name()), cm_(cm) {
   if (!cm_.get(cluster_name_)) {
     throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
   }

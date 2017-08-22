@@ -40,7 +40,8 @@ inline std::string clustersJson(const std::vector<std::string>& clusters) {
 inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr, Optional<SdsConfig>(), cluster);
+  Config::CdsJson::translateCluster(*json_object_ptr, Optional<envoy::api::v2::ConfigSource>(),
+                                    cluster);
   return cluster;
 }
 
@@ -48,11 +49,12 @@ inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromJson(defaultStaticClusterJson(name));
 }
 
-inline envoy::api::v2::Cluster parseSdsClusterFromJson(const std::string& json_string,
-                                                       const SdsConfig sds_config) {
+inline envoy::api::v2::Cluster
+parseSdsClusterFromJson(const std::string& json_string,
+                        const envoy::api::v2::ConfigSource eds_config) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr, sds_config, cluster);
+  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   return cluster;
 }
 

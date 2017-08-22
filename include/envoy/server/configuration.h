@@ -68,16 +68,10 @@ public:
    */
   virtual Optional<std::string> statsdTcpClusterName() PURE;
 
-  // TODO(hennna): DEPRECATED - will be removed in 1.4.0.
   /**
-   * @return Optional<uint32_t> the optional local UDP statsd port to write to.
+   * @return Network::Address::InstanceConstSharedPtr the optional UDP statsd address to write to.
    */
-  virtual Optional<uint32_t> statsdUdpPort() PURE;
-
-  /**
-   * @return Optional<std::string> the optional UDP statsd address to write to.
-   */
-  virtual Optional<std::string> statsdUdpIpAddress() PURE;
+  virtual Network::Address::InstanceConstSharedPtr statsdUdpIpAddress() PURE;
 
   /**
    * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.

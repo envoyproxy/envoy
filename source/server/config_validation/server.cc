@@ -1,5 +1,6 @@
 #include "server/config_validation/server.h"
 
+#include "common/config/bootstrap_json.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -64,12 +65,13 @@ void ValidationInstance::initialize(Options& options,
   if (!options.bootstrapPath().empty()) {
     MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
   }
+  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap); // TODO(htuch): only if -c.
 
   local_info_.reset(
       new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
                                    options.serviceClusterName(), options.serviceNodeName()));
 
-  Configuration::InitialImpl initial_config(*config_json);
+  Configuration::InitialImpl initial_config(bootstrap);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
@@ -79,7 +81,7 @@ void ValidationInstance::initialize(Options& options,
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
+  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
 
   clusterManager().setInitializedCb(
       [this]() -> void { init_manager_.initialize([]() -> void {}); });

@@ -52,7 +52,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
           throw EnvoyException(
               fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
         }
-        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        MessageUtil::jsonConvert(proto_config, *message);
         callback = factory->createFilterFactoryFromProto(*message, context);
       }
       ret.push_back(callback);

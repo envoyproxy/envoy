@@ -34,8 +34,9 @@ public:
         .WillByDefault(Return("access_token"));
 
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
-    envoy::api::v2::Bootstrap bootstrap;
-    Server::Configuration::InitialImpl initial_config(*config_json);
+    envoy::api::v2::Bootstrap bootstrap =
+        TestUtility::parseBootstrapFromJson(config_json->asJsonString());
+    Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
@@ -55,7 +56,7 @@ public:
         }));
 
     try {
-      main_config.initialize(*config_json, bootstrap, server_, *cluster_manager_factory_);
+      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }
