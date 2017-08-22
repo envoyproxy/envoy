@@ -3,10 +3,17 @@
 Overview
 ========
 
-The Envoy configuration format is written in JSON and is validated against a JSON schema. The
+The Envoy configuration format is written in JSON and is validated against a JSON schema.  The
 schema can be found in :repo:`source/common/json/config_schemas.cc`. The main configuration for the
 server is contained within the listeners and cluster manager sections. The other top level elements
 specify miscellaneous configuration.
+
+YAML support is also provided as a syntactic convenience for hand-written configurations. Envoy will
+internally convert YAML to JSON if a file path ends with .yaml. In the rest of the configuration
+documentation, we refer exclusively to JSON. Envoy expects unambiguous YAML scalars, so if a cluster
+name (which should be a string) is called *true*, it should be written in the configuration YAML as
+*"true"*. The same applies to integer and floating point values (e.g. *1* vs. *1.0* vs. *"1.0"*).
+
 
 .. code-block:: json
 

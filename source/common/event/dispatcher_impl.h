@@ -35,13 +35,11 @@ public:
   void clearDeferredDeleteList() override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address =
-                             Network::Address::InstanceConstSharedPtr()) override;
+                         Network::Address::InstanceConstSharedPtr source_address) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                             Network::Address::InstanceConstSharedPtr address,
-                            const Network::Address::InstanceConstSharedPtr source_address =
-                                Network::Address::InstanceConstSharedPtr()) override;
+                            Network::Address::InstanceConstSharedPtr source_address) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,

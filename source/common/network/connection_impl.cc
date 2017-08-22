@@ -40,8 +40,7 @@ int ConnectionImplUtility::createSocket(Address::InstanceConstSharedPtr address,
   if (fd >= 0 && source_address != nullptr) {
     int rc = source_address->bind(fd);
     // TODO(alyssawilk) make this a non-fatal connect failure.
-    ASSERT(rc >= 0);
-    UNREFERENCED_PARAMETER(rc);
+    RELEASE_ASSERT(rc >= 0);
   }
   return fd;
 }

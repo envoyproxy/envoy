@@ -59,8 +59,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -341,8 +341,8 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
   Ssl::ConnectionImpl* ssl_connection =
@@ -405,8 +405,8 @@ TEST_P(SslConnectionImplTest, SslError) {
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);

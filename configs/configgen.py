@@ -115,3 +115,4 @@ generate_config(SCRIPT_DIR, 'envoy_service_to_service.template.json',
                 mongos_servers=mongos_servers)
 
 shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.json'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.yaml'), OUT_DIR)

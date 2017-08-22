@@ -9,7 +9,7 @@ recent Linux including Ubuntu 16 LTS.
 Envoy has the following requirements:
 
 * GCC 4.9+ (for C++11 regex support)
-* `Bazel <https://github.com/bazelbuild/bazel>`_ (last tested with 0.5.2)
+* `Bazel <https://github.com/bazelbuild/bazel>`_ (last tested with 0.5.3)
 * `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 0.13.0)
 * `http-parser <https://github.com/nodejs/http-parser>`_ (last tested with 2.7.1)
 * `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.23.1)
@@ -23,6 +23,7 @@ Envoy has the following requirements:
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.13.0)
 * `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
 * `zlib <https://github.com/madler/zlib>`_ (last tested with 1.2.11)
+* `yaml-cpp <https://github.com/jbeder/yaml-cpp>`_ (last tested with sha e2818c423e5058a02f46ce2e519a82742a8ccac9).
 
 In order to compile and run the tests the following is required:
 
