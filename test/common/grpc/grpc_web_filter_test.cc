@@ -33,7 +33,7 @@ const size_t TEXT_MESSAGE_SIZE = sizeof(TEXT_MESSAGE) - 1;
 const char B64_MESSAGE[] = "AAAAABJncnBjLXdlYi10ZXh0LWRhdGE=";
 const size_t B64_MESSAGE_SIZE = sizeof(B64_MESSAGE) - 1;
 const char INVALID_B64_MESSAGE[] = "****";
-const size_t INVALID_B64_MESSAGE_SIZE = 4;
+const size_t INVALID_B64_MESSAGE_SIZE = sizeof(INVALID_B64_MESSAGE) - 1;
 const char TRAILERS[] = "\x80\x00\x00\x00\x20grpc-status:0\r\ngrpc-message:ok\r\n";
 const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 } // namespace

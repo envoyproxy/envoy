@@ -90,7 +90,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
                   decoding_buffer_.length()));
-  if (decoded == EMPTY_STRING) {
+  if (decoded.empty()) {
     // Error happened when decoding base64.
     Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
                                   "Bad gRPC-web request, invalid base64 data.");
