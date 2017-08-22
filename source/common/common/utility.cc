@@ -190,4 +190,17 @@ bool StringUtil::startsWith(const char* source, const std::string& start, bool c
     return strncasecmp(source, start.c_str(), start.size()) == 0;
   }
 }
+
+const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
+                                                       const std::string& default_value) {
+  return s.empty() ? default_value : s;
+}
+
+std::string StringUtil::toUpper(const std::string& s) {
+  std::string upper_s;
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s),
+                 [](unsigned char c) -> unsigned char { return std::toupper(c); });
+  return upper_s;
+}
+
 } // namespace Envoy

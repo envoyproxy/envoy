@@ -23,9 +23,17 @@ set -e
 # E.g., "//envoy-lyft/test/..."
 [ -z "${EXTRA_QUERY_PATHS}" ] && EXTRA_QUERY_PATHS=""
 
-TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)")
+rm -f "${BUILD_PATH}"
+
+TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)" | grep "^//")
 if [ -n "${EXTRA_QUERY_PATHS}" ]; then
-  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})")"
+  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})" | grep "^//")"
+fi
+
+# gcov requires gcc
+if [ "${NO_GCOV}" != 1 ]
+then
+  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib"
 fi
 
 (
@@ -44,7 +52,6 @@ envoy_cc_test(
     name = "coverage_tests",
     repository = "${REPOSITORY}",
     deps = [
-        "${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib", # gcov requires gcc
 EOF
   for t in ${TARGETS}
   do

@@ -57,11 +57,11 @@ Network::FilterStatus Instance::onNewConnection() {
                                     : Network::FilterStatus::Continue;
 }
 
-void Instance::onEvent(uint32_t events) {
+void Instance::onEvent(Network::ConnectionEvent event) {
   // Make sure that any pending request in the client is cancelled. This will be NOP if the
   // request already completed.
-  if (events & Network::ConnectionEvent::RemoteClose ||
-      events & Network::ConnectionEvent::LocalClose) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
       client_->cancel();
       config_->stats().active_.dec();

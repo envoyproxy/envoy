@@ -6,10 +6,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/drain_manager.h"
+#include "envoy/singleton/manager.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -47,9 +49,10 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return DrainManager& singleton for use by the entire server.
+   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
+   *         they should be doing graceful closes on connections when possible.
    */
-  virtual DrainManager& drainManager() PURE;
+  virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.
@@ -104,10 +107,15 @@ public:
   virtual Stats::Scope& scope() PURE;
 
   /**
-   * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
-   *         allow runtime lockless updates to configuration, etc. across multiple threads.
+   * @return Singleton::Manager& the server-wide singleton manager.
    */
-  virtual ThreadLocal::Instance& threadLocal() PURE;
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };

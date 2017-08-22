@@ -8,7 +8,7 @@ apt-get install -y wget software-properties-common make cmake git python python-
   bc libtool automake zip time golang g++ gdb strace
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
 apt-get update
 apt-get install -y clang-5.0 clang-format-5.0
 # Bazel and related dependencies.
@@ -41,14 +41,8 @@ DEPS=$(python <(cat target_recipes.bzl; \
   echo "print ' '.join(\"${THIRDPARTY_DEPS}/%s.dep\" % r for r in set(TARGET_RECIPES.values()))"))
 
 # TODO(htuch): We build twice as a workaround for https://github.com/google/protobuf/issues/3322.
-# Fix this.
-export THIRDPARTY_BUILD=/thirdparty_build_opt
+# Fix this. This will be gone real soon now.
+export THIRDPARTY_BUILD=/thirdparty_build
 export CPPFLAGS="-DNDEBUG"
 echo "Building opt deps ${DEPS}"
-"$(dirname "$0")"/build_and_install_deps.sh ${DEPS}
-
-export THIRDPARTY_BUILD=/thirdparty_build_dbg
-export CPPFLAGS=""
-echo "Building dbg deps ${DEPS}"
-rm -f /tmp/*.dep
 "$(dirname "$0")"/build_and_install_deps.sh ${DEPS}

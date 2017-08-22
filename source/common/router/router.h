@@ -104,7 +104,9 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 /**
  * Service routing filter.
  */
-class Filter : Logger::Loggable<Logger::Id::router>, public Http::StreamDecoderFilter {
+class Filter : Logger::Loggable<Logger::Id::router>,
+               public Http::StreamDecoderFilter,
+               public Upstream::LoadBalancerContext {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
@@ -121,6 +123,20 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+  }
+
+  // Upstream::LoadBalancerContext
+  Optional<uint64_t> hashKey() const override {
+    if (route_entry_ && downstream_headers_) {
+      auto hash_policy = route_entry_->hashPolicy();
+      if (hash_policy) {
+        return hash_policy->generateHash(*downstream_headers_);
+      }
+    }
+    return {};
+  }
+  const Network::Connection* downstreamConnection() const override {
+    return callbacks_->connection();
   }
 
 private:
@@ -152,12 +168,37 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {
+      // Have the connection manager disable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
+      parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      // Have the connection manager enable reads on the downstream stream.
+      parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
+      parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host) override;
+
+    void setRequestEncoder(Http::StreamEncoder& request_encoder);
+    void clearRequestEncoder();
+
+    struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
+      DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
+
+      // Http::DownstreamWatermarkCallbacks
+      void onBelowWriteBufferLowWatermark() override;
+      void onAboveWriteBufferHighWatermark() override;
+
+      UpstreamRequest& parent_;
+    };
+
+    void readEnable();
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
@@ -167,6 +208,7 @@ private:
     Optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::InstancePtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
+    DownstreamWatermarkManager downstream_watermark_manager_{*this};
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -175,15 +217,6 @@ private:
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
-
-  struct LoadBalancerContextImpl : public Upstream::LoadBalancerContext {
-    LoadBalancerContextImpl(const Optional<uint64_t>& hash) : hash_(hash) {}
-
-    // Upstream::LoadBalancerContext
-    const Optional<uint64_t>& hashKey() const override { return hash_; }
-
-    const Optional<uint64_t> hash_;
-  };
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
@@ -201,7 +234,6 @@ private:
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
-  Upstream::ResourcePriority finalPriority();
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   void onRequestComplete();
@@ -231,7 +263,7 @@ private:
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
-  std::unique_ptr<LoadBalancerContextImpl> lb_context_;
+  bool stream_destroyed_{};
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

@@ -31,3 +31,8 @@ config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
+
+config_setting(
+    name = "disable_hot_restart",
+    values = {"define": "hot_restart=disabled"},
+)

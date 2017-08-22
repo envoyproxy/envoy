@@ -24,13 +24,13 @@ protected:
 
   testing::NiceMock<MockOptions> options_;
   TestComponentFactory component_factory_;
-  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 std::string ValidationServerTest::directory_ = "";
 
 TEST_P(ValidationServerTest, Validate) {
-  EXPECT_TRUE(validateConfig(options_, component_factory_, local_info_));
+  EXPECT_TRUE(
+      validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -39,7 +39,8 @@ TEST_P(ValidationServerTest, Validate) {
 // as-is.
 INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
                         ::testing::Values("front-envoy.json", "google_com_proxy.json",
-                                          "s2s-grpc-envoy.json", "service-envoy.json"));
+                                          "google_com_proxy.yaml", "s2s-grpc-envoy.json",
+                                          "service-envoy.json"));
 
 } // namespace Server
 } // namespace Envoy

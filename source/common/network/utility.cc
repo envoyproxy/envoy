@@ -2,7 +2,11 @@
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+
+#if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#endif
+
 #include <netinet/ip.h>
 #include <sys/socket.h>
 
@@ -19,6 +23,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
 
@@ -71,17 +76,18 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
+                                                              uint16_t port) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
-    sa4.sin_port = 0;
+    sa4.sin_port = htons(port);
     return std::make_shared<Address::Ipv4Instance>(&sa4);
   }
   sockaddr_in6 sa6;
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
-    sa6.sin6_port = 0;
+    sa6.sin6_port = htons(port);
     return std::make_shared<Address::Ipv6Instance>(sa6);
   }
   throwWithMalformedIp(ip_address);
@@ -131,6 +137,28 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);
   return std::make_shared<Address::Ipv4Instance>(&sa4);
+}
+
+Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Address::Ip& ip) {
+  if (ip.version() == Address::IpVersion::v4) {
+    return std::make_shared<Address::Ipv4Instance>(ip.addressAsString(), ip.port());
+  }
+  return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
+}
+
+Address::InstanceConstSharedPtr Utility::fromProtoAddress(const envoy::api::v2::Address& address) {
+  switch (address.address_case()) {
+  case envoy::api::v2::Address::kSocketAddress:
+    // TODO(htuch): Support custom resolvers #1477.
+    ASSERT(address.socket_address().resolver_name().empty());
+    ASSERT(address.socket_address().named_port().empty());
+    return parseInternetAddress(address.socket_address().address(),
+                                address.socket_address().port_value());
+  case envoy::api::v2::Address::kPipe:
+    return Address::InstanceConstSharedPtr{new Address::PipeInstance(address.pipe().path())};
+  default:
+    NOT_REACHED;
+  }
 }
 
 void Utility::throwWithMalformedIp(const std::string& ip_address) {
@@ -266,6 +294,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+#ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
@@ -278,6 +307,12 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   } else {
     return nullptr;
   }
+#else
+  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // divert), and whether it's possible to find the learn destination address.
+  UNREFERENCED_PARAMETER(fd);
+  return nullptr;
+#endif
 }
 
 void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {

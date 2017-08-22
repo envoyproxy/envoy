@@ -1,7 +1,5 @@
 #pragma once
 
-#include "exe/hot_restart.h"
-
 #include "server/options_impl.h"
 
 namespace Envoy {
@@ -10,9 +8,8 @@ namespace Envoy {
  * main() runs.
  *
  * @param options Options object initialized by site-specific code
- * @param restarter HotRestart object initialized in site-specific code.
  * @return int Return code that should be returned from the actual main()
  */
-int main_common(Envoy::OptionsImpl& options, Envoy::Server::HotRestartImpl& restarter);
+int main_common(Envoy::OptionsImpl& options);
 
 } // namespace Envoy

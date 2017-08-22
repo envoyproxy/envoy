@@ -17,14 +17,11 @@ public:
   OptionsImpl(int argc, char** argv, const std::string& hot_restart_version,
               spdlog::level::level_enum default_log_level);
 
-  const std::string& serviceClusterName() { return service_cluster_; }
-  const std::string& serviceNodeName() { return service_node_; }
-  const std::string& serviceZone() { return service_zone_; }
-
   // Server::Options
   uint64_t baseId() override { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& bootstrapPath() override { return bootstrap_path_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return drain_time_; }
@@ -33,11 +30,15 @@ public:
   uint64_t restartEpoch() override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
   std::chrono::milliseconds fileFlushIntervalMsec() override { return file_flush_interval_msec_; }
+  const std::string& serviceClusterName() override { return service_cluster_; }
+  const std::string& serviceNodeName() override { return service_node_; }
+  const std::string& serviceZone() override { return service_zone_; }
 
 private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
+  std::string bootstrap_path_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

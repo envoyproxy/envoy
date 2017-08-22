@@ -4,10 +4,13 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/thread.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -114,6 +117,22 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressAndPort("[::]:0")->asString());
   EXPECT_EQ("[1::1]:65535", Utility::parseInternetAddressAndPort("[1::1]:65535")->asString());
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPort("[::1]:0")->asString());
+}
+
+TEST(NetworkUtility, FromProtoAddress) {
+  envoy::api::v2::Address ipv4_address;
+  ipv4_address.mutable_socket_address()->set_address("1.2.3.4");
+  ipv4_address.mutable_socket_address()->set_port_value(5);
+  EXPECT_EQ("1.2.3.4:5", Utility::fromProtoAddress(ipv4_address)->asString());
+
+  envoy::api::v2::Address ipv6_address;
+  ipv4_address.mutable_socket_address()->set_address("1::1");
+  ipv4_address.mutable_socket_address()->set_port_value(2);
+  EXPECT_EQ("[1::1]:2", Utility::fromProtoAddress(ipv4_address)->asString());
+
+  envoy::api::v2::Address pipe_address;
+  pipe_address.mutable_pipe()->set_path("/foo/bar");
+  EXPECT_EQ("/foo/bar", Utility::fromProtoAddress(pipe_address)->asString());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};

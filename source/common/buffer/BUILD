@@ -9,6 +9,16 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "watermark_buffer_lib",
+    srcs = ["watermark_buffer.cc"],
+    hdrs = ["watermark_buffer.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "buffer_lib",
     srcs = ["buffer_impl.cc"],
     hdrs = ["buffer_impl.h"],
@@ -22,8 +32,8 @@ envoy_cc_library(
     name = "zero_copy_input_stream_lib",
     srcs = ["zero_copy_input_stream_impl.cc"],
     hdrs = ["zero_copy_input_stream_impl.h"],
-    external_deps = ["protobuf"],
     deps = [
         ":buffer_lib",
+        "//source/common/protobuf",
     ],
 )

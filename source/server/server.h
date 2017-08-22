@@ -19,7 +19,6 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -77,6 +76,15 @@ public:
    * integration tests where a mock runtime is not needed.
    */
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
+
+  /**
+   * Helper for flushing counters and gauges to sinks. This takes care of calling beginFlush(),
+   * latching of counters and flushing, flushing of gauges, and calling endFlush(), on each sink.
+   * @param sinks supplies the list of sinks.
+   * @param store supplies the store to flush.
+   */
+  static void flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                            Stats::Store& store);
 };
 
 /**
@@ -84,9 +92,10 @@ public:
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
-  InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+  InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+               TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               const LocalInfo::LocalInfo& local_info);
+               ThreadLocal::Instance& tls);
 
   ~InstanceImpl() override;
 
@@ -99,7 +108,6 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
-  bool draining() override { return drain_manager_->draining(); }
   void drainListeners() override;
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
@@ -116,6 +124,7 @@ public:
   Runtime::Loader& runtime() override;
   void shutdown() override;
   void shutdownAdmin() override;
+  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
   Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
@@ -123,15 +132,16 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
 private:
   void flushStats();
-  void initialize(Options& options, TestHooks& hooks, ComponentFactory& component_factory);
+  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                  ComponentFactory& component_factory);
   void initializeStatSinks();
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
-  void startWorkers(TestHooks& hooks);
+  void startWorkers();
 
   Options& options_;
   HotRestart& restarter_;
@@ -140,15 +150,17 @@ private:
   Stats::StoreRoot& stats_store_;
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
-  ThreadLocal::InstanceImpl thread_local_;
+  ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
+  std::unique_ptr<Router::ServerRouteConfigProviderManager> route_config_provider_manager_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Stats::ScopePtr admin_scope_;
@@ -158,7 +170,7 @@ private:
   Event::SignalEventPtr sig_hup_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  const LocalInfo::LocalInfo& local_info_;
+  LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;

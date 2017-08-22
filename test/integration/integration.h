@@ -14,6 +14,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 
@@ -44,6 +45,8 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -86,7 +89,9 @@ private:
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
   };
@@ -116,7 +121,7 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version);
 
   void close();
@@ -130,7 +135,9 @@ private:
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationTcpClient& parent_;
   };
@@ -139,16 +146,22 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
+  MockBuffer* client_write_buffer_;
 };
 
 typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
+
+struct ApiFilesystemConfig {
+  std::string bootstrap_path_;
+  std::string cds_path_;
+  std::string eds_path_;
+};
 
 /**
  * Test fixture for all integration tests.
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  ~BaseIntegrationTest();
   BaseIntegrationTest(Network::Address::IpVersion version);
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
@@ -173,8 +186,12 @@ public:
   void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
+  void createApiTestServer(const std::string& json_path,
+                           const ApiFilesystemConfig& api_filesystem_config,
+                           const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
+  MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
 
 protected:
@@ -185,7 +202,7 @@ protected:
                                             Http::CodecClient::Type type, uint64_t request_size,
                                             uint64_t response_size, bool big_header);
   void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
-                                              Http::CodecClient::Type type);
+                                              Http::CodecClient::Type type, bool close_upstream);
   void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
                                                          Http::CodecClient::Type type);
   void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
@@ -206,6 +223,12 @@ protected:
   void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
+  void testAbsolutePath();
+  void testConnect();
+  void testAllowAbsoluteSameRelative();
+  // Test that a request returns the same content with both allow_absolute_urls enabled and
+  // allow_absolute_urls disabled
+  void testEquivalent(const std::string& request);
   void testValidZeroLengthContent(Http::CodecClient::Type type);
   void testInvalidContentLength(Http::CodecClient::Type type);
   void testMultipleContentLengths(Http::CodecClient::Type type);

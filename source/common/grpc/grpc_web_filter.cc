@@ -51,7 +51,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
 
   const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
   if (accept != nullptr &&
@@ -62,9 +62,10 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   }
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
-  headers.insertTE().value(Http::Headers::get().TEValues.Trailers);
+  headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
   // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.insertGrpcAcceptEncoding().value(Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  headers.insertGrpcAcceptEncoding().value().setReference(
+      Http::Headers::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -98,9 +99,11 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
     chargeStat(headers);
   }
   if (is_text_response_) {
-    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
+    headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
-    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebProto);
+    headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
   return Http::FilterHeadersStatus::Continue;
 }

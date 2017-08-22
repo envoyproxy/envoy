@@ -21,6 +21,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/stats/stats_impl.h"
@@ -82,7 +83,7 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, bool canary, uint32_t initial_weight,
            const std::string& zone)
-      : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
+      : HostDescriptionImpl(cluster, hostname, address, canary, zone), used_(true) {
     weight(initial_weight);
   }
 
@@ -99,6 +100,8 @@ public:
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
+  bool used() const override { return used_; }
+  void used(bool new_used) override { used_ = new_used; }
 
 protected:
   static Network::ClientConnectionPtr
@@ -108,6 +111,7 @@ protected:
 private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  std::atomic<bool> used_;
 };
 
 typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;
@@ -146,18 +150,24 @@ public:
   const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
     return *healthy_hosts_per_zone_;
   }
-  void addMemberUpdateCb(MemberUpdateCb callback) const override;
+  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+    return member_update_cb_helper_.add(callback);
+  }
 
 protected:
   virtual void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                  const std::vector<HostSharedPtr>& hosts_removed);
+                                  const std::vector<HostSharedPtr>& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
 
 private:
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_zone_;
   HostListsConstSharedPtr healthy_hosts_per_zone_;
-  mutable std::list<MemberUpdateCb> callbacks_;
+  mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
+                                  const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -167,12 +177,14 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
  */
 class ClusterInfoImpl : public ClusterInfo {
 public:
-  ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager);
+  ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
+  bool addedViaApi() const override { return added_via_api_; }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
@@ -190,17 +202,18 @@ public:
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
+    ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name);
-    ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name, const std::string& priority);
+    ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                                const std::string& cluster_name,
+                                const envoy::api::v2::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 
     Managers managers_;
   };
 
-  static uint64_t parseFeatures(const Json::Object& config);
+  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
 
   Runtime::Loader& runtime_;
   const std::string name_;
@@ -215,6 +228,7 @@ private:
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   LoadBalancerType lb_type_;
+  const bool added_via_api_;
 };
 
 /**
@@ -225,13 +239,14 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterPtr create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
-                           ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                           Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                           const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                           const LocalInfo::LocalInfo& local_info,
-                           Outlier::EventLoggerSharedPtr outlier_event_logger);
+  static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                 Stats::Store& stats, ThreadLocal::Instance& tls,
+                                 Network::DnsResolverSharedPtr dns_resolver,
+                                 Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 const LocalInfo::LocalInfo& local_info,
+                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                 bool added_via_api);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -251,8 +266,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
 
 protected:
-  ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager);
+  ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
@@ -279,8 +295,9 @@ private:
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager);
+  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                    bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -321,9 +338,10 @@ protected:
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager,
-                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher);
+  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                       Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher,
+                       bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}

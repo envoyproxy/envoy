@@ -20,6 +20,10 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
+#include "server/lds_api.h"
+
+#include "api/bootstrap.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -104,11 +108,12 @@ public:
    * will call through the server into the config to get the cluster manager so the config object
    * must be created already.
    * @param json supplies the configuration JSON.
+   * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const Json::Object& json, Instance& server,
-                  Upstream::ClusterManagerFactory& cluster_manager_factory);
+  void initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
+                  Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
@@ -144,6 +149,7 @@ private:
   }
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
+  std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
   Optional<std::string> statsd_tcp_cluster_name_;
   Optional<uint32_t> statsd_udp_port_;

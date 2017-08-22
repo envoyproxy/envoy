@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/config/rds_json.h"
+
 #include "test/test_common/printers.h"
 
 namespace Envoy {
@@ -15,18 +17,18 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
 
   // Add header field values
   std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addViaCopy(":authority", input->getString(":authority", ""));
-  headers->addViaCopy(":path", input->getString(":path", ""));
-  headers->addViaCopy(":method", input->getString(":method", "GET"));
-  headers->addViaCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
+  headers->addCopy(":authority", input->getString(":authority", ""));
+  headers->addCopy(":path", input->getString(":path", ""));
+  headers->addCopy(":method", input->getString(":method", "GET"));
+  headers->addCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
 
   if (input->getBoolean("internal", false)) {
-    headers->addViaCopy("x-envoy-internal", "true");
+    headers->addCopy("x-envoy-internal", "true");
   }
 
   if (input->hasObject("additional_headers")) {
     for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_headers")) {
-      headers->addViaCopy(header_config->getString("field"), header_config->getString("value"));
+      headers->addCopy(header_config->getString("field"), header_config->getString("value"));
     }
   }
 
@@ -40,12 +42,14 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
-  loader->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+  envoy::api::v2::RouteConfiguration route_config;
+  Config::RdsJson::translateRouteConfiguration(*loader, route_config);
 
   std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
   std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
       new NiceMock<Upstream::MockClusterManager>());
-  std::unique_ptr<Router::ConfigImpl> config(new Router::ConfigImpl(*loader, *runtime, *cm, false));
+  std::unique_ptr<Router::ConfigImpl> config(
+      new Router::ConfigImpl(route_config, *runtime, *cm, false));
 
   return RouterCheckTool(std::move(runtime), std::move(cm), std::move(config));
 }

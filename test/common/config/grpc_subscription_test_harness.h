@@ -29,7 +29,7 @@ typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubsc
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   GrpcSubscriptionTestHarness()
-      : method_descriptor_(google::protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+      : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new SubscriptionMockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
@@ -52,11 +52,11 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request)));
+    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     expectSendMessage(cluster_names, "");
     subscription_->start(cluster_names, callbacks_);
     // These are just there to add coverage to the null implementations of these
@@ -72,7 +72,7 @@ public:
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
         new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);
-    google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
       load_assignment->set_cluster_name(cluster);
@@ -96,7 +96,7 @@ public:
   }
 
   std::string version_;
-  const google::protobuf::MethodDescriptor* method_descriptor_;
+  const Protobuf::MethodDescriptor* method_descriptor_;
   SubscriptionMockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
@@ -104,7 +104,7 @@ public:
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  Grpc::MockAsyncClientStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
 };
 

@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",

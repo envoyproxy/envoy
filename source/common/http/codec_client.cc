@@ -45,25 +45,25 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   return *active_requests_.front()->encoder_;
 }
 
-void CodecClient::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::Connected) {
+void CodecClient::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
   }
 
-  if (events & Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     remote_closed_ = true;
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (type_ == Type::HTTP1 && (events & Network::ConnectionEvent::RemoteClose) &&
+  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
     while (!active_requests_.empty()) {

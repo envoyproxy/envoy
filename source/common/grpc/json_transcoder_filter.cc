@@ -9,27 +9,27 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
-#include "google/protobuf/descriptor.h"
-#include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/util/type_resolver.h"
-#include "google/protobuf/util/type_resolver_util.h"
 #include "grpc_transcoding/json_request_translator.h"
+#include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
+using Envoy::Protobuf::DescriptorPool;
+using Envoy::Protobuf::FileDescriptor;
+using Envoy::Protobuf::FileDescriptorSet;
+using Envoy::Protobuf::io::ZeroCopyInputStream;
+using Envoy::ProtobufUtil::Status;
+using Envoy::ProtobufUtil::error::Code;
 using google::grpc::transcoding::JsonRequestTranslator;
+using google::grpc::transcoding::PathMatcherBuilder;
+using google::grpc::transcoding::PathMatcherUtility;
 using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::ResponseToJsonTranslator;
 using google::grpc::transcoding::Transcoder;
 using google::grpc::transcoding::TranscoderInputStream;
-using google::protobuf::DescriptorPool;
-using google::protobuf::FileDescriptor;
-using google::protobuf::FileDescriptorSet;
-using google::protobuf::io::ZeroCopyInputStream;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
 
 namespace Envoy {
 namespace Grpc {
@@ -86,8 +86,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
     }
   }
 
-  // TODO(lizan): Consider factor out building PathMatcher building.
-  google::grpc::transcoding::PathMatcherBuilder<const google::protobuf::MethodDescriptor*> pmb;
+  PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
 
   for (const auto& service_name : config.getStringArray("services")) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -97,31 +96,10 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-
-      auto http_rule = method->options().GetExtension(google::api::http);
-
-      switch (http_rule.pattern_case()) {
-      case ::google::api::HttpRule::kGet:
-        pmb.Register("GET", http_rule.get(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPut:
-        pmb.Register("PUT", http_rule.put(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPost:
-        pmb.Register("POST", http_rule.post(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kDelete:
-        pmb.Register("DELETE", http_rule.delete_(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kPatch:
-        pmb.Register("PATCH", http_rule.patch(), http_rule.body(), method);
-        break;
-      case ::google::api::HttpRule::kCustom:
-        pmb.Register(http_rule.custom().kind(), http_rule.custom().path(), http_rule.body(),
-                     method);
-        break;
-      default: // ::google::api::HttpRule::PATTEN_NOT_SET
-        break;
+      if (!PathMatcherUtility::RegisterByHttpRule(
+              pmb, method->options().GetExtension(google::api::http), method)) {
+        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
+                             "' to path matcher");
       }
     }
   }
@@ -129,18 +107,25 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
   path_matcher_ = pmb.Build();
 
   type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      google::protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX,
-                                                               &descriptor_pool_)));
+      Protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX, &descriptor_pool_)));
+
+  const auto print_config = config.getObject("print_options", true);
+  print_options_.add_whitespace = print_config->getBoolean("add_whitespace", false);
+  print_options_.always_print_primitive_fields =
+      print_config->getBoolean("always_print_primitive_fields", false);
+  print_options_.always_print_enums_as_ints =
+      print_config->getBoolean("always_print_enums_as_ints", false);
+  print_options_.preserve_proto_field_names =
+      print_config->getBoolean("preserve_proto_field_names", false);
 }
 
 Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder,
-    const google::protobuf::MethodDescriptor*& method_descriptor) {
-  const std::string method = headers.Method()->value().c_str();
-  std::string path = headers.Path()->value().c_str();
-  std::string args;
+    std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
+  const ProtobufTypes::String method = headers.Method()->value().c_str();
+  ProtobufTypes::String path = headers.Path()->value().c_str();
+  ProtobufTypes::String args;
 
   const size_t pos = path.find('?');
   if (pos != std::string::npos) {
@@ -180,16 +165,16 @@ Status JsonTranscoderConfig::createTranscoder(
 
   const auto response_type_url =
       TYPE_URL_PREFIX + "/" + method_descriptor->output_type()->full_name();
-  std::unique_ptr<ResponseToJsonTranslator> response_translator{
-      new ResponseToJsonTranslator(type_helper_->Resolver(), response_type_url,
-                                   method_descriptor->server_streaming(), &response_input)};
+  std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
+      type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
+      &response_input, print_options_)};
 
   transcoder.reset(
       new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
-  return Status::OK;
+  return Status();
 }
 
-Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
+Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
                                                  google::grpc::transcoding::RequestInfo* info) {
   auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
@@ -198,7 +183,7 @@ Status JsonTranscoderConfig::methodToRequestInfo(const google::protobuf::MethodD
     return Status(Code::NOT_FOUND, "Could not resolve type: " + method->input_type()->full_name());
   }
 
-  return Status::OK;
+  return Status();
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
@@ -215,22 +200,23 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
   }
 
   headers.removeContentLength();
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.insertEnvoyOriginalPath().value(*headers.Path());
   headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
+  headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
-  headers.insertMethod().value(Http::Headers::get().MethodValues.Post);
-
-  headers.insertTE().value(Http::Headers::get().TEValues.Trailers);
+  decoder_callbacks_->clearRouteCache();
 
   if (end_stream) {
     request_in_.finish();
 
     const auto& request_status = transcoder_->RequestStatus();
     if (!request_status.ok()) {
-      ENVOY_LOG(debug, "Transcoding request error " + request_status.ToString());
+      ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      Http::Utility::sendLocalReply(*decoder_callbacks_, Http::Code::BadRequest,
-                                    request_status.error_message().ToString());
+      Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
+                                    request_status.error_message());
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -263,10 +249,10 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   const auto& request_status = transcoder_->RequestStatus();
 
   if (!request_status.ok()) {
-    ENVOY_LOG(debug, "Transcoding request error " + request_status.ToString());
+    ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    Http::Utility::sendLocalReply(*decoder_callbacks_, Http::Code::BadRequest,
-                                  request_status.error_message().ToString());
+    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
+                                  request_status.error_message());
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -303,7 +289,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   }
 
   response_headers_ = &headers;
-  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Json);
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   if (!method_->server_streaming() && !end_stream) {
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -375,7 +361,7 @@ void JsonTranscoderFilter::setEncoderFilterCallbacks(
 }
 
 // TODO(lizan): Incorporate watermarks to bound buffer sizes
-bool JsonTranscoderFilter::readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream,
+bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& stream,
                                         Buffer::Instance& data) {
   const void* out;
   int size;

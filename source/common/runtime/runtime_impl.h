@@ -84,7 +84,7 @@ public:
 
   bool featureEnabled(const std::string& key, uint64_t default_value) const override {
     // Avoid PNRG if we know we don't need it.
-    uint64_t cutoff = std::min(getInteger(key, default_value), 100UL);
+    uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
     if (cutoff == 0) {
       return false;
     } else if (cutoff == 100) {
@@ -101,9 +101,6 @@ public:
 
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string&, uint64_t default_value) const override;
-
-  // ThreadLocal::ThreadLocalObject
-  void shutdown() override {}
 
 private:
   struct Directory {
@@ -138,7 +135,7 @@ private:
  */
 class LoaderImpl : public Loader {
 public:
-  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::Instance& tls,
+  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const std::string& root_symlink_path, const std::string& subdir,
              const std::string& override_dir, Stats::Store& store, RandomGenerator& generator);
 
@@ -150,8 +147,7 @@ private:
   void onSymlinkSwap();
 
   Filesystem::WatcherPtr watcher_;
-  ThreadLocal::Instance& tls_;
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   RandomGenerator& generator_;
   std::string root_path_;
   std::string override_path_;

@@ -68,7 +68,7 @@ Ssl::ClientContextPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
     target = json_tls;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  Ssl::ContextConfigImpl cfg(*loader);
+  Ssl::ClientContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager_->createSslClientContext(*client_stats_store, cfg);
 }
@@ -82,7 +82,7 @@ Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
 )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  Ssl::ContextConfigImpl cfg(*loader);
+  Ssl::ServerContextConfigImpl cfg(*loader);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }

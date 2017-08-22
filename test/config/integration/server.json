@@ -1,6 +1,6 @@
 {
   "listeners": [
-  {
+ {
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
@@ -72,6 +72,114 @@
                 {
                   "prefix": "/test/",
                   "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
+                  "cluster": "cluster_1",
+                  "use_websocket" : true
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": false, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "foo"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http1",
+        "http1_settings": {
+            "allow_absolute_url": true
+        },
+        "drain_timeout_ms": 5000,
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1",
+                  "rate_limits": [
+                    {
+                      "actions": [
+                        {"type": "destination_cluster"}
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
+                  "cluster": "cluster_1",
+                  "use_websocket" : true
                 }
               ]
             }
@@ -165,6 +273,12 @@
                 {
                   "prefix": "/test/",
                   "cluster": "cluster_2"
+                },
+                {
+                  "prefix": "/websocket/test",
+                  "prefix_rewrite": "/websocket",
+                  "cluster": "cluster_1",
+                  "use_websocket" : true
                 }
               ]
             }
@@ -228,6 +342,21 @@
         ]
       }
     }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "redis_proxy",
+      "config": {
+        "cluster_name": "redis",
+        "stat_prefix": "redis",
+        "conn_pool": {
+          "op_timeout_ms": 400
+        }
+      }
+    }]
   }],
 
   "admin": { "access_log_path": "/dev/null",
@@ -236,16 +365,9 @@
   "flags_path": "/invalid_flags",
   "statsd_udp_ip_address": "{{ ip_loopback_address }}:8125",
   "statsd_tcp_cluster_name": "statsd",
-  "tracing": {
-    "http": {
-      "driver": {
-        "type": "lightstep",
-        "config": {
-          "access_token_file": "{{ test_rundir }}/test/config/integration/lightstep_access_token",
-          "collector_cluster": "lightstep_saas"
-        }
-      }
-    }
+
+  "lds": {
+    "cluster": "lds"
   },
 
   "runtime": {
@@ -261,7 +383,7 @@
         "connect_timeout_ms": 5000,
         "type": "static",
         "lb_type": "round_robin",
-        "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+        "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
       }
     },
     "clusters": [
@@ -270,7 +392,14 @@
       "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:12000"}]
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
+    },
+    {
+      "name": "lds",
+      "connect_timeout_ms": 5000,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:4"}]
     },
     {
       "name": "cluster_1",
@@ -293,16 +422,15 @@
       "type": "strict_dns",
       "lb_type": "round_robin",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:10009"}]
+      "hosts": [{"url": "tcp://localhost:4"}]
     },
     {
-      "name": "lightstep_saas",
-      "features": "http2",
+      "name": "redis",
       "connect_timeout_ms": 5000,
       "type": "strict_dns",
-      "lb_type": "round_robin",
+      "lb_type": "ring_hash",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:10010"}]
+      "hosts": [{"url": "tcp://localhost:4"}]
     }]
   }
 }

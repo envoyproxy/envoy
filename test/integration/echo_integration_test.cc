@@ -1,5 +1,6 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/server/utility.h"
 
 namespace Envoy {
 class EchoIntegrationTest : public BaseIntegrationTest,
@@ -45,7 +46,7 @@ TEST_P(EchoIntegrationTest, Hello) {
 }
 
 TEST_P(EchoIntegrationTest, AddRemoveListener) {
-  std::string json = R"EOF(
+  const std::string json = TestEnvironment::substitute(R"EOF(
   {
     "name": "new_listener",
     "address": "tcp://{{ ip_loopback_address }}:0",
@@ -53,17 +54,21 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       { "type": "read", "name": "echo", "config": {} }
     ]
   }
-  )EOF";
+  )EOF",
+                                                       GetParam());
 
   // Add the listener.
-  ConditionalInitializer listener_added;
+  ConditionalInitializer listener_added_by_worker;
+  ConditionalInitializer listener_added_by_manager;
   test_server_->setOnWorkerListenerAddedCb(
-      [&listener_added]() -> void { listener_added.setReady(); });
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json, GetParam());
-  test_server_->server().dispatcher().post([this, loader]() -> void {
-    EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(*loader));
+      [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
+  test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
+    EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
+        Server::parseListenerFromJson(json)));
+    listener_added_by_manager.setReady();
   });
-  listener_added.waitReady();
+  listener_added_by_worker.waitReady();
+  listener_added_by_manager.waitReady();
 
   EXPECT_EQ(2UL, test_server_->server().listenerManager().listeners().size());
   uint32_t new_listener_port = test_server_->server()
@@ -91,7 +96,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   ConditionalInitializer listener_removed;
   test_server_->setOnWorkerListenerRemovedCb(
       [&listener_removed]() -> void { listener_removed.setReady(); });
-  test_server_->server().dispatcher().post([this, loader]() -> void {
+  test_server_->server().dispatcher().post([this]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().removeListener("new_listener"));
   });
   listener_removed.waitReady();

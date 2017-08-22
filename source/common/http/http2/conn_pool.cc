@@ -101,13 +101,13 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
   return nullptr;
 }
 
-void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
 
     if (client.closed_with_active_rq_) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
-      if (events & Network::ConnectionEvent::RemoteClose) {
+      if (event == Network::ConnectionEvent::RemoteClose) {
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       } else {
         host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
@@ -132,7 +132,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
     }
   }
 
-  if (events & Network::ConnectionEvent::Connected) {
+  if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
   }
 

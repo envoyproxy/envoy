@@ -34,72 +34,159 @@ protected:
   ConnPool::Instance& conn_pool_;
 };
 
-class AllParamsToOneServerCommandHandler : public CommandHandler,
-                                           CommandHandlerBase,
-                                           Logger::Loggable<Logger::Id::redis> {
-public:
-  AllParamsToOneServerCommandHandler(ConnPool::Instance& conn_pool)
-      : CommandHandlerBase(conn_pool) {}
-
-  // Redis::CommandSplitter::CommandHandler
-  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) override;
-
-private:
-  struct SplitRequestImpl : public SplitRequest, public ConnPool::PoolCallbacks {
-    SplitRequestImpl(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
-    ~SplitRequestImpl();
-
-    // Redis::CommandSplitter::SplitRequest
-    void cancel() override;
-
-    // Redis::ConnPool::PoolCallbacks
-    void onResponse(RespValuePtr&& value) override;
-    void onFailure() override;
-
-    SplitCallbacks& callbacks_;
-    ConnPool::PoolRequest* handle_{};
-  };
+class SplitRequestBase : public SplitRequest {
+protected:
+  static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const RespValue& request);
 };
 
-class MGETCommandHandler : public CommandHandler,
-                           CommandHandlerBase,
-                           Logger::Loggable<Logger::Id::redis> {
+/**
+ * SingleServerRequest is a base class for commands that hash to a single backend.
+ */
+class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
 public:
-  MGETCommandHandler(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  ~SingleServerRequest();
 
-  // Redis::CommandSplitter::CommandHandler
-  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) override;
+  // Redis::ConnPool::PoolCallbacks
+  void onResponse(RespValuePtr&& response) override;
+  void onFailure() override;
+
+  // Redis::CommandSplitter::SplitRequest
+  void cancel() override;
+
+protected:
+  SingleServerRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+
+  SplitCallbacks& callbacks_;
+  ConnPool::PoolRequest* handle_{};
+};
+
+/**
+ * SimpleRequest hashes the first argument as the key.
+ */
+class SimpleRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
 
 private:
-  struct SplitRequestImpl : public SplitRequest {
-    struct PendingRequest : public ConnPool::PoolCallbacks {
-      PendingRequest(SplitRequestImpl& parent, uint32_t index) : parent_(parent), index_(index) {}
+  SimpleRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
 
-      // Redis::ConnPool::PoolCallbacks
-      void onResponse(RespValuePtr&& value) override {
-        parent_.onResponse(std::move(value), index_);
-      }
-      void onFailure() override { parent_.onFailure(index_); }
+/**
+ * EvalRequest hashes the fourth argument as the key.
+ */
+class EvalRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
 
-      SplitRequestImpl& parent_;
-      const uint32_t index_;
-      ConnPool::PoolRequest* handle_{};
-    };
+private:
+  EvalRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
 
-    SplitRequestImpl(SplitCallbacks& callbacks, uint32_t num_responses);
-    ~SplitRequestImpl();
+/**
+ * FragmentedRequest is a base class for requests that contains multiple keys. An individual request
+ * is sent to the appropriate server for each key. The responses from all servers are combined and
+ * returned to the client.
+ */
+class FragmentedRequest : public SplitRequestBase {
+public:
+  ~FragmentedRequest();
 
-    void onResponse(RespValuePtr&& value, uint32_t index);
-    void onFailure(uint32_t index);
+  // Redis::CommandSplitter::SplitRequest
+  void cancel() override;
 
-    // Redis::CommandSplitter::SplitRequest
-    void cancel() override;
+protected:
+  FragmentedRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
-    SplitCallbacks& callbacks_;
-    RespValuePtr pending_response_;
-    std::vector<PendingRequest> pending_requests_;
-    uint32_t pending_responses_;
+  struct PendingRequest : public ConnPool::PoolCallbacks {
+    PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
+
+    // Redis::ConnPool::PoolCallbacks
+    void onResponse(RespValuePtr&& value) override {
+      parent_.onChildResponse(std::move(value), index_);
+    }
+    void onFailure() override { parent_.onChildFailure(index_); }
+
+    FragmentedRequest& parent_;
+    const uint32_t index_;
+    ConnPool::PoolRequest* handle_{};
   };
+
+  virtual void onChildResponse(RespValuePtr&& value, uint32_t index) PURE;
+  void onChildFailure(uint32_t index);
+
+  SplitCallbacks& callbacks_;
+  RespValuePtr pending_response_;
+  std::vector<PendingRequest> pending_requests_;
+  uint32_t num_pending_responses_;
+  uint32_t error_count_{0};
+};
+
+/**
+ * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
+ * server. The response contains the result from each command.
+ */
+class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  MGETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+
+  // Redis::CommandSplitter::FragmentedRequest
+  void onChildResponse(RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * SplitKeysSumResultRequest takes each key from the command and sends the same incoming command
+ * with each key to the appropriate Redis server. The response from each Redis (which must be an
+ * integer) is summed and returned to the user. If there is any error or failure in processing the
+ * fragmented commands, an error will be returned.
+ */
+class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  SplitKeysSumResultRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+
+  // Redis::CommandSplitter::FragmentedRequest
+  void onChildResponse(RespValuePtr&& value, uint32_t index) override;
+
+  int64_t total_{0};
+};
+
+/**
+ * MSETRequest takes each key and value pair from the command and sends a SET for each to the
+ * appropriate Redis server. The response is an OK if all commands succeeded or an ERR if any
+ * failed.
+ */
+class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  MSETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
+
+  // Redis::CommandSplitter::FragmentedRequest
+  void onChildResponse(RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * CommandHandlerFactory is placed in the command lookup map for each supported command and is used
+ * to create Request objects.
+ */
+template <class RequestClass>
+class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
+public:
+  CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  SplitRequestPtr startRequest(const RespValue& request, SplitCallbacks& callbacks) {
+    return RequestClass::create(conn_pool_, request, callbacks);
+  }
 };
 
 /**
@@ -116,23 +203,6 @@ private:
  */
 struct InstanceStats {
   ALL_COMMAND_SPLITTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-/**
- * Supported commands and how to handle them
- */
-struct Commands {
-  /**
-   * @return commands which hash to a single server
-   */
-  static const std::vector<std::string>& allToOneCommands() {
-    // TODO(danielhochman): DEL should hash to multiple servers and is only added for testing single
-    // key deletes
-    static const std::vector<std::string>* commands = new std::vector<std::string>{
-        "decr", "decrby", "del", "expire", "get", "getset", "incr", "incrby", "set", "setex"};
-    return *commands;
-  }
-  // TODO(danielhochman): static vector of commands that hash to multiple servers: mget, mset, del
 };
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
@@ -154,8 +224,11 @@ private:
   void onInvalidRequest(SplitCallbacks& callbacks);
 
   ConnPool::InstancePtr conn_pool_;
-  AllParamsToOneServerCommandHandler all_to_one_handler_;
-  MGETCommandHandler mget_handler_;
+  CommandHandlerFactory<SimpleRequest> simple_command_handler_;
+  CommandHandlerFactory<EvalRequest> eval_command_handler_;
+  CommandHandlerFactory<MGETRequest> mget_handler_;
+  CommandHandlerFactory<MSETRequest> mset_handler_;
+  CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   std::unordered_map<std::string, HandlerData> command_map_;
   InstanceStats stats_;
   const ToLowerTable to_lower_table_;

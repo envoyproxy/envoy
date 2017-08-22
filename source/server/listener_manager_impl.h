@@ -6,9 +6,10 @@
 #include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
-#include "common/json/json_validator.h"
 
 #include "server/init_manager_impl.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,17 +28,18 @@ public:
    * Static worker for createFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList_(const std::vector<Json::ObjectSharedPtr>& filters,
+  createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                            Server::Instance& server, Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, server_, context);
   }
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
+  DrainManagerPtr createDrainManager() override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -47,6 +49,27 @@ private:
 
 class ListenerImpl;
 typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
+
+/**
+ * All listener manager stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
+  COUNTER(listener_added)                                                                          \
+  COUNTER(listener_modified)                                                                       \
+  COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_create_failure)                                                                 \
+  GAUGE  (total_listeners_warming)                                                                 \
+  GAUGE  (total_listeners_active)                                                                  \
+  GAUGE  (total_listeners_draining)
+// clang-format on
+
+/**
+ * Struct definition for all listener manager stats. @see stats_macros.h
+ */
+struct ListenerManagerStats {
+  ALL_LISTENER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * Implementation of ListenerManager.
@@ -59,7 +82,7 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const Json::Object& json) override;
+  bool addOrUpdateListener(const envoy::api::v2::Listener& config) override;
   std::vector<std::reference_wrapper<Listener>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
@@ -81,6 +104,17 @@ private:
     uint64_t workers_pending_removal_;
   };
 
+  void addListenerToWorker(Worker& worker, ListenerImpl& listener);
+  static ListenerManagerStats generateStats(Stats::Scope& scope);
+  static bool hasListenerWithAddress(const ListenerList& list,
+                                     const Network::Address::Instance& address);
+  void updateWarmingActiveGauges() {
+    // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
+    // restart.
+    stats_.total_listeners_warming_.set(warming_listeners_.size());
+    stats_.total_listeners_active_.set(active_listeners_.size());
+  }
+
   /**
    * Mark a listener for draining. The listener will no longer be considered active but will remain
    * present to allow connection draining.
@@ -96,47 +130,63 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
+  // Warming listeners are listeners that may need further initialization via the listener's init
+  // manager. For example, RDS, or in the future KDS. Once a listener is done warming it will
+  // be transitioned to active.
   ListenerList warming_listeners_;
+  // Draining listeners are listeners that are in the process of being drained and removed. They
+  // go through two phases where first the workers stop accepting new connections and existing
+  // connections are drained. Then after that time period the listener is removed from all workers
+  // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
-  std::mutex draining_listeners_lock_;
+  ListenerManagerStats stats_;
 };
 
-// TODO(mattklein123): Listener manager stats.
-// TODO(mattklein123): Check that addresses for unbound listeners are unique.
-// TODO(mattklein123): Real listener draining with a per listener drain manager.
-// TODO(mattklein123): Detect runtime worker listener addition failure and handle.
+// TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
+//                     initializing all listeners after workers are started.
 
 /**
- * Maps JSON config to runtime config for a listener with a network filter chain.
+ * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Listener,
                      public Configuration::FactoryContext,
+                     public Network::DrainDecision,
                      public Network::FilterChainFactory,
-                     Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Create a new listener.
-   * @param json supplies the configuration JSON.
+   * @param config supplies the configuration proto.
    * @param parent supplies the owning manager.
    * @param name supplies the listener name.
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
    */
-  ListenerImpl(const Json::Object& json, ListenerManagerImpl& parent, const std::string& name,
-               bool workers_started, uint64_t hash);
+  ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
+               const std::string& name, bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
-  Network::Address::InstanceConstSharedPtr address() { return address_; }
-  const Network::ListenSocketSharedPtr& getSocket() { return socket_; }
-  uint64_t hash() { return hash_; }
+  /**
+   * Called when a listener failed to be actually created on a worker.
+   * @return TRUE if we have seen more than one worker failure.
+   */
+  bool onListenerCreateFailure() {
+    bool ret = saw_listener_create_failure_;
+    saw_listener_create_failure_ = true;
+    return ret;
+  }
+
+  Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
+  uint64_t hash() const { return hash_; }
   void infoLog(const std::string& message);
   void initialize();
-  const std::string& name() { return name_; }
+  DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
 
   // Server::Listener
@@ -149,6 +199,7 @@ public:
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() override { return listener_tag_; }
+  const std::string& name() const override { return name_; }
 
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -156,7 +207,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
-  DrainManager& drainManager() override { return parent_.server_.drainManager(); }
+  Network::DrainDecision& drainDecision() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
   Init::Manager& initManager() override;
@@ -169,7 +220,11 @@ public:
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
   Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
+  Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
+
+  // Network::DrainDecision
+  bool drainClose() const override;
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
@@ -192,6 +247,8 @@ private:
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  DrainManagerPtr local_drain_manager_;
+  bool saw_listener_create_failure_{};
 };
 
 } // namespace Server

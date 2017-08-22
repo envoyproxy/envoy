@@ -30,8 +30,10 @@ public:
   void releaseContext(Context* context);
 
   // Ssl::ContextManager
-  Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope, ContextConfig& config) override;
-  Ssl::ServerContextPtr createSslServerContext(Stats::Scope& scope, ContextConfig& config) override;
+  Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
+                                               ClientContextConfig& config) override;
+  Ssl::ServerContextPtr createSslServerContext(Stats::Scope& scope,
+                                               ServerContextConfig& config) override;
   size_t daysUntilFirstCertExpires() override;
   void iterateContexts(std::function<void(Context&)> callback) override;
 

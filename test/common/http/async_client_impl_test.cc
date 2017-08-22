@@ -27,6 +27,7 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::_;
 
 namespace Http {
@@ -40,7 +41,7 @@ public:
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(local_info_.zoneName()));
+    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRefOfCopy(local_info_.zoneName()));
   }
 
   void expectSuccess(uint64_t code) {
@@ -85,9 +86,9 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
@@ -124,9 +125,9 @@ TEST_F(AsyncClientImplTest, Basic) {
       }));
 
   TestHeaderMapImpl copy(message_->headers());
-  copy.addViaCopy("x-envoy-internal", "true");
-  copy.addViaCopy("x-forwarded-for", "127.0.0.1");
-  copy.addViaCopy(":scheme", "http");
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
@@ -476,9 +477,9 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -499,6 +500,44 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   stream->reset();
 }
 
+// Validate behavior when the stream's onHeaders() callback performs a stream
+// reset.
+TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
+
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+
+  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false))
+      .WillOnce(Invoke([&stream](HeaderMap&, bool) { stream->reset(); }));
+  EXPECT_CALL(stream_callbacks_, onData(_, _)).Times(0);
+  EXPECT_CALL(stream_callbacks_, onReset());
+
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, false);
+
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  filter_callbacks->encodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+}
+
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
 
@@ -512,9 +551,9 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -760,9 +799,9 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -791,6 +830,19 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("internal.upstream_rq_200")
                      .value());
+}
+
+TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+  stream->sendHeaders(headers, false);
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_CALL(stream_callbacks_, onReset());
 }
 
 } // namespace Http

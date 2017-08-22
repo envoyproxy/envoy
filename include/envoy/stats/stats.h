@@ -101,6 +101,12 @@ public:
   virtual ~Sink() {}
 
   /**
+   * This will be called before a sequence of flushCounter() and flushGauge() calls. Sinks can
+   * choose to optimize writing if desired with a paired endFlush() call.
+   */
+  virtual void beginFlush() PURE;
+
+  /**
    * Flush a counter delta.
    */
   virtual void flushCounter(const std::string& name, uint64_t delta) PURE;
@@ -109,6 +115,12 @@ public:
    * Flush a gauge value.
    */
   virtual void flushGauge(const std::string& name, uint64_t value) PURE;
+
+  /**
+   * This will be called after beginFlush(), some number of flushCounter(), and some number of
+   * flushGauge(). Sinks can use this to optimize writing if desired.
+   */
+  virtual void endFlush() PURE;
 
   /**
    * Flush a histogram value.
@@ -123,6 +135,9 @@ public:
 
 typedef std::unique_ptr<Sink> SinkPtr;
 
+class Scope;
+typedef std::unique_ptr<Scope> ScopePtr;
+
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
@@ -130,6 +145,14 @@ typedef std::unique_ptr<Sink> SinkPtr;
 class Scope {
 public:
   virtual ~Scope() {}
+
+  /**
+   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
+   * that point to the same reference counted backing stats. This allows a new scope to be
+   * gracefully swapped in while an old scope with the same name is being destroyed.
+   * @param name supplies the scope's namespace prefix.
+   */
+  virtual ScopePtr createScope(const std::string& name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.
@@ -157,21 +180,11 @@ public:
   virtual Timer& timer(const std::string& name) PURE;
 };
 
-typedef std::unique_ptr<Scope> ScopePtr;
-
 /**
  * A store for all known counters, gauges, and timers.
  */
 class Store : public Scope {
 public:
-  /**
-   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
-   * that point to the same reference counted backing stats. This allows a new scope to be
-   * gracefully swapped in while an old scope with the same name is being destroyed.
-   * @param name supplies the scope's namespace prefix.
-   */
-  virtual ScopePtr createScope(const std::string& name) PURE;
-
   /**
    * @return a list of all known counters.
    */

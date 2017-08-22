@@ -1,12 +1,13 @@
 #include "common/config/utility.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/mocks/local_info/mocks.h"
 
 #include "api/eds.pb.h"
 #include "gmock/gmock.h"
-#include "google/protobuf/util/time_util.h"
 #include "gtest/gtest.h"
 
+using testing::AtLeast;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -33,20 +34,8 @@ TEST(UtilityTest, GetTypedResources) {
 TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   envoy::api::v2::ApiConfigSource api_config_source;
   api_config_source.mutable_refresh_delay()->CopyFrom(
-      google::protobuf::util::TimeUtil::MillisecondsToDuration(1234));
+      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
-}
-
-TEST(UtilityTest, LocalInfoToNode) {
-  LocalInfo::MockLocalInfo local_info;
-  std::string foo_id("foo_id");
-  EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(foo_id));
-  std::string foo_zone("foo_zone");
-  EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(foo_zone));
-  envoy::api::v2::Node node;
-  Utility::localInfoToNode(local_info, node);
-  EXPECT_EQ("foo_id", node.id());
-  EXPECT_EQ("foo_zone", node.locality().zone());
 }
 
 TEST(UtilityTest, SdsConfigToEdsConfig) {

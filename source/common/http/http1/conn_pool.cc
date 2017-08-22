@@ -96,19 +96,19 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
   }
 }
 
-void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     // The client died.
     ENVOY_CONN_LOG(debug, "client disconnected", *client.codec_client_);
     ActiveClientPtr removed;
     bool check_for_drained = true;
     if (client.stream_wrapper_) {
       if (!client.stream_wrapper_->decode_complete_) {
-        if (events & Network::ConnectionEvent::LocalClose) {
+        if (event == Network::ConnectionEvent::LocalClose) {
           host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
         }
-        if (events & Network::ConnectionEvent::RemoteClose) {
+        if (event == Network::ConnectionEvent::RemoteClose) {
           host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
         }
         host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
@@ -155,7 +155,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
     if (check_for_drained) {
       checkForDrained();
     }
-  } else if (events & Network::ConnectionEvent::Connected) {
+  } else if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
     processIdleClient(client);
   }

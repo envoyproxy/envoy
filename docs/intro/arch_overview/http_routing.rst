@@ -6,7 +6,9 @@ HTTP routing
 Envoy includes an HTTP :ref:`router filter <config_http_filters_router>` which can be installed to
 perform advanced routing tasks. This is useful both for handling edge traffic (traditional reverse
 proxy request handling) as well as for building a service to service Envoy mesh (typically via
-routing on the host/authority HTTP header to reach a particular upstream service cluster). At a high
+routing on the host/authority HTTP header to reach a particular upstream service cluster). Envoy
+also has the ability to be configured as forward proxy. In the forward proxy configuration, mesh
+clients can participate by appropriately configuring their http proxy to be an Envoy. At a high
 level the router takes an incoming HTTP request, matches it to an upstream cluster, acquires a
 :ref:`connection pool <arch_overview_conn_pool>` to a host in the upstream cluster, and forwards the
 request. The router filter supports the following features:
@@ -26,6 +28,7 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <config_http_conn_man_route_table_route_auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <config_http_conn_man_route_table_route_prefix_rewrite>`.
+* :ref:`Websocket upgrades <config_http_conn_man_route_table_route_use_websocket>` at route level.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
@@ -43,6 +46,7 @@ request. The router filter supports the following features:
   clusters can use regex matching.
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
 * :ref:`Hash policy <config_http_conn_man_route_table_hash_policy>` based routing.
+* :ref:`Absolute urls <config_http_conn_man_http1_settings>` are supported for non-tls forward proxies.
 
 Route table
 -----------
@@ -77,16 +81,11 @@ headers <config_http_filters_router_headers>`. The following configurations are 
 Priority routing
 ----------------
 
-Envoy supports priority routing both at the :ref:`route <config_http_conn_man_route_table_route>`
-and the :ref:`virtual cluster <config_http_conn_man_route_table_vcluster>` level. The current
-priority implementation uses different :ref:`connection pool <arch_overview_conn_pool>` and
-:ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` settings for each priority
-level. This means that even for HTTP/2 requests, two physical connections will be used to an
-upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
+Envoy supports priority routing at the :ref:`route <config_http_conn_man_route_table_route>` level.
+The current priority implementation uses different :ref:`connection pool <arch_overview_conn_pool>`
+and :ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` settings for each
+priority level. This means that even for HTTP/2 requests, two physical connections will be used to
+an upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
 connection.
-
-Note that if a route matches a virtual cluster, the virtual cluster priority is used. This feature
-is useful for splitting circuit breaking limits between different traffic priorities such that low
-priority traffic does not starve higher priority traffic.
 
 The currently supported priorities are *default* and *high*.

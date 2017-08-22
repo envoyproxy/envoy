@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Buffer {
 
+InstancePtr OwnedImplFactory::create() { return InstancePtr{new OwnedImpl()}; }
+
 // RawSlice is the same structure as evbuffer_iovec. This was put into place to avoid leaking
 // libevent into most code since we will likely replace evbuffer with our own implementation at
 // some point. However, we can avoid a bunch of copies since the structure is the same.
@@ -65,17 +67,19 @@ void OwnedImpl::move(Instance& rhs) {
   // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
   // This is a reasonable compromise in a high performance path where we want to maintain an
   // abstraction in case we get rid of evbuffer later.
-  int rc = evbuffer_add_buffer(buffer_.get(), static_cast<OwnedImpl&>(rhs).buffer_.get());
+  int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
+  static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
   // See move() above for why we do the static cast.
-  int rc =
-      evbuffer_remove_buffer(static_cast<OwnedImpl&>(rhs).buffer_.get(), buffer_.get(), length);
+  int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
+                                  length);
   ASSERT(static_cast<uint64_t>(rc) == length);
   UNREFERENCED_PARAMETER(rc);
+  static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {

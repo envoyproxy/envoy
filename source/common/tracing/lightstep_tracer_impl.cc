@@ -108,11 +108,11 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer
 
 LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
-                                 ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                 ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::TracerOptions> options)
     : cm_(cluster_manager), tracer_stats_{LIGHTSTEP_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      tls_(tls), runtime_(runtime), options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
+      tls_(tls.allocateSlot()), runtime_(runtime), options_(std::move(options)) {
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
@@ -125,20 +125,19 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
-  tls_.set(tls_slot_,
-           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-             lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-                 *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this),
-                                      std::ref(dispatcher), std::placeholders::_1)));
+  tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
+                             std::placeholders::_1)));
 
-             return ThreadLocal::ThreadLocalObjectSharedPtr{
-                 new TlsLightStepTracer(std::move(tracer), *this)};
-           });
+    return ThreadLocal::ThreadLocalObjectSharedPtr{
+        new TlsLightStepTracer(std::move(tracer), *this)};
+  });
 }
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time) {
-  lightstep::Tracer& tracer = *tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
+  lightstep::Tracer& tracer = *tls_->getTyped<TlsLightStepTracer>().tracer_;
   LightStepSpanPtr active_span;
 
   if (request_headers.OtSpanContext()) {

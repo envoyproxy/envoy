@@ -69,7 +69,7 @@ MockClient::MockClient() {
         callbacks_.push_back(&callbacks);
       }));
   ON_CALL(*this, close()).WillByDefault(Invoke([this]() -> void {
-    raiseEvents(Network::ConnectionEvent::LocalClose);
+    raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
 }
 

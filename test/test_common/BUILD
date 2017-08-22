@@ -3,13 +3,14 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_basic_cc_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
 
-cc_library(
+envoy_basic_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
 )
@@ -23,6 +24,7 @@ envoy_cc_test_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",

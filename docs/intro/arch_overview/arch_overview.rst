@@ -12,6 +12,7 @@ Architecture overview
   http_filters
   http_routing
   grpc
+  websocket
   cluster_manager
   service_discovery
   health_checking
@@ -29,3 +30,4 @@ Architecture overview
   dynamo
   hot_restart
   dynamic_configuration
+  init

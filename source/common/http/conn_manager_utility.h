@@ -19,7 +19,7 @@ public:
   static uint64_t generateStreamId(const Router::Config& route_table,
                                    Runtime::RandomGenerator& random_generator);
 
-  static void mutateRequestHeaders(Http::HeaderMap& request_headers,
+  static void mutateRequestHeaders(Http::HeaderMap& request_headers, Protocol protocol,
                                    Network::Connection& connection, ConnectionManagerConfig& config,
                                    const Router::Config& route_config,
                                    Runtime::RandomGenerator& random, Runtime::Loader& runtime,

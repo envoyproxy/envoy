@@ -16,6 +16,8 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
 #ifdef REG_RIP
     // x86_64
     error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_RIP]);
+#elif defined(__APPLE__) && defined(__x86_64__)
+    error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext->__ss.__rip);
 #else
 #warning "Please enable and test PC retrieval code for your arch in signal_action.cc"
 // x86 Classic: reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_EIP]);
@@ -57,12 +59,23 @@ void SignalAction::installSigHandlers() {
 }
 
 void SignalAction::removeSigHandlers() {
+#if defined(__APPLE__)
+  // ss_flags contains SS_DISABLE, but Darwin still checks the size, contrary to the man page
+  if (previous_altstack_.ss_size < MINSIGSTKSZ) {
+    previous_altstack_.ss_size = MINSIGSTKSZ;
+  }
+#endif
   RELEASE_ASSERT(sigaltstack(&previous_altstack_, nullptr) == 0);
+
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
     RELEASE_ASSERT(sigaction(sig, &previous_handlers_[hidx++], nullptr) == 0);
   }
 }
+
+#if defined(__APPLE__) && !defined(MAP_STACK)
+#define MAP_STACK (0)
+#endif
 
 void SignalAction::mapAndProtectStackMemory() {
   // Per docs MAP_STACK doesn't actually do anything today but provides a

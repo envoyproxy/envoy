@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -15,7 +16,7 @@ namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server) : server_(server) {}
 
-bool DrainManagerImpl::drainClose() {
+bool DrainManagerImpl::drainClose() const {
   // If we are actively HC failed, always drain close.
   if (server_.healthCheckFailed()) {
     return true;
@@ -37,10 +38,13 @@ void DrainManagerImpl::drainSequenceTick() {
 
   if (drain_time_completed_ < server_.options().drainTime()) {
     drain_tick_timer_->enableTimer(std::chrono::milliseconds(1000));
+  } else if (drain_sequence_completion_) {
+    drain_sequence_completion_();
   }
 }
 
-void DrainManagerImpl::startDrainSequence() {
+void DrainManagerImpl::startDrainSequence(std::function<void()> completion) {
+  drain_sequence_completion_ = completion;
   ASSERT(!drain_tick_timer_);
   drain_tick_timer_ = server_.dispatcher().createTimer([this]() -> void { drainSequenceTick(); });
   drainSequenceTick();

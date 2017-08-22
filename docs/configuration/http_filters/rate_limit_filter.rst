@@ -22,7 +22,8 @@ If the rate limit service is called, and the response for any of the descriptors
     "config": {
       "domain": "...",
       "stage": "...",
-      "request_type": "..."
+      "request_type": "...",
+      "timeout_ms": "..."
     }
   }
 
@@ -42,6 +43,10 @@ request_type
   :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
   request is considered external. The filter defaults to *both*, and it will apply to all request
   types.
+
+timeout_ms
+  *(optional, integer)* The timeout in milliseconds for the rate limit service RPC. If not set,
+  this defaults to 20ms.
 
 Statistics
 ----------

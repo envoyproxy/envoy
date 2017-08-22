@@ -27,6 +27,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "byte_order_lib",
+    hdrs = ["byte_order.h"],
+)
+
+envoy_cc_library(
     name = "c_smart_ptr_lib",
     hdrs = ["c_smart_ptr.h"],
 )
@@ -125,4 +130,13 @@ envoy_cc_library(
     name = "to_lower_table_lib",
     srcs = ["to_lower_table.cc"],
     hdrs = ["to_lower_table.h"],
+)
+
+envoy_cc_library(
+    name = "callback_impl_lib",
+    hdrs = ["callback_impl.h"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:callback",
+    ],
 )

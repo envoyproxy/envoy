@@ -24,6 +24,7 @@
 
 namespace Envoy {
 namespace Filesystem {
+
 bool fileExists(const std::string& path) {
   std::ifstream input_file(path);
   return input_file.is_open();
@@ -66,8 +67,12 @@ ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, OsSysCalls& os_sys_calls, Stats::Store& stats_store,
                    std::chrono::milliseconds flush_interval_msec)
-    : path_(path), flush_lock_(lock), dispatcher_(dispatcher), os_sys_calls_(os_sys_calls),
-      flush_interval_msec_(flush_interval_msec),
+    : path_(path), flush_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
+        stats_.flushed_by_timer_.inc();
+        flush_event_.notify_one();
+        flush_timer_->enableTimer(flush_interval_msec_);
+      })),
+      os_sys_calls_(os_sys_calls), flush_interval_msec_(flush_interval_msec),
       stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {
   open();
@@ -186,11 +191,6 @@ void FileImpl::write(const std::string& data) {
 
 void FileImpl::createFlushStructures() {
   flush_thread_.reset(new Thread::Thread([this]() -> void { flushThreadFunc(); }));
-  flush_timer_ = dispatcher_.createTimer([this]() -> void {
-    stats_.flushed_by_timer_.inc();
-    flush_event_.notify_one();
-    flush_timer_->enableTimer(flush_interval_msec_);
-  });
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 

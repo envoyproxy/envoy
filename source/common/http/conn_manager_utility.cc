@@ -28,20 +28,23 @@ uint64_t ConnectionManagerUtility::generateStreamId(const Router::Config& route_
   }
 }
 
-void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_headers,
-                                                    Network::Connection& connection,
-                                                    ConnectionManagerConfig& config,
-                                                    const Router::Config& route_config,
-                                                    Runtime::RandomGenerator& random,
-                                                    Runtime::Loader& runtime,
-                                                    const LocalInfo::LocalInfo& local_info) {
+void ConnectionManagerUtility::mutateRequestHeaders(
+    Http::HeaderMap& request_headers, Protocol protocol, Network::Connection& connection,
+    ConnectionManagerConfig& config, const Router::Config& route_config,
+    Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+    const LocalInfo::LocalInfo& local_info) {
   // Clean proxy headers.
-  request_headers.removeConnection();
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
-  request_headers.removeUpgrade();
+
+  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // as we forward them verbatim to the upstream hosts.
+  if (protocol != Protocol::Http11 || !Utility::isWebSocketUpgradeRequest(request_headers)) {
+    request_headers.removeConnection();
+    request_headers.removeUpgrade();
+  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
@@ -52,14 +55,14 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     } else {
       Utility::appendXff(request_headers, connection.remoteAddress());
     }
-    request_headers.insertForwardedProto().value(
+    request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
   // If we didn't already replace x-forwarded-proto because we are using the remote address, and
   // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
   if (!request_headers.ForwardedProto()) {
-    request_headers.insertForwardedProto().value(
+    request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
@@ -73,7 +76,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
   // If internal request, set header and do other internal only modifications.
   if (internal_request) {
-    request_headers.insertEnvoyInternalRequest().value(
+    request_headers.insertEnvoyInternalRequest().value().setReference(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
     if (edge_request) {
@@ -98,7 +101,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
-      user_agent_header.value(config.userAgent().value());
+      // Following setReference() is safe because user agent is constant for the life of the
+      // listener.
+      user_agent_header.value().setReference(config.userAgent().value());
     }
 
     if (!local_info.nodeName().empty()) {
@@ -115,18 +120,10 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId() && (edge_request || !request_headers.RequestId())) {
-    std::string uuid = "";
-
-    try {
-      uuid = random.uuid();
-    } catch (const EnvoyException&) {
-      // We could not generate uuid, not a big deal.
-      config.stats().named_.failed_generate_uuid_.inc();
-    }
-
-    if (!uuid.empty()) {
-      request_headers.insertRequestId().value(uuid);
-    }
+    // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
+    const std::string uuid = random.uuid();
+    ASSERT(!uuid.empty());
+    request_headers.insertRequestId().value(uuid);
   }
 
   if (config.tracingConfig()) {
@@ -211,7 +208,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
 
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        route_config.responseHeadersToAdd()) {
-    response_headers.addStatic(to_add.first, to_add.second);
+    response_headers.addReference(to_add.first, to_add.second);
   }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {

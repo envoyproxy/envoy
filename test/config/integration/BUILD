@@ -14,6 +14,7 @@ exports_files([
     "server_http2.json",
     "server_http2_upstream.json",
     "server_proxy_proto.json",
+    "server_ratelimit.json",
     "server_ssl.json",
     "server_uds.json",
     "server_xfcc.json",
@@ -21,9 +22,18 @@ exports_files([
 ])
 
 filegroup(
+    name = "server_xds_files",
+    srcs = [
+        "server_xds.bootstrap.yaml",
+        "server_xds.cds.yaml",
+        "server_xds.eds.yaml",
+        "server_xds.json",
+    ],
+)
+
+filegroup(
     name = "server_config_files",
     srcs = [
-        "lightstep_access_token",
         "server.json",
     ],
 )

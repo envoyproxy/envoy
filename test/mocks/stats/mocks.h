@@ -7,6 +7,7 @@
 
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/stats/stats_impl.h"
 
@@ -58,8 +59,10 @@ public:
   MockSink();
   ~MockSink();
 
+  MOCK_METHOD0(beginFlush, void());
   MOCK_METHOD2(flushCounter, void(const std::string& name, uint64_t delta));
   MOCK_METHOD2(flushGauge, void(const std::string& name, uint64_t value));
+  MOCK_METHOD0(endFlush, void());
   MOCK_METHOD2(onHistogramComplete, void(const std::string& name, uint64_t value));
   MOCK_METHOD2(onTimespanComplete, void(const std::string& name, std::chrono::milliseconds ms));
 };

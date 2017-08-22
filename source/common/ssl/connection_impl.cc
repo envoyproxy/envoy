@@ -31,9 +31,11 @@ getNullLocalAddress(const Network::Address::Instance& address) {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
-                               Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
+                               Network::Address::InstanceConstSharedPtr local_address,
+                               bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
+    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, using_original_dst,
+                              connected),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -70,7 +72,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);
+    uint64_t num_slices = read_buffer_->reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
       ENVOY_CONN_LOG(trace, "ssl read returns: {}", *this, rc);
@@ -97,7 +99,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     }
 
     if (slices_to_commit > 0) {
-      read_buffer_.commit(slices, slices_to_commit);
+      read_buffer_->commit(slices, slices_to_commit);
       if (shouldDrainReadBuffer()) {
         setReadBufferReady();
         keep_reading = false;
@@ -113,13 +115,9 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", *this);
-    if (!ctx_.verifyPeer(ssl_.get())) {
-      ENVOY_CONN_LOG(debug, "SSL peer verification failed", *this);
-      return PostIoAction::Close;
-    }
-
     handshake_complete_ = true;
-    raiseEvents(Network::ConnectionEvent::Connected);
+    ctx_.logHandshake(ssl_.get());
+    raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
     return state() == State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;
@@ -139,15 +137,24 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 
 void ConnectionImpl::drainErrorQueue() {
   bool saw_error = false;
+  bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
-    if (!saw_error) {
-      ctx_.stats().connection_error_.inc();
-      saw_error = true;
+    if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
+      if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
+        ctx_.stats().fail_verify_no_cert_.inc();
+        saw_counted_error = true;
+      } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
+        saw_counted_error = true;
+      }
     }
+    saw_error = true;
 
     ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
+  }
+  if (saw_error && !saw_counted_error) {
+    ctx_.stats().connection_error_.inc();
   }
 }
 
@@ -246,8 +253,19 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   if (!cert) {
     return "";
   }
-  bssl::UniquePtr<char> buf(X509_NAME_oneline(X509_get_subject_name(cert.get()), nullptr, 0));
-  return std::string(buf.get());
+
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
+
+  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
+
+  const uint8_t* data;
+  size_t data_len;
+  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
+  ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
+  return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
@@ -289,11 +307,11 @@ std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), ctx, InitialState::Client) {}
+                     getNullLocalAddress(*address), false, false, ctx, InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 
-void ConnectionImpl::closeSocket(uint32_t close_type) {
+void ConnectionImpl::closeSocket(Network::ConnectionEvent close_type) {
   if (handshake_complete_ && state() != State::Closed) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point
@@ -307,7 +325,7 @@ void ConnectionImpl::closeSocket(uint32_t close_type) {
   Network::ConnectionImpl::closeSocket(close_type);
 }
 
-std::string ConnectionImpl::nextProtocol() {
+std::string ConnectionImpl::nextProtocol() const {
   const unsigned char* proto;
   unsigned int proto_len;
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);

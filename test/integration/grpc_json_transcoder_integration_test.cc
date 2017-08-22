@@ -1,22 +1,20 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/integration/integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
 
-#include "google/protobuf/stubs/status.h"
-#include "google/protobuf/text_format.h"
-#include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 
-using google::protobuf::Empty;
-using google::protobuf::Message;
-using google::protobuf::TextFormat;
-using google::protobuf::util::MessageDifferencer;
-using google::protobuf::util::Status;
-using google::protobuf::util::error::Code;
+using Envoy::Protobuf::Message;
+using Envoy::Protobuf::TextFormat;
+using Envoy::Protobuf::util::MessageDifferencer;
+using Envoy::ProtobufUtil::Status;
+using Envoy::ProtobufUtil::error::Code;
+using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
 
@@ -77,8 +75,8 @@ protected:
       for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
         RequestType actual_message;
         if (frames[i].length_ > 0) {
-          EXPECT_TRUE(actual_message.ParseFromArray(frames[i].data_->linearize(frames[i].length_),
-                                                    frames[i].length_));
+          EXPECT_TRUE(
+              actual_message.ParseFromString(TestUtility::bufferToString(*frames[i].data_)));
         }
         RequestType expected_message;
         EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
@@ -140,7 +138,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
                               {":authority", "host"},
                               {"content-type", "application/json"}},
       R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
-      {R"(id: 20 theme: "Children" )"}, Status::OK,
+      {R"(id: 20 theme: "Children" )"}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "30"},
@@ -152,7 +150,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
       "", {""}, {R"(shelves { id: 20 theme: "Children" }
-          shelves { id: 1 theme: "Foo" } )"}, Status::OK,
+          shelves { id: 1 theme: "Foo" } )"}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "69"},
@@ -174,7 +172,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
   testTranscoding<bookstore::DeleteBookRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "DELETE"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
-      "", {"shelf: 456 book: 123"}, {""}, Status::OK,
+      "", {"shelf: 456 book: 123"}, {""}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "2"},
@@ -188,7 +186,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
           {":method", "PATCH"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
       R"({"author" : "Leo Tolstoy", "title" : "War and Peace"})",
       {R"(shelf: 456 book { id: 123 author: "Leo Tolstoy" title: "War and Peace" })"},
-      {R"(id: 123 author: "Leo Tolstoy" title: "War and Peace")"}, Status::OK,
+      {R"(id: 123 author: "Leo Tolstoy" title: "War and Peace")"}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "59"},
@@ -200,7 +198,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryCustom) {
   testTranscoding<bookstore::GetShelfRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"}, {":path", "/shelves/456"}, {":authority", "host"}},
-      "", {"shelf: 456"}, {""}, Status::OK,
+      "", {"shelf: 456"}, {""}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "2"},
@@ -214,7 +212,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
           {":method", "PUT"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
       R"({"author" : "Leo Tolstoy", "title" : "War and Peace"})",
       {R"(shelf: 1 book { author: "Leo Tolstoy" title: "War and Peace" })"},
-      {R"(id: 3 author: "Leo Tolstoy" title: "War and Peace")"}, Status::OK,
+      {R"(id: 3 author: "Leo Tolstoy" title: "War and Peace")"}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"({"id":"3","author":"Leo Tolstoy","title":"War and Peace"})");
 }
@@ -226,7 +224,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
       "", {"shelf: 1"},
       {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
        R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-      Status::OK, Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      Status(), Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})"
       R"(,{"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"}])");
 }
@@ -255,7 +253,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
        R"(id: 6 theme: "Children")",
        R"(id: 7 theme: "Documentary")",
        R"(id: 8 theme: "Mystery")"},
-      Status::OK,
+      Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"transfer-encoding", "chunked"}},
@@ -270,7 +268,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
-      R"(INVALID_JSON)", {}, {}, Status::OK,
+      R"(INVALID_JSON)", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
       "Unexpected token.\n"
       "INVALID_JSON\n"
@@ -278,7 +276,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
 
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
-      R"({ "theme" : "Children")", {}, {}, Status::OK,
+      R"({ "theme" : "Children")", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
       "Unexpected end of string. Expected , or } after key:value pair.\n"
       "\n"
@@ -286,7 +284,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
 
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
-      R"({ "theme"  "Children" })", {}, {}, Status::OK,
+      R"({ "theme"  "Children" })", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
       "Expected : between key:value pair.\n"
       "{ \"theme\"  \"Children\" }\n"

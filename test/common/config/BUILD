@@ -66,10 +66,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "http_subscription_test_harness",
     srcs = ["http_subscription_test_harness.h"],
-    external_deps = [
-        "envoy_eds",
-        "protobuf",
-    ],
+    external_deps = ["envoy_eds"],
     deps = [
         ":subscription_test_harness",
         "//include/envoy/http:async_client_interface",
@@ -116,6 +113,12 @@ envoy_cc_test_library(
     name = "subscription_test_harness",
     srcs = ["subscription_test_harness.h"],
     deps = ["//test/mocks/stats:stats_mocks"],
+)
+
+envoy_cc_test(
+    name = "metadata_test",
+    srcs = ["metadata_test.cc"],
+    deps = ["//source/common/config:metadata_lib"],
 )
 
 envoy_cc_test(

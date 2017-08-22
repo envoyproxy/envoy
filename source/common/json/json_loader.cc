@@ -24,6 +24,8 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "yaml-cpp/yaml.h"
+
 namespace Envoy {
 namespace Json {
 
@@ -45,6 +47,7 @@ public:
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
+  bool isNull() const override { return type_ == Type::Null; }
   bool isArray() const { return type_ == Type::Array; }
   bool isObject() const { return type_ == Type::Object; }
 
@@ -71,12 +74,17 @@ public:
   int64_t getInteger(const std::string& name) const override;
   int64_t getInteger(const std::string& name, int64_t default_value) const override;
   ObjectSharedPtr getObject(const std::string& name, bool allow_empty) const override;
-  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const override;
+  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
+                                              bool allow_empty) const override;
   std::string getString(const std::string& name) const override;
   std::string getString(const std::string& name, const std::string& default_value) const override;
-  std::vector<std::string> getStringArray(const std::string& name) const override;
+  std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
+  bool asBoolean() const override { return booleanValue(); }
+  double asDouble() const override { return doubleValue(); }
+  int64_t asInteger() const override { return integerValue(); }
+  std::string asJsonString() const override;
 
   bool empty() const override;
   bool hasObject(const std::string& name) const override;
@@ -397,10 +405,14 @@ ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) cons
   }
 }
 
-std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name) const {
+std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
+                                                   bool allow_empty) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
+    if (allow_empty && value_itr == value_.object_value_.end()) {
+      return std::vector<ObjectSharedPtr>();
+    }
     throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
@@ -429,16 +441,19 @@ std::string Field::getString(const std::string& name, const std::string& default
   }
 }
 
-std::vector<std::string> Field::getStringArray(const std::string& name) const {
+std::vector<std::string> Field::getStringArray(const std::string& name, bool allow_empty) const {
   checkType(Type::Object);
+  std::vector<std::string> string_array;
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
+    if (allow_empty && value_itr == value_.object_value_.end()) {
+      return string_array;
+    }
     throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
-  std::vector<std::string> string_array;
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
@@ -454,6 +469,14 @@ std::vector<std::string> Field::getStringArray(const std::string& name) const {
 std::vector<ObjectSharedPtr> Field::asObjectArray() const {
   checkType(Type::Array);
   return {value_.array_value_.begin(), value_.array_value_.end()};
+}
+
+std::string Field::asJsonString() const {
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  rapidjson::Document document = asRapidJsonDocument();
+  document.Accept(writer);
+  return buffer.GetString();
 }
 
 bool Field::empty() const {
@@ -658,9 +681,69 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
   try {
-    return loadFromString(Filesystem::fileReadToEnd(file_path));
+    const std::string contents = Filesystem::fileReadToEnd(file_path);
+    return StringUtil::endsWith(file_path, ".yaml") ? loadFromYamlString(contents)
+                                                    : loadFromString(contents);
   } catch (EnvoyException& e) {
     throw Exception(e.what());
+  }
+}
+
+namespace {
+
+FieldSharedPtr parseYamlNode(YAML::Node node) {
+  switch (node.Type()) {
+  case YAML::NodeType::Null:
+    return Field::createNull();
+  case YAML::NodeType::Scalar:
+    // Due to the fact that we prefer to parse without schema or application knowledge (e.g. since
+    // we may have embedded opaque configs), we must use heuristics to resolve what the type of the
+    // scalar is. See discussion in https://github.com/jbeder/yaml-cpp/issues/261.
+    // First, if we know this has been explicitly quoted as a string, do that.
+    if (node.Tag() == "!") {
+      return Field::createValue(node.as<std::string>());
+    }
+    bool bool_value;
+    if (YAML::convert<bool>::decode(node, bool_value)) {
+      return Field::createValue(bool_value);
+    }
+    int64_t int_value;
+    if (YAML::convert<int64_t>::decode(node, int_value)) {
+      return Field::createValue(int_value);
+    }
+    double double_value;
+    if (YAML::convert<double>::decode(node, double_value)) {
+      return Field::createValue(double_value);
+    }
+    // Otherwise, fall back on string.
+    return Field::createValue(node.as<std::string>());
+  case YAML::NodeType::Sequence: {
+    FieldSharedPtr array = Field::createArray();
+    for (auto it : node) {
+      array->append(parseYamlNode(it));
+    }
+    return array;
+  }
+  case YAML::NodeType::Map: {
+    FieldSharedPtr object = Field::createObject();
+    for (auto it : node) {
+      object->insert(it.first.as<std::string>(), parseYamlNode(it.second));
+    }
+    return object;
+  }
+  case YAML::NodeType::Undefined:
+    throw EnvoyException("Undefined YAML value");
+  }
+  NOT_REACHED;
+}
+
+} // namespace
+
+ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
+  try {
+    return parseYamlNode(YAML::Load(yaml));
+  } catch (YAML::ParserException& e) {
+    throw EnvoyException(e.what());
   }
 }
 

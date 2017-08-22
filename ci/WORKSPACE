@@ -3,14 +3,14 @@ workspace(name = "ci")
 load("//bazel:repositories.bzl", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
-envoy_dependencies(
-    path = "//ci/prebuilt",
-    skip_protobuf_bzl = True,
+# We shouldn't need this, but it's a workaround for https://github.com/bazelbuild/bazel/issues/3580.
+local_repository(
+    name = "envoy",
+    path = "/source",
 )
 
-local_repository(
-    name = "protobuf_bzl",
-    path = "/thirdparty/protobuf",
+envoy_dependencies(
+    path = "@envoy//ci/prebuilt",
 )
 
 cc_configure()

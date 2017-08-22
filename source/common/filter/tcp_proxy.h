@@ -10,6 +10,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -30,7 +31,9 @@ namespace Filter {
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_no_route)
+  COUNTER(downstream_cx_no_route)                                                                  \
+  COUNTER(downstream_flow_control_paused_reading_total)                                            \
+  COUNTER(downstream_flow_control_resumed_reading_total)
 // clang-format on
 
 /**
@@ -84,7 +87,9 @@ typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
  * connection using the defined load balancing proxy for the configured cluster. All data will
  * be proxied back and forth between the two connections.
  */
-class TcpProxy : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class TcpProxy : public Network::ReadFilter,
+                 Upstream::LoadBalancerContext,
+                 protected Logger::Loggable<Logger::Id::filter> {
 public:
   TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~TcpProxy();
@@ -94,14 +99,28 @@ public:
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-private:
+  // Upstream::LoadBalancerContext
+  Optional<uint64_t> hashKey() const override { return {}; }
+  const Network::Connection* downstreamConnection() const override {
+    return &read_callbacks_->connection();
+  }
+
+  // These two functions allow enabling/disabling reads on the upstream and downstream connections.
+  // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
+  void readDisableUpstream(bool disable);
+  void readDisableDownstream(bool disable);
+
+protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
 
   struct UpstreamCallbacks : public Network::ConnectionCallbacks,
@@ -109,7 +128,9 @@ private:
     UpstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
+    void onEvent(Network::ConnectionEvent event) override { parent_.onUpstreamEvent(event); }
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {
@@ -118,13 +139,34 @@ private:
     }
 
     TcpProxy& parent_;
+    bool on_high_watermark_called_{false};
   };
+
+  // Callbacks for different error and success states during connection establishment
+  virtual const std::string& getUpstreamCluster() {
+    return config_->getRouteFromEntries(read_callbacks_->connection());
+  }
+
+  virtual void onInitFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  virtual void onConnectTimeoutError() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  virtual void onConnectionFailure() {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+
+  virtual void onConnectionSuccess() {}
+  virtual void onUpstreamHostReady() {}
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
-  void onDownstreamEvent(uint32_t event);
+  void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data);
-  void onUpstreamEvent(uint32_t event);
+  void onUpstreamEvent(Network::ConnectionEvent event);
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;

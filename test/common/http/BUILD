@@ -94,6 +94,8 @@ envoy_cc_test(
         "//source/common/http/access_log:access_log_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/buffer:buffer_mocks",
@@ -163,6 +165,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        "//source/common/config:protocol_json_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",

@@ -77,9 +77,10 @@ MockClusterInfo::MockClusterInfo()
 MockClusterInfo::~MockClusterInfo() {}
 
 MockCluster::MockCluster() {
-  ON_CALL(*this, addMemberUpdateCb(_)).WillByDefault(Invoke([this](MemberUpdateCb cb) -> void {
-    callbacks_.push_back(cb);
-  }));
+  ON_CALL(*this, addMemberUpdateCb(_))
+      .WillByDefault(Invoke([this](MemberUpdateCb cb) -> Common::CallbackHandle* {
+        return member_update_cb_helper_.add(cb);
+      }));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, hostsPerZone()).WillByDefault(ReturnRef(hosts_per_zone_));

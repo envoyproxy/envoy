@@ -72,7 +72,12 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string Upgrade{"upgrade"};
   } ConnectionValues;
+
+  struct {
+    const std::string WebSocket{"websocket"};
+  } UpgradeValues;
 
   struct {
     const std::string Text{"text/plain"};

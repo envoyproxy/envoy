@@ -184,6 +184,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
 
   store_->shutdownThreading();
+  scope1->deliverHistogramToSinks("h", 100);
+  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
   tls_.shutdownThread();
 
   // Includes overflow stat.
@@ -215,6 +217,37 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
 
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopePtr scope1 = store_->createScope("scope1.");
+  EXPECT_CALL(*this, alloc(_));
+  Counter& c1 = scope1->counter("foo.bar");
+  EXPECT_EQ("scope1.foo.bar", c1.name());
+
+  ScopePtr scope2 = scope1->createScope("foo.");
+  EXPECT_CALL(*this, alloc(_));
+  Counter& c2 = scope2->counter("bar");
+  EXPECT_NE(&c1, &c2);
+  EXPECT_EQ("scope1.foo.bar", c2.name());
+
+  // Different allocations point to the same referenced counted backing memory.
+  c1.inc();
+  EXPECT_EQ(1UL, c1.value());
+  EXPECT_EQ(c1.value(), c2.value());
+
+  EXPECT_CALL(*this, alloc(_));
+  Gauge& g1 = scope2->gauge("some_gauge");
+  EXPECT_EQ("scope1.foo.some_gauge", g1.name());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {

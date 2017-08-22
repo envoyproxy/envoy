@@ -45,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
@@ -134,11 +135,13 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/protobuf",
     ],
 )

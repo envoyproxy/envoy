@@ -18,7 +18,7 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server.json",
-                     {"http", "http_buffer", "tcp_proxy", "rds"});
+                     {"http", "http_forward", "http_buffer", "tcp_proxy", "rds"});
   }
 
   /**

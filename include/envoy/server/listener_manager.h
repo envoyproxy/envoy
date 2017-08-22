@@ -1,11 +1,15 @@
 #pragma once
 
-#include "envoy/json/json_object.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/ssl/context.h"
+
+#include "common/protobuf/protobuf.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -28,13 +32,18 @@ public:
 
   /**
    * Creates a list of filter factories.
-   * @param filters supplies the JSON configuration.
+   * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
    * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const std::vector<Json::ObjectSharedPtr>& filters,
+  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) PURE;
+
+  /**
+   * @return DrainManagerPtr a new drain manager.
+   */
+  virtual DrainManagerPtr createDrainManager() PURE;
 
   /**
    * @return uint64_t a listener tag usable for connection handler tracking.
@@ -100,6 +109,11 @@ public:
    * @return uint64_t the tag the listener should use for connection handler tracking.
    */
   virtual uint64_t listenerTag() PURE;
+
+  /**
+   * @return const std::string& the listener's name.
+   */
+  virtual const std::string& name() const PURE;
 };
 
 /**
@@ -116,12 +130,12 @@ public:
    * should be updated. The new listener must have the same configured address. The old listener
    * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
    * been initialized).
-   * @param json supplies the configuration JSON.
+   * @param config supplies the configuration proto.
    * @return TRUE if a listener was added or FALSE if the listener was not updated because it is
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const Json::Object& json) PURE;
+  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Listener>> a list of the currently loaded listeners.

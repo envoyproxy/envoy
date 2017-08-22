@@ -1,0 +1,40 @@
+{
+  "listeners": [
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http2",
+        "drain_timeout_ms": 5000,
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  }],
+
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
+
+  "cluster_manager": {
+    "clusters": []
+  }
+}

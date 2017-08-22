@@ -20,6 +20,7 @@ namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
@@ -28,21 +29,73 @@ namespace Http1 {
 
 class Http1ServerConnectionImplTest : public ::testing::Test {
 public:
-  Http1ServerConnectionImplTest() : codec_(new ServerConnectionImpl(connection_, callbacks_)) {}
+  void initialize() {
+    codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+  }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
+  NiceMock<Http1Settings> codec_settings_;
   Http::ServerConnectionPtr codec_;
+
+  void expectHeadersTest(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
+                         TestHeaderMapImpl& expected_headers);
+  void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer);
 };
 
+void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
+                                              Buffer::OwnedImpl& buffer) {
+  InSequence sequence;
+
+  std::string output;
+  ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
+
+  if (allow_absolute_url) {
+    codec_settings_.allow_absolute_url_ = allow_absolute_url;
+    codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+  }
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
+  EXPECT_EQ(p, codec_->protocol());
+}
+
+void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_absolute_url,
+                                                      Buffer::OwnedImpl& buffer,
+                                                      TestHeaderMapImpl& expected_headers) {
+  InSequence sequence;
+
+  // Make a new 'codec' with the right settings
+  if (allow_absolute_url) {
+    codec_settings_.allow_absolute_url_ = allow_absolute_url;
+    codec_.reset(new ServerConnectionImpl(connection_, callbacks_, codec_settings_));
+  }
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(p, codec_->protocol());
+}
+
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{
-      {"Test", ""}, {"Hello", "World"}, {":path", "/"}, {":method", "GET"},
+      {"Test", ""},
+      {"Hello", "World"},
+      {":path", "/"},
+      {":method", "GET"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
@@ -52,6 +105,8 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
@@ -66,7 +121,102 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
 
+TEST_F(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
+  expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foobar HTTP/1.0\r\n\r\n");
+  expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "bah"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET /foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
+  initialize();
+
+  // Invalid because www.somewhere.com is not an absolute path nor an absolute url
+  Buffer::OwnedImpl buffer("GET www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathBad) {
+  initialize();
+
+  Buffer::OwnedImpl buffer("GET * HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePortTooLarge) {
+  initialize();
+
+  Buffer::OwnedImpl buffer("GET http://foobar.com:1000000 HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expect400(Protocol::Http11, true, buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11RelativeOnly) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "bah"}, {":path", "http://www.somewhere.com/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, false, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11Options) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "*"}, {":method", "OPTIONS"}};
+  Buffer::OwnedImpl buffer("OPTIONS * HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
@@ -81,6 +231,8 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
+  initialize();
+
   std::string output;
   ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
 
@@ -90,6 +242,8 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
+  initialize();
+
   std::string output;
   ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
 
@@ -105,6 +259,8 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
@@ -119,6 +275,8 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
@@ -137,6 +295,8 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
+  initialize();
+
   InSequence sequence;
 
   Http::MockStreamDecoder decoder;
@@ -157,6 +317,8 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -178,6 +340,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -203,6 +367,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, ContentLengthResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -227,6 +393,8 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -248,6 +416,8 @@ TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, ExpectContinueResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -271,6 +441,8 @@ TEST_F(Http1ServerConnectionImplTest, ExpectContinueResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -294,6 +466,8 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_))
@@ -308,16 +482,52 @@ TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
+  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+
+  Http::MockStreamCallbacks stream_callbacks;
+  response_encoder->getStream().addCallbacks(stream_callbacks);
+
+  // Fake a call from the underlying Network::Connection and verify the stream is notified.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  static_cast<ServerConnection*>(codec_.get())
+      ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  TestHeaderMapImpl headers{{":status", "200"}};
+  response_encoder->encodeHeaders(headers, false);
+
+  // Fake out the underlying Network::Connection buffer being drained.
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  static_cast<ServerConnection*>(codec_.get())
+      ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+}
+
 class Http1ClientConnectionImplTest : public testing::Test {
 public:
-  Http1ClientConnectionImplTest() : codec_(new ClientConnectionImpl(connection_, callbacks_)) {}
+  void initialize() { codec_.reset(new ClientConnectionImpl(connection_, callbacks_)); }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
-  Http::ClientConnectionPtr codec_;
+  std::unique_ptr<ClientConnectionImpl> codec_;
 };
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
+  initialize();
+
   Http::MockStreamDecoder response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
@@ -330,6 +540,8 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
+  initialize();
+
   Http::MockStreamDecoder response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
@@ -342,6 +554,8 @@ TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, Reset) {
+  initialize();
+
   Http::MockStreamDecoder response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
 
@@ -352,6 +566,8 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
+  initialize();
+
   Http::MockStreamDecoder response_decoder;
   Http::StreamEncoder* request_encoder = &codec_->newStream(response_decoder);
 
@@ -364,6 +580,13 @@ TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
 
+  // Simulate the underlying connection being backed up.  Ensure that it is
+  // read-enabled as the new stream is created.
+  EXPECT_CALL(connection_, readEnabled())
+      .Times(2)
+      .WillOnce(Return(false))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(connection_, readDisable(false));
   request_encoder = &codec_->newStream(response_decoder);
   request_encoder->encodeHeaders(headers, false);
 
@@ -374,11 +597,15 @@ TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, PrematureResponse) {
+  initialize();
+
   Buffer::OwnedImpl response("HTTP/1.1 408 Request Timeout\r\nConnection: Close\r\n\r\n");
   EXPECT_THROW(codec_->dispatch(response), PrematureResponseException);
 }
 
 TEST_F(Http1ClientConnectionImplTest, HeadRequest) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{{":method", "HEAD"}, {":path", "/"}, {":authority", "host"}};
@@ -390,6 +617,8 @@ TEST_F(Http1ClientConnectionImplTest, HeadRequest) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, 204Response) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
@@ -401,6 +630,8 @@ TEST_F(Http1ClientConnectionImplTest, 204Response) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, BadEncodeParams) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
 
   // Need to set :method and :path
@@ -412,6 +643,8 @@ TEST_F(Http1ClientConnectionImplTest, BadEncodeParams) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
@@ -431,6 +664,8 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
@@ -443,6 +678,8 @@ TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, GiantPath) {
+  initialize();
+
   NiceMock<Http::MockStreamDecoder> response_decoder;
   Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
   TestHeaderMapImpl headers{
@@ -452,6 +689,35 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
   codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
+  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
+  initialize();
+
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks stream_callbacks;
+  request_encoder.getStream().addCallbacks(stream_callbacks);
+
+  // Fake a call from the underlying Network::Connection and verify the stream is notified.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  static_cast<ClientConnection*>(codec_.get())
+      ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  // Do a large write. This will result in the buffer temporarily going over the
+  // high watermark and then draining.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Fake out the underlying Network::Connection buffer being drained.
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark());
+  static_cast<ClientConnection*>(codec_.get())
+      ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
 } // namespace Http1

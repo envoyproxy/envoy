@@ -26,6 +26,7 @@ envoy_cc_library(
     deps = [
         ":message_interface",
         "//include/envoy/common:optional",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
 
@@ -65,6 +66,14 @@ envoy_cc_library(
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "wshandler_callback_interface",
+    hdrs = ["websocket.h"],
+    deps = [
+        ":header_map_interface",
     ],
 )
 

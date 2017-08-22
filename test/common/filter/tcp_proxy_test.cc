@@ -376,15 +376,17 @@ public:
       upstream_connection_ = new NiceMock<Network::MockClientConnection>();
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
-      conn_info.host_.reset(
+      conn_info.host_description_.reset(
           new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "",
                                  Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
-      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+          .WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))
           .WillOnce(SaveArg<0>(&upstream_read_filter_));
     } else {
       Upstream::MockHost::MockCreateConnectionData conn_info;
-      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
+      EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+          .WillOnce(Return(conn_info));
     }
 
     filter_.reset(new TcpProxy(config_, cluster_manager_));
@@ -412,14 +414,14 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   filter_->onData(buffer);
 
   EXPECT_CALL(*connect_timer_, disableTimer());
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
@@ -430,14 +432,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   filter_->onData(buffer);
 
   EXPECT_CALL(*connect_timer_, disableTimer());
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
@@ -448,14 +450,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   filter_->onData(buffer);
 
   EXPECT_CALL(*connect_timer_, disableTimer());
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::Connected);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::LocalClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
@@ -482,7 +484,7 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
   filter_.reset(new TcpProxy(config_, cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
-  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
@@ -494,7 +496,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*connect_timer_, disableTimer());
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_fail")
                     .value());
@@ -582,7 +584,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(local_address));
 
   // Expect filter to try to open a connection to specified cluster
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster"));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _));
 
   filter_->onNewConnection();
 

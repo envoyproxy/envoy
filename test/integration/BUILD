@@ -6,13 +6,14 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_sh_test",
+    "envoy_select_hot_restart",
 )
 
 envoy_package()
 
 envoy_sh_test(
     name = "hotrestart_test",
-    srcs = ["hotrestart_test.sh"],
+    srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
     data = [
         "//source/exe:envoy-static",
         "//test/common/runtime:filesystem_setup.sh",
@@ -138,10 +139,12 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/server:connection_handler_lib",
+        "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
         "//source/server/config/http:buffer_lib",
@@ -162,6 +165,7 @@ envoy_cc_test_library(
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//source/server/http:health_check_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -197,6 +201,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//test/server:utility_lib",
     ],
 )
 
@@ -212,6 +217,19 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "ratelimit_integration_test",
+    srcs = ["ratelimit_integration_test.cc"],
+    data = ["//test/config/integration:server_ratelimit.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/ratelimit:ratelimit_proto",
     ],
 )
 
@@ -259,6 +277,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "uds_integration_test",
+    srcs = [
+        "uds_integration_test.cc",
+        "uds_integration_test.h",
+    ],
+    data = ["//test/config/integration:server_uds.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/stats:stats_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "xds_integration_test",
+    srcs = ["xds_integration_test.cc"],
+    data = ["//test/config/integration:server_xds_files"],
+    deps = [
+        ":integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "xfcc_integration_test",
     srcs = [
         "ssl_integration_test.h",
@@ -273,22 +317,5 @@ envoy_cc_test(
         ":integration_lib",
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "uds_integration_test",
-    srcs = [
-        "uds_integration_test.cc",
-        "uds_integration_test.h",
-    ],
-    data = ["//test/config/integration:server_uds.json"],
-    deps = [
-        ":integration_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/http:codec_client_lib",
-        "//source/common/stats:stats_lib",
-        "//test/test_common:environment_lib",
     ],
 )

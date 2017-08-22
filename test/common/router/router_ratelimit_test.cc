@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "common/config/rds_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
@@ -23,15 +24,17 @@ using testing::ReturnRef;
 using testing::_;
 
 namespace Router {
+namespace {
+
+envoy::api::v2::RateLimit parseRateLimitFromJson(const std::string& json_string) {
+  envoy::api::v2::RateLimit rate_limit;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::RdsJson::translateRateLimit(*json_object_ptr, rate_limit);
+  return rate_limit;
+}
 
 TEST(BadRateLimitConfiguration, MissingActions) {
-  std::string json = R"EOF(
-{
-  "rate_limits": [{}]
-}
-)EOF";
-
-  EXPECT_THROW(RateLimitPolicyImpl(*Json::Factory::loadFromString(json)), EnvoyException);
+  EXPECT_THROW(parseRateLimitFromJson("{}"), EnvoyException);
 }
 
 TEST(BadRateLimitConfiguration, BadType) {
@@ -45,7 +48,7 @@ TEST(BadRateLimitConfiguration, BadType) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(parseRateLimitFromJson(json)), EnvoyException);
 }
 
 TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
@@ -59,7 +62,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_one)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(parseRateLimitFromJson(json_one)), EnvoyException);
 
   std::string json_two = R"EOF(
   {
@@ -72,7 +75,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_two)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(parseRateLimitFromJson(json_two)), EnvoyException);
 
   std::string json_three = R"EOF(
   {
@@ -85,8 +88,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_three)),
-               EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(parseRateLimitFromJson(json_three)), EnvoyException);
 }
 
 static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
@@ -97,8 +99,10 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    config_.reset(new ConfigImpl(*loader, runtime_, cm_, true));
+    envoy::api::v2::RouteConfiguration route_config;
+    auto json_object_ptr = Json::Factory::loadFromString(json);
+    Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
+    config_.reset(new ConfigImpl(route_config, runtime_, cm_, true));
   }
 
   std::unique_ptr<ConfigImpl> config_;
@@ -338,8 +342,7 @@ TEST_F(RateLimitConfiguration, Stages) {
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-    rate_limit_entry_.reset(new RateLimitPolicyEntryImpl(*loader));
+    rate_limit_entry_.reset(new RateLimitPolicyEntryImpl(parseRateLimitFromJson(json)));
     descriptors_.clear();
   }
 
@@ -661,5 +664,6 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
   EXPECT_TRUE(descriptors_.empty());
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

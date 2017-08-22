@@ -43,11 +43,25 @@ alt_alpn_protocols
 ca_cert_file
   *(optional, string)* A file containing certificate authority certificates to use in verifying
   a presented client side certificate. If not specified and a client certificate is presented it
-  will not be verified.
+  will not be verified. By default, a client certificate is optional, unless one of the additional
+  options (
+  :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`,
+  :ref:`verify_certificate_hash <config_listener_ssl_context_verify_certificate_hash>` or
+  :ref:`verify_subject_alt_name <config_listener_ssl_context_verify_subject_alt_name>`) is also
+  specified.
+
+.. _config_listener_ssl_context_require_client_certificate:
+
+require_client_certificate
+  *(optional, boolean)* If specified, Envoy will reject connections without a valid client certificate.
+
+.. _config_listener_ssl_context_verify_certificate_hash:
 
 verify_certificate_hash
   *(optional, string)* If specified, Envoy will verify (pin) the hash of the presented client
   side certificate.
+
+.. _config_listener_ssl_context_verify_subject_alt_name:
 
 verify_subject_alt_name
   *(optional, array)* An optional list of subject alt names. If specified, Envoy will verify

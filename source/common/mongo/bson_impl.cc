@@ -5,6 +5,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/byte_order.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 

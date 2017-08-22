@@ -10,8 +10,8 @@ namespace Envoy {
 #define RELEASE_ASSERT(X)                                                                          \
   {                                                                                                \
     if (!(X)) {                                                                                    \
-      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert)                                   \
-          .critical("assert failure: {}: {}:{}", #X, __FILE__, __LINE__);                          \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
+                          "assert failure: {}", #X);                                               \
       abort();                                                                                     \
     }                                                                                              \
   }
@@ -26,8 +26,8 @@ namespace Envoy {
  * Indicate a panic situation and exit.
  */
 #define PANIC(X)                                                                                   \
-  Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert)                                       \
-      .critical("panic: {}: {}:{}", X, __FILE__, __LINE__);                                        \
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,        \
+                      "panic: {}", X);                                                             \
   abort();
 
 #define NOT_IMPLEMENTED PANIC("not implemented")

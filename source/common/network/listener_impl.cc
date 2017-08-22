@@ -19,6 +19,10 @@
 namespace Envoy {
 namespace Network {
 
+Address::InstanceConstSharedPtr ListenerImpl::getLocalAddress(int fd) {
+  return Address::addressFromFd(fd);
+}
+
 Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
   return Utility::getOriginalDst(fd);
 }
@@ -26,24 +30,32 @@ Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
-
   Address::InstanceConstSharedPtr final_local_address = listener->socket_.localAddress();
+  bool using_original_dst = false;
+
+  // Get the local address from the new socket if the listener is listening on the all hosts
+  // address (e.g., 0.0.0.0 for IPv4).
+  auto ip = final_local_address->ip();
+  if (ip && ip->isAnyAddress()) {
+    final_local_address = listener->getLocalAddress(fd);
+  }
+
   if (listener->options_.use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
     Address::InstanceConstSharedPtr original_local_address = listener->getOriginalDst(fd);
-    if (original_local_address) {
-      final_local_address = original_local_address;
-    }
 
-    // Hands off redirected connections (from iptables) to the listener associated with the
-    // original destination address. If there is no listener associated with the original
-    // destination address, the connection is handled by the listener that receives it.
-    // Note: A listener that has the use_original_dst flag set to true can still receive.
+    // A listener that has the use_original_dst flag set to true can still receive
     // connections that are NOT redirected using iptables. If a connection was not redirected,
-    // the address returned by getOriginalDst() match the listener address. In this case the
-    // listener handles the connection directly and does not hand it off.
-    if (listener->socket_.localAddress() != final_local_address) {
+    // the address returned by getOriginalDst() matches the local address of the new socket.
+    // In this case the listener handles the connection directly and does not hand it off.
+    if (original_local_address && (*original_local_address != *final_local_address)) {
+      final_local_address = original_local_address;
+      using_original_dst = true;
+
+      // Hands off redirected connections (from iptables) to the listener associated with the
+      // original destination address. If there is no listener associated with the original
+      // destination address, the connection is handled by the listener that receives it.
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
-          listener->connection_handler_.findListenerByAddress(*final_local_address));
+          listener->connection_handler_.findListenerByAddress(*original_local_address));
 
       if (new_listener != nullptr) {
         listener = new_listener;
@@ -68,7 +80,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     // TODO(jamessynge): We need to keep per-family stats. BUT, should it be based on the original
     // family or the local family? Probably local family, as the original proxy can take care of
     // stats for the original family.
-    listener->newConnection(fd, final_remote_address, final_local_address);
+    listener->newConnection(fd, final_remote_address, final_local_address, using_original_dst);
   }
 }
 
@@ -99,18 +111,21 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
 }
 
 void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
-                                 Address::InstanceConstSharedPtr local_address) {
-  ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
-  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+                                 Address::InstanceConstSharedPtr local_address,
+                                 bool using_original_dst) {
+  ConnectionPtr new_connection(
+      new ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst, true));
+  new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
 void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
-                                    Address::InstanceConstSharedPtr local_address) {
-  ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
-                                                       local_address, ssl_ctx_,
-                                                       Ssl::ConnectionImpl::InitialState::Server));
-  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
+                                    Address::InstanceConstSharedPtr local_address,
+                                    bool using_original_dst) {
+  ConnectionPtr new_connection(
+      new Ssl::ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst,
+                              true, ssl_ctx_, Ssl::ConnectionImpl::InitialState::Server));
+  new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 

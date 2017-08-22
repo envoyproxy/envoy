@@ -19,8 +19,6 @@
 
 #include "test/test_common/utility.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -29,35 +27,46 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path) : config_path_(config_path) {}
+  TestOptionsImpl(const std::string& config_path, const std::string& bootstrap_path,
+                  Network::Address::IpVersion ip_version)
+      : config_path_(config_path), bootstrap_path_(bootstrap_path),
+        local_address_ip_version_(ip_version), service_cluster_name_("cluster_name"),
+        service_node_name_("node_name"), service_zone_("zone_name") {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& bootstrapPath() override { return bootstrap_path_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
-  std::chrono::seconds drainTime() override { return std::chrono::seconds(0); }
+  std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
-  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
+  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
   uint64_t restartEpoch() override { return 0; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
   }
   Mode mode() const override { return Mode::Serve; }
+  const std::string& serviceClusterName() override { return service_cluster_name_; }
+  const std::string& serviceNodeName() override { return service_node_name_; }
+  const std::string& serviceZone() override { return service_zone_; }
 
 private:
   const std::string config_path_;
+  const std::string bootstrap_path_;
   const std::string admin_address_path_;
-  Network::Address::IpVersion local_address_ip_version_;
+  const Network::Address::IpVersion local_address_ip_version_;
+  const std::string service_cluster_name_;
+  const std::string service_node_name_;
+  const std::string service_zone_;
 };
 
 class TestDrainManager : public DrainManager {
 public:
   // Server::DrainManager
-  bool drainClose() override { return draining_; }
-  bool draining() override { return draining_; }
-  void startDrainSequence() override {}
+  bool drainClose() const override { return draining_; }
+  void startDrainSequence(std::function<void()>) override {}
   void startParentShutdownSequence() override {}
 
   bool draining_{};
@@ -86,6 +95,11 @@ class TestScopeWrapper : public Scope {
 public:
   TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+
+  ScopePtr createScope(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+  }
 
   void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
     std::unique_lock<std::mutex> lock(lock_);
@@ -128,6 +142,10 @@ public:
     std::unique_lock<std::mutex> lock(lock_);
     return store_.counter(name);
   }
+  ScopePtr createScope(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+  }
   void deliverHistogramToSinks(const std::string&, uint64_t) override {}
   void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
   Gauge& gauge(const std::string& name) override {
@@ -147,10 +165,6 @@ public:
   std::list<GaugeSharedPtr> gauges() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauges();
-  }
-  ScopePtr createScope(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
 
   // Stats::StoreRoot
@@ -176,6 +190,7 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public Server::ComponentFactory {
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
+                                         const std::string& bootstrap_path,
                                          const Network::Address::IpVersion version);
   ~IntegrationTestServer();
 
@@ -192,20 +207,15 @@ public:
   }
   void start(const Network::Address::IpVersion version);
   void start();
-  Stats::Store& store() { return stats_store_; }
+  Stats::CounterSharedPtr counter(const std::string& name) {
+    // When using the thread local store, only counters() is thread safe. This also allows us
+    // to test if a counter exists at all versus just defaulting to zero.
+    return TestUtility::findCounter(*stat_store_, name);
+  }
 
   // TestHooks
-  void onServerInitialized() override { server_initialized_.setReady(); }
-  void onWorkerListenerAdded() override {
-    if (on_worker_listener_added_cb_) {
-      on_worker_listener_added_cb_();
-    }
-  }
-  void onWorkerListenerRemoved() override {
-    if (on_worker_listener_removed_cb_) {
-      on_worker_listener_removed_cb_();
-    }
-  }
+  void onWorkerListenerAdded() override;
+  void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance&) override {
@@ -218,7 +228,8 @@ public:
   }
 
 protected:
-  IntegrationTestServer(const std::string& config_path) : config_path_(config_path) {}
+  IntegrationTestServer(const std::string& config_path, const std::string& bootstrap_path)
+      : config_path_(config_path), bootstrap_path_(bootstrap_path) {}
 
 private:
   /**
@@ -227,12 +238,15 @@ private:
   void threadRoutine(const Network::Address::IpVersion version);
 
   const std::string config_path_;
+  const std::string bootstrap_path_;
   Thread::ThreadPtr thread_;
-  ConditionalInitializer server_initialized_;
+  std::condition_variable listeners_cv_;
+  std::mutex listeners_mutex_;
+  uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
-  Stats::TestIsolatedStoreImpl stats_store_;
+  Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
 };

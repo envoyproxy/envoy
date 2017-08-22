@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -28,7 +30,19 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::AnyNumber;
+using testing::Invoke;
+using testing::_;
+
 namespace Envoy {
+
+namespace {
+std::string normalizeDate(const std::string& s) {
+  const std::regex date_regex("date:[^\r]+");
+  return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
+}
+} // namespace
+
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -166,22 +180,38 @@ void IntegrationCodecClient::waitForDisconnect() {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events & Network::ConnectionEvent::Connected) {
+void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
     parent_.connection_->dispatcher().exit();
-  } else if (events & Network::ConnectionEvent::RemoteClose) {
+  } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port,
+IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
+                                           MockBufferFactory& factory, uint32_t port,
                                            Network::Address::IpVersion version)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
+  EXPECT_CALL(factory, create_())
+      .Times(2)
+      .WillOnce(Invoke([&]() -> Buffer::Instance* {
+        return new Buffer::OwnedImpl; // client read buffer.
+      }))
+      .WillOnce(Invoke([&]() -> Buffer::Instance* {
+        client_write_buffer_ = new MockBuffer;
+        return client_write_buffer_;
+      }));
+
   connection_ = dispatcher.createClientConnection(Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
+
+  ON_CALL(*client_write_buffer_, drain(_))
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::baseDrain));
+  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
+
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
@@ -205,13 +235,19 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
+  EXPECT_CALL(*client_write_buffer_, move(_)).Times(1);
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(1);
+
+  int bytes_expected = client_write_buffer_->bytes_written() + data.size();
+
   connection_->write(buffer);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  // NOTE: We should run blocking until all the body data is flushed.
+  while (client_write_buffer_->bytes_written() != bytes_expected) {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
-void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
-  if (events == Network::ConnectionEvent::RemoteClose) {
+void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   }
@@ -219,7 +255,8 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher()),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
+      dispatcher_(new Event::DispatcherImpl(Buffer::FactoryPtr{mock_buffer_factory_})),
       default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
@@ -228,9 +265,10 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  ON_CALL(*mock_buffer_factory_, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
+    return new Buffer::OwnedImpl;
+  }));
 }
-
-BaseIntegrationTest::~BaseIntegrationTest() {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return dispatcher_->createClientConnection(Network::Utility::resolveUrl(
@@ -256,7 +294,8 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port, version_)};
+  return IntegrationTcpClientPtr{
+      new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port, version_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -281,11 +320,31 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
 
+void BaseIntegrationTest::createApiTestServer(const std::string& json_path,
+                                              const ApiFilesystemConfig& api_filesystem_config,
+                                              const std::vector<std::string>& port_names) {
+  if (api_filesystem_config.bootstrap_path_.empty()) {
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), std::string(),
+        version_);
+  } else {
+    const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.eds_path_, port_map_, version_);
+    const std::string cds_path = TestEnvironment::temporaryFileSubstitute(
+        api_filesystem_config.cds_path_, {{"eds_json_path", eds_path}}, port_map_, version_);
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_),
+        TestEnvironment::temporaryFileSubstitute(api_filesystem_config.bootstrap_path_,
+                                                 {{"cds_json_path", cds_path}}, port_map_,
+                                                 version_),
+        version_);
+  }
+  registerTestServerPorts(port_names);
+}
+
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
-  registerTestServerPorts(port_names);
+  createApiTestServer(json_path, ApiFilesystemConfig(), port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
@@ -304,7 +363,7 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
              {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
              {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
          if (big_header) {
-           headers.addViaCopy("big", std::string(4096, 'a'));
+           headers.addCopy("big", std::string(4096, 'a'));
          }
 
          codec_client->makeRequestWithBody(headers, request_size, *response);
@@ -333,7 +392,7 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
 }
 
 void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, bool close_upstream) {
 
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
@@ -359,9 +418,16 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
        },
        [&]() -> void { response->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client->close(); }});
+
+  // The following allows us to test shutting down the server with active connection pool
+  // connections. Either way we need to clean up the upstream connections to avoid race conditions.
+  if (!close_upstream) {
+    test_server_.reset();
+  }
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
 
   EXPECT_TRUE(request->complete());
   EXPECT_EQ(0U, request->bodyLength());
@@ -886,6 +952,59 @@ void BaseIntegrationTest::testNoHost() {
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
+void BaseIntegrationTest::testAbsolutePath() {
+  Buffer::OwnedImpl buffer("GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http_forward"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection.run();
+  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void BaseIntegrationTest::testAllowAbsoluteSameRelative() {
+  // Ensure that relative urls behave the same with allow_absolute_url enabled and without
+  testEquivalent("GET /foo/bar HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testConnect() {
+  // Ensure that connect behaves the same with allow_absolute_url enabled and without
+  testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
+}
+
+void BaseIntegrationTest::testEquivalent(const std::string& request) {
+  Buffer::OwnedImpl buffer1(request);
+  std::string response1;
+  RawConnectionDriver connection1(
+      lookupPort("http"), buffer1,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response1.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection1.run();
+
+  Buffer::OwnedImpl buffer2(request);
+  std::string response2;
+  RawConnectionDriver connection2(
+      lookupPort("http_forward"), buffer2,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response2.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      },
+      version_);
+
+  connection2.run();
+
+  EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
+}
+
 void BaseIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
@@ -996,7 +1115,7 @@ void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
-  big_headers.addViaCopy("big", std::string(60 * 1024, 'a'));
+  big_headers.addCopy("big", std::string(60 * 1024, 'a'));
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },

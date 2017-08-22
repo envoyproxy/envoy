@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/optional.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
 
 namespace Envoy {
@@ -152,6 +153,11 @@ public:
    */
   virtual Stream* start(StreamCallbacks& callbacks,
                         const Optional<std::chrono::milliseconds>& timeout) PURE;
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this client.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
 
 typedef std::unique_ptr<AsyncClient> AsyncClientPtr;

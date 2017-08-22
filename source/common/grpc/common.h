@@ -11,7 +11,7 @@
 #include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
 
-#include "google/protobuf/message.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -90,7 +90,7 @@ public:
   /**
    * Serialize protobuf message.
    */
-  static Buffer::InstancePtr serializeBody(const google::protobuf::Message& message);
+  static Buffer::InstancePtr serializeBody(const Protobuf::Message& message);
 
   /**
    * Prepare headers for protobuf service.

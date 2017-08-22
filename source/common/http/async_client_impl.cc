@@ -79,7 +79,7 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
       },
       nullptr);
 #endif
-
+  ASSERT(!remote_closed_);
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
 }
@@ -87,6 +87,7 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "async http request response data (length={} end_stream={})", data.length(),
             end_stream);
+  ASSERT(!remote_closed_);
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
 }
@@ -100,13 +101,14 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
       },
       nullptr);
 #endif
-
+  ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
   closeRemote(true);
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
-  headers.insertEnvoyInternalRequest().value(Headers::get().EnvoyInternalRequestValues.True);
+  headers.insertEnvoyInternalRequest().value().setReference(
+      Headers::get().EnvoyInternalRequestValues.True);
   Utility::appendXff(headers, *parent_.config_.local_info_.address());
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
@@ -144,10 +146,11 @@ void AsyncStreamImpl::reset() {
 }
 
 void AsyncStreamImpl::cleanup() {
+  local_closed_ = remote_closed_ = true;
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
-    removeFromList(parent_.active_streams_);
+    dispatcher().deferredDelete(removeFromList(parent_.active_streams_));
   }
 }
 

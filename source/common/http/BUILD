@@ -104,6 +104,7 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:wshandler_callback_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -125,6 +126,7 @@ envoy_cc_library(
         "//source/common/http/access_log:request_info_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -141,6 +143,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:utility_lib",
     ],
@@ -220,6 +223,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["envoy_protocol"],
     deps = [
         ":exception_lib",
         ":header_map_lib",
@@ -234,6 +238,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

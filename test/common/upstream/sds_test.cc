@@ -7,10 +7,11 @@
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/upstream/eds.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -21,11 +22,11 @@
 
 #include "api/base.pb.h"
 #include "gmock/gmock.h"
-#include "google/protobuf/util/time_util.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 using testing::DoAll;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -48,14 +49,12 @@ protected:
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
-    Config::Utility::sdsConfigToEdsConfig(SdsConfig{"sds", std::chrono::milliseconds(30000)},
-                                          eds_config_);
-
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";
-    cluster_.reset(new EdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, eds_config_,
-                                      local_info_, cm_, dispatcher_, random_));
+    const SdsConfig sds_config{"sds", std::chrono::milliseconds(30000)};
+    sds_cluster_ = parseSdsClusterFromJson(raw_config, sds_config);
+    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, stats_, ssl_context_manager_,
+                                      local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -101,10 +100,10 @@ protected:
 
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  envoy::api::v2::ConfigSource eds_config_;
+  envoy::api::v2::Cluster sds_cluster_;
   MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  std::unique_ptr<EdsClusterImpl> cluster_;
+  std::shared_ptr<EdsClusterImpl> cluster_;
   Event::MockTimer* timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   ReadyWatcher membership_updated_;
@@ -128,10 +127,10 @@ TEST_F(SdsTest, PoolFailure) {
 }
 
 TEST_F(SdsTest, NoHealthChecker) {
+  InSequence s;
   setupRequest();
   cluster_->initialize();
 
-  EXPECT_CALL(membership_updated_, ready()).Times(3);
   cluster_->addMemberUpdateCb(
       [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
         membership_updated_.ready();
@@ -143,6 +142,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -171,6 +171,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   message->body().reset(
       new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
           "test/common/upstream/test_data/sds_response_weight_change.json"))));
+  EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -216,9 +217,10 @@ TEST_F(SdsTest, NoHealthChecker) {
 }
 
 TEST_F(SdsTest, HealthChecker) {
+  InSequence s;
   MockHealthChecker* health_checker = new MockHealthChecker();
   EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster_->setHealthChecker(HealthCheckerPtr{health_checker});
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
@@ -232,6 +234,7 @@ TEST_F(SdsTest, HealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());

@@ -14,10 +14,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/lds_json.h"
+#include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "api/lds.pb.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -33,17 +36,28 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-void MainImpl::initialize(const Json::Object& json, Instance& server,
+void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
+                          Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   cluster_manager_ = cluster_manager_factory.clusterManagerFromJson(
-      *json.getObject("cluster_manager"), server.stats(), server.threadLocal(), server.runtime(),
-      server.random(), server.localInfo(), server.accessLogManager());
+      *json.getObject("cluster_manager"), bootstrap, server.stats(), server.threadLocal(),
+      server.runtime(), server.random(), server.localInfo(), server.accessLogManager());
 
   std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(info, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(*listeners[i]);
+    envoy::api::v2::Listener listener;
+    Config::LdsJson::translateListener(*listeners[i], listener);
+    server.listenerManager().addOrUpdateListener(listener);
+  }
+
+  if (json.hasObject("lds")) {
+    envoy::api::v2::ConfigSource lds_config;
+    Config::Utility::translateLdsConfig(*json.getObject("lds"), lds_config);
+    lds_api_.reset(new LdsApi(lds_config, *cluster_manager_, server.dispatcher(), server.random(),
+                              server.initManager(), server.localInfo(), server.stats(),
+                              server.listenerManager()));
   }
 
   if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {

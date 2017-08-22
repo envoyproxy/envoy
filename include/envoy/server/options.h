@@ -65,6 +65,14 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
+   * @return const std::string& the path to the v2 bootstrap file.
+   * TODO(htuch): We can eventually consolidate configPath()/bootstrapPath(), but today
+   * the config fetched from bootstrapPath() acts as an overlay to the config fetched from
+   * configPath() during v2 API bringup.
+   */
+  virtual const std::string& bootstrapPath() PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() PURE;
@@ -100,6 +108,21 @@ public:
    * @return std::chrono::milliseconds the duration in msec between log flushes.
    */
   virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;
+
+  /**
+   * @return const std::string& the server's cluster.
+   */
+  virtual const std::string& serviceClusterName() PURE;
+
+  /**
+   * @return const std::string& the server's node identification.
+   */
+  virtual const std::string& serviceNodeName() PURE;
+
+  /**
+   * @return const std::string& the server's zone.
+   */
+  virtual const std::string& serviceZone() PURE;
 };
 
 } // namespace Server

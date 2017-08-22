@@ -3,6 +3,15 @@
 Listeners
 =========
 
+.. toctree::
+  :hidden:
+
+  filters
+  ssl
+  stats
+  runtime
+  lds
+
 The top level Envoy configuration contains a list of :ref:`listeners <arch_overview_listeners>`.
 Each individual listener configuration has the following format:
 
@@ -19,10 +28,12 @@ Each individual listener configuration has the following format:
     "per_connection_buffer_limit_bytes": "..."
   }
 
+.. _config_listeners_name:
+
 name
   *(optional, string)* The unique name by which this listener is known. If no name is provided,
   Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
-  updated or removed via LDS a unique name must be provided.
+  updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
 
 address
   *(required, string)* The address that the listener should listen on. Currently only TCP
@@ -66,10 +77,19 @@ per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.
   If unspecified, an implementation defined default is applied (1MiB).
 
-.. toctree::
-  :hidden:
+Statistics
+----------
 
-  filters
-  ssl
-  stats
-  runtime
+The listener manager has a statistics tree rooted at *listener_manager.* with the following
+statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  listener_added, Counter, Total listeners added (either via static config or LDS)
+  listener_modified, Counter, Total listeners modified (via LDS)
+  listener_removed, Counter, Total listeners removed (via LDS)
+  total_listeners_warming, Gauge, Number of currently warming listeners
+  total_listeners_active, Gauge, Number of currently active listeners
+  total_listeners_draining, Gauge, Number of currently draining listeners

@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <iostream>
 #include <list>
 #include <mutex>
 #include <stdexcept>
@@ -22,7 +23,20 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::GTEST_FLAG(random_seed);
+
 namespace Envoy {
+
+static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+
+TestRandomGenerator::TestRandomGenerator()
+    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+  std::cerr << "TestRandomGenerator running with seed " << seed_ << "\n";
+}
+
+uint64_t TestRandomGenerator::random() { return generator_(); }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
@@ -127,11 +141,13 @@ void ConditionalInitializer::setReady() {
 void ConditionalInitializer::waitReady() {
   std::unique_lock<std::mutex> lock(mutex_);
   if (ready_) {
+    ready_ = false;
     return;
   }
 
   cv_.wait(lock);
   EXPECT_TRUE(ready_);
+  ready_ = false;
 }
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
@@ -151,22 +167,14 @@ TestHeaderMapImpl::TestHeaderMapImpl(
     const std::initializer_list<std::pair<std::string, std::string>>& values)
     : HeaderMapImpl() {
   for (auto& value : values) {
-    addViaCopy(value.first, value.second);
+    addCopy(value.first, value.second);
   }
 }
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
 
-void TestHeaderMapImpl::addViaCopy(const std::string& key, const std::string& value) {
-  addViaCopy(LowerCaseString(key), value);
-}
-
-void TestHeaderMapImpl::addViaCopy(const LowerCaseString& key, const std::string& value) {
-  HeaderString key_string;
-  key_string.setCopy(key.get().c_str(), key.get().size());
-  HeaderString value_string;
-  value_string.setCopy(value.c_str(), value.size());
-  addViaMove(std::move(key_string), std::move(value_string));
+void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
+  addCopy(LowerCaseString(key), value);
 }
 
 std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }

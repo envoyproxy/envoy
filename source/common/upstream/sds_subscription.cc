@@ -6,13 +6,14 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/eds.pb.h"
-#include "google/protobuf/util/time_util.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -39,8 +40,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   // Since in the v2 EDS API we place all the endpoints for a given zone in the same proto, we first
   // need to bin the returned hosts list so that we group them by zone. We use an ordered map here
   // to provide better determinism for debug/test behavior.
-  std::map<std::string, google::protobuf::RepeatedPtrField<envoy::api::v2::LbEndpoint>>
-      zone_lb_endpoints;
+  std::map<std::string, Protobuf::RepeatedPtrField<envoy::api::v2::LbEndpoint>> zone_lb_endpoints;
   for (const Json::ObjectSharedPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
@@ -52,15 +52,16 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     }
     auto* lb_endpoint = zone_lb_endpoints[zone].Add();
     auto* address = lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
-    address->set_ip_address(host->getString("ip_address"));
-    address->mutable_port()->set_value(host->getInteger("port"));
-    // TODO(htuch): This will eventually be generalized metadata/labels, see
-    // https://github.com/lyft/envoy-api/issues/81.
-    lb_endpoint->mutable_canary()->set_value(canary);
+    address->set_address(host->getString("ip_address"));
+    address->set_port_value(host->getInteger("port"));
+    Config::Metadata::mutableMetadataValue(*lb_endpoint->mutable_metadata(),
+                                           Config::MetadataFilters::get().ENVOY_LB,
+                                           Config::MetadataEnvoyLbKeys::get().CANARY)
+        .set_bool_value(canary);
     lb_endpoint->mutable_load_balancing_weight()->set_value(weight);
   }
 
-  google::protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name(cluster_name_);
   for (auto it : zone_lb_endpoints) {
@@ -86,7 +87,7 @@ void SdsSubscription::createRequest(Http::Message& message) {
   ENVOY_LOG(debug, "starting sds refresh for cluster: {}", cluster_name_);
   stats_.update_attempt_.inc();
 
-  message.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  message.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   message.headers().insertPath().value("/v1/registration/" + cluster_name_);
 }
 

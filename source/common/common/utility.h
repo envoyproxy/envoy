@@ -171,5 +171,22 @@ public:
    * @return true if @param source starts with @param start and ignores cases.
    */
   static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
+
+  /**
+   * Provide a default value for a string if empty.
+   * @param s string.
+   * @param default_value replacement for s if empty.
+   * @return s is !s.empty() otherwise default_value.
+   */
+  static const std::string& nonEmptyStringOrDefault(const std::string& s,
+                                                    const std::string& default_value);
+
+  /**
+   * Convert a string to upper case.
+   * @param s string.
+   * @return std::string s converted to upper case.
+   */
+  static std::string toUpper(const std::string& s);
 };
+
 } // namespace Envoy

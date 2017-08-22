@@ -52,6 +52,7 @@ public:
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
+  ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(name, value);
   }
@@ -63,7 +64,6 @@ public:
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override;
-  ScopePtr createScope(const std::string& name) override;
   std::list<GaugeSharedPtr> gauges() const override;
 
   // Stats::StoreRoot
@@ -86,6 +86,9 @@ private:
 
     // Stats::Scope
     Counter& counter(const std::string& name) override;
+    ScopePtr createScope(const std::string& name) override {
+      return parent_.createScope(prefix_ + name);
+    }
     void deliverHistogramToSinks(const std::string& name, uint64_t value) override;
     void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override;
     Gauge& gauge(const std::string& name) override;
@@ -97,9 +100,6 @@ private:
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
-    // ThreadLocal::ThreadLocalObject
-    void shutdown() override { scope_cache_.clear(); }
-
     std::unordered_map<ScopeImpl*, TlsCacheEntry> scope_cache_;
   };
 
@@ -114,8 +114,7 @@ private:
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::Instance* tls_{};
-  uint32_t tls_slot_;
+  ThreadLocal::SlotPtr tls_;
   mutable std::mutex lock_;
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;

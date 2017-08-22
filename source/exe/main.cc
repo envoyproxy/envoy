@@ -1,11 +1,14 @@
 #include <iostream>
 #include <memory>
 
-#include "exe/hot_restart.h"
 #include "exe/main_common.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
+#endif
+
+#ifdef ENVOY_HOT_RESTART
+#include "server/hot_restart_impl.h"
 #endif
 
 #include "server/options_impl.h"
@@ -19,7 +22,7 @@
  *
  * This should be used to do setup tasks specific to a particular site's
  * deployment such as initializing signal handling.  It calls main_common
- * after setting up command line options and the hot restarter.
+ * after setting up command line options.
  */
 int main(int argc, char** argv) {
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -27,16 +30,14 @@ int main(int argc, char** argv) {
   Envoy::SignalAction handle_sigs;
 #endif
 
-  Envoy::OptionsImpl options(argc, argv, Envoy::Server::SharedMemory::version(),
-                             spdlog::level::warn);
+#ifdef ENVOY_HOT_RESTART
+  // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
+  const std::string shared_mem_version = Envoy::Server::SharedMemory::version();
+#else
+  const std::string shared_mem_version = "disabled";
+#endif
 
-  std::unique_ptr<Envoy::Server::HotRestartImpl> restarter;
-  try {
-    restarter.reset(new Envoy::Server::HotRestartImpl(options));
-  } catch (Envoy::EnvoyException& e) {
-    std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
-    return 1;
-  }
+  Envoy::OptionsImpl options(argc, argv, shared_mem_version, spdlog::level::warn);
 
-  return Envoy::main_common(options, *restarter);
+  return Envoy::main_common(options);
 }

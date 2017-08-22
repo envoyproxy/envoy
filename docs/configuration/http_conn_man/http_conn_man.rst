@@ -20,6 +20,7 @@ HTTP connection manager
       "add_user_agent": "...",
       "tracing": "{...}",
       "http_codec_options": "...",
+      "http1_settings": "{...}",
       "http2_settings": "{...}",
       "server_name": "...",
       "idle_timeout_s": "...",
@@ -106,6 +107,16 @@ http_codec_options (Warning: DEPRECATED and will be removed in 1.4.0)
   <config_cluster_manager_cluster_http_codec_options>` option. See the comment there about
   disabling HTTP/2 header compression.
 
+.. _config_http_conn_man_http1_settings:
+
+http1_settings
+  *(optional, object)* Additional HTTP/1 settings that are passed to the HTTP/1 codec.
+
+  allow_absolute_url
+  *(optional, boolean)* Handle http requests with absolute urls in the requests. These requests are generally
+  sent by clients to forward/explicit proxies. This allows clients to configure envoy as their http proxy.
+  In Unix, for example, this is typically done by setting the http_proxy environment variable.
+
 .. _config_http_conn_man_http2_settings:
 
 http2_settings
@@ -135,6 +146,10 @@ http2_settings
     NOTE: 65535 is the initial window size from HTTP/2 spec. We only support increasing the default window
     size now, so it's also the minimum.
 
+    This field also acts as a soft limit on the number of bytes Envoy will buffer per-stream in the
+    HTTP/2 codec buffers.  Once the buffer reaches this pointer, watermark callbacks will fire to
+    stop the flow of data to the codec buffers.
+
   initial_connection_window_size
     *(optional, integer)* Similar to :ref:`initial_stream_window_size
     <config_http_conn_man_http2_settings_initial_stream_window_size>`, but for connection-level flow-control
@@ -156,7 +171,7 @@ idle_timeout_s
   manager. The idle timeout is defined as the period in which there are no active requests. If not
   set, there is no idle timeout. When the idle timeout is reached the connection will be closed. If
   the connection is an HTTP/2 connection a drain sequence will occur prior to closing the
-  connection. See :ref:`drain_timeout_s <config_http_conn_man_drain_timeout_ms>`.
+  connection. See :ref:`drain_timeout_ms <config_http_conn_man_drain_timeout_ms>`.
 
 .. _config_http_conn_man_drain_timeout_ms:
 

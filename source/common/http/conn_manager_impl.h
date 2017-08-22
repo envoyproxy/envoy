@@ -12,6 +12,7 @@
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/websocket.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -26,6 +27,7 @@
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
+#include "common/http/websocket/ws_handler_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -39,6 +41,7 @@ namespace Http {
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_ssl_total)                                                                 \
   COUNTER(downstream_cx_http1_total)                                                               \
+  COUNTER(downstream_cx_websocket_total)                                                           \
   COUNTER(downstream_cx_http2_total)                                                               \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_remote)                                                            \
@@ -49,6 +52,7 @@ namespace Http {
   GAUGE  (downstream_cx_active)                                                                    \
   GAUGE  (downstream_cx_ssl_active)                                                                \
   GAUGE  (downstream_cx_http1_active)                                                              \
+  GAUGE  (downstream_cx_websocket_active)                                                          \
   GAUGE  (downstream_cx_http2_active)                                                              \
   COUNTER(downstream_cx_protocol_error)                                                            \
   TIMER  (downstream_cx_length_ms)                                                                 \
@@ -58,6 +62,8 @@ namespace Http {
   GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
+  COUNTER(downstream_flow_control_paused_reading_total)                                            \
+  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
@@ -66,12 +72,13 @@ namespace Http {
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_non_relative_path)                                                         \
+  COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
+  COUNTER(downstream_rq_non_ws_on_ws_route)                                                        \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
-  TIMER  (downstream_rq_time)                                                                      \
-  COUNTER(failed_generate_uuid)
+  TIMER  (downstream_rq_time)
 // clang-format on
 
 /**
@@ -255,9 +262,10 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public ServerConnectionCallbacks,
                               public Network::ConnectionCallbacks {
 public:
-  ConnectionManagerImpl(ConnectionManagerConfig& config, Network::DrainDecision& drain_close,
+  ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
-                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
+                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                        Upstream::ClusterManager& cluster_manager);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -278,7 +286,14 @@ public:
   StreamDecoder& newStream(StreamEncoder& response_encoder) override;
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  // Pass connection watermark events on to all the streams associated with that connection.
+  void onAboveWriteBufferHighWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  }
 
 private:
   struct ActiveStream;
@@ -305,10 +320,12 @@ private:
 
     // Http::StreamFilterCallbacks
     uint64_t connectionId() override;
+    const Network::Connection* connection() override;
     Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
+    void clearRouteCache() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;
@@ -351,6 +368,12 @@ private:
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void onDecoderFilterAboveWriteBufferHighWatermark() override;
+    void onDecoderFilterBelowWriteBufferLowWatermark() override;
+    void
+    addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+    void
+    removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -381,6 +404,8 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data) override;
+    void onEncoderFilterAboveWriteBufferHighWatermark() override;
+    void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
@@ -400,6 +425,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
+                        public WsHandlerCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -410,6 +436,7 @@ private:
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
+    const Network::Connection* connection();
     Ssl::Connection* ssl();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
@@ -424,6 +451,8 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -443,9 +472,19 @@ private:
     }
     void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
 
+    // Http::WsHandlerCallbacks
+    void sendHeadersOnlyResponse(HeaderMap& headers) override {
+      encodeHeaders(nullptr, headers, true);
+    }
+
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+
+    // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
+    // events for this stream and the downstream connection to the router filter.
+    void callHighWatermarkCallbacks();
+    void callLowWatermarkCallbacks();
 
     /**
      * Flags that keep track of which filter calls are currently in progress.
@@ -490,6 +529,8 @@ private:
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
+    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    uint32_t high_watermark_count_{0};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
@@ -516,6 +557,8 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
+  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
@@ -524,7 +567,7 @@ private:
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
-  Network::DrainDecision& drain_close_;
+  const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   Event::TimerPtr idle_timer_;
@@ -533,6 +576,8 @@ private:
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
+  Upstream::ClusterManager& cluster_manager_;
+  WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

@@ -10,12 +10,6 @@ load("//bazel:cc_configure.bzl", "cc_configure")
 
 envoy_dependencies(
     path = "@envoy//ci/prebuilt",
-    skip_protobuf_bzl = True,
-)
-
-local_repository(
-    name = "protobuf_bzl",
-    path = "/thirdparty/protobuf",
 )
 
 cc_configure()

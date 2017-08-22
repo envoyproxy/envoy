@@ -8,9 +8,19 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/init/init.h"
+#include "envoy/json/json_object.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/router/rds.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -114,10 +124,8 @@ class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
   const std::string& name() const override { return name_; }
-  Upstream::ResourcePriority priority() const override { return priority_; }
 
   std::string name_{"fake_virtual_cluster"};
-  Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -160,6 +168,7 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
 
@@ -202,6 +211,20 @@ public:
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
+};
+
+class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {
+public:
+  MockRouteConfigProviderManager();
+  ~MockRouteConfigProviderManager();
+
+  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD5(getRouteConfigProvider,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::Rds& rds,
+                                            Upstream::ClusterManager& cm, Stats::Scope& scope,
+                                            const std::string& stat_prefix,
+                                            Init::Manager& init_manager));
+  MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
 };
 
 } // namespace Router

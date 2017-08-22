@@ -88,6 +88,13 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version) 
   return std::string("127.0.0.1");
 }
 
+const std::string getLoopbackAddressString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("::1");
+  }
+  return std::string("127.0.0.1");
+}
+
 const std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::]");
@@ -100,25 +107,6 @@ const std::string addressVersionAsString(const Address::IpVersion version) {
     return std::string("v4");
   }
   return std::string("v6");
-}
-
-Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
-  if (version == Address::IpVersion::v4) {
-    // Pick a random address in 127.0.0.0/8.
-    // TODO(jamessynge): Consider how to use $GTEST_RANDOM_SEED for seeding the rng.
-    // Perhaps we need a TestRuntime::getRandomGenerator() or similar.
-    Runtime::RandomGeneratorImpl rng;
-    sockaddr_in sin;
-    sin.sin_family = AF_INET;
-    sin.sin_port = 0;
-    sin.sin_addr.s_addr = static_cast<uint32_t>(rng.random() % 0xffffffff);
-    uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&sin.sin_addr.s_addr);
-    address_bytes[0] = 127;
-    return std::make_shared<Address::Ipv4Instance>(&sin);
-  } else {
-    // There is only one IPv6 loopback address.
-    return Network::Utility::getIpv6LoopbackAddress();
-  }
 }
 
 Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {
@@ -153,7 +141,7 @@ bool supportsIpVersion(const Address::IpVersion version) {
 
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
                                                                      Address::SocketType type) {
-  Address::InstanceConstSharedPtr addr = getSomeLoopbackAddress(version);
+  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const char* failing_fn = nullptr;
   const int fd = addr->socket(type);
   if (fd < 0) {

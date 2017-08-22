@@ -38,6 +38,7 @@ FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
     return FilterDataStatus::Continue;
   } else if (callbacks_->decodingBuffer() &&
              callbacks_->decodingBuffer()->length() > config_->max_request_bytes_) {
+    // TODO(htuch): Switch this to Utility::sendLocalReply().
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Http::Code::PayloadTooLarge))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -60,6 +61,7 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
 void BufferFilter::onDestroy() { resetInternalState(); }
 
 void BufferFilter::onRequestTimeout() {
+  // TODO(htuch): Switch this to Utility::sendLocalReply().
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{
       {Headers::get().Status, std::to_string(enumToInt(Http::Code::RequestTimeout))}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);

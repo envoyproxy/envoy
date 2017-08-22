@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -94,6 +95,16 @@ public:
    * Set the current load balancing weight of the host, in the range 1-100.
    */
   virtual void weight(uint32_t new_weight) PURE;
+
+  /**
+   * @return the current boolean value of host being in use.
+   */
+  virtual bool used() const PURE;
+
+  /**
+   * @param new_used supplies the new value of host being in use to be stored.
+   */
+  virtual void used(bool new_used) PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
@@ -118,8 +129,9 @@ public:
   /**
    * Install a callback that will be invoked when the cluster membership changes.
    * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* the callback handle.
    */
-  virtual void addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * @return all hosts that make up the set at the current time.
@@ -201,6 +213,10 @@ public:
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_flow_control_paused_reading_total)                                              \
+  COUNTER(upstream_flow_control_resumed_reading_total)                                             \
+  COUNTER(upstream_flow_control_backed_up_total)                                                   \
+  COUNTER(upstream_flow_control_drained_total)                                                     \
   GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_healthy)                                                                      \
@@ -228,6 +244,12 @@ public:
   };
 
   virtual ~ClusterInfo() {}
+
+  /**
+   * @return bool whether the cluster was added via API (if false the cluster was present in the
+   *         initial configuration and cannot be removed or updated).
+   */
+  virtual bool addedViaApi() const PURE;
 
   /**
    * @return the connect timeout for upstream hosts that belong to this cluster.
@@ -276,7 +298,7 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return ResourceManager& the resource manager to use by proxy agents for for this cluster (at
+   * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
    *         a particular priority).
    */
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
@@ -340,7 +362,7 @@ public:
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
-typedef std::unique_ptr<Cluster> ClusterPtr;
+typedef std::shared_ptr<Cluster> ClusterSharedPtr;
 
 } // namespace Upstream
 } // namespace Envoy

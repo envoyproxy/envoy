@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/compiler_requirements.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 
 #include "server/options_impl.h"
 
@@ -73,11 +74,10 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
     if (TestEnvironment::shouldRunTestForIpVersion(version)) {
       parameters.push_back(version);
       if (!Network::Test::supportsIpVersion(version)) {
-        Logger::Registry::getLog(Logger::Id::testing)
-            .warn(
-                fmt::format("Testing with IP{} addresses may not be supported on this machine. If "
+        ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), warn,
+                            "Testing with IP{} addresses may not be supported on this machine. If "
                             "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
-                            Network::Test::addressVersionAsString(version)));
+                            Network::Test::addressVersionAsString(version));
       }
     }
   }
@@ -121,14 +121,19 @@ std::string TestEnvironment::substitute(const std::string& str,
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
                                        Network::Test::getLoopbackAddressUrlString(version));
+  const std::regex ntop_loopback_address_regex("\\{\\{ ntop_ip_loopback_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
+                                       Network::Test::getLoopbackAddressString(version));
 
   // Substitute dns lookup family.
   const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");
   switch (version) {
   case Network::Address::IpVersion::v4:
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v4_only");
+    break;
   case Network::Address::IpVersion::v6:
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
+    break;
   }
 
   return out_json_string;
@@ -175,7 +180,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute paths and other common things.
   out_json_string = substitute(out_json_string, version);
 
-  const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
+  const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
+  const std::string out_json_path =
+      TestEnvironment::temporaryPath(path + ".with.ports" + extension);
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
   {
     std::ofstream out_json_file(out_json_path);

@@ -1,5 +1,7 @@
 #include "server/init_manager_impl.h"
 
+#include <functional>
+
 #include "common/common/assert.h"
 
 namespace Envoy {

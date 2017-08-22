@@ -22,12 +22,14 @@ public:
   ~MockConnectionCallbacks();
 
   // Network::ConnectionCallbacks
-  MOCK_METHOD1(onEvent, void(uint32_t events));
+  MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockConnectionBase {
 public:
-  void raiseEvents(uint32_t events);
+  void raiseEvent(Network::ConnectionEvent event);
 
   static uint64_t next_id_;
 
@@ -51,20 +53,23 @@ public:
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(id, uint64_t());
+  MOCK_CONST_METHOD0(id, uint64_t());
   MOCK_METHOD0(initializeReadFilters, bool());
-  MOCK_METHOD0(nextProtocol, std::string());
+  MOCK_CONST_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD0(readEnabled, bool());
-  MOCK_METHOD0(remoteAddress, const Address::Instance&());
-  MOCK_METHOD0(localAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(readEnabled, bool());
+  MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
-  MOCK_METHOD0(state, State());
+  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
-  MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
-  MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
+  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
+  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
+  MOCK_CONST_METHOD0(usingOriginalDst, bool());
+  MOCK_CONST_METHOD0(aboveHighWatermark, bool());
 };
 
 /**
@@ -83,20 +88,23 @@ public:
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD0(id, uint64_t());
+  MOCK_CONST_METHOD0(id, uint64_t());
   MOCK_METHOD0(initializeReadFilters, bool());
-  MOCK_METHOD0(nextProtocol, std::string());
+  MOCK_CONST_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD0(readEnabled, bool());
-  MOCK_METHOD0(remoteAddress, const Address::Instance&());
-  MOCK_METHOD0(localAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(readEnabled, bool());
+  MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
-  MOCK_METHOD0(state, State());
+  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
-  MOCK_METHOD1(setReadBufferLimit, void(uint32_t limit));
-  MOCK_CONST_METHOD0(readBufferLimit, uint32_t());
+  MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
+  MOCK_CONST_METHOD0(bufferLimit, uint32_t());
+  MOCK_CONST_METHOD0(usingOriginalDst, bool());
+  MOCK_CONST_METHOD0(aboveHighWatermark, bool());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
@@ -185,7 +193,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision();
 
-  MOCK_METHOD0(drainClose, bool());
+  MOCK_CONST_METHOD0(drainClose, bool());
 };
 
 class MockFilterChainFactory : public FilterChainFactory {

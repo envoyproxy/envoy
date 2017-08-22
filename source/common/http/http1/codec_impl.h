@@ -9,7 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
 #include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
@@ -42,6 +42,7 @@ public:
   void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
+  void readDisable(bool disable) override;
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
@@ -130,7 +131,7 @@ public:
 
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
-  Buffer::OwnedImpl& buffer() { return output_buffer_; }
+  Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
@@ -141,6 +142,11 @@ public:
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
+
+  void readDisable(bool disable) { connection_.readDisable(disable); }
+  uint32_t bufferLimit() { return connection_.bufferLimit(); }
 
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
@@ -225,6 +231,18 @@ private:
    */
   virtual void sendProtocolError() PURE;
 
+  /**
+   * Called when output_buffer_ or the underlying connection go from below a low watermark to over
+   * a high watermark.
+   */
+  virtual void onAboveHighWatermark() PURE;
+
+  /**
+   * Called when output_buffer_ or the underlying connection  go from above a high watermark to
+   * below a low watermark.
+   */
+  virtual void onBelowLowWatermark() PURE;
+
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
 
@@ -233,7 +251,7 @@ private:
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool reset_stream_called_{};
-  Buffer::OwnedImpl output_buffer_;
+  Buffer::WatermarkBuffer output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
@@ -244,7 +262,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks);
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Http1Settings settings);
 
 private:
   /**
@@ -259,6 +278,16 @@ private:
     bool remote_complete_{};
   };
 
+  /**
+   * Manipulate the request's first line, parsing the url and converting to a relative path if
+   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
+   *
+   * @param is_connect true if the request has the CONNECT method
+   * @param headers the request's headers
+   * @throws CodecProtocolException on an invalid url in the request line
+   */
+  void handlePath(HeaderMapImpl& headers, unsigned int method);
+
   // ConnectionImpl
   void onEncodeComplete() override;
   void onMessageBegin() override;
@@ -268,9 +297,12 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
+  void onAboveHighWatermark() override;
+  void onBelowLowWatermark() override;
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
+  Http1Settings codec_settings_;
 };
 
 /**
@@ -302,6 +334,8 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
+  void onAboveHighWatermark() override;
+  void onBelowLowWatermark() override;
 
   std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
   std::list<PendingResponse> pending_responses_;

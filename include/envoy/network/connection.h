@@ -19,13 +19,12 @@ class Dispatcher;
 namespace Network {
 
 /**
- * Events that occur on a connection. Maybe be combined.
+ * Events that occur on a connection.
  */
-class ConnectionEvent {
-public:
-  static const uint32_t RemoteClose = 0x1;
-  static const uint32_t LocalClose = 0x2;
-  static const uint32_t Connected = 0x4;
+enum class ConnectionEvent {
+  RemoteClose,
+  LocalClose,
+  Connected,
 };
 
 /**
@@ -42,9 +41,20 @@ public:
 
   /**
    * Callback for connection events.
-   * @param events supplies the ConnectionEvent events that occurred as a bitmask.
+   * @param events supplies the ConnectionEvent that occurred.
    */
-  virtual void onEvent(uint32_t events) PURE;
+  virtual void onEvent(ConnectionEvent event) PURE;
+
+  /**
+   * Called when the write buffer for a connection goes over its high watermark.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the write buffer for a connection goes from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -89,14 +99,14 @@ public:
   /**
    * @return uint64_t the unique local ID of this connection.
    */
-  virtual uint64_t id() PURE;
+  virtual uint64_t id() const PURE;
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
    *         ALPN). If network level negotation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
-  virtual std::string nextProtocol() PURE;
+  virtual std::string nextProtocol() const PURE;
 
   /**
    * Enable/Disable TCP NO_DELAY on the connection.
@@ -114,12 +124,12 @@ public:
   /**
    * @return bool whether reading is enabled on the connection.
    */
-  virtual bool readEnabled() PURE;
+  virtual bool readEnabled() const PURE;
 
   /**
    * @return The address of the remote client.
    */
-  virtual const Address::Instance& remoteAddress() PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -127,7 +137,7 @@ public:
    * it can be different from the proxy address if the downstream connection has been redirected or
    * the proxy is operating in transparent mode.
    */
-  virtual const Address::Instance& localAddress() PURE;
+  virtual const Address::Instance& localAddress() const PURE;
 
   /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that
@@ -142,9 +152,14 @@ public:
   virtual Ssl::Connection* ssl() PURE;
 
   /**
+   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   */
+  virtual const Ssl::Connection* ssl() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
-  virtual State state() PURE;
+  virtual State state() const PURE;
 
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
@@ -153,15 +168,32 @@ public:
   virtual void write(Buffer::Instance& data) PURE;
 
   /**
-   * Set a soft limit on the size of the read buffer prior to flushing to further stages in the
+   * Set a soft limit on the size of buffers for the connection.
+   * For the read buffer, this limits the bytes read prior to flushing to further stages in the
    * processing pipeline.
+   * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
+   * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
+   * reads on the socket funneling data to the write buffer.  When enough data is drained from the
+   * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
+   * resuming reading.
    */
-  virtual void setReadBufferLimit(uint32_t limit) PURE;
+  virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
-   * Get the value set with setReadBufferLimit.
+   * Get the value set with setBufferLimits.
    */
-  virtual uint32_t readBufferLimit() const PURE;
+  virtual uint32_t bufferLimit() const PURE;
+
+  /**
+   * @return boolean telling if the connection's local address is an original destination address,
+   * rather than the listener's address.
+   */
+  virtual bool usingOriginalDst() const PURE;
+
+  /**
+   * @return boolean telling if the connection is currently above the high watermark.
+   */
+  virtual bool aboveHighWatermark() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

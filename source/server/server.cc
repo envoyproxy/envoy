@@ -10,16 +10,19 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
-#include "envoy/network/listener.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/utility.h"
+#include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/singleton/manager_impl.h"
 #include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -28,23 +31,24 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
-#include "spdlog/spdlog.h"
+#include "api/bootstrap.pb.h"
 
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
-                           Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           const LocalInfo::LocalInfo& local_info)
+InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                           TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+                           Thread::BasicLockable& access_log_lock,
+                           ComponentFactory& component_factory, ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_),
       stats_store_(store), server_stats_{ALL_SERVER_STATS(
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
+      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
+      dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
-      dns_resolver_(dispatcher_->createDnsResolver({})), local_info_(local_info),
+      dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
   failHealthcheck(false);
@@ -59,10 +63,13 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   drain_manager_ = component_factory.createDrainManager(*this);
 
   try {
-    initialize(options, hooks, component_factory);
+    initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
+              options.configPath() +
+                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
               e.what());
+    thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
     exit(1);
   }
@@ -77,12 +84,40 @@ Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(warn, "closing and draining listeners");
   listener_manager_->stopListeners();
-  drain_manager_->startDrainSequence();
+  drain_manager_->startDrainSequence(nullptr);
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
   // We keep liveness state in shared memory so the parent process sees the same state.
   server_stats_.live_.set(!fail);
+}
+
+void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                                 Stats::Store& store) {
+  for (const auto& sink : sinks) {
+    sink->beginFlush();
+  }
+
+  for (const Stats::CounterSharedPtr& counter : store.counters()) {
+    uint64_t delta = counter->latch();
+    if (counter->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushCounter(counter->name(), delta);
+      }
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
+    if (gauge->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushGauge(gauge->name(), gauge->value());
+      }
+    }
+  }
+
+  for (const auto& sink : sinks) {
+    sink->endFlush();
+  }
 }
 
 void InstanceImpl::flushStats() {
@@ -98,23 +133,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (const Stats::CounterSharedPtr& counter : stats_store_.counters()) {
-    uint64_t delta = counter->latch();
-    if (counter->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushCounter(counter->name(), delta);
-      }
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-    if (gauge->used()) {
-      for (const auto& sink : stat_sinks_) {
-        sink->flushGauge(gauge->name(), gauge->value());
-      }
-    }
-  }
-
+  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
@@ -125,13 +144,24 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_.live_.value() == 0; }
 
-void InstanceImpl::initialize(Options& options, TestHooks& hooks,
+void InstanceImpl::initialize(Options& options,
+                              Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(warn, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  envoy::api::v2::Bootstrap bootstrap;
+  if (!options.bootstrapPath().empty()) {
+    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  }
+  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+
+  local_info_.reset(
+      new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
+                                   options.serviceClusterName(), options.serviceNodeName()));
+
   Configuration::InitialImpl initial_config(*config_json);
   ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
 
@@ -175,7 +205,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, *this, *cluster_manager_factory_);
+  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
 
   // Setup signals.
   sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
@@ -204,34 +234,15 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // started and before our own run() loop runs.
   guard_dog_.reset(
       new Server::GuardDogImpl(stats_store_, *config_, ProdMonotonicTimeSource::instance_));
-
-  // Register for cluster manager init notification. We don't start serving worker traffic until
-  // upstream clusters are initialized which may involve running the event loop. Note however that
-  // this can fire immediately if all clusters have already initialized.
-  clusterManager().setInitializedCb([this, &hooks]() -> void {
-    ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
-    init_manager_.initialize([this, &hooks]() -> void { startWorkers(hooks); });
-  });
 }
 
-void InstanceImpl::startWorkers(TestHooks& hooks) {
-  try {
-    listener_manager_->startWorkers(*guard_dog_);
-  } catch (const Network::CreateListenerException& e) {
-    // It is possible that we fail to start listening on a port, even though we were able to
-    // bind to it above. This happens when there is a race between two applications to listen
-    // on the same port. In general if we can't initialize the worker configuration just print
-    // the error and exit cleanly without crashing.
-    ENVOY_LOG(critical, "shutting down due to error initializing worker configuration: {}",
-              e.what());
-    shutdown();
-  }
+void InstanceImpl::startWorkers() {
+  listener_manager_->startWorkers(*guard_dog_);
 
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
   drain_manager_->startParentShutdownSequence();
-  hooks.onServerInitialized();
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
@@ -273,7 +284,7 @@ void InstanceImpl::initializeStatSinks() {
   if (config_->statsdTcpClusterName().valid()) {
     ENVOY_LOG(info, "statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(
-        new Stats::Statsd::TcpStatsdSink(local_info_, config_->statsdTcpClusterName().value(),
+        new Stats::Statsd::TcpStatsdSink(*local_info_, config_->statsdTcpClusterName().value(),
                                          thread_local_, config_->clusterManager(), stats_store_));
     stats_store_.addSink(*stat_sinks_.back());
   }
@@ -294,6 +305,14 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
 void InstanceImpl::run() {
+  // Register for cluster manager init notification. We don't start serving worker traffic until
+  // upstream clusters are initialized which may involve running the event loop. Note however that
+  // this can fire immediately if all clusters have already initialized.
+  clusterManager().setInitializedCb([this]() -> void {
+    ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
+    init_manager_.initialize([this]() -> void { startWorkers(); });
+  });
+
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(warn, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
@@ -302,6 +321,9 @@ void InstanceImpl::run() {
   ENVOY_LOG(warn, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
+
+  // Before starting to shutdown anything else, stop slot destruction updates.
+  thread_local_.shutdownGlobalThreading();
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();

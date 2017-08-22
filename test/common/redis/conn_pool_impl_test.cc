@@ -74,7 +74,7 @@ public:
 
   void onConnected() {
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    upstream_connection_->raiseEvents(Network::ConnectionEvent::Connected);
+    upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
   }
 
   const std::string cluster_name_{"foo"};
@@ -202,7 +202,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
@@ -228,7 +228,7 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   EXPECT_CALL(callbacks1, onFailure()).Times(0);
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::LocalClose);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_local_with_active_rq_.value());
@@ -275,7 +275,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(503));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
@@ -425,6 +425,13 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   tls_.shutdownThread();
 }
 
+TEST_F(RedisConnPoolImplTest, DeleteFollowedByClusterUpdateCallback) {
+  conn_pool_.reset();
+
+  std::shared_ptr<Upstream::Host> host(new Upstream::MockHost());
+  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host});
+}
+
 TEST_F(RedisConnPoolImplTest, NoHost) {
   InSequence s;
 
@@ -451,7 +458,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
   conn_pool_->makeRequest("foo", value, callbacks);
 
   EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
-  client->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  client->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   tls_.shutdownThread();
 }

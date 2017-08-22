@@ -71,12 +71,19 @@ public:
   virtual ~StreamFilterCallbacks() {}
 
   /**
-   * @return uint64_t the ID of the originating connection for logging purposes.
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
    */
   virtual uint64_t connectionId() PURE;
 
   /**
-   * @return Ssl::Connection* the ssl connection.
+   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   */
+  virtual const Network::Connection* connection() PURE;
+
+  /**
+   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
+   * instead.
    */
   virtual Ssl::Connection* ssl() PURE;
 
@@ -92,15 +99,18 @@ public:
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
-   * caching where applicable to avoid multiple lookups.
+   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
+   * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
-   *       routing (such as the request headers). In practice, we don't do this anywhere currently,
-   *       but in the future we might need to provide the ability to clear the cache if a filter
-   *       knows that it has modified the headers in a way that would affect routing. In the future
-   *       we may also want to allow the filter to override the route entry.
+   * NOTE: In the future we may want to allow the filter to override the route entry.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Clears the route cache for the current request. This must be called when a filter has modified
+   * the headers in a way that would affect routing.
+   */
+  virtual void clearRouteCache() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -191,6 +201,39 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times.  Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * This routine can be called by a filter to subscribe to watermark events on the downstream
+   * stream and downstream connection.
+   *
+   * Immediately after subscribing, the filter will get a high watermark callback for each
+   * outstanding backed up buffer.
+   */
+  virtual void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine can be called by a filter to stop subscribing to watermark events on the
+   * downstream stream and downstream connection.
+   *
+   * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
+   */
+  virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**
@@ -206,7 +249,8 @@ public:
    * sure that any async events are cleaned up in the context of this routine. This includes timers,
    * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
    * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
-   * complications.
+   * complications. Filters must not invoke either encoder or decoder filter callbacks after having
+   * onDestroy() invoked.
    */
   virtual void onDestroy() PURE;
 };
@@ -240,7 +284,7 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter decoder callbacks that the
-   * filter should use.
+   * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
 };
@@ -289,6 +333,16 @@ public:
    * It is an error to call this method in any other case.
    */
   virtual void addEncodedData(Buffer::Instance& data) PURE;
+
+  /**
+   * Called when an encoder filter goes over its high watermark.
+   */
+  virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -320,7 +374,7 @@ public:
 
   /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
-   * use.
+   * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
 };

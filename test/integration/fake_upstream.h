@@ -55,6 +55,8 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   FakeHttpConnection& parent_;
@@ -85,18 +87,25 @@ public:
       : connection_(connection), parented_(false) {
     connection_.addConnectionCallbacks(*this);
   }
-  void set_parented() { parented_ = true; }
+  void set_parented() {
+    std::unique_lock<std::mutex> lock(lock_);
+    parented_ = true;
+  }
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) {
-    RELEASE_ASSERT(parented_ || (!(events & Network::ConnectionEvent::RemoteClose) &&
-                                 !(events & Network::ConnectionEvent::LocalClose)));
+  void onEvent(Network::ConnectionEvent event) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    RELEASE_ASSERT(parented_ || (event != Network::ConnectionEvent::RemoteClose &&
+                                 event != Network::ConnectionEvent::LocalClose));
   }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   Network::Connection& connection_;
   bool parented_;
+  std::mutex lock_;
 };
 
 typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
@@ -106,25 +115,35 @@ typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
  */
 class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
+  ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
   void readDisable(bool disable);
-  void waitForDisconnect();
+  // By default waitForDisconnect assumes the next event is a disconnect and
+  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // wait until disconnect, set ignore_spurious_events = true.
+  void waitForDisconnect(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  void initialize() {
+    initialized_ = true;
+    connection_wrapper_->set_parented();
+    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
+  }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
       : connection_(connection_wrapper->connection()),
-        connection_wrapper_(std::move(connection_wrapper)) {
-    connection_wrapper_->set_parented();
-    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
-  }
+        connection_wrapper_(std::move(connection_wrapper)) {}
 
   Network::Connection& connection_;
   std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
+  bool initialized_{false};
 
 private:
   // We hold on to this as connection callbacks live for the entire life of the

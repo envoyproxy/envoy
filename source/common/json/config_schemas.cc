@@ -15,6 +15,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "alpn_protocols" : {"type" : "string"},
           "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
+          "require_client_certificate" : {"type" : "boolean"},
           "verify_certificate_hash" : {"type" : "string"},
           "verify_subject_alt_name" : {
             "type" : "array",
@@ -263,6 +264,17 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["no_compression"]
       },
+      "http1_settings": {
+        "type": "object",
+        "properties": {
+          "allow_absolute_url": {
+            "type": "boolean"
+          },
+          "allow_connect": {
+            "type": "boolean"
+          }
+        }
+      },
       "http2_settings" : {
         "type" : "object",
         "properties" : {
@@ -376,6 +388,11 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
             "additionalProperties": false
           }
         }
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["stat_prefix", "descriptors", "domain"],
@@ -524,8 +541,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "properties" : {
           "pattern" : {"type" : "string"},
           "string" : {"type" : "string"},
-          "method" : {"type" : "string"},
-          "priority" : {"type" : "string"}
+          "method" : {"type" : "string"}
         },
         "required" : ["pattern", "name"],
         "additionalProperties" : false
@@ -605,6 +621,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "prefix_rewrite" : {"type" : "string"},
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
+      "use_websocket" : {"type" : "boolean"},
       "case_sensitive" : {"type" : "boolean"},
       "timeout_ms" : {"type" : "integer"},
       "runtime" : {
@@ -884,6 +901,34 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "proto_descriptor" : {"type" : "string"},
+      "services" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : { "type" : "string" }
+      },
+      "print_options" : {
+        "type" : "object",
+        "properties" : {
+          "add_whitespace": {"type" : "boolean"},
+          "always_print_primitive_fields": {"type" : "boolean"},
+          "always_print_enums_as_ints": {"type" : "boolean"},
+          "preserve_proto_field_names": {"type" : "boolean"}
+        },
+        "additionalProperties" : false
+      }
+    },
+    "required" : ["proto_descriptor", "services"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -945,6 +990,11 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
       "request_type" : {
         "type" : "string",
         "enum" : ["internal", "external", "both"]
+      },
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required" : ["domain"],
@@ -1012,6 +1062,40 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
       "cds" : {"$ref" : "#/definitions/cds"}
     },
     "required" : ["clusters"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::LDS_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "listeners" : {
+        "type" : "array",
+        "items" : {"type" : "object"}
+      }
+    },
+    "required" : ["listeners"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "cluster" : {
+        "type" : "string"
+      },
+      "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required" : ["cluster"],
     "additionalProperties" : false
   }
   )EOF");
@@ -1086,6 +1170,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "array",
         "items" : {"type" : "object"}
       },
+      "lds" : {"type" : "object"},
       "admin" : {
         "type" : "object",
         "properties" : {
@@ -1102,6 +1187,10 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
+      "watchdog_miss_timeout_ms" : {"type" : "integer"},
+      "watchdog_megamiss_timeout_ms" : {"type" : "integer"},
+      "watchdog_kill_timeout_ms" : {"type" : "integer"},
+      "watchdog_multikill_timeout_ms" : {"type" : "integer"},
       "tracing" : {
         "type" : "object",
         "properties" : {
@@ -1241,7 +1330,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "type" : {
         "type" : "string",
-        "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+        "enum" : ["static", "strict_dns", "logical_dns", "sds", "original_dst"]
       },
       "connect_timeout_ms" : {
         "type" : "integer",
@@ -1255,7 +1344,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "lb_type" : {
         "type" : "string",
-        "enum" : ["round_robin", "least_request", "random", "ring_hash"]
+        "enum" : ["round_robin", "least_request", "random", "ring_hash", "original_dst_lb"]
       },
       "hosts" : {
         "type" : "array",
@@ -1333,6 +1422,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "dns_lookup_family" : {
         "type" : "string",
         "enum" : ["v4_only", "v6_only", "auto"]
+      },
+      "cleanup_interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       },
       "outlier_detection" : {
         "type" : "object",

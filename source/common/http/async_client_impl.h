@@ -48,6 +48,8 @@ public:
   Stream* start(StreamCallbacks& callbacks,
                 const Optional<std::chrono::milliseconds>& timeout) override;
 
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
 private:
   const Upstream::ClusterInfo& cluster_;
   Router::FilterConfig config_;
@@ -64,6 +66,7 @@ private:
  */
 class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
+                        public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
                         LinkedObject<AsyncStreamImpl> {
 public:
@@ -147,6 +150,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
@@ -177,10 +181,12 @@ private:
 
   // Http::StreamDecoderFilterCallbacks
   uint64_t connectionId() override { return 0; }
+  const Network::Connection* connection() override { return nullptr; }
   Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
+  void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
@@ -193,6 +199,10 @@ private:
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
+  void onDecoderFilterAboveWriteBufferHighWatermark() override {}
+  void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

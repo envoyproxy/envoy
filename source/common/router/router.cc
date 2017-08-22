@@ -30,9 +30,9 @@ namespace Router {
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
                                       const Upstream::ClusterInfo& cluster) {
   if (cluster.sslContext()) {
-    headers.insertScheme().value(Http::Headers::get().SchemeValues.Https);
+    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
   } else {
-    headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
+    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
   }
 }
 
@@ -208,17 +208,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
-    Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
+    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
+                                  "maintenance mode");
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
-  }
-
-  // See if we need to set up for hashing.
-  if (route_entry_->hashPolicy()) {
-    Optional<uint64_t> hash = route_entry_->hashPolicy()->generateHash(headers);
-    if (hash.valid()) {
-      lb_context_.reset(new LoadBalancerContextImpl(hash));
-    }
   }
 
   // Fetch a connection pool for the upstream cluster.
@@ -238,8 +231,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
-  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
-                                  config_.random_, callbacks_->dispatcher(), finalPriority());
+  retry_state_ =
+      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
+                       config_.random_, callbacks_->dispatcher(), route_entry_->priority());
   do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
                                               callbacks_->streamId());
 
@@ -270,14 +264,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 }
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority(),
-                                            lb_context_.get());
+  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
+                                            this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
-  Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "no healthy upstream");
+  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
+                                "no healthy upstream");
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -314,15 +309,6 @@ void Filter::cleanup() {
   if (response_timeout_) {
     response_timeout_->disableTimer();
     response_timeout_.reset();
-  }
-}
-
-Upstream::ResourcePriority Filter::finalPriority() {
-  // Virtual cluster priority trumps route priority if the route has a virtual cluster.
-  if (request_vcluster_) {
-    return request_vcluster_->priority();
-  } else {
-    return route_entry_->priority();
   }
 }
 
@@ -368,7 +354,7 @@ void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
-
+  stream_destroyed_ = true;
   cleanup();
 }
 
@@ -437,7 +423,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     }
 
     chargeUpstreamCode(code, upstream_host);
-    Http::Utility::sendLocalReply(*callbacks_, code, body);
+    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
   }
 }
 
@@ -616,6 +602,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+  clearRequestEncoder();
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -674,7 +661,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
 }
 
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
-  request_encoder_ = nullptr;
+  clearRequestEncoder();
   if (!calling_encode_headers_) {
     parent_.onUpstreamReset(UpstreamResetType::Reset, Optional<Http::StreamResetReason>(reason));
   } else {
@@ -709,7 +696,9 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 void Filter::UpstreamRequest::onPerTryTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
   parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
-  upstream_host_->stats().rq_timeout_.inc();
+  if (upstream_host_) {
+    upstream_host_->stats().rq_timeout_.inc();
+  }
   resetStream();
   parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
                           Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
@@ -739,7 +728,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   request_encoder.getStream().addCallbacks(*this);
 
   conn_pool_stream_handle_ = nullptr;
-  request_encoder_ = &request_encoder;
+  setRequestEncoder(request_encoder);
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
@@ -774,6 +763,36 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                              Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,
                                 priority);
+}
+
+void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
+  request_encoder_ = &request_encoder;
+  // Now that there is an encoder, have the connection manager inform the manager when the
+  // downstream buffers are overrun.  This may result in immediate watermark callbacks referencing
+  // the encoder.
+  parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+}
+
+void Filter::UpstreamRequest::clearRequestEncoder() {
+  // Before clearing the encoder, unsubscribe from callbacks.
+  if (request_encoder_) {
+    parent_.callbacks_->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+  }
+  request_encoder_ = nullptr;
+}
+
+void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
+  ASSERT(parent_.request_encoder_);
+  // The downstream connection is overrun.  Pause reads from upstream.
+  parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
+  parent_.request_encoder_->getStream().readDisable(true);
+}
+
+void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
+  ASSERT(parent_.request_encoder_);
+  // The downstream connection has buffer available.  Resume reads from upstream.
+  parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
+  parent_.request_encoder_->getStream().readDisable(false);
 }
 
 } // namespace Router

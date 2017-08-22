@@ -8,7 +8,7 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -45,7 +45,8 @@ class ConnectionImpl : public virtual Connection,
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address);
+                 Address::InstanceConstSharedPtr local_address, bool using_original_dst,
+                 bool connected);
 
   ~ConnectionImpl();
 
@@ -59,22 +60,25 @@ public:
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
-  uint64_t id() override;
-  std::string nextProtocol() override { return ""; }
+  uint64_t id() const override;
+  std::string nextProtocol() const override { return ""; }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
-  bool readEnabled() override;
-  const Address::Instance& remoteAddress() override { return *remote_address_; }
-  const Address::Instance& localAddress() override { return *local_address_; }
+  bool readEnabled() const override;
+  const Address::Instance& remoteAddress() const override { return *remote_address_; }
+  const Address::Instance& localAddress() const override { return *local_address_; }
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
-  State state() override;
+  const Ssl::Connection* ssl() const override { return nullptr; }
+  State state() const override;
   void write(Buffer::Instance& data) override;
-  void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
-  uint32_t readBufferLimit() const override { return read_buffer_limit_; }
+  void setBufferLimits(uint32_t limit) override;
+  uint32_t bufferLimit() const override { return read_buffer_limit_; }
+  bool usingOriginalDst() const override { return using_original_dst_; }
+  bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource
-  Buffer::Instance& getReadBuffer() override { return read_buffer_; }
+  Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
 protected:
@@ -85,12 +89,12 @@ protected:
     uint64_t bytes_processed_;
   };
 
-  virtual void closeSocket(uint32_t close_type);
+  virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
-  void raiseEvents(uint32_t events);
+  void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
-    return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
+    return read_buffer_limit_ > 0 && read_buffer_->length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
   // shouldDrainReadBuffer().
@@ -99,11 +103,14 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
+  void onLowWatermark();
+  void onHighWatermark();
+
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
-  Buffer::OwnedImpl read_buffer_;
-  Buffer::OwnedImpl write_buffer_;
+  Buffer::InstancePtr read_buffer_;
+  Buffer::WatermarkBuffer write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:
@@ -138,6 +145,12 @@ private:
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
   std::unique_ptr<BufferStats> buffer_stats_;
+  // Tracks the number of times reads have been disabled.  If N different components call
+  // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
+  // has been called N times.
+  uint32_t read_disable_count_{0};
+  const bool using_original_dst_;
+  bool above_high_watermark_{false};
 };
 
 /**

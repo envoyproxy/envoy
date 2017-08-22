@@ -21,6 +21,7 @@
 # limitations under the License.
 """Rules for configuring the C++ toolchain (experimental)."""
 
+load("//bazel:osx_cc_configure.bzl", "configure_osx_toolchain")
 load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain")
 load("//bazel:lib_cc_configure.bzl", "get_cpu_value")
 
@@ -33,7 +34,7 @@ def _impl(repository_ctx):
     #configure_windows_toolchain(repository_ctx)
     fail("x64_windows support needs to be added to the Envoy Bazel cc_configure.bzl fork")
   elif cpu_value == "darwin":
-    fail("darwin support needs to be added to the Envoy Bazel cc_configure.bzl fork")
+    configure_osx_toolchain(repository_ctx)
   else:
     configure_unix_toolchain(repository_ctx, cpu_value)
 

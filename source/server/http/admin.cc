@@ -342,22 +342,24 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
       handlers_{
-          {"/certs", "print certs on machine", MAKE_HANDLER(handlerCerts)},
-          {"/clusters", "upstream cluster status", MAKE_HANDLER(handlerClusters)},
-          {"/cpuprofiler", "enable/disable the CPU profiler", MAKE_HANDLER(handlerCpuProfiler)},
+          {"/certs", "print certs on machine", MAKE_HANDLER(handlerCerts), false},
+          {"/clusters", "upstream cluster status", MAKE_HANDLER(handlerClusters), false},
+          {"/cpuprofiler", "enable/disable the CPU profiler", MAKE_HANDLER(handlerCpuProfiler),
+           false},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_HANDLER(handlerHealthcheckFail)},
+           MAKE_HANDLER(handlerHealthcheckFail), false},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_HANDLER(handlerHealthcheckOk)},
+           MAKE_HANDLER(handlerHealthcheckOk), false},
           {"/hot_restart_version", "print the hot restart compatability version",
-           MAKE_HANDLER(handlerHotRestartVersion)},
-          {"/logging", "query/change logging levels", MAKE_HANDLER(handlerLogging)},
-          {"/quitquitquit", "exit the server", MAKE_HANDLER(handlerQuitQuitQuit)},
-          {"/reset_counters", "reset all counters to zero", MAKE_HANDLER(handlerResetCounters)},
+           MAKE_HANDLER(handlerHotRestartVersion), false},
+          {"/logging", "query/change logging levels", MAKE_HANDLER(handlerLogging), false},
+          {"/quitquitquit", "exit the server", MAKE_HANDLER(handlerQuitQuitQuit), false},
+          {"/reset_counters", "reset all counters to zero", MAKE_HANDLER(handlerResetCounters),
+           false},
           {"/server_info", "print server version/status information",
-           MAKE_HANDLER(handlerServerInfo)},
-          {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
-          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)}} {
+           MAKE_HANDLER(handlerServerInfo), false},
+          {"/stats", "print server stats", MAKE_HANDLER(handlerStats), false},
+          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo), false}} {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -377,13 +379,14 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance&,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks)};
+  return Http::ServerConnectionPtr{
+      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
 }
 
 bool AdminImpl::createFilterChain(Network::Connection& connection) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
-      server_.localInfo())});
+      server_.localInfo(), server_.clusterManager())});
   return true;
 }
 
@@ -422,6 +425,27 @@ Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& res
 
 const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
+}
+
+bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
+                           HandlerCb callback, bool removable) {
+  auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
+                         [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
+  if (it == handlers_.end()) {
+    handlers_.push_back({prefix, help_text, callback, removable});
+    return true;
+  }
+  return false;
+}
+
+bool AdminImpl::removeHandler(const std::string& prefix) {
+  const uint size_before_removal = handlers_.size();
+  handlers_.remove_if(
+      [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_ && entry.removable_; });
+  if (handlers_.size() != size_before_removal) {
+    return true;
+  }
+  return false;
 }
 
 } // Server

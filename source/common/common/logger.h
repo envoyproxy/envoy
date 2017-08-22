@@ -177,7 +177,8 @@ protected:
  * Convenience macros for logging with a stream ID and a connection ID.
  */
 #define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT, (STREAM).connectionId(),                \
+  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT,                                         \
+                      (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
                       (STREAM).streamId(), ##__VA_ARGS__)
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
@@ -217,7 +218,8 @@ protected:
  * DEPRECATED: Convenience macros for logging with a stream ID and a connection ID.
  */
 #define stream_log(LOG, LEVEL, FORMAT, STREAM, ...)                                                \
-  LOG.LEVEL("[C{}][S{}] " FORMAT, (STREAM).connectionId(), (STREAM).streamId(), ##__VA_ARGS__)
+  LOG.LEVEL("[C{}][S{}] " FORMAT, (STREAM).connection() ? (STREAM).connection()->id() : 0,         \
+            (STREAM).streamId(), ##__VA_ARGS__)
 
 #ifdef NVLOG
 #define stream_log_trace(...)

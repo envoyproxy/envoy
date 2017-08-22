@@ -11,3 +11,4 @@ cscope.*
 BROWSE
 .deps
 *.pyc
+SOURCE_VERSION

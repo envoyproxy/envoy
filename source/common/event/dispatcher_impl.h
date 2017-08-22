@@ -11,6 +11,7 @@
 #include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -22,6 +23,7 @@ namespace Event {
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
   DispatcherImpl();
+  DispatcherImpl(Buffer::FactoryPtr&& factory);
   ~DispatcherImpl();
 
   /**
@@ -55,10 +57,21 @@ public:
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
+  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
 
 private:
   void runPostCallbacks();
+#ifndef NDEBUG
+  // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
+  // dispatcher run loop is executing on. We allow run_tid_ == 0 for tests where we don't invoke
+  // run().
+  bool isThreadSafe() const {
+    return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
+  }
+#endif
 
+  Thread::ThreadId run_tid_{};
+  Buffer::FactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

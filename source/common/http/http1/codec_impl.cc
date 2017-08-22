@@ -177,6 +177,8 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -259,7 +261,10 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
-    : connection_(connection) {
+    : connection_(connection), output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                              [&]() -> void { this->onBelowLowWatermark(); },
+                                              [&]() -> void { this->onAboveHighWatermark(); }) {
+  output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
@@ -363,8 +368,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
-                                           ServerConnectionCallbacks& callbacks)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks) {}
+                                           ServerConnectionCallbacks& callbacks,
+                                           Http1Settings settings)
+    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -376,16 +382,88 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
+void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
+  HeaderString path(Headers::get().Path);
+
+  bool is_connect = (method == HTTP_CONNECT);
+
+  // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
+  if (active_request_->request_url_.c_str()[0] == '/' ||
+      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  // If absolute_urls and/or connect are not going be handled, copy the url and return.
+  // This forces the behavior to be backwards compatible with the old codec behavior.
+  if (!codec_settings_.allow_absolute_url_) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  if (is_connect) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
+    return;
+  }
+
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  int result = http_parser_parse_url(active_request_->request_url_.buffer(),
+                                     active_request_->request_url_.size(), is_connect, &u);
+
+  if (result != 0) {
+    sendProtocolError();
+    throw CodecProtocolException(
+        "http/1.1 protocol error: invalid url in request line, parsed invalid");
+  } else {
+    if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
+      // RFC7230#5.7
+      // When a proxy receives a request with an absolute-form of
+      // request-target, the proxy MUST ignore the received Host header field
+      // (if any) and instead replace it with the host information of the
+      // request-target.  A proxy that forwards such a request MUST generate a
+      // new Host field-value based on the received request-target rather than
+      // forward the received Host field-value.
+
+      // Insert the host header, this will later be converted to :authority
+      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
+                           u.field_data[UF_HOST].len);
+
+      headers.insertHost().value(new_host);
+
+      // RFC allows the absolute-uri to not end in /, but the absolute path form
+      // must start with /
+      if ((u.field_set & UF_PATH) == UF_PATH && u.field_data[UF_PATH].len > 0) {
+        HeaderString new_path;
+        new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
+                         active_request_->request_url_.size() - u.field_data[UF_PATH].off);
+        headers.addViaMove(std::move(path), std::move(new_path));
+      } else {
+        HeaderString new_path;
+        new_path.setCopy("/", 1);
+        headers.addViaMove(std::move(path), std::move(new_path));
+      }
+
+      active_request_->request_url_.clear();
+      return;
+    }
+    sendProtocolError();
+    throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
+  }
+}
+
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    HeaderString path(Headers::get().Path);
-    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
+    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+
+    // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
+    // CONNECT
+    handlePath(*headers, parser_.method);
     ASSERT(active_request_->request_url_.empty());
 
-    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
     headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since higher layers are never going to do anything other
@@ -486,6 +564,17 @@ void ServerConnectionImpl::sendProtocolError() {
   }
 }
 
+void ServerConnectionImpl::onAboveHighWatermark() {
+  if (active_request_) {
+    active_request_->response_encoder_.runHighWatermarkCallbacks();
+  }
+}
+void ServerConnectionImpl::onBelowLowWatermark() {
+  if (active_request_) {
+    active_request_->response_encoder_.runLowWatermarkCallbacks();
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
     : ConnectionImpl(connection, HTTP_RESPONSE) {}
 
@@ -502,7 +591,13 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
-
+  // Streams are responsible for unwinding any outstanding readDisable(true)
+  // calls done on the underlying connection as they are destroyed. As this is
+  // the only place a HTTP/1 stream is destroyed where the Network::Connection is
+  // reused, unwind any outstanding readDisable() calls here.
+  while (!connection_.readEnabled()) {
+    connection_.readDisable(false);
+  }
   request_encoder_.reset(new RequestStreamEncoderImpl(*this));
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
@@ -566,6 +661,10 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     request_encoder_->runResetCallbacks(reason);
   }
 }
+
+void ClientConnectionImpl::onAboveHighWatermark() { request_encoder_->runHighWatermarkCallbacks(); }
+
+void ClientConnectionImpl::onBelowLowWatermark() { request_encoder_->runLowWatermarkCallbacks(); }
 
 } // namespace Http1
 } // namespace Http

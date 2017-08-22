@@ -86,7 +86,7 @@ class MockHost : public Host {
 public:
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    HostConstSharedPtr host_;
+    HostDescriptionConstSharedPtr host_description_{};
   };
 
   MockHost();
@@ -94,7 +94,7 @@ public:
 
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override {
     MockCreateConnectionData data = createConnection_(dispatcher);
-    return {Network::ClientConnectionPtr{data.connection_}, data.host_};
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
   void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
@@ -117,6 +117,8 @@ public:
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_METHOD1(used, void(bool new_used));
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   testing::NiceMock<MockClusterInfo> cluster_;

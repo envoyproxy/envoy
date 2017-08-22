@@ -1,5 +1,7 @@
 #include "test/integration/http2_upstream_integration_test.h"
 
+#include <iostream>
+
 #include "common/http/header_map_impl.h"
 
 #include "test/test_common/printers.h"
@@ -49,17 +51,17 @@ TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyHttp1) {
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP2);
+                                         Http::CodecClient::Type::HTTP2, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseHttp1) {
   testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http1_buffer")),
-                                         Http::CodecClient::Type::HTTP1);
+                                         Http::CodecClient::Type::HTTP1, true);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -101,16 +103,14 @@ TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
-TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
+void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t port, uint32_t bytes) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::StreamEncoder* encoder;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr upstream_request;
   executeActions(
-      {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-       },
+      {[&]() -> void { codec_client = makeHttpConnection(port, Http::CodecClient::Type::HTTP2); },
        // Start request
        [&]() -> void {
          encoder = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -126,17 +126,17 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
 
        // Send some data
        [&]() -> void {
-         codec_client->sendData(*encoder, 1024, false);
+         codec_client->sendData(*encoder, bytes, false);
 
        },
-       [&]() -> void { upstream_request->waitForData(*dispatcher_, 1024); },
+       [&]() -> void { upstream_request->waitForData(*dispatcher_, bytes); },
 
        // Start response
        [&]() -> void {
          upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request->encodeData(1024, false);
+         upstream_request->encodeData(bytes, false);
        },
-       [&]() -> void { response->waitForBodyData(1024); },
+       [&]() -> void { response->waitForBodyData(bytes); },
 
        // Finish request
        [&]() -> void {
@@ -157,6 +157,14 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
+}
+
+TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
+  bidirectionalStreaming(lookupPort("http"), 1024);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, LargeBidirectionalStreamingWithBufferLimits) {
+  bidirectionalStreaming(lookupPort("http_with_buffer_limits"), 1024 * 32);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
@@ -215,7 +223,10 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   EXPECT_FALSE(response->complete());
 }
 
-TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
+void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t port, uint32_t request1_bytes,
+                                                       uint32_t request2_bytes,
+                                                       uint32_t response1_bytes,
+                                                       uint32_t response2_bytes) {
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   Http::StreamEncoder* encoder1;
@@ -225,9 +236,7 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   executeActions(
-      {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-       },
+      {[&]() -> void { codec_client = makeHttpConnection(port, Http::CodecClient::Type::HTTP2); },
        // Start request 1
        [&]() -> void {
          encoder1 = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
@@ -243,7 +252,6 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
 
        // Start request 2
        [&]() -> void {
-         response2.reset(new IntegrationStreamDecoder(*dispatcher_));
          encoder2 = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                         {":path", "/test/long/url"},
                                                                         {":scheme", "http"},
@@ -254,14 +262,14 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
 
        // Finish request 1
        [&]() -> void {
-         codec_client->sendData(*encoder1, 1024, true);
+         codec_client->sendData(*encoder1, request1_bytes, true);
 
        },
        [&]() -> void { upstream_request1->waitForEndStream(*dispatcher_); },
 
        // Finish request 2
        [&]() -> void {
-         codec_client->sendData(*encoder2, 512, true);
+         codec_client->sendData(*encoder2, request2_bytes, true);
 
        },
        [&]() -> void { upstream_request2->waitForEndStream(*dispatcher_); },
@@ -269,31 +277,31 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
        // Respond request 2
        [&]() -> void {
          upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request2->encodeData(1024, true);
+         upstream_request2->encodeData(response2_bytes, true);
        },
        [&]() -> void {
          response2->waitForEndStream();
          EXPECT_TRUE(upstream_request2->complete());
-         EXPECT_EQ(512U, upstream_request2->bodyLength());
+         EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
 
          EXPECT_TRUE(response2->complete());
          EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
-         EXPECT_EQ(1024U, response2->body().size());
+         EXPECT_EQ(response2_bytes, response2->body().size());
        },
 
        // Respond request 1
        [&]() -> void {
          upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request1->encodeData(512, true);
+         upstream_request1->encodeData(response1_bytes, true);
        },
        [&]() -> void {
          response1->waitForEndStream();
          EXPECT_TRUE(upstream_request1->complete());
-         EXPECT_EQ(1024U, upstream_request1->bodyLength());
+         EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
 
          EXPECT_TRUE(response1->complete());
          EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
-         EXPECT_EQ(512U, response1->body().size());
+         EXPECT_EQ(response1_bytes, response1->body().size());
        },
 
        // Cleanup both downstream and upstream
@@ -301,4 +309,142 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection->close(); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
+
+TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
+  simultaneousRequest(lookupPort("http"), 1024, 512, 1023, 513);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
+  simultaneousRequest(lookupPort("http_with_buffer_limits"), 1024 * 20, 1024 * 14 + 2,
+                      1024 * 10 + 5, 1024 * 16);
+}
+
+void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t port, uint32_t request_bytes,
+                                                            uint32_t) {
+  TestRandomGenerator rand;
+  const uint32_t num_requests = 50;
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<FakeStreamPtr> upstream_requests;
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(port, Http::CodecClient::Type::HTTP2); },
+       [&]() -> void {
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           responses.push_back(
+               IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
+           encoders.push_back(
+               &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}},
+                                           *responses[i]));
+           codec_client->sendData(*encoders[i], request_bytes, true);
+         }
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           upstream_requests.push_back(fake_upstream_connection->waitForNewStream());
+         }
+       },
+       [&]() -> void {
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           upstream_requests[i]->waitForEndStream(*dispatcher_);
+           if (i % 2 == 0) {
+             upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}},
+                                                 false);
+             upstream_requests[i]->encodeData(rand.random() % (1024 * 2), true);
+           } else {
+             upstream_requests[i]->encodeResetStream();
+           }
+         }
+       },
+       [&]() -> void {
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           responses[i]->waitForEndStream();
+           if (i % 2 == 0) {
+             EXPECT_TRUE(upstream_requests[i]->complete());
+             EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
+
+             EXPECT_TRUE(responses[i]->complete());
+             EXPECT_STREQ("200", responses[i]->headers().Status()->value().c_str());
+           }
+         }
+       },
+
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
+  manySimultaneousRequests(lookupPort("http"), 1024, 1024);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
+  manySimultaneousRequests(lookupPort("http_with_buffer_limits"), 1024 * 20, 1024 * 20);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
+  uint32_t port = lookupPort("http_with_buffer_limits");
+  TestRandomGenerator rand;
+  const uint32_t num_requests = rand.random() % 50 + 1;
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<FakeStreamPtr> upstream_requests;
+  executeActions(
+      {[&]() -> void { codec_client = makeHttpConnection(port, Http::CodecClient::Type::HTTP2); },
+       [&]() -> void {
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           responses.push_back(
+               IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
+           encoders.push_back(
+               &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}},
+                                           *responses[i]));
+           // Reset a few streams to test how reset and watermark interact.
+           if (i % 15 == 0) {
+             codec_client->sendReset(*encoders[i]);
+           } else {
+             codec_client->sendData(*encoders[i], 0, true);
+           }
+         }
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           upstream_requests.push_back(fake_upstream_connection->waitForNewStream());
+         }
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           if (i % 15 != 0) {
+             upstream_requests[i]->waitForEndStream(*dispatcher_);
+             upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}},
+                                                 false);
+             upstream_requests[i]->encodeData(100, false);
+           }
+         }
+         // Close the connection.
+         fake_upstream_connection->close();
+       },
+       [&]() -> void {
+         // Ensure the streams are all reset successfully.
+         for (uint32_t i = 0; i < num_requests; ++i) {
+           if (i % 15 != 0) {
+             responses[i]->waitForReset();
+           }
+         }
+       },
+
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
 } // namespace Envoy

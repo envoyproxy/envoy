@@ -81,7 +81,9 @@ public:
   }
 
   // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   // RateLimit::RequestCallbacks
   void complete(LimitStatus status) override;

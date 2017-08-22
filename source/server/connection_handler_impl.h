@@ -114,13 +114,15 @@ private:
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t event) override {
+    void onEvent(Network::ConnectionEvent event) override {
       // Any event leads to destruction of the connection.
       if (event == Network::ConnectionEvent::LocalClose ||
           event == Network::ConnectionEvent::RemoteClose) {
         listener_.removeConnection(*this);
       }
     }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     ActiveListener& listener_;
     Network::ConnectionPtr connection_;

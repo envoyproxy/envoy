@@ -2,8 +2,6 @@ syntax = "proto3";
 
 option go_package = "ratelimit";
 
-option cc_generic_services = true;
-
 package pb.lyft.ratelimit;
 
 service RateLimitService {

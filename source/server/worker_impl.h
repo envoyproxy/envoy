@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "envoy/api/api.h"
@@ -40,7 +41,7 @@ public:
              Network::ConnectionHandlerPtr handler);
 
   // Server::Worker
-  void addListener(Listener& listener) override;
+  void addListener(Listener& listener, AddListenerCompletion completion) override;
   uint64_t numConnections() override;
   void removeListener(Listener& listener, std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <stdlib.h>
+
 #include <condition_variable>
 #include <list>
 #include <mutex>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -25,6 +28,19 @@ namespace Envoy {
   } catch (expected_exception & e) {                                                               \
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
+
+// Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
+// one can run the test with --test_arg=--gtest_filter=[seed]
+class TestRandomGenerator {
+public:
+  TestRandomGenerator();
+
+  uint64_t random();
+
+private:
+  const int32_t seed_;
+  std::ranlux48 generator_;
+};
 
 class TestUtility {
 public:
@@ -95,13 +111,14 @@ public:
 class ConditionalInitializer {
 public:
   /**
-   * Set the conditional to ready, should only be called once.
+   * Set the conditional to ready.
    */
   void setReady();
 
   /**
-   * Block until the conditional is ready, will return immediately if it is already ready.
-   *
+   * Block until the conditional is ready, will return immediately if it is already ready. This
+   * routine will also reset ready_ so that the initializer can be used again. setReady() should
+   * only be called once in between a call to waitReady().
    */
   void waitReady();
 
@@ -123,8 +140,8 @@ private:
 namespace Http {
 
 /**
- * A test version of HeaderMapImpl that adds some niceties since the prod one makes it very
- * difficult to do any string copies without really meaning to.
+ * A test version of HeaderMapImpl that adds some niceties around letting us use
+ * std::string instead of always doing LowerCaseString() by hand.
  */
 class TestHeaderMapImpl : public HeaderMapImpl {
 public:
@@ -132,8 +149,8 @@ public:
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
 
-  void addViaCopy(const std::string& key, const std::string& value);
-  void addViaCopy(const LowerCaseString& key, const std::string& value);
+  using HeaderMapImpl::addCopy;
+  void addCopy(const std::string& key, const std::string& value);
   std::string get_(const std::string& key);
   std::string get_(const LowerCaseString& key);
   bool has(const std::string& key);

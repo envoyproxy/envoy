@@ -129,7 +129,7 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
                                        Stats::Store& store, Type type)
     : FakeConnectionBase(std::move(connection_wrapper)) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
+    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this, Http::Http1Settings()));
   } else {
     codec_.reset(
         new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));
@@ -164,19 +164,27 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
   return *new_streams_.back();
 }
 
-void FakeConnectionBase::onEvent(uint32_t events) {
+void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
   std::unique_lock<std::mutex> lock(lock_);
-  if ((events & Network::ConnectionEvent::RemoteClose) ||
-      (events & Network::ConnectionEvent::LocalClose)) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
     disconnected_ = true;
     connection_event_.notify_one();
   }
 }
 
-void FakeConnectionBase::waitForDisconnect() {
+void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   std::unique_lock<std::mutex> lock(lock_);
-  if (!disconnected_) {
+  while (!disconnected_) {
     connection_event_.wait(lock);
+    // The default behavior of waitForDisconnect is to assume the test cleanly
+    // calls waitForData, waitForNewStream, etc. to handle all events on the
+    // connection.  If the caller explicitly notes that other events should be
+    // ignored, continue looping until a disconnect is detected.  Otherwise fall
+    // through and hit the assert below.
+    if (!ignore_spurious_events) {
+      break;
+    }
   }
 
   ASSERT(disconnected_);
@@ -273,6 +281,7 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
   ASSERT(!new_connections_.empty());
   FakeHttpConnectionPtr connection(
       new FakeHttpConnection(std::move(new_connections_.front()), stats_store_, http_type_));
+  connection->initialize();
   new_connections_.pop_front();
   connection->readDisable(false);
   return connection;
@@ -287,6 +296,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
 
   ASSERT(!new_connections_.empty());
   FakeRawConnectionPtr connection(new FakeRawConnection(std::move(new_connections_.front())));
+  connection->initialize();
   new_connections_.pop_front();
   connection->readDisable(false);
   return connection;

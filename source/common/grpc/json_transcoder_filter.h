@@ -7,11 +7,8 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/transcoder_input_stream_impl.h"
+#include "common/protobuf/protobuf.h"
 
-#include "google/protobuf/descriptor.h"
-#include "google/protobuf/io/zero_copy_stream.h"
-#include "google/protobuf/util/internal/type_info.h"
-#include "google/protobuf/util/type_resolver.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
@@ -32,9 +29,9 @@ struct VariableBinding {
   // The location of the field in the protobuf message, where the value
   // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
   // of the nested "shelf" message of the request protobuf message.
-  std::vector<std::string> field_path;
+  std::vector<ProtobufTypes::String> field_path;
   // The value to be inserted.
-  std::string value;
+  ProtobufTypes::String value;
 };
 
 /**
@@ -57,28 +54,27 @@ public:
    * @param method_descriptor output parameter for the method looked up from config
    * @return status whether the Transcoder instance are successfully created or not
    */
-  google::protobuf::util::Status
-  createTranscoder(const Http::HeaderMap& headers,
-                   google::protobuf::io::ZeroCopyInputStream& request_input,
+  ProtobufUtil::Status
+  createTranscoder(const Http::HeaderMap& headers, Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   const google::protobuf::MethodDescriptor*& method_descriptor);
+                   const Protobuf::MethodDescriptor*& method_descriptor);
 
+private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
-  google::protobuf::util::Status
-  methodToRequestInfo(const google::protobuf::MethodDescriptor* method,
-                      google::grpc::transcoding::RequestInfo* info);
+  ProtobufUtil::Status methodToRequestInfo(const Protobuf::MethodDescriptor* method,
+                                           google::grpc::transcoding::RequestInfo* info);
 
 private:
-  google::protobuf::DescriptorPool descriptor_pool_;
-  google::grpc::transcoding::PathMatcherPtr<const google::protobuf::MethodDescriptor*>
-      path_matcher_;
+  Protobuf::DescriptorPool descriptor_pool_;
+  google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
+  Protobuf::util::JsonPrintOptions print_options_;
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> TranscodingConfigSharedPtr;
+typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
 
 /**
  * The filter instance for gRPC JSON transcoder.
@@ -100,10 +96,10 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase
-  void onDestroy() override {}
+  void onDestroy() override { stream_reset_ = true; }
 
 private:
-  bool readToBuffer(google::protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
+  bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
 
   JsonTranscoderConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
@@ -111,10 +107,11 @@ private:
   TranscoderInputStreamImpl response_in_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-  const google::protobuf::MethodDescriptor* method_{nullptr};
+  const Protobuf::MethodDescriptor* method_{nullptr};
   Http::HeaderMap* response_headers_{nullptr};
 
   bool error_{false};
+  bool stream_reset_{false};
 };
 
 } // namespace Grpc
