@@ -224,6 +224,8 @@ protected:
   void testUpstreamProtocolError();
   void testBadPath();
   void testAbsolutePath();
+  void testAbsolutePathWithPort();
+  void testAbsolutePathWithoutPort();
   void testConnect();
   void testAllowAbsoluteSameRelative();
   // Test that a request returns the same content with both allow_absolute_urls enabled and
