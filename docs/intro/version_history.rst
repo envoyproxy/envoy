@@ -4,8 +4,11 @@ Version history
 1.4.0
 =====
 
-* OSX is :repo:`now supported </bazel#quick-start-bazel-build-for-developers>`. (A few features are
-  missing such as hot restart and original destination routing).
+* macOS is :repo:`now supported </bazel#quick-start-bazel-build-for-developers>`. (A few features
+  are missing such as hot restart and original destination routing).
+* YAML is now directly supported for :ref:`config files <config_overview>`.
+* End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control
+  that includes filter buffering is incomplete and will be implemented in 1.5.0.
 * Log verbosity :repo:`compile time flag </bazel#log-verbosity>` added.
 * Hot restart :repo:`compile time flag </bazel#hot-restart>` added.
 * Original destination :ref:`cluster <arch_overview_service_discovery_types_original_destination>`
@@ -30,8 +33,7 @@ Version history
 * :ref:`LDS API <arch_overview_dynamic_config_lds>` added.
 * TLS :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`
   option added.
-* Configuration check tool added.
-* Route table :ref:`check tool <config_tools_router_check_tool>` added.
+* :ref:`Configuration check tool <install_tools_config_load_check_tool>` added.
 * JSON schema check tool added.
 * Config validation mode added via the :option:`--mode` option.
 * :option:`--local-address-ip-version` option added.
@@ -40,7 +42,9 @@ Version history
 * Per-cluster :ref:`DNS resolvers <config_cluster_manager_cluster_dns_resolvers>` added.
 * :ref:`Fault filter <config_http_filters_fault_injection>` enhancements and fixes.
 * Several features are :repo:`deprecated as of the 1.4.0 release </DEPRECATED.md#version-140>`. They
-  will be removed at the beginning of the 1.5.0 release cycle.
+  will be removed at the beginning of the 1.5.0 release cycle. We explicitly call out that the
+  `HttpFilterConfigFactory` filter API has been deprecated in favor of
+  `NamedHttpFilterConfigFactory`.
 * Many small bug fixes and performance improvements not listed.
 
 1.3.0

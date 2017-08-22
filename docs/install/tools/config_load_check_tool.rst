@@ -1,3 +1,5 @@
+.. _install_tools_config_load_check_tool:
+
 Config load check tool
 ======================
 
