@@ -63,7 +63,8 @@ public:
   void createRequest(Http::Message& request) override {
     ENVOY_LOG(debug, "Sending REST request for {}", path_);
     stats_.update_attempt_.inc();
-    Protobuf::util::JsonOptions json_options;
+    Protobuf::util::JsonPrintOptions json_options;
+    json_options.preserve_proto_field_names = true;
     ProtobufTypes::String request_json;
     const auto status = Protobuf::util::MessageToJsonString(request_, &request_json, json_options);
     // If the status isn't OK, we just send an empty body.
