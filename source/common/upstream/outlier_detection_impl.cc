@@ -248,17 +248,15 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
     return;
   }
 
-  // There are two outcomes here. The ejection will be enforced,
-  // or it won't. Either way the host won't trigger the check in the sink's putHttpResponseCode
-  // call if the host keeps been
-  // charged with only 5xx ResponseCodes without an intervening non-5xx code. Therefore,
-  // the sink's consecutive_5xx_ counter should be reset to allow the sink to detect another bout
-  // of 5xx from this host. The reset is done here instead of the sink's putHttpResponseCode
-  // call to prevent thread thrashing.
-  host_sinks_[host]->resetConsecutive5xx();
-
   stats_.ejections_consecutive_5xx_.inc();
   ejectHost(host, EjectionType::Consecutive5xx);
+
+  // Reset the DetectorHostSink's consecutive_5xx_. This counter needs to be reset
+  // in order to allow the Sink to detect a bout of consecutive 5xx responses even
+  // if the sink is not charged with an interleaved non-5xx code.
+  // The reset is done here instead of the Sink's putHttpResponseCode call to prevent
+  // thread thrashing.
+  host_sinks_[host]->resetConsecutive5xx();
 }
 
 Utility::EjectionPair Utility::successRateEjectionThreshold(
