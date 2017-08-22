@@ -238,7 +238,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         callback = factory->createFilterFactory(*filter_config->getObject("value", true),
                                                 stats_prefix_, context);
       } else {
-        auto message = factory->createConfigProto();
+        auto message = factory->createEmptyConfigProto();
         if (!message) {
           throw EnvoyException(
               fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
