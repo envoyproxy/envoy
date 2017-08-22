@@ -240,8 +240,10 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string expected_path(128 - path_prefix.length(), 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}, {":scheme", "http"}};
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                          {"x-envoy-original-path", path},
+                                          {":method", "GET"},
+                                          {":scheme", "http"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
