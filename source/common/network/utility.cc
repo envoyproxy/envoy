@@ -146,16 +146,16 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-Address::InstanceConstSharedPtr
-Utility::fromProtoResolvedAddress(const envoy::api::v2::ResolvedAddress& resolved_address) {
-  switch (resolved_address.address_case()) {
-  case envoy::api::v2::ResolvedAddress::kSocketAddress:
-    return parseInternetAddress(
-        ProtobufTypes::FromString(resolved_address.socket_address().ip_address()),
-        resolved_address.socket_address().port().value());
-  case envoy::api::v2::ResolvedAddress::kPipe:
-    return Address::InstanceConstSharedPtr{
-        new Address::PipeInstance(resolved_address.pipe().path())};
+Address::InstanceConstSharedPtr Utility::fromProtoAddress(const envoy::api::v2::Address& address) {
+  switch (address.address_case()) {
+  case envoy::api::v2::Address::kSocketAddress:
+    // TODO(htuch): Support custom resolvers #1477.
+    ASSERT(address.socket_address().resolver_name().empty());
+    ASSERT(address.socket_address().named_port().empty());
+    return parseInternetAddress(address.socket_address().address(),
+                                address.socket_address().port_value());
+  case envoy::api::v2::Address::kPipe:
+    return Address::InstanceConstSharedPtr{new Address::PipeInstance(address.pipe().path())};
   default:
     NOT_REACHED;
   }

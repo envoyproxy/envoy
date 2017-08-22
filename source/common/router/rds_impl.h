@@ -7,10 +7,10 @@
 
 #include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
@@ -27,13 +27,13 @@ namespace Router {
 class RouteConfigProviderUtil {
 public:
   /**
-   * @return RouteConfigProviderPtr a new route configuration provider based on the supplied JSON
+   * @return RouteConfigProviderPtr a new route configuration provider based on the supplied proto
    *         configuration.
    */
   static RouteConfigProviderSharedPtr
-  create(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-         Stats::Scope& scope, const std::string& stat_prefix, Init::Manager& init_manager,
-         RouteConfigProviderManager& route_config_provider_manager);
+  create(const envoy::api::v2::filter::HttpConnectionManager& config, Runtime::Loader& runtime,
+         Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
+         Init::Manager& init_manager, RouteConfigProviderManager& route_config_provider_manager);
 };
 
 /**
@@ -41,8 +41,8 @@ public:
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
-  StaticRouteConfigProviderImpl(const Json::Object& config, Runtime::Loader& runtime,
-                                Upstream::ClusterManager& cm);
+  StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
+                                Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
@@ -127,8 +127,8 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
-// TODO(junr03): use then singleton manager in #1410.
-class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager {
+class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager,
+                                       public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,

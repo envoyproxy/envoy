@@ -316,12 +316,14 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
-    write_buffer_.setWatermarks(limit / 2, limit + 1);
+    write_buffer_.setWatermarks(limit + 1);
   }
 }
 
 void ConnectionImpl::onLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
+  ASSERT(above_high_watermark_);
+  above_high_watermark_ = false;
   for (ConnectionCallbacks* callback : callbacks_) {
     callback->onBelowWriteBufferLowWatermark();
   }
@@ -329,6 +331,8 @@ void ConnectionImpl::onLowWatermark() {
 
 void ConnectionImpl::onHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
+  ASSERT(!above_high_watermark_);
+  above_high_watermark_ = true;
   for (ConnectionCallbacks* callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
   }

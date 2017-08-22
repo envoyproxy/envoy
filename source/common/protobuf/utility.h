@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/json/json_object.h"
 
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -41,17 +42,35 @@ class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source,
                           const std::string& delimiter) {
-    return StringUtil::join(ProtobufTypes::stringVector(source), delimiter);
+    return StringUtil::join(std::vector<std::string>(source.begin(), source.end()), delimiter);
   }
 };
 
 class MessageUtil {
 public:
   static std::size_t hash(const Protobuf::Message& message) {
-    return std::hash<std::string>{}(message.SerializeAsString());
+    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
+    // message doesn't hash to different values.
+    std::string text;
+    Protobuf::io::StringOutputStream string_stream(&text);
+    Protobuf::io::CodedOutputStream coded_stream(&string_stream);
+    coded_stream.SetSerializationDeterministic(true);
+    message.SerializeToCodedStream(&coded_stream);
+    return std::hash<std::string>{}(text);
   }
 
+  static void loadFromJson(const std::string& json, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
+};
+
+class WktUtil {
+public:
+  /**
+   * Extract JSON object from a google.protobuf.Struct.
+   * @param message message of type type.googleapis.com/google.protobuf.Struct.
+   * @return Json::ObjectSharedPtr of JSON object or nullptr if unable to extract.
+   */
+  static Json::ObjectSharedPtr getJsonObjectFromStruct(const Protobuf::Struct& message);
 };
 
 } // namespace Envoy

@@ -366,6 +366,16 @@ TEST(JsonLoaderTest, AsString) {
   });
 }
 
+TEST(JsonLoaderTest, AsJsonString) {
+  // We can't do simply equality of asJsonString(), since there is a reliance on internal ordering,
+  // e.g. of map traversal, in the output.
+  const std::string json_string = "{\"name1\": \"value1\", \"name2\": true}";
+  const ObjectSharedPtr json = Factory::loadFromString(json_string);
+  const ObjectSharedPtr json2 = Factory::loadFromString(json->asJsonString());
+  EXPECT_EQ("value1", json2->getString("name1"));
+  EXPECT_TRUE(json2->getBoolean("name2"));
+}
+
 TEST(JsonLoaderTest, ListAsString) {
   {
     std::list<std::string> list = {};
@@ -405,6 +415,33 @@ TEST(JsonLoaderTest, ListAsString) {
     EXPECT_EQ("127.0.0.1:46465", output[0]->asString());
     EXPECT_EQ("127.0.0.1:52211", output[1]->asString());
     EXPECT_EQ("127.0.0.1:58941", output[2]->asString());
+  }
+}
+
+TEST(JsonLoaderTest, YamlScalar) {
+  EXPECT_EQ(true, Factory::loadFromYamlString("true")->asBoolean());
+  EXPECT_EQ("true", Factory::loadFromYamlString("\"true\"")->asString());
+  EXPECT_EQ(1, Factory::loadFromYamlString("1")->asInteger());
+  EXPECT_EQ("1", Factory::loadFromYamlString("\"1\"")->asString());
+  EXPECT_DOUBLE_EQ(1.0, Factory::loadFromYamlString("1.0")->asDouble());
+  EXPECT_EQ("1.0", Factory::loadFromYamlString("\"1.0\"")->asString());
+}
+
+TEST(JsonLoaderTest, YamlObject) {
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("[foo, bar]");
+    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
+    EXPECT_EQ(2, output.size());
+    EXPECT_EQ("foo", output[0]->asString());
+    EXPECT_EQ("bar", output[1]->asString());
+  }
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("foo: bar");
+    EXPECT_EQ("bar", json->getString("foo"));
+  }
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("Null");
+    EXPECT_TRUE(json->isNull());
   }
 }
 

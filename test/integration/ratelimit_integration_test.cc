@@ -165,14 +165,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
 TEST_P(RatelimitIntegrationTest, Timeout) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  // Keep polling stats until the HTTP ratelimit wait times out.
-  const uint32_t sleep_ms = 100;
-  for (int32_t timeout_wait_ms = 50000; timeout_wait_ms > 0; timeout_wait_ms -= sleep_ms) {
-    if (test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value() > 0) {
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-  }
+  test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();

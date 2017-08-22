@@ -179,8 +179,7 @@ Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescripto
   auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
-    ENVOY_LOG(debug, "Cannot resolve input-type: {}",
-              ProtobufTypes::FromString(method->input_type()->full_name()));
+    ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());
     return Status(Code::NOT_FOUND, "Could not resolve type: " + method->input_type()->full_name());
   }
 
@@ -214,8 +213,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
 
     const auto& request_status = transcoder_->RequestStatus();
     if (!request_status.ok()) {
-      ENVOY_LOG(debug, "Transcoding request error " +
-                           ProtobufTypes::FromString(request_status.ToString()));
+      ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
       Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
                                     request_status.error_message());
@@ -251,8 +249,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   const auto& request_status = transcoder_->RequestStatus();
 
   if (!request_status.ok()) {
-    ENVOY_LOG(debug,
-              "Transcoding request error " + ProtobufTypes::FromString(request_status.ToString()));
+    ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
     Http::Utility::sendLocalReply(*decoder_callbacks_, stream_reset_, Http::Code::BadRequest,
                                   request_status.error_message());

@@ -70,23 +70,21 @@ public:
     ASSERT(status.ok());
     request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
-    request.body().reset(new Buffer::OwnedImpl(ProtobufTypes::FromString(request_json)));
+    request.body().reset(new Buffer::OwnedImpl(request_json));
   }
 
   void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
-    const auto status = Protobuf::util::JsonStringToMessage(
-        ProtobufTypes::ToString(response.bodyAsString()), &message);
+    const auto status = Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
     if (!status.ok()) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}",
-                ProtobufTypes::FromString(status.ToString()));
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
       handleFailure(nullptr);
       return;
     }
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     try {
       callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(ProtobufTypes::FromString(message.version_info()));
+      request_.set_version_info(message.version_info());
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());

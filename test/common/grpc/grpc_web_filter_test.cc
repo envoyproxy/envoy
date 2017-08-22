@@ -1,6 +1,10 @@
+#include "envoy/http/filter.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"
+#include "common/common/utility.h"
 #include "common/grpc/grpc_web_filter.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -28,6 +32,8 @@ const char TEXT_MESSAGE[] = "\x00\x00\x00\x00\x12grpc-web-text-data";
 const size_t TEXT_MESSAGE_SIZE = sizeof(TEXT_MESSAGE) - 1;
 const char B64_MESSAGE[] = "AAAAABJncnBjLXdlYi10ZXh0LWRhdGE=";
 const size_t B64_MESSAGE_SIZE = sizeof(B64_MESSAGE) - 1;
+const char INVALID_B64_MESSAGE[] = "****";
+const size_t INVALID_B64_MESSAGE_SIZE = sizeof(INVALID_B64_MESSAGE) - 1;
 const char TRAILERS[] = "\x80\x00\x00\x00\x20grpc-status:0\r\ngrpc-message:ok\r\n";
 const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 } // namespace
@@ -81,7 +87,7 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
       Http::Headers::get().ContentTypeValues.GrpcWebTextProto};
   for (auto& content_type : supported_content_types) {
     Http::TestHeaderMapImpl request_headers;
-    request_headers.addViaCopy(Http::Headers::get().ContentType, content_type);
+    request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().c_str());
@@ -90,15 +96,55 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
   Http::TestHeaderMapImpl request_headers;
-  request_headers.addViaCopy(Http::Headers::get().ContentType, "unsupported");
+  request_headers.addCopy(Http::Headers::get().ContentType, "unsupported");
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
+        uint64_t code;
+        StringUtil::atoul(headers.Status()->value().c_str(), code);
+        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
+      }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
 }
 
 TEST_F(GrpcWebFilterTest, NoContentType) {
   Http::TestHeaderMapImpl request_headers;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
+        uint64_t code;
+        StringUtil::atoul(headers.Status()->value().c_str(), code);
+        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
+      }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
+}
+
+TEST_F(GrpcWebFilterTest, InvalidBase64) {
+  Http::TestHeaderMapImpl request_headers;
+  request_headers.addCopy(Http::Headers::get().ContentType,
+                          Http::Headers::get().ContentTypeValues.GrpcWebText);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
+        uint64_t code;
+        StringUtil::atoul(headers.Status()->value().c_str(), code);
+        EXPECT_EQ(static_cast<uint64_t>(Http::Code::BadRequest), code);
+      }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool) {
+        EXPECT_EQ("Bad gRPC-web request, invalid base64 data.", TestUtility::bufferToString(data));
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            request_headers.ContentType()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.TE()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
+            request_headers.GrpcAcceptEncoding()->value().c_str());
+
+  Buffer::OwnedImpl request_buffer;
+  Buffer::OwnedImpl decoded_buffer;
+  request_buffer.add(&INVALID_B64_MESSAGE, INVALID_B64_MESSAGE_SIZE);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_.decodeData(request_buffer, true));
 }
 
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
@@ -148,8 +194,8 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
   Http::TestHeaderMapImpl request_headers;
-  request_headers.addViaCopy(Http::Headers::get().ContentType, request_content_type());
-  request_headers.addViaCopy(Http::Headers::get().Accept, request_accept());
+  request_headers.addCopy(Http::Headers::get().ContentType, request_content_type());
+  request_headers.addCopy(Http::Headers::get().Accept, request_accept());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
             request_headers.ContentType()->value().c_str());
@@ -188,15 +234,15 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests request trailers, they are passed through.
   Http::TestHeaderMapImpl request_trailers;
-  request_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
-  request_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
+  request_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
+  request_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
   EXPECT_STREQ("0", request_trailers.GrpcStatus()->value().c_str());
   EXPECT_STREQ("ok", request_trailers.GrpcMessage()->value().c_str());
 
   // Tests response headers.
   Http::TestHeaderMapImpl response_headers;
-  response_headers.addViaCopy(Http::Headers::get().Status, "200");
+  response_headers.addCopy(Http::Headers::get().Status, "200");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
   if (accept_binary_response()) {
@@ -245,8 +291,8 @@ TEST_P(GrpcWebFilterTest, Unary) {
     trailers_buffer.move(data);
   }));
   Http::TestHeaderMapImpl response_trailers;
-  response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
-  response_trailers.addViaCopy(Http::Headers::get().GrpcMessage, "ok");
+  response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
+  response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   if (accept_binary_response()) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), TestUtility::bufferToString(trailers_buffer));

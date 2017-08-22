@@ -7,12 +7,12 @@
 #include <string>
 
 #include "envoy/http/filter.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
-#include "common/json/json_validator.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,7 +27,13 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                      FactoryContext& context) override;
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::unique_ptr<envoy::api::v2::filter::HttpConnectionManager>(
+        new envoy::api::v2::filter::HttpConnectionManager());
+  }
   std::string name() override { return "http_connection_manager"; }
   NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
@@ -61,15 +67,15 @@ public:
 };
 
 /**
- * Maps JSON config to runtime config for an HTTP connection manager network filter.
+ * Maps proto config to runtime config for an HTTP connection manager network filter.
  */
 class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::FilterChainFactory,
-                                    public Http::ConnectionManagerConfig,
-                                    Json::Validator {
+                                    public Http::ConnectionManagerConfig {
 public:
-  HttpConnectionManagerConfig(const Json::Object& config, FactoryContext& context,
-                              Http::DateProvider& date_provider);
+  HttpConnectionManagerConfig(const envoy::api::v2::filter::HttpConnectionManager& config,
+                              FactoryContext& context, Http::DateProvider& date_provider,
+                              Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -133,9 +139,10 @@ private:
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
-  bool use_remote_address_{};
+  const bool use_remote_address_{};
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Router::RouteConfigProviderManager& route_config_provider_manager_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
