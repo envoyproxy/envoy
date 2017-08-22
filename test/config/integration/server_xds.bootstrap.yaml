@@ -1,2 +1,4 @@
+lds_config:
+  path: {{ lds_json_path }}
 cds_config:
   path: {{ cds_json_path }}

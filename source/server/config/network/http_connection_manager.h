@@ -27,7 +27,13 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                      FactoryContext& context) override;
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::unique_ptr<envoy::api::v2::filter::HttpConnectionManager>(
+        new envoy::api::v2::filter::HttpConnectionManager());
+  }
   std::string name() override { return "http_connection_manager"; }
   NetworkFilterType type() override { return NetworkFilterType::Read; }
 };

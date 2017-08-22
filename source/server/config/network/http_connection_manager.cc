@@ -33,8 +33,11 @@ const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+namespace {
+
+NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
+    const envoy::api::v2::filter::HttpConnectionManager& http_connection_manager,
+    FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -50,9 +53,6 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
                 context.threadLocal());
           });
 
-  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
-  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
-                                                     http_connection_manager);
   std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
       http_connection_manager, context, *date_provider, *route_config_provider_manager));
 
@@ -65,6 +65,22 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
   };
+}
+
+} // namespace
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
+  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
+                                                     http_connection_manager);
+  return createHttpConnectionManagerFilterFactory(http_connection_manager, context);
+}
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, FactoryContext& context) {
+  return createHttpConnectionManagerFilterFactory(
+      dynamic_cast<const envoy::api::v2::filter::HttpConnectionManager&>(config), context);
 }
 
 /**
@@ -210,23 +226,26 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    Protobuf::util::JsonOptions json_options;
-    ProtobufTypes::String json_config;
-    const auto status =
-        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
-    // This should always succeed unless something crash-worthy such as out-of-memory.
-    RELEASE_ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
-    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
-
+    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
     const HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
     NamedHttpFilterConfigFactory* factory =
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
     if (factory != nullptr) {
-      HttpFilterFactoryCb callback =
-          factory->createFilterFactory(*filter_config, stats_prefix_, context_);
+      HttpFilterFactoryCb callback;
+      if (filter_config->getBoolean("deprecatedV1", false)) {
+        callback = factory->createFilterFactory(*filter_config->getObject("value", true),
+                                                stats_prefix_, context);
+      } else {
+        auto message = factory->createEmptyConfigProto();
+        if (!message) {
+          throw EnvoyException(
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
+        }
+        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        callback = factory->createFilterFactoryFromProto(*message, stats_prefix_, context);
+      }
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED
@@ -234,7 +253,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       bool found_filter = false;
       for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
         HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config, stats_prefix_, context_.server());
+            type, string_name, *filter_config->getObject("value", true), stats_prefix_,
+            context_.server());
         if (callback) {
           filter_factories_.push_back(callback);
           found_filter = true;
@@ -287,7 +307,7 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
   } else if (type == "encoder") {
     return HttpFilterType::Encoder;
   } else {
-    ASSERT(type == "both");
+    ASSERT(type == "both" || type.empty());
     return HttpFilterType::Both;
   }
 }

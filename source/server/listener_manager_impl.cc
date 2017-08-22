@@ -25,15 +25,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     const auto& proto_config = filters[i].config();
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    name: {}", string_name);
-
-    Protobuf::util::JsonOptions json_options;
-    ProtobufTypes::String json_config;
-    const auto status =
-        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
-    // This should always succeed unless something crash-worthy such as out-of-memory.
-    RELEASE_ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
-    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
+    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
 
     // Map filter type string to enum.
     Configuration::NetworkFilterType type;
@@ -42,7 +34,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     } else if (string_type == "write") {
       type = Configuration::NetworkFilterType::Write;
     } else {
-      ASSERT(string_type == "both");
+      ASSERT(string_type == "both" || string_type.empty());
       type = Configuration::NetworkFilterType::Both;
     }
 
@@ -51,8 +43,18 @@ ProdListenerComponentFactory::createFilterFactoryList_(
         Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
             string_name);
     if (factory != nullptr) {
-      Configuration::NetworkFilterFactoryCb callback =
-          factory->createFilterFactory(*filter_config, context);
+      Configuration::NetworkFilterFactoryCb callback;
+      if (filter_config->getBoolean("deprecatedV1", false)) {
+        callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
+      } else {
+        auto message = factory->createEmptyConfigProto();
+        if (!message) {
+          throw EnvoyException(
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
+        }
+        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        callback = factory->createFilterFactoryFromProto(*message, context);
+      }
       ret.push_back(callback);
     } else {
       // DEPRECATED
@@ -60,8 +62,8 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       bool found_filter = false;
       for (Configuration::NetworkFilterConfigFactory* config_factory :
            Configuration::MainImpl::filterConfigFactories()) {
-        Configuration::NetworkFilterFactoryCb callback =
-            config_factory->tryCreateFilterFactory(type, string_name, *filter_config, server);
+        Configuration::NetworkFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
+            type, string_name, *filter_config->getObject("value", true), server);
         if (callback) {
           ret.push_back(callback);
           found_filter = true;
@@ -411,6 +413,9 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
                   listener.name(), listener.socket().localAddress()->asString());
         stats_.listener_create_failure_.inc();
         removeListener(listener.name());
+      }
+      if (success) {
+        stats_.listener_create_success_.inc();
       }
     });
   });
