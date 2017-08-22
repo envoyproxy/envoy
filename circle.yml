@@ -16,7 +16,7 @@ dependencies:
     - |
         if [ "${PULL_REQUEST}" = "true" -a -n "${PULL_REQUEST_REPO}" -a -n "${PULL_REQUEST_SHA}" ]; then
           git branch -D ci-branch || true
-          git remove remove pr_repo || true
+          git remote remove pr_repo || true
           git remote add pr_repo "https://github.com/${PULL_REQUEST_REPO}.git"
           git fetch pr_repo
           git checkout -b ci-branch
