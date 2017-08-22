@@ -38,12 +38,12 @@ public:
   /**
    * @return std::string the name of the configured route table
    */
-   virtual std::string routeConfigName() PURE;
+  virtual std::string routeConfigName() PURE;
 
-   /**
-    * @return std::string the name of the cluster the provider is issuing RDS requests to.
-    */
-    virtual std::string clusterName() PURE; 
+  /**
+   * @return std::string the name of the cluster the provider is issuing RDS requests to.
+   */
+  virtual std::string clusterName() PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;

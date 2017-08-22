@@ -7,11 +7,15 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 
+#include "server/http/admin.h"
+
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -37,9 +41,13 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
   return http_connection_manager;
 }
 
-class RdsImplTest : public testing::Test {
+class RdsImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  RdsImplTest() : request_(&cm_.async_client_) {}
+  RdsImplTest()
+      : request_(&cm_.async_client_),
+        admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
+               TestEnvironment::temporaryPath("admin.address"),
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_) {}
   ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
@@ -92,7 +100,8 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
-  NiceMock<Server::MockAdmin> admin_;
+  NiceMock<Server::MockInstance> server_;
+  Server::AdminImpl admin_;
   RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_,    dispatcher_, random_,
                                                                 local_info_, tls_,        admin_};
   RouteConfigProviderSharedPtr rds_;
@@ -100,7 +109,10 @@ public:
   Http::AsyncClient::Callbacks* callbacks_{};
 };
 
-TEST_F(RdsImplTest, RdsAndStatic) {
+INSTANTIATE_TEST_CASE_P(IpVersions, RdsImplTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(RdsImplTest, RdsAndStatic) {
   const std::string config_json = R"EOF(
     {
       "rds": {},
@@ -119,7 +131,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
                EnvoyException);
 }
 
-TEST_F(RdsImplTest, LocalInfoNotDefined) {
+TEST_P(RdsImplTest, LocalInfoNotDefined) {
   const std::string config_json = R"EOF(
     {
       "rds": {
@@ -142,7 +154,7 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
                EnvoyException);
 }
 
-TEST_F(RdsImplTest, UnknownCluster) {
+TEST_P(RdsImplTest, UnknownCluster) {
   const std::string config_json = R"EOF(
     {
       "rds": {
@@ -168,7 +180,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
                EnvoyException);
 }
 
-TEST_F(RdsImplTest, DestroyDuringInitialize) {
+TEST_P(RdsImplTest, DestroyDuringInitialize) {
   InSequence s;
 
   setup();
@@ -177,13 +189,21 @@ TEST_F(RdsImplTest, DestroyDuringInitialize) {
   rds_.reset();
 }
 
-TEST_F(RdsImplTest, Basic) {
+TEST_P(RdsImplTest, Basic) {
   InSequence s;
+  Buffer::OwnedImpl empty;
+  Buffer::OwnedImpl data;
 
   setup();
 
   // Make sure the initial empty route table works.
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
+
+  // Test Admin /routes handler
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", data));
+  EXPECT_EQ("route_config_name: foo_route_config\ncluster_name: foo_cluster\nconfig dump:\n\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
 
   // Initial request.
   std::string response1_json = R"EOF(
@@ -201,6 +221,13 @@ TEST_F(RdsImplTest, Basic) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
+  // Test Admin /routes handler
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", data));
+  EXPECT_EQ("route_config_name: foo_route_config\ncluster_name: foo_cluster\nconfig dump:\nname: "
+            "\"foo_route_config\"\n\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
+
   expectRequest();
   interval_timer_->callback_();
 
@@ -212,6 +239,13 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
+
+  // Test Admin /routes handler
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", data));
+  EXPECT_EQ("route_config_name: foo_route_config\ncluster_name: foo_cluster\nconfig dump:\nname: "
+            "\"foo_route_config\"\n\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
 
   expectRequest();
   interval_timer_->callback_();
@@ -255,6 +289,36 @@ TEST_F(RdsImplTest, Basic) {
                        ->routeEntry()
                        ->clusterName());
 
+  // Test Admin /routes handler
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", data));
+  EXPECT_EQ("route_config_name: foo_route_config\ncluster_name: foo_cluster\nconfig dump:\nname: "
+            "\"foo_route_config\"\nvirtual_hosts {\n  name: \"local_service\"\n  domains: \"*\"\n  "
+            "routes {\n    match {\n      prefix: \"/foo\"\n    }\n    route {\n      "
+            "cluster_header: \":authority\"\n    }\n  }\n  routes {\n    match {\n      prefix: "
+            "\"/bar\"\n    }\n    route {\n      cluster: \"bar\"\n    }\n  }\n}\n\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
+  // Test that we get the same dump if we specify the route name
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes?route_config_name=foo_route_config", data));
+  EXPECT_EQ("route_config_name: foo_route_config\ncluster_name: foo_cluster\nconfig dump:\nname: "
+            "\"foo_route_config\"\nvirtual_hosts {\n  name: \"local_service\"\n  domains: \"*\"\n  "
+            "routes {\n    match {\n      prefix: \"/foo\"\n    }\n    route {\n      "
+            "cluster_header: \":authority\"\n    }\n  }\n  routes {\n    match {\n      prefix: "
+            "\"/bar\"\n    }\n    route {\n      cluster: \"bar\"\n    }\n  }\n}\n\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
+  // Test that we get an emtpy response if the name does not match
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes?route_config_name=does_not_exist", data));
+  EXPECT_EQ("", TestUtility::bufferToString(data));
+  data.drain(data.length());
+  // Test that we get the help text if we use the command in an invalid ways
+  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/routes?bad_param", data));
+  EXPECT_EQ("usage: /routes (dump all dynamic HTTP route tables).\nusage: "
+            "/routes?route_config_name=<name> (dump all dynamic HTTP route tables with the <name> "
+            "if any).\n",
+            TestUtility::bufferToString(data));
+  data.drain(data.length());
+
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
 
@@ -263,7 +327,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(3UL, store_.counter("foo.rds.update_success").value());
 }
 
-TEST_F(RdsImplTest, Failure) {
+TEST_P(RdsImplTest, Failure) {
   InSequence s;
 
   setup();
@@ -292,7 +356,7 @@ TEST_F(RdsImplTest, Failure) {
   EXPECT_EQ(2UL, store_.counter("foo.rds.update_failure").value());
 }
 
-TEST_F(RdsImplTest, FailureArray) {
+TEST_P(RdsImplTest, FailureArray) {
   InSequence s;
 
   setup();
@@ -317,7 +381,7 @@ class RouteConfigProviderManagerImplTest : public testing::Test {
 public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;

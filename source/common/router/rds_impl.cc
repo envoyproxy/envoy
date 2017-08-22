@@ -186,8 +186,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
 void RouteConfigProviderManagerImpl::addRouteInfo(RdsRouteConfigProviderSharedPtr provider,
                                                   Buffer::Instance& response) {
   response.add(fmt::format("route_config_name: {}\n", provider->routeConfigName()));
-  response.add(fmt::format("cluster_name", provider->clusterName()));
-  response.add("config dump: \n");
+  response.add(fmt::format("cluster_name: {}\n", provider->clusterName()));
+  response.add("config dump:\n");
   response.add(fmt::format("{}\n", provider->configAsString()));
 }
 
@@ -209,9 +209,10 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
     }
     return Http::Code::OK;
   } else {
-    response.add("usage: /routes (dump all dynamic route tables).\n");
-    response.add("usage: /routes?route_config_name=<name> (dump all dynamic route tables with the "
-                 "<name> if any).\n");
+    response.add("usage: /routes (dump all dynamic HTTP route tables).\n");
+    response.add(
+        "usage: /routes?route_config_name=<name> (dump all dynamic HTTP route tables with the "
+        "<name> if any).\n");
     return Http::Code::NotFound;
   }
 }
