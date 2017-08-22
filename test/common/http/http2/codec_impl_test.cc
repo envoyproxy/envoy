@@ -399,6 +399,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
   MockStreamDecoder request_decoder2;
+  // When the server stream is created it should check the status of the
+  // underlying connection.  Pretend it is overrun.
+  EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark()).Times(1);
   EXPECT_CALL(server_callbacks_, newStream(_))
       .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
         response_encoder2 = &encoder;
