@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "google/protobuf/any.pb.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/empty.pb.h"
@@ -43,6 +42,8 @@ namespace ProtobufWkt = google::protobuf;
 // type. Below we provide wrappers to facilitate remapping of the type during
 // import.
 namespace ProtobufTypes {
+
+typedef std::unique_ptr<Protobuf::Message> MessagePtr;
 
 typedef std::string String;
 typedef int64_t Int64;

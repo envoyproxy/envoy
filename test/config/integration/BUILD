@@ -27,9 +27,9 @@ filegroup(
         "server_xds.bootstrap.yaml",
         "server_xds.cds.yaml",
         "server_xds.eds.yaml",
+        "server_xds.json",
         "server_xds.lds.yaml",
         "server_xds.rds.yaml",
-        "server_xds.json",
     ],
 )
 
