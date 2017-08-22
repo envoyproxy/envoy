@@ -96,7 +96,7 @@ public:
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
-                       "envoy.api.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
+                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
                        cluster + "\"},";
     }
     response_json.pop_back();

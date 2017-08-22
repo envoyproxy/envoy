@@ -32,6 +32,9 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 
 Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {
   Protobuf::util::JsonPrintOptions json_options;
+  // By default, proto field names are converted to camelCase when the message is converted to JSON.
+  // Setting this option makes debugging easier because it keeps field names consistent in JSON
+  // printouts.
   json_options.preserve_proto_field_names = true;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
