@@ -34,7 +34,7 @@ Version history
 * TLS :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`
   option added.
 * :ref:`Configuration check tool <install_tools_config_load_check_tool>` added.
-* JSON schema check tool added.
+* :ref:`JSON schema check tool <install_tools_schema_validator_check_tool>` added.
 * Config validation mode added via the :option:`--mode` option.
 * :option:`--local-address-ip-version` option added.
 * IPv6 support is now complete.
