@@ -15,6 +15,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 
@@ -161,7 +162,7 @@ public:
                                                               FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
-    return NetworkFilterFactoryCb();
+    NOT_IMPLEMENTED;
   }
 
   /**
@@ -230,7 +231,7 @@ public:
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);
-    return HttpFilterFactoryCb();
+    NOT_IMPLEMENTED;
   }
 
   /**
