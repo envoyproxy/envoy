@@ -16,6 +16,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/utility.h"
 
 #include "api/filter/http_connection_manager.pb.h"
 #include "api/rds.pb.h"
@@ -93,7 +94,7 @@ public:
   Router::ConfigConstSharedPtr config() override;
 
   // Router::RdsRouteConfigProvider
-  std::string configAsString() const override;
+  std::string configAsJson() const override { return MessageUtil::getJsonStringFromMessage(route_config_proto_); }
   const std::string& routeConfigName() const override { return route_config_name_; }
   const std::string& clusterName() const override { return cluster_name_; }
 

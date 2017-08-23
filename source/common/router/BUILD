@@ -73,6 +73,7 @@ envoy_cc_library(
         "//source/common/config:rds_json_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

@@ -123,12 +123,6 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-std::string RdsRouteConfigProviderImpl::configAsString() const {
-  std::string json_string;
-  Protobuf::util::MessageToJsonString(route_config_proto_, &json_string);
-  return json_string;
-}
-
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
@@ -196,7 +190,7 @@ void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& 
   response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
   response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
   response.add("    \"route_table_dump\": ");
-  response.add(fmt::format("{}\n", provider.configAsString()));
+  response.add(fmt::format("{}\n", provider.configAsJson()));
   response.add("}");
 }
 

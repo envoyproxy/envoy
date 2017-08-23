@@ -61,6 +61,13 @@ public:
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
+
+  /**
+   * Extract JSON as string from a google.protobuf.Message.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @return std::string of JSON object.
+   */  
+  static std::string getJsonStringFromMessage(const Protobuf::Message& message);
 };
 
 class WktUtil {

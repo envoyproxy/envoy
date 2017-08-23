@@ -30,7 +30,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
-Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {
+std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
@@ -40,7 +40,11 @@ Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& m
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok());
-  return Json::Factory::loadFromString(json);
+  return json;
+}
+
+Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {
+  return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
 }
 
 } // namespace Envoy

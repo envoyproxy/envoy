@@ -31,9 +31,9 @@ public:
   virtual ~RdsRouteConfigProvider() {}
 
   /**
-   * @return std::string the loaded route table.
+   * @return std::string the loaded route tablein JSON format.
    */
-  virtual std::string configAsString() const PURE;
+  virtual std::string configAsJson() const PURE;
 
   /**
    * @return const std::string& the name of the configured route table.

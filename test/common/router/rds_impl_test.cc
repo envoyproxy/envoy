@@ -302,7 +302,7 @@ TEST_F(RdsImplTest, Basic) {
   const std::string routes_expected_output_full_table = R"EOF({
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
-    "route_table_dump": {"name":"foo_route_config","virtualHosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"clusterHeader":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
+    "route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
 })EOF";
 
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
