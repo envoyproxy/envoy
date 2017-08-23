@@ -149,6 +149,17 @@
               ]
             },
             {
+              "name": "redirect",
+              "domains": [ "www.namewithport.com:1234" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
               "name": "integration",
               "domains": [ "*" ],
               "routes": [

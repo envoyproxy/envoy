@@ -207,10 +207,29 @@ public:
   }
   void start(const Network::Address::IpVersion version);
   void start();
+
+  void waitForCounterGe(const std::string& name, uint64_t value) {
+    while (counter(name)->value() < value) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+
+  void waitForGaugeGe(const std::string& name, uint64_t value) {
+    while (gauge(name)->value() < value) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+
   Stats::CounterSharedPtr counter(const std::string& name) {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findCounter(*stat_store_, name);
+  }
+
+  Stats::GaugeSharedPtr gauge(const std::string& name) {
+    // When using the thread local store, only gauges() is thread safe. This also allows us
+    // to test if a counter exists at all versus just defaulting to zero.
+    return TestUtility::findGauge(*stat_store_, name);
   }
 
   // TestHooks

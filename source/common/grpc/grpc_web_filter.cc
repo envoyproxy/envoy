@@ -4,10 +4,12 @@
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
+#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/filter_utility.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -40,7 +42,8 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
-    // TODO(fengli): Return error response.
+    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_,
+                                  Http::Code::UnsupportedMediaType, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -88,6 +91,13 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
                   decoding_buffer_.length()));
+  if (decoded.empty()) {
+    // Error happened when decoding base64.
+    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
+                                  "Bad gRPC-web request, invalid base64 data.");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   decoding_buffer_.drain(decoding_buffer_.length());
   decoding_buffer_.move(data);
   data.add(decoded);

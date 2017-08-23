@@ -802,6 +802,9 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
 
   StreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
+  if (connection_.aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   stream->decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);

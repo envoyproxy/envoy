@@ -11,7 +11,6 @@
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnRefOfCopy;
 using testing::_;
 
 namespace Envoy {
@@ -118,7 +117,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
-  ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRefOfCopy(std::string()));
+  ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
                             EnvoyException,
