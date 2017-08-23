@@ -125,7 +125,7 @@ void FilterJson::translateHttpConnectionManager(
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string json_config = "{\"deprecatedV1\": true, \"value\": " +
+    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
                                     json_filter->getObject("config")->asJsonString() + "}";
 
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());

@@ -44,7 +44,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
             string_name);
     if (factory != nullptr) {
       Configuration::NetworkFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecatedV1", false)) {
+      if (filter_config->getBoolean("deprecated_v1", false)) {
         callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
       } else {
         auto message = factory->createEmptyConfigProto();
