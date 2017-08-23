@@ -93,9 +93,9 @@ public:
   Router::ConfigConstSharedPtr config() override;
 
   // Router::RdsRouteConfigProvider
-  std::string configAsString() override { return route_config_proto_.DebugString(); }
-  std::string routeConfigName() override { return route_config_name_; }
-  std::string clusterName() override { return cluster_name_; }
+  std::string configAsString() const override;
+  const std::string& routeConfigName() const override { return route_config_name_; }
+  const std::string& clusterName() const override { return cluster_name_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
@@ -160,7 +160,7 @@ private:
    * @param provider supplies the Provider to extract information from.
    * @param response supplies the buffer to fill with information.
    */
-  void addRouteInfo(RdsRouteConfigProviderSharedPtr provider, Buffer::Instance& response);
+  void addRouteInfo(const RdsRouteConfigProvider& provider, Buffer::Instance& response);
 
   /**
    * The handler used in the Admin /routes endpoint. This handler is used to
@@ -168,6 +168,7 @@ private:
    * loaded dynamic HTTP Route Tables.
    * @param url supplies the url sent to the Admin endpoint.
    * @param response supplies the buffer to fill with information.
+   * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
    */
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 

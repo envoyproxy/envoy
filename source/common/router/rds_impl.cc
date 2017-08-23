@@ -43,6 +43,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
+      // TODO(htuch): If support for multiple clusters is added per #1170 this has to be fixed.
       cluster_name_(rds.config_source().api_config_source().cluster_name()[0]),
       route_config_name_(rds.route_config_name()), scope_(scope.createScope(stat_prefix + "rds.")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
@@ -122,6 +123,12 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
+std::string RdsRouteConfigProviderImpl::configAsString() const {
+  std::string json_string;
+  Protobuf::util::MessageToJsonString(route_config_proto_, &json_string);
+  return json_string;
+}
+
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
@@ -183,12 +190,14 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-void RouteConfigProviderManagerImpl::addRouteInfo(RdsRouteConfigProviderSharedPtr provider,
+void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& provider,
                                                   Buffer::Instance& response) {
-  response.add(fmt::format("route_config_name: {}\n", provider->routeConfigName()));
-  response.add(fmt::format("cluster_name: {}\n", provider->clusterName()));
-  response.add("config dump:\n");
-  response.add(fmt::format("{}\n", provider->configAsString()));
+  response.add("{\n");
+  response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
+  response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
+  response.add("    \"route_table_dump\": ");
+  response.add(fmt::format("{}\n", provider.configAsString()));
+  response.add("}");
 }
 
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
@@ -196,27 +205,28 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   // If there are no query params, print out all the configured route tables.
   if (query_params.size() == 0) {
-    for (auto provider : rdsRouteConfigProviders()) {
-      addRouteInfo(provider, response);
+    for (const auto& provider : rdsRouteConfigProviders()) {
+      addRouteInfo(*provider, response);
     }
     return Http::Code::OK;
   }
 
   // If there are query params, make sure it is only the route_config_name param.
-  auto it = query_params.find("route_config_name");
+  const auto it = query_params.find("route_config_name");
   if (query_params.size() == 1 && it != query_params.end()) {
-    for (auto provider : rdsRouteConfigProviders()) {
+    for (const auto& provider : rdsRouteConfigProviders()) {
       if (provider->routeConfigName() == it->second) {
-        addRouteInfo(provider, response);
+        addRouteInfo(*provider, response);
       }
     }
     return Http::Code::OK;
   }
-
-  response.add("usage: /routes (dump all dynamic HTTP route tables).\n");
-  response.add(
-      "usage: /routes?route_config_name=<name> (dump all dynamic HTTP route tables with the "
-      "<name> if any).\n");
+  response.add("{\n");
+  response.add("    \"general_usage\": \"/routes (dump all dynamic HTTP route tables).\",\n");
+  response.add("    \"specify_name_usage\": \"/routes?route_config_name=<name> (dump all dynamic "
+               "HTTP route tables with the "
+               "<name> if any).\"\n");
+  response.add("}");
   return Http::Code::NotFound;
 }
 
