@@ -94,7 +94,9 @@ public:
   Router::ConfigConstSharedPtr config() override;
 
   // Router::RdsRouteConfigProvider
-  std::string configAsJson() const override { return MessageUtil::getJsonStringFromMessage(route_config_proto_); }
+  std::string configAsJson() const override {
+    return MessageUtil::getJsonStringFromMessage(route_config_proto_);
+  }
   const std::string& routeConfigName() const override { return route_config_name_; }
   const std::string& clusterName() const override { return cluster_name_; }
 

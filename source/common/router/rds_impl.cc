@@ -36,6 +36,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
+// TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
+// initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const envoy::api::v2::filter::Rds& rds, const std::string& manager_identifier,
     Runtime::Loader& runtime, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
@@ -43,7 +45,6 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
-      // TODO(htuch): If support for multiple clusters is added per #1170 this has to be fixed.
       cluster_name_(rds.config_source().api_config_source().cluster_name()[0]),
       route_config_name_(rds.route_config_name()), scope_(scope.createScope(stat_prefix + "rds.")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
