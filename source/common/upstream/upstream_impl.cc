@@ -185,6 +185,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
+// TODO(alyssawilk) allow pulling source address from cluster config a well
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const Network::Address::InstanceConstSharedPtr source_address,
                                  Runtime::Loader& runtime, Stats::Store& stats,
