@@ -7,27 +7,22 @@
 namespace Envoy {
 namespace Compressor {
 
-class Impl : public Compressor {
+class GzipCompressorImpl : public Compressor {
 
 public:
-  enum CompressionLevel {
-    best = Z_BEST_COMPRESSION,
-    normal = Z_DEFAULT_COMPRESSION,
-    speed = Z_BEST_SPEED,
-    zero = Z_NO_COMPRESSION,
-  };
-
-  Impl();
-  ~Impl();
+  GzipCompressorImpl();
+  ~GzipCompressorImpl();
   uint64_t getTotalIn();
   uint64_t getTotalOut();
-  bool init(CompressionLevel level);
+  bool init();
   bool finish() override;
   bool compress(Buffer::Instance& in, Buffer::Instance& out) override;
 
 private:
-  z_stream zstream{};
-  bool is_finished_{false};
+  std::unique_ptr<z_stream> ZlibPtr_{nullptr};
+  static const uint chunk_{4096};
+  static const uint window_bits_{15 | 16};
+  static const uint memory_level_{8};
 };
 
 } // namespace zlib

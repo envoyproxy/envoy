@@ -10,8 +10,8 @@ envoy_package()
 
 envoy_cc_library(
     name = "compressor_lib",
-    srcs = ["compressor_impl.cc"],
-    hdrs = ["compressor_impl.h"],
+    srcs = ["gzip_compressor_impl.cc"],
+    hdrs = ["gzip_compressor_impl.h"],
     external_deps = ["zlib"],
     deps = [
         "//source/common/common:assert_lib",

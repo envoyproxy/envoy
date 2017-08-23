@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "compressor_test",
-    srcs = ["compressor_test.cc"],
+    srcs = ["gzip_compressor_impl_test.cc"],
     deps = [
         "//source/common/compressor:compressor_lib",
         "//source/common/common:assert_lib",

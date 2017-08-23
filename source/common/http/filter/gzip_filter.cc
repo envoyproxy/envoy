@@ -80,7 +80,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
   headers.removeEtag();
 
-  compressor_.init(Compressor::Impl::CompressionLevel::best);
+  compressor_.init();
   
   return Http::FilterHeadersStatus::Continue;
 }

@@ -5,7 +5,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/compressor/compressor_impl.h"
+#include "common/compressor/gzip_compressor_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -34,9 +34,8 @@ private:
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   Http::HeaderEntry* content_encoding_header_{nullptr};
-  Compressor::Impl compressor_;
+  Compressor::GzipCompressorImpl compressor_;
   Buffer::OwnedImpl buffer_;
-  Event::TimerPtr request_timeout_;
   
   bool deflate_{false};
   bool is_compressed_{true};
