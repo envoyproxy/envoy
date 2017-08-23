@@ -125,7 +125,7 @@ private:
   Upstream::ClusterManager& cm_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
-  const std::string cluster_name_;
+  std::string cluster_name_;
   const std::string route_config_name_;
   bool initialized_{};
   uint64_t last_config_hash_{};

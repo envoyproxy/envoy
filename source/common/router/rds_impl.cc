@@ -45,7 +45,6 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
-      cluster_name_(rds.config_source().api_config_source().cluster_name()[0]),
       route_config_name_(rds.route_config_name()), scope_(scope.createScope(stat_prefix + "rds.")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
@@ -65,6 +64,12 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
+
+  if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
+    cluster_name_ = rds.config_source().api_config_source().cluster_name()[0];
+  } else {
+    cluster_name_ = "NOT_SET";
+  }
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
