@@ -89,7 +89,7 @@ public:
     stream_ = http_async_client.start(*this, Optional<std::chrono::milliseconds>(timeout_));
 
     if (stream_ == nullptr) {
-      callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable);
+      callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, "");
       http_reset_ = true;
       return;
     }
@@ -158,12 +158,13 @@ public:
       streamError(Status::GrpcStatus::Internal);
       return;
     }
+    std::string grpc_message = Common::getGrpcMessage(*trailers);
     if (grpc_status.value() != Status::GrpcStatus::Ok) {
-      streamError(grpc_status.value());
+      streamError(grpc_status.value(), std::move(grpc_message));
       return;
     }
     callbacks_.onReceiveTrailingMetadata(std::move(trailers));
-    callbacks_.onRemoteClose(Status::GrpcStatus::Ok);
+    callbacks_.onRemoteClose(Status::GrpcStatus::Ok, "");
     closeRemote();
   }
 
@@ -201,9 +202,13 @@ public:
   bool hasResetStream() const { return http_reset_; }
 
 private:
-  void streamError(Status::GrpcStatus grpc_status) {
-    callbacks_.onRemoteClose(grpc_status);
+  void streamError(Status::GrpcStatus grpc_status, const std::string& message) {
+    callbacks_.onRemoteClose(grpc_status, message);
     resetStream();
+  }
+
+  void streamError(Status::GrpcStatus grpc_status) {
+    streamError(grpc_status, "");
   }
 
   void cleanup() {
@@ -291,13 +296,13 @@ private:
 
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
 
-  void onRemoteClose(Grpc::Status::GrpcStatus status) override {
+  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
     if (status != Grpc::Status::GrpcStatus::Ok) {
-      callbacks_.onFailure(status);
+      callbacks_.onFailure(status, message);
       return;
     }
     if (response_ == nullptr) {
-      callbacks_.onFailure(Status::Internal);
+      callbacks_.onFailure(Status::Internal, "");
       return;
     }
 

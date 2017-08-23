@@ -78,7 +78,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitRes
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status) {
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
   UNREFERENCED_PARAMETER(status);
   callbacks_->complete(LimitStatus::Error);

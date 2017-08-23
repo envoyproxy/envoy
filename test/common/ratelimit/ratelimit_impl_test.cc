@@ -104,7 +104,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::Error));
-    client_.onFailure(Grpc::Status::Unknown);
+    client_.onFailure(Grpc::Status::Unknown, "");
   }
 }
 

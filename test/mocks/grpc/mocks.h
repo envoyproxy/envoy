@@ -33,7 +33,7 @@ public:
 
   MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
   MOCK_METHOD1_T(onSuccess_, void(const ResponseType& response));
-  MOCK_METHOD1_T(onFailure, void(Status::GrpcStatus status));
+  MOCK_METHOD2_T(onFailure, void(Status::GrpcStatus status, const std::string& message));
 };
 
 template <class ResponseType>
@@ -53,7 +53,7 @@ public:
   MOCK_METHOD1_T(onReceiveInitialMetadata_, void(const Http::HeaderMap& metadata));
   MOCK_METHOD1_T(onReceiveMessage_, void(const ResponseType& message));
   MOCK_METHOD1_T(onReceiveTrailingMetadata_, void(const Http::HeaderMap& metadata));
-  MOCK_METHOD1_T(onRemoteClose, void(Status::GrpcStatus status));
+  MOCK_METHOD2_T(onRemoteClose, void(Status::GrpcStatus status, const std::string& message));
 };
 
 template <class RequestType, class ResponseType>
