@@ -25,7 +25,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     const auto& proto_config = filters[i].config();
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
     // Map filter type string to enum.
     Configuration::NetworkFilterType type;

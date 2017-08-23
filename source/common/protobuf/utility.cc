@@ -43,8 +43,4 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
-Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {
-  return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
-}
-
 } // namespace Envoy

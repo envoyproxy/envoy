@@ -227,7 +227,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
     const HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
