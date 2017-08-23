@@ -111,6 +111,16 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   }
 }
 
+int ServerContextImpl::npnListCallback(const uint8_t** out, unsigned int* outlen) {
+  if (parsed_alpn_protocols_.empty()) {
+    return SSL_TLSEXT_ERR_NOACK;
+  } else {
+    *out = &parsed_alpn_protocols_[0];
+    *outlen = parsed_alpn_protocols_.size();
+    return SSL_TLSEXT_ERR_OK;
+  }
+}
+
 std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_protocols) {
   if (alpn_protocols.empty()) {
     return {};
@@ -367,6 +377,13 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
                                   const unsigned char* in, unsigned int inlen, void* arg) -> int {
                                  return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
                                      out, outlen, in, inlen);
+                               },
+                               this);
+    SSL_CTX_set_next_protos_advertised_cb(ctx_.get(),
+                               [](SSL*, const uint8_t** out, unsigned int* outlen,
+                                   void* arg) -> int {
+                                 return static_cast<ServerContextImpl*>(arg)
+                                     ->npnListCallback(out, outlen);
                                },
                                this);
   }
