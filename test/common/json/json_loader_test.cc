@@ -418,5 +418,32 @@ TEST(JsonLoaderTest, ListAsString) {
   }
 }
 
+TEST(JsonLoaderTest, YamlScalar) {
+  EXPECT_EQ(true, Factory::loadFromYamlString("true")->asBoolean());
+  EXPECT_EQ("true", Factory::loadFromYamlString("\"true\"")->asString());
+  EXPECT_EQ(1, Factory::loadFromYamlString("1")->asInteger());
+  EXPECT_EQ("1", Factory::loadFromYamlString("\"1\"")->asString());
+  EXPECT_DOUBLE_EQ(1.0, Factory::loadFromYamlString("1.0")->asDouble());
+  EXPECT_EQ("1.0", Factory::loadFromYamlString("\"1.0\"")->asString());
+}
+
+TEST(JsonLoaderTest, YamlObject) {
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("[foo, bar]");
+    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
+    EXPECT_EQ(2, output.size());
+    EXPECT_EQ("foo", output[0]->asString());
+    EXPECT_EQ("bar", output[1]->asString());
+  }
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("foo: bar");
+    EXPECT_EQ("bar", json->getString("foo"));
+  }
+  {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("Null");
+    EXPECT_TRUE(json->isNull());
+  }
+}
+
 } // namespace Json
 } // namespace Envoy

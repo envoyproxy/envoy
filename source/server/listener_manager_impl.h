@@ -58,6 +58,7 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_create_failure)                                                                 \
   GAUGE  (total_listeners_warming)                                                                 \
   GAUGE  (total_listeners_active)                                                                  \

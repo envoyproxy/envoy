@@ -20,5 +20,6 @@ TARGET_RECIPES = {
     "spdlog": "spdlog",
     "ssl": "boringssl",
     "tclap": "tclap",
+    "yaml_cpp": "yaml-cpp",
     "zlib": "zlib",
 }

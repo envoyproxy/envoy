@@ -114,6 +114,7 @@ public:
   void updateCurrentSuccessRateBucket();
   SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; }
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
+  void resetConsecutive5xx() { consecutive_5xx_ = 0; }
 
   // Upstream::Outlier::DetectorHostSink
   uint32_t numEjections() override { return num_ejections_; }
