@@ -40,6 +40,10 @@ int ConnectionImplUtility::createSocket(Address::InstanceConstSharedPtr address,
   if (fd >= 0 && source_address != nullptr) {
     int rc = source_address->bind(fd);
     // TODO(alyssawilk) make this a non-fatal connect failure.
+    if (rc < 0) {
+      ENVOY_LOG_MISC(critical, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+                     strerror(errno));
+    }
     RELEASE_ASSERT(rc >= 0);
   }
   return fd;
