@@ -45,7 +45,7 @@ public:
   RdsImplTest() : request_(&cm_.async_client_) {
     EXPECT_CALL(admin_, addHandler("/routes",
                                    "print out currently loaded dynamic HTTP route tables", _, true))
-        .WillRepeatedly(SaveArg<2>(&handler_callback_));
+        .WillOnce(SaveArg<2>(&handler_callback_));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
