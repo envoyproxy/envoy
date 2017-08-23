@@ -635,7 +635,7 @@ TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5
 TEST_P(SslReadBufferLimitTest, WritesLargerThanBufferLimit) { singleWriteTest(1024, 5 * 1024); }
 
 TEST_P(SslReadBufferLimitTest, TestBind) {
-  std::string address_string = "127.0.0.9";
+  std::string address_string = TestUtility::getIpv4Loopback();
   if (GetParam() == Network::Address::IpVersion::v4) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance(address_string, 0)};

@@ -475,7 +475,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
 }
 
 TEST_P(ConnectionImplTest, BindTest) {
-  std::string address_string = "127.0.0.9";
+  std::string address_string = TestUtility::getIpv4Loopback();
   if (GetParam() == Network::Address::IpVersion::v4) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance(address_string, 0)};

@@ -256,7 +256,7 @@ public:
   void SetUp() override {
     envoy::api::v2::Bootstrap bootstrap;
     if (GetParam() == Network::Address::IpVersion::v4) {
-      address_string_ = "127.0.0.5";
+      address_string_ = TestUtility::getIpv4Loopback();
     }
     bootstrap.mutable_upstream_bind_config()->mutable_source_address()->set_address(
         address_string_);
