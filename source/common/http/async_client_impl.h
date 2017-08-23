@@ -192,7 +192,7 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  void addDecodedData(Buffer::Instance&) override { NOT_IMPLEMENTED; }
+  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
   const Buffer::Instance* decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }

@@ -258,7 +258,7 @@ public:
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
 
   MOCK_METHOD0(continueDecoding, void());
-  MOCK_METHOD1(addDecodedData, void(Buffer::Instance& data));
+  MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
@@ -292,7 +292,7 @@ public:
   MOCK_METHOD0(encoderBufferLimit, uint32_t());
 
   // Http::StreamEncoderFilterCallbacks
-  MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));
+  MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 

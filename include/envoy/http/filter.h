@@ -193,7 +193,7 @@ public:
    *
    * It is an error to call this method in any other case.
    */
-  virtual void addDecodedData(Buffer::Instance& data) PURE;
+  virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -366,7 +366,7 @@ public:
    *
    * It is an error to call this method in any other case.
    */
-  virtual void addEncodedData(Buffer::Instance& data) PURE;
+  virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

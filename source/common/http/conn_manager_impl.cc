@@ -639,9 +639,11 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 }
 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
-                                                         Buffer::Instance& data) {
+                                                         Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
+    // Make sure if this triggers watermarks, the correct action is taken.
+    decoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -810,9 +812,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
-                                                         Buffer::Instance& data) {
+                                                         Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
+    // Make sure if this triggers watermarks, the correct action is taken.
+    encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -1089,8 +1093,9 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
   return buffer;
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data) {
-  parent_.addDecodedData(*this, data);
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data,
+                                                                      bool streaming) {
+  parent_.addDecodedData(*this, data, streaming);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
@@ -1168,8 +1173,9 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   return Buffer::WatermarkBufferPtr{buffer};
 }
 
-void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
-  return parent_.addEncodedData(*this, data);
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
+                                                                      bool streaming) {
+  return parent_.addEncodedData(*this, data, streaming);
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::

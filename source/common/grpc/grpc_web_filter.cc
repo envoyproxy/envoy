@@ -177,9 +177,9 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   buffer.move(temp);
   if (is_text_response_) {
     Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
-    encoder_callbacks_->addEncodedData(encoded);
+    encoder_callbacks_->addEncodedData(encoded, true);
   } else {
-    encoder_callbacks_->addEncodedData(buffer);
+    encoder_callbacks_->addEncodedData(buffer, true);
   }
   return Http::FilterTrailersStatus::Continue;
 }

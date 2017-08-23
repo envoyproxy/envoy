@@ -364,7 +364,7 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     // Http::StreamDecoderFilterCallbacks
-    void addDecodedData(Buffer::Instance& data) override;
+    void addDecodedData(Buffer::Instance& data, bool streaming) override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -413,7 +413,7 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
-    void addEncodedData(Buffer::Instance& data) override;
+    void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -453,11 +453,11 @@ private:
     uint64_t connectionId();
     const Network::Connection* connection();
     Ssl::Connection* ssl();
-    void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
+    void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
-    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data);
+    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);

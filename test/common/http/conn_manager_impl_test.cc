@@ -152,7 +152,7 @@ public:
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           Buffer::OwnedImpl data("hello");
-          decoder_filters_[0]->callbacks_->addDecodedData(data);
+          decoder_filters_[0]->callbacks_->addDecodedData(data, true);
           return FilterHeadersStatus::Continue;
         }));
   }
@@ -1093,7 +1093,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
   Buffer::OwnedImpl trailers_data("hello");
   EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
-        decoder_filters_[0]->callbacks_->addDecodedData(trailers_data);
+        decoder_filters_[0]->callbacks_->addDecodedData(trailers_data, true);
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(Ref(trailers_data), false))
@@ -1124,7 +1124,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
   decoder_filters_[1]->callbacks_->encodeData(response_body, false);
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
-        encoder_filters_[0]->callbacks_->addEncodedData(trailers_data);
+        encoder_filters_[0]->callbacks_->addEncodedData(trailers_data, true);
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[1], encodeData(Ref(trailers_data), false))
@@ -1154,7 +1154,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         Buffer::OwnedImpl data("hello");
-        decoder_filters_[0]->callbacks_->addDecodedData(data);
+        decoder_filters_[0]->callbacks_->addDecodedData(data, true);
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
@@ -1169,7 +1169,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         Buffer::OwnedImpl data("hello");
-        encoder_filters_[0]->callbacks_->addEncodedData(data);
+        encoder_filters_[0]->callbacks_->addEncodedData(data, true);
         EXPECT_EQ(5UL, encoder_filters_[0]->callbacks_->encodingBuffer()->length());
         return FilterHeadersStatus::Continue;
       }));
@@ -1378,7 +1378,6 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
-  // TODO(alyssawilk) talk to Matt about AddDecodedData/addEncodedData.
   initial_buffer_limit_ = 10;
   streaming_filter_ = false;
   setup(false, "");
@@ -1394,7 +1393,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   Buffer::OwnedImpl data("A longer string");
-  decoder_filters_[0]->callbacks_->addDecodedData(data);
+  decoder_filters_[0]->callbacks_->addDecodedData(data, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
@@ -1480,7 +1479,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
       .WillOnce(Return(FilterDataStatus::Continue));
 
   Buffer::OwnedImpl data("hello");
-  decoder_filters_[0]->callbacks_->addDecodedData(data);
+  decoder_filters_[0]->callbacks_->addDecodedData(data, true);
   decoder_filters_[0]->callbacks_->continueDecoding();
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
@@ -1498,7 +1497,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
   expectOnDestroy();
 
   Buffer::OwnedImpl data2("hello");
-  encoder_filters_[0]->callbacks_->addEncodedData(data2);
+  encoder_filters_[0]->callbacks_->addEncodedData(data2, true);
   encoder_filters_[0]->callbacks_->continueEncoding();
 }
 
