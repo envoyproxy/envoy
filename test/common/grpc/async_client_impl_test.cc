@@ -77,7 +77,8 @@ public:
     http_callbacks_->onData(reply_buffer, false);
   }
 
-  void expectGrpcStatus(Status::GrpcStatus grpc_status, const std::string& grpc_message = std::string()) {
+  void expectGrpcStatus(Status::GrpcStatus grpc_status,
+                        const std::string& grpc_message = std::string()) {
     if (grpc_status != Status::GrpcStatus::Ok) {
       EXPECT_CALL(*http_stream_, reset());
     }
@@ -547,8 +548,8 @@ TEST_F(GrpcAsyncClientImplTest, ResourceExhaustedError) {
   auto stream = createStream(empty_metadata);
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted,
-                             "error message", empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted, "error message",
+                             empty_metadata);
 }
 
 // Validate that we can continue to receive after a local close.

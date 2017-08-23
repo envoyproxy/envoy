@@ -207,9 +207,7 @@ private:
     resetStream();
   }
 
-  void streamError(Status::GrpcStatus grpc_status) {
-    streamError(grpc_status, "");
-  }
+  void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, ""); }
 
   void cleanup() {
     if (!http_reset_) {
