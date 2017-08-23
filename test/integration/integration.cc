@@ -46,6 +46,13 @@ std::string normalizeDate(const std::string& s) {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
+void IntegrationStreamDecoder::waitForHeaders() {
+  if (!headers_.get()) {
+    waiting_for_headers_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   ASSERT(body_data_waiting_length_ == 0);
   body_data_waiting_length_ = size;
@@ -69,7 +76,7 @@ void IntegrationStreamDecoder::waitForReset() {
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
-  if (end_stream && waiting_for_end_stream_) {
+  if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
     dispatcher_.exit();
   }
 }
@@ -864,6 +871,88 @@ void BaseIntegrationTest::testRetryHittingBufferLimit(Http::CodecClient::Type ty
 
          EXPECT_TRUE(response->complete());
          EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+       },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+// Test hitting the dynamo filter with too many request bytes to buffer.  Ensure the connection
+// manager sends a 413.
+void BaseIntegrationTest::testHittingDecoderFilterLimit(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr request;
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("dynamo_with_buffer_limits"), type);
+       },
+       [&]() -> void {
+         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"},
+                                                                   {"x-forwarded-for", "10.0.0.1"},
+                                                                   {"x-envoy-retry-on", "5xx"}},
+                                           1024 * 65, *response);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void {
+         response->waitForEndStream();
+         EXPECT_TRUE(response->complete());
+         EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+       },
+       // Cleanup both downstream and upstream
+       [&]() -> void { codec_client->close(); },
+       [&]() -> void { fake_upstream_connection->close(); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+// Test hitting the dynamo filter with too many response bytes to buffer.  Given the request headers
+// are sent on early, the stream/connection will be reset.
+void BaseIntegrationTest::testHittingEncoderFilterLimit(Http::CodecClient::Type type) {
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr request;
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("dynamo_with_buffer_limits"), type);
+       },
+       [&]() -> void {
+         auto downstream_request =
+             &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         *response);
+
+         Buffer::OwnedImpl data("{\"TableName\":\"locations\"}");
+         codec_client->sendData(*downstream_request, data, true);
+       },
+       [&]() -> void {
+         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+       },
+       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void {
+         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         // Make sure the headers are received before the body is sent.
+         response->waitForHeaders();
+         request->encodeData(1024 * 65, false);
+       },
+       [&]() -> void {
+         if (type == Http::CodecClient::Type::HTTP2) {
+           response->waitForReset();
+         } else {
+           response->waitForEndStream();
+         }
+         EXPECT_FALSE(response->complete());
+         EXPECT_STREQ("200", response->headers().Status()->value().c_str());
        },
        // Cleanup both downstream and upstream
        [&]() -> void { codec_client->close(); },

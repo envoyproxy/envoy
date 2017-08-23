@@ -1202,11 +1202,12 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
 
       parent_.response_headers_ = std::move(response_headers);
-      parent_.encodeHeaders(nullptr, *parent_.response_headers_, false);
+      // Bypass the filters and send the response headers and body directly to the encoder.
+      parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, false);
       if (!parent_.destroyed_) {
-        // Bypass the filters and send the response directly to the encoder.
         Buffer::OwnedImpl buffer(body_text);
         parent_.response_encoder_->encodeData(buffer, true);
+        parent_.state_.local_complete_ = true;
         parent_.maybeEndEncode(true);
       }
     } else {

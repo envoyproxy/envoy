@@ -118,6 +118,14 @@ TEST_P(Http2IntegrationTest, RetryHittingBufferLimit) {
   testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP2);
 }
 
+TEST_P(Http2IntegrationTest, HittingDecoderFilterLimit) {
+  testHittingDecoderFilterLimit(Http::CodecClient::Type::HTTP2);
+}
+
+TEST_P(Http2IntegrationTest, HittingEncoderFilterLimit) {
+  testHittingEncoderFilterLimit(Http::CodecClient::Type::HTTP2);
+}
+
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {

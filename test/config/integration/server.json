@@ -245,6 +245,70 @@
   },
   {
     "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http1",
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_3"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "http_dynamo_filter", "config": {} },
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http1",
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_3"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "grpc_http1_bridge", "config": {} },
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
     {
       "type": "read",

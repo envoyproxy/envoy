@@ -1413,17 +1413,17 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   // Now overload the buffer with response data.  The filter returns
   // StopIterationAndBuffer, which will trigger an early response.
 
+  expectOnDestroy();
   Http::TestHeaderMapImpl expected_response_headers{
       {":status", "500"}, {"content-length", "21"}, {"content-type", "text/plain"}};
-  EXPECT_CALL(*encoder_filters_[0],
-              encodeHeaders(HeaderMapEqualRef(&expected_response_headers), false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
   Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
   // Fake response starts doing through the filter.
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   std::string response_body;
   // The 500 goes directly to the encoder.
+  EXPECT_CALL(response_encoder_,
+              encodeHeaders(HeaderMapEqualRef(&expected_response_headers), false));
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
   EXPECT_EQ("Internal Server Error", response_body);

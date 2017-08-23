@@ -310,7 +310,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming()) {
-    // Buffer until the request is complete.
+    // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
   // TODO(lizan): Check ResponseStatus
