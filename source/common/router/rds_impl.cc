@@ -67,7 +67,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
 
   // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
   // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),
-  // then there is no actual RDS server, and hence no RDS cluster name.    
+  // then there is no actual RDS server, and hence no RDS cluster name.
   if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
     cluster_name_ = rds.config_source().api_config_source().cluster_name()[0];
   } else {
