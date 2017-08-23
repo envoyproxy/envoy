@@ -351,16 +351,7 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
-    Buffer::WatermarkBufferPtr createBuffer() override {
-      auto buffer = Buffer::WatermarkBufferPtr{
-          new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                      [this]() -> void { this->requestDataTooLarge(); },
-                                      [this]() -> void { this->requestDataDrained(); })};
-      if (parent_.buffer_limit_ > 0) {
-        buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
-      }
-      return buffer;
-    }
+    Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
     void doHeaders(bool end_stream) override {
@@ -409,15 +400,7 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
-    Buffer::WatermarkBufferPtr createBuffer() override {
-      auto buffer = new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                                [this]() -> void { this->responseDataTooLarge(); },
-                                                [this]() -> void { this->responseDataDrained(); });
-      if (parent_.buffer_limit_ > 0) {
-        buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
-      }
-      return Buffer::WatermarkBufferPtr{buffer};
-    }
+    Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
     void doHeaders(bool end_stream) override {

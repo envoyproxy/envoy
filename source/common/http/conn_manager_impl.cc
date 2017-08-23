@@ -936,8 +936,8 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t limit) {
     return;
 
   buffer_limit_ = limit;
-  if (buffered_response_data_) {
-    buffered_response_data_->setWatermarks(buffer_limit_);
+  if (buffered_request_data_) {
+    buffered_request_data_->setWatermarks(buffer_limit_);
   }
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
@@ -1080,6 +1080,15 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
 }
 
+Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
+  auto buffer = Buffer::WatermarkBufferPtr{
+      new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                  [this]() -> void { this->requestDataDrained(); },
+                                  [this]() -> void { this->requestDataTooLarge(); })};
+  buffer->setWatermarks(parent_.buffer_limit_);
+  return buffer;
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data) {
   parent_.addDecodedData(*this, data);
 }
@@ -1149,6 +1158,16 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
   parent_.watermark_callbacks_ = nullptr;
 }
 
+Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
+  auto buffer = new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
+                                            [this]() -> void { this->responseDataDrained(); },
+                                            [this]() -> void { this->responseDataTooLarge(); });
+  if (parent_.buffer_limit_ > 0) {
+    buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
+  }
+  return Buffer::WatermarkBufferPtr{buffer};
+}
+
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data) {
   return parent_.addEncodedData(*this, data);
 }
@@ -1171,21 +1190,31 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   if (parent_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
-    // FIXME(alyssawilk) terminate if response has started before submission.
-    HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::InternalServerError))}}};
-    std::string body_text = CodeUtility::toString(Http::Code::InternalServerError);
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    // If headers have not been sent to the user, send a 500.
+    if (!headers_continued_) {
+      // Make sure we won't end up with nested watermark calls from the body buffer.
+      parent_.encoder_filters_streaming_ = true;
+      stopped_ = false;
+      HeaderMapPtr response_headers{new HeaderMapImpl{
+          {Headers::get().Status, std::to_string(enumToInt(Http::Code::InternalServerError))}}};
+      std::string body_text = CodeUtility::toString(Http::Code::InternalServerError);
+      response_headers->insertContentLength().value(body_text.size());
+      response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
 
-    parent_.response_headers_ = std::move(response_headers);
-    parent_.encodeHeaders(nullptr, *parent_.response_headers_, false);
-    if (!parent_.destroyed_) {
-      Buffer::OwnedImpl buffer(body_text);
-      parent_.encodeData(nullptr, buffer, true);
+      parent_.response_headers_ = std::move(response_headers);
+      parent_.encodeHeaders(nullptr, *parent_.response_headers_, false);
+      if (!parent_.destroyed_) {
+        // Bypass the filters and send the response directly to the encoder.
+        Buffer::OwnedImpl buffer(body_text);
+        parent_.response_encoder_->encodeData(buffer, true);
+        parent_.maybeEndEncode(true);
+      }
+    } else {
+      resetStream();
     }
   }
 }
+
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataDrained() {
   onEncoderFilterBelowWriteBufferLowWatermark();
 }

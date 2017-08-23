@@ -116,14 +116,31 @@ The low watermark path is similar
 
 ## HTTP/1 and HTTP/2 filters
 
-Each HTTP and HTTP/2 filter gets a call of `StreamFilterBase::setBufferLimit()` on creation.  If the
-limit is non-zero, the buffers are responsible for enforcing buffer limits.
+Each HTTP and HTTP/2 filter has an opportunity to call `decoderBufferLimit()` or
+`encoderBufferLimit()` on creation.  No filter should buffer more than the
+configured bytes without calling the appropriate watermark callbacks or sending
+an error response.
+
+Filters may override the default limit with calls to `setDecoderBufferLimit()`
+and `setEncoderBufferLimit()`.  These calls should only increase the buffer
+limit, and will be ignored if they would reduce the limit.
+
+Most filters do not buffer internally, but instead push back on data by
+returning a FilterDataStatus on `encodeData()`/`decodeData()` calls.
+If a buffer is a streaming buffer, i.e. the buffered data will resolve over
+time, it should return `FilterDataStatus::StopIterationAndWatermark` to pause
+further data processing, which will cause the `ConnectionManagerImpl` to trigger
+watermark callbacks on behalf of the filter.  If a filter can not make forward progress without the
+complete body, it should return `FilterDataStatus::StopIterationAndWatermark`.
+in this case if the `ConnectionManagerImpl` buffers more than the allowed data
+it will return an error downstream: a 413 on the request path, 500 or `resetStream()` on the
+response path.
 
 # Decoder filters
 
-Decoder filters buffering more than the buffer limit should call
-`onDecoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e. filters which can
-process more bytes as the underlying buffer is drained.   This causes the
+For filters which do their own internal buffering, filters buffering more than the buffer limit
+should call `onDecoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e.
+filters which can process more bytes as the underlying buffer is drained.   This causes the
 downstream stream to be readDisabled and the flow of downstream data to be
 halted.  The filter is then responsible for calling `onDecoderFilterBelowWriteBufferLowWatermark`
 when the buffer is drained to resume the flow of data.

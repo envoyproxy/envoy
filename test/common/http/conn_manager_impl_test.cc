@@ -39,6 +39,7 @@
 namespace Envoy {
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -139,6 +140,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
+    EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
       HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
@@ -153,13 +155,18 @@ public:
           decoder_filters_[0]->callbacks_->addDecodedData(data);
           return FilterHeadersStatus::Continue;
         }));
+  }
+
+  void sendReqestHeadersAndData() {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
         .WillOnce(Return(FilterHeadersStatus::StopIteration));
-    EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
-        .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+    auto status = streaming_filter_ ? FilterDataStatus::StopIterationAndWatermark
+                                    : FilterDataStatus::StopIterationAndBuffer;
+    EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).WillOnce(Return(status));
 
-    // Kick off the incoming data.
-    Buffer::OwnedImpl fake_input("1234");
+    // Kick off the incoming data.  |fake_input| is not sent, but instead kicks
+    // off sending the headers and |data| queued up in setUpEncoderAndDecoder().
+    Buffer::OwnedImpl fake_input("asdf");
     conn_manager_->onData(fake_input);
   }
 
@@ -256,6 +263,8 @@ public:
   MockStream stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  uint32_t initial_buffer_limit_;
+  bool streaming_filter_{false};
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;
@@ -1209,6 +1218,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
 
   // Mimic the upstream connection backing up.  The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
@@ -1231,6 +1241,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
 TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
 
   // Test what happens when there are no subscribers.
   conn_manager_->onAboveWriteBufferHighWatermark();
@@ -1292,10 +1303,156 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
   // callbacks immediately.
   EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
   setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
   ASSERT_GE(decoder_filters_.size(), 1);
   MockDownstreamWatermarkCallbacks callbacks;
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+}
+
+TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
+  initial_buffer_limit_ = 100;
+  setup(false, "");
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  EXPECT_EQ(initial_buffer_limit_, encoder_filters_[0]->callbacks_->encoderBufferLimit());
+
+  // setDecoderBufferLimit does not lower the limit.
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ - 1);
+  EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+
+  // setDecoderBufferLimit raise the limit, and affects both limits
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ + 1);
+  EXPECT_EQ(initial_buffer_limit_ + 1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  EXPECT_EQ(initial_buffer_limit_ + 1, encoder_filters_[0]->callbacks_->encoderBufferLimit());
+
+  // Turning off buffer limits works.
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(0);
+  EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+
+  // Once the limits are turned off they may not be turned on again.
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(1);
+  EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+}
+
+TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+  initial_buffer_limit_ = 1;
+  streaming_filter_ = true;
+  setup(false, "");
+  setUpEncoderAndDecoder();
+
+  // The filter is a streaming filter.  Sending 4 bytes should hit the
+  // watermark limit and disable reads on the stream.
+  EXPECT_CALL(stream_, readDisable(true));
+  sendReqestHeadersAndData();
+
+  // Change the limit so the buffered data is below the new watermark.  The
+  // stream should be read-enabled
+  EXPECT_CALL(stream_, readDisable(false));
+  int buffer_len = decoder_filters_[0]->callbacks_->decodingBuffer()->length();
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit((buffer_len + 1) * 2);
+
+  // Start the response
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+  MockDownstreamWatermarkCallbacks callbacks;
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+
+  // Now overload the buffer with response data.  The downstream watermark
+  // callbacks should be called.
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
+  decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
+
+  // Change the limit so the buffered data is below the new watermark.
+  buffer_len = encoder_filters_[0]->callbacks_->encodingBuffer()->length();
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  encoder_filters_[0]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
+  // TODO(alyssawilk) talk to Matt about AddDecodedData/addEncodedData.
+  initial_buffer_limit_ = 10;
+  streaming_filter_ = false;
+  setup(false, "");
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  // Set the filter to be a buffering filter.  Sending any data will hit the
+  // watermark limit and result in a 413 being sent to the user.
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
+  Buffer::OwnedImpl data("A longer string");
+  decoder_filters_[0]->callbacks_->addDecodedData(data);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
+  initial_buffer_limit_ = 10;
+  setup(false, "");
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  // Start the response without processing the request headers through all
+  // filters.
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+  // Now overload the buffer with response data.  The filter returns
+  // StopIterationAndBuffer, which will trigger an early response.
+
+  Http::TestHeaderMapImpl expected_response_headers{
+      {":status", "500"}, {"content-length", "21"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(*encoder_filters_[0],
+              encodeHeaders(HeaderMapEqualRef(&expected_response_headers), false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
+  // Fake response starts doing through the filter.
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  std::string response_body;
+  // The 500 goes directly to the encoder.
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+  decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
+  EXPECT_EQ("Internal Server Error", response_body);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
+  initial_buffer_limit_ = 10;
+  setup(false, "");
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  // Start the response, and make sure the request headers are fully processed.
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+  // Now overload the buffer with response data.  The filter returns
+  // StopIterationAndBuffer, which will trigger an early reset.
+  const std::string data = "A long enough string to go over watermarks";
+  Buffer::OwnedImpl fake_response(data);
+  InSequence s;
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(stream_, resetStream(_));
+  decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
