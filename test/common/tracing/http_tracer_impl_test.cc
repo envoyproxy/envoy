@@ -237,7 +237,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string path_prefix = "http://";
-  const std::string expected_path(128 - path_prefix.length(), 'a');
+  const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},

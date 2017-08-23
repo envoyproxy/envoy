@@ -26,18 +26,16 @@ static std::string valueOrDefault(const Http::HeaderEntry* header, const char* d
 }
 
 static std::string buildUrl(const Http::HeaderMap& request_headers) {
-  const std::string path = request_headers.EnvoyOriginalPath()
-                               ? request_headers.EnvoyOriginalPath()->value().c_str()
-                               : request_headers.Path()->value().c_str();
-  const std::string url =
-      fmt::format("{}://{}{}", valueOrDefault(request_headers.ForwardedProto(), ""),
-                  valueOrDefault(request_headers.Host(), ""), path);
+  std::string path = request_headers.EnvoyOriginalPath()
+                         ? request_headers.EnvoyOriginalPath()->value().c_str()
+                         : request_headers.Path()->value().c_str();
   static const size_t max_path_length = 128;
-  if (url.length() > max_path_length) {
-    return url.substr(0, max_path_length);
+  if (path.length() > max_path_length) {
+    path = path.substr(0, max_path_length);
   }
 
-  return url;
+  return fmt::format("{}://{}{}", valueOrDefault(request_headers.ForwardedProto(), ""),
+                     valueOrDefault(request_headers.Host(), ""), path);
 }
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
