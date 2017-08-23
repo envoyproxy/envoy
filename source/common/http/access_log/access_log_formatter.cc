@@ -231,13 +231,17 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo& request_info) {
       return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
     };
-  } else if (field_name == "REQUEST_TIME") {
+  } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return AccessLogDateTimeFormatter::fromTime(request_info.requestReceivedTime());
+      return request_info.requestReceivedDuration().valid()
+                 ? std::to_string(request_info.requestReceivedDuration().value().count())
+                 : "0";
     };
-  } else if (field_name == "RESPONSE_TIME") {
+  } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return AccessLogDateTimeFormatter::fromTime(request_info.responseReceivedTime());
+      return request_info.responseReceivedDuration().valid()
+                 ? std::to_string(request_info.responseReceivedDuration().value().count())
+                 : "0";
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo& request_info) {

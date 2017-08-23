@@ -93,19 +93,17 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter start_time_format("REQUEST_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, requestReceivedTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
+    RequestInfoFormatter request_duration_format("REQUEST_DURATION");
+    Optional<std::chrono::milliseconds> duration{std::chrono::milliseconds(5)};
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillRepeatedly(ReturnRef(duration));
+    EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
-    RequestInfoFormatter start_time_format("RESPONSE_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, responseReceivedTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
+    RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
+    Optional<std::chrono::milliseconds> duration{std::chrono::milliseconds(10)};
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(ReturnRef(duration));
+    EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
   }
 
   {

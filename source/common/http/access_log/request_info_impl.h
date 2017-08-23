@@ -11,16 +11,27 @@ namespace AccessLog {
 
 struct RequestInfoImpl : public RequestInfo {
   RequestInfoImpl(Protocol protocol)
-      : protocol_(protocol), start_time_(std::chrono::system_clock::now()) {}
+      : protocol_(protocol), start_time_(std::chrono::system_clock::now()),
+        start_time_monotonic_(std::chrono::steady_clock::now()) {}
 
   // Http::AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
-  SystemTime requestReceivedTime() const override { return request_received_time_; }
-  void requestReceivedTime(SystemTime time) override { request_received_time_ = time; }
+  const Optional<std::chrono::milliseconds>& requestReceivedDuration() const override {
+    return request_received_duration_;
+  }
+  void requestReceivedDuration(MonotonicTime time) override {
+    request_received_duration_ =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time - start_time_monotonic_);
+  }
 
-  SystemTime responseReceivedTime() const override { return response_received_time_; }
-  void responseReceivedTime(SystemTime time) override { response_received_time_ = time; }
+  const Optional<std::chrono::milliseconds>& responseReceivedDuration() const override {
+    return request_received_duration_;
+  }
+  void responseReceivedDuration(MonotonicTime time) override {
+    request_received_duration_ =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time - start_time_monotonic_);
+  }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
@@ -54,8 +65,9 @@ struct RequestInfoImpl : public RequestInfo {
 
   Protocol protocol_;
   const SystemTime start_time_;
-  SystemTime request_received_time_{};
-  SystemTime response_received_time_{};
+  const MonotonicTime start_time_monotonic_;
+  Optional<std::chrono::milliseconds> request_received_duration_;
+  Optional<std::chrono::milliseconds> response_received_duration_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};

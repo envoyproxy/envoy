@@ -66,26 +66,30 @@ public:
   virtual SystemTime startTime() const PURE;
 
   /**
-   * @return the time that the entire request was received from the downstream client.  Note: if
-   * unset, will return unix epoch.
+   * @return duration from request start to when the entire request was received from the
+   * downstream client.  Note: if unset, will return an empty optional.
    */
-  virtual SystemTime requestReceivedTime() const PURE;
+  virtual const Optional<std::chrono::milliseconds>& requestReceivedDuration() const PURE;
 
   /**
-   * Set the time that the entire request was received from the downstream client.
+   * Set the duration from request start to when the entire request was received from the
+   * downstream client.
+   * @param time monotonic clock time when the response was received.
    */
-  virtual void requestReceivedTime(SystemTime time) PURE;
+  virtual void requestReceivedDuration(MonotonicTime time) PURE;
 
   /**
-   * @return the time that the entire response was received from the upstream host.  Note: if unset,
-   * will return unix epoch.
+   * @return the duration from request start to when the entire response was received from the
+   * upstream host.  Note: if unset, will return an empty optional.
    */
-  virtual SystemTime responseReceivedTime() const PURE;
+  virtual const Optional<std::chrono::milliseconds>& responseReceivedDuration() const PURE;
 
   /**
-   * Set the time that the entire response was received from the upstream host.
+   * Set the duration from request start to when the entire response was received from the
+   * upstream host.
+   * @param time monotonic clock time when the response was received.
    */
-  virtual void responseReceivedTime(SystemTime time) PURE;
+  virtual void responseReceivedDuration(MonotonicTime time) PURE;
 
   /**
    * @return the # of body bytes received in the request.
