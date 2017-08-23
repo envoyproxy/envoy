@@ -15,12 +15,24 @@ ExtAuth::ExtAuth(ExtAuthConfigConstSharedPtr config) : config_(config) {}
 
 ExtAuth::~ExtAuth() { ASSERT(!auth_request_); }
 
+void ExtAuth::dumpHeaders(const char *what, HeaderMap* headers) {
+  log().info("ExtAuth headers ({}):", what);
+
+  headers->iterate(
+    [](const HeaderEntry& header, void* context) -> void {
+      (void)context;
+      log().trace("  '{}':'{}'",
+                  header.key().c_str(), header.value().c_str());
+    },
+    nullptr);
+}
+
 FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
-  log().info("ExtAuth Request received; contacting auth server");
 
   // Request external authentication
   auth_complete_ = false;
   request_headers_ = &headers;
+  dumpHeaders("decodeHeaders", request_headers_);
 
   MessagePtr request(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
 
@@ -39,6 +51,7 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
 
   request->headers().addReference(header_to_add, value_to_add.get());
 
+  log().info("ExtAuth contacting auth server");
   // request->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
   auth_request_ =
       config_->cm_.httpAsyncClientForCluster(config_->cluster_)
@@ -72,6 +85,8 @@ ExtAuthStats ExtAuth::generateStats(const std::string& prefix, Stats::Store& sto
 void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   auth_request_ = nullptr;
 
+  dumpHeaders("onSuccess", request_headers_);
+
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   std::string response_body(response->bodyAsString());
 
@@ -101,10 +116,14 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
 
   log().info("ExtAuth accepting request");
 
+  // If we actually add any headers, we need to invalidate the route cache.
+  // If we don't, we don't want to invalidate the route cache because it's
+  // slow.
+  addedHeaders_ = false;
+
   response->headers().iterate(
     [](const HeaderEntry& header, void* vctx) -> void {
       ExtAuth *self = static_cast<ExtAuth *>(vctx);
-      // (void)vctx;
 
       std::string key(header.key().c_str());
       std::string value(header.value().c_str());
@@ -114,23 +133,23 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
       // Should we use a map<> for this? We don't expect there to be many
       // allowed headers.
 
-      bool allowed = false;
-
       for (std::string allowed_header : self->config_->allowed_headers_) {
         if (key == allowed_header) {
           log().info("ExtAuth allowing response header {}: {}", key, value);
-          allowed = true;
-
+          self->addedHeaders_ = true;
           self->request_headers_->addCopy(LowerCaseString(key), value);
         }
-      }
-
-      if (!allowed) {
-        log().info("ExtAuth not allowing response header {}: {}", key, value);
       }
     },
     static_cast<void *>(this)
   );
+
+  if (addedHeaders_) {
+    dumpHeaders("ExtAuth invalidating route cache", request_headers_);
+
+    // callbacks_->encodeHeaders(HeaderMapPtr(new HeaderMapImpl{request_headers_}), false);
+    callbacks_->clearRouteCache();
+  }
 
   config_->stats_.rq_passed_.inc();
   auth_complete_ = true;
@@ -140,6 +159,7 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
 
 void ExtAuth::onFailure(Http::AsyncClient::FailureReason) {
   auth_request_ = nullptr;
+  request_headers_ = nullptr;
   log().warn("ExtAuth Auth request failed");
   config_->stats_.rq_failed_.inc();
   Http::Utility::sendLocalReply(*callbacks_, false, Http::Code::ServiceUnavailable,
