@@ -9,26 +9,6 @@ namespace Envoy {
 namespace Zipkin {
 
 /**
- * This struct identifies which Zipkin annotations are present in the
- * span context (see SpanContext)
- * Each member is a one-bit boolean indicating whether or not the
- * corresponding annotation is present.
- *
- * In particular, the following annotations are tracked by this struct:
- * CS: "Client Send"
- * CR: "Client Receive"
- * SS: "Server Send"
- * SR: "Server Receive"
- */
-struct AnnotationSet {
-  AnnotationSet() : cs_(false), cr_(false), ss_(false), sr_(false) {}
-  bool cs_ : 1;
-  bool cr_ : 1;
-  bool ss_ : 1;
-  bool sr_ : 1;
-};
-
-/**
  * This class represents the context of a Zipkin span. It embodies the following
  * span characteristics: trace id, span id, parent id, and basic annotations.
  */
@@ -105,16 +85,10 @@ public:
    */
   std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
 
-  /**
-   * @return a struct indicating which annotations are present in the span.
-   */
-  AnnotationSet annotationSet() const { return annotation_values_; }
-
 private:
   uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
-  AnnotationSet annotation_values_;
   bool is_initialized_;
 };
 } // namespace Zipkin
