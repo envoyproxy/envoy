@@ -234,7 +234,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
     if (factory != nullptr) {
       HttpFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecatedV1", false)) {
+      if (filter_config->getBoolean("deprecated_v1", false)) {
         callback = factory->createFilterFactory(*filter_config->getObject("value", true),
                                                 stats_prefix_, context);
       } else {
