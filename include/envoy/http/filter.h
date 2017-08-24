@@ -192,6 +192,9 @@ public:
    * followed by decodeTrailers().
    *
    * It is an error to call this method in any other case.
+   *
+   * @param data Buffer::Instance supplies the data to be decoded.
+   * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
@@ -365,6 +368,9 @@ public:
    * followed by encodeTrailers().
    *
    * It is an error to call this method in any other case.
+   *
+   * @param data Buffer::Instance supplies the data to be encoded.
+   * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
