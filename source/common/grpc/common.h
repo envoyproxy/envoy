@@ -37,7 +37,8 @@ public:
   /**
    * Returns the grpc-message from a given set of headers, if present.
    * @param headers the headers to parse.
-   * @return the gRPC message string or empty string if grpc-message is not present in headrs.
+   * @return std::string the gRPC status message or empty string if grpc-message is not present in
+   *         headrs.
    */
   static std::string getGrpcMessage(const Http::HeaderMap& headers);
 

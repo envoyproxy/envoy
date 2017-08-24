@@ -74,7 +74,7 @@ public:
   /**
    * Called when the async gRPC request fails. No further callbacks will be invoked.
    * @param status the gRPC status.
-   * @param message the gRPC message.
+   * @param message the gRPC status message or empty string if not present.
    */
   virtual void onFailure(Status::GrpcStatus status, const std::string& message) PURE;
 };
@@ -120,7 +120,7 @@ public:
    * invoked. A non-Ok status implies that stream is also locally closed and that no
    * further stream operations are permitted.
    * @param status the gRPC status.
-   * @param message the gRPC message, if present.
+   * @param message the gRPC status message or empty string if not present.
    */
   virtual void onRemoteClose(Status::GrpcStatus status, const std::string& message) PURE;
 };
