@@ -44,6 +44,16 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 }
 
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
+  allow_origin_ = config.allow_origin();
+  allow_methods_ = config.allow_methods();
+  allow_headers_ = config.allow_headers();
+  expose_headers_ = config.expose_headers();
+  max_age_ = config.max_age();
+  allow_credentials_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_credentials, false);
+  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, false);
+}
+
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   if (!config.has_request_mirror_policy()) {
     return;
@@ -81,7 +91,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
-      vhost_(vhost),
+      cors_policy_(route.route().cors()), vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       use_websocket_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false)),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
@@ -389,7 +399,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
-      global_route_config_(global_route_config) {
+      global_route_config_(global_route_config), cors_policy_(virtual_host.cors()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;

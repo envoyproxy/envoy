@@ -21,6 +21,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cors_lib",
+    srcs = ["cors.cc"],
+    hdrs = ["cors.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/http/filter:cors_filter_lib",
+        "//source/common/json:config_schemas_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "dynamo_lib",
     srcs = ["dynamo.cc"],
     hdrs = ["dynamo.h"],

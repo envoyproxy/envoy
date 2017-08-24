@@ -34,6 +34,16 @@ void RdsJson::translateVirtualCluster(const Json::Object& json_virtual_cluster,
   virtual_cluster.set_method(method);
 }
 
+void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsPolicy& cors) {
+  JSON_UTIL_SET_STRING(json_cors, cors, allow_origin);
+  JSON_UTIL_SET_STRING(json_cors, cors, allow_methods);
+  JSON_UTIL_SET_STRING(json_cors, cors, allow_headers);
+  JSON_UTIL_SET_STRING(json_cors, cors, expose_headers);
+  JSON_UTIL_SET_STRING(json_cors, cors, max_age);
+  JSON_UTIL_SET_BOOL(json_cors, cors, allow_credentials);
+  JSON_UTIL_SET_BOOL(json_cors, cors, enabled);
+}
+
 void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
                                  envoy::api::v2::RateLimit& rate_limit) {
   json_rate_limit.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
@@ -148,6 +158,12 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     auto* header_value_option = virtual_host.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
+
+  if (json_virtual_host.hasObject("cors")) {
+    auto* cors = virtual_host.mutable_cors();
+    const auto json_cors = json_virtual_host.getObject("cors");
+    translateCors(*json_cors, *cors);
+  }
 }
 
 void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Route& route) {
@@ -261,6 +277,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
     if (json_route.hasObject("hash_policy")) {
       const std::string header_name = json_route.getObject("hash_policy")->getString("header_name");
       action->mutable_hash_policy()->Add()->mutable_header()->set_header_name(header_name);
+    }
+
+    if (json_route.hasObject("cors")) {
+      auto* cors = action->mutable_cors();
+      const auto json_cors = json_route.getObject("cors");
+      translateCors(*json_cors, *cors);
     }
   }
 
