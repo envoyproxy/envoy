@@ -67,6 +67,8 @@ protected:
     // For performance reasons we just clear the callback and do not resize the vector.
     // Reset callbacks scale with the number of filters per request and do not get added and
     // removed multiple times.
+    // The vector may not be safely resized without making sure the run.*Callbacks() helper
+    // functions above still handle removeCallbacks_() calls mid-loop.
     for (size_t i = 0; i < callbacks_.size(); i++) {
       if (callbacks_[i] == &callbacks) {
         callbacks_[i] = nullptr;
