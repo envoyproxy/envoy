@@ -11,6 +11,9 @@ namespace Compressor {
  * Deflate implementation of compressor's interface.
  */
 class ZlibCompressorImpl : public Compressor {
+public:
+  ZlibCompressorImpl();
+  ~ZlibCompressorImpl();
 
   enum CompressionLevel {
     default_compression = Z_DEFAULT_COMPRESSION,
@@ -25,10 +28,6 @@ class ZlibCompressorImpl : public Compressor {
     fixed = Z_FIXED,
     default_strategy = Z_DEFAULT_STRATEGY,
   };
-
-public:
-  ZlibCompressorImpl();
-  ~ZlibCompressorImpl();
 
   /**
    * Gets current total bytes passed into the compressor

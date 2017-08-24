@@ -22,7 +22,7 @@ protected:
 };
 
 TEST_F(ZlibCompressorImplTest, FinalizeCompressor) {
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init());
   EXPECT_EQ(true, compressor.finish());
@@ -35,7 +35,7 @@ TEST_F(ZlibCompressorImplTest, CompressDataWithGzipEnconding) {
 
   in.add(get200CharsText());
 
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init());
   EXPECT_EQ(true, compressor.start(in, out));
@@ -74,7 +74,7 @@ TEST_F(ZlibCompressorImplTest, CompressDataPassingEmptyBuffer) {
   Buffer::OwnedImpl in;
   Buffer::OwnedImpl out;
 
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init());
   EXPECT_EQ(true, compressor.start(in, out));
