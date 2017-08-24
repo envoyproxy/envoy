@@ -379,13 +379,12 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
                                      out, outlen, in, inlen);
                                },
                                this);
-    SSL_CTX_set_next_protos_advertised_cb(ctx_.get(),
-                               [](SSL*, const uint8_t** out, unsigned int* outlen,
-                                   void* arg) -> int {
-                                 return static_cast<ServerContextImpl*>(arg)
-                                     ->npnListCallback(out, outlen);
-                               },
-                               this);
+    SSL_CTX_set_next_protos_advertised_cb(
+        ctx_.get(),
+        [](SSL*, const uint8_t** out, unsigned int* outlen, void* arg) -> int {
+          return static_cast<ServerContextImpl*>(arg)->npnListCallback(out, outlen);
+        },
+        this);
   }
 }
 
