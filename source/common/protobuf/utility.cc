@@ -30,9 +30,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       return;
     }
     throw EnvoyException("Unable to parse proto " + path);
-    // If parsing fails, fall through and attempt to parse the file as json.
   }
-  ProtobufUtil::Status status;
   if (StringUtil::endsWith(path, ".yaml")) {
     const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();
     loadFromJson(json, message);
