@@ -27,17 +27,6 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     ENVOY_LOG(info, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
-    // Map filter type string to enum.
-    Configuration::NetworkFilterType type;
-    if (string_type == "read") {
-      type = Configuration::NetworkFilterType::Read;
-    } else if (string_type == "write") {
-      type = Configuration::NetworkFilterType::Write;
-    } else {
-      ASSERT(string_type == "both" || string_type.empty());
-      type = Configuration::NetworkFilterType::Both;
-    }
-
     // Now see if there is a factory that will accept the config.
     Configuration::NamedNetworkFilterConfigFactory* factory =
         Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
