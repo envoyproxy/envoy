@@ -223,6 +223,7 @@ public:
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
+  Admin& admin() override { return parent_.server_.admin(); }
 
   // Network::DrainDecision
   bool drainClose() const override;

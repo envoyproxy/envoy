@@ -36,6 +36,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
+// TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
+// initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const envoy::api::v2::filter::Rds& rds, const std::string& manager_identifier,
     Runtime::Loader& runtime, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
@@ -62,6 +64,15 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
+
+  // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
+  // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),
+  // then there is no actual RDS server, and hence no RDS cluster name.
+  if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
+    cluster_name_ = rds.config_source().api_config_source().cluster_name()[0];
+  } else {
+    cluster_name_ = "NOT_USING_CLUSTER";
+  }
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
@@ -99,6 +110,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
               new_hash);
     tls_->runOnAllThreads(
         [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+    route_config_proto_ = route_config;
   }
   runInitializeCallbackIfAny();
 }
@@ -122,19 +134,26 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls)
+    const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
-      tls_(tls) {}
+      tls_(tls), admin_(admin) {
+  admin_.addHandler("/routes", "print out currently loaded dynamic HTTP route tables",
+                    MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
+}
 
-std::vector<Router::RouteConfigProviderSharedPtr>
-RouteConfigProviderManagerImpl::routeConfigProviders() {
-  std::vector<Router::RouteConfigProviderSharedPtr> ret;
+RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
+  admin_.removeHandler("/routes");
+}
+
+std::vector<RdsRouteConfigProviderSharedPtr>
+RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
+  std::vector<RdsRouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigProviderImpl destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
-    Router::RouteConfigProviderSharedPtr provider = element.second.lock();
+    RdsRouteConfigProviderSharedPtr provider = element.second.lock();
     ASSERT(provider)
     ret.push_back(provider);
   }
@@ -173,6 +192,47 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   ASSERT(new_provider);
   return new_provider;
 };
+
+void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& provider,
+                                                  Buffer::Instance& response) {
+  // TODO(junr03): change this to proto with JSON transcoding when #1522 is done.
+  response.add("{\n");
+  response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
+  response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
+  response.add("    \"route_table_dump\": ");
+  response.add(fmt::format("{}\n", provider.configAsJson()));
+  response.add("}");
+}
+
+Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
+                                                         Buffer::Instance& response) {
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  // If there are no query params, print out all the configured route tables.
+  if (query_params.size() == 0) {
+    for (const auto& provider : rdsRouteConfigProviders()) {
+      addRouteInfo(*provider, response);
+    }
+    return Http::Code::OK;
+  }
+
+  // If there are query params, make sure it is only the route_config_name param.
+  const auto it = query_params.find("route_config_name");
+  if (query_params.size() == 1 && it != query_params.end()) {
+    for (const auto& provider : rdsRouteConfigProviders()) {
+      if (provider->routeConfigName() == it->second) {
+        addRouteInfo(*provider, response);
+      }
+    }
+    return Http::Code::OK;
+  }
+  response.add("{\n");
+  response.add("    \"general_usage\": \"/routes (dump all dynamic HTTP route tables).\",\n");
+  response.add("    \"specify_name_usage\": \"/routes?route_config_name=<name> (dump all dynamic "
+               "HTTP route tables with the "
+               "<name> if any).\"\n");
+  response.add("}");
+  return Http::Code::NotFound;
+}
 
 } // namespace Router
 } // namespace Envoy

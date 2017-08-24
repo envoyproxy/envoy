@@ -341,6 +341,7 @@ public:
   MOCK_METHOD0(server, Instance&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
+  MOCK_METHOD0(admin, Server::Admin&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -355,6 +356,7 @@ public:
   testing::NiceMock<MockInstance> server_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
+  testing::NiceMock<MockAdmin> admin_;
 };
 
 } // namespace Configuration

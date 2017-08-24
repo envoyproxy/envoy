@@ -97,6 +97,12 @@ modify different aspects of the server.
   that this does not drop any data sent to statsd. It just effects local output of the
   :http:get:`/stats` command.
 
+.. http:get:: /routes?route_config_name=<name>
+
+  This endpoint is only available if envoy has HTTP routes configured via RDS.
+  The endpoint dumps all the configured HTTP route tables, or only ones that
+  match the ``route_config_name`` query, if a query is specified.
+
 .. http:get:: /server_info
 
   Outputs information about the running server. Sample output looks like:

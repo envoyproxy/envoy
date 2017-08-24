@@ -153,6 +153,7 @@ private:
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorImpl random_generator_;
@@ -160,11 +161,9 @@ private:
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
-  std::unique_ptr<Router::ServerRouteConfigProviderManager> route_config_provider_manager_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Stats::ScopePtr admin_scope_;
-  std::unique_ptr<AdminImpl> admin_;
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
