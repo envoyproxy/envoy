@@ -891,7 +891,7 @@ void BaseIntegrationTest::testHittingDecoderFilterLimit(Http::CodecClient::Type 
        },
        [&]() -> void {
          codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                   {":path", "/test/long/url"},
+                                                                   {":path", "/dynamo/url"},
                                                                    {":scheme", "http"},
                                                                    {":authority", "host"},
                                                                    {"x-forwarded-for", "10.0.0.1"},
@@ -926,7 +926,7 @@ void BaseIntegrationTest::testHittingEncoderFilterLimit(Http::CodecClient::Type 
        [&]() -> void {
          auto downstream_request =
              &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/test/long/url"},
+                                                                 {":path", "/dynamo/url"},
                                                                  {":scheme", "http"},
                                                                  {":authority", "host"}},
                                          *response);

@@ -261,7 +261,7 @@
               "domains": [ "*" ],
               "routes": [
                 {
-                  "prefix": "/test/long/url",
+                  "prefix": "/dynamo/url",
                   "cluster": "cluster_3"
                 }
               ]
