@@ -17,20 +17,20 @@ struct RequestInfoImpl : public RequestInfo {
   // Http::AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
-  const Optional<std::chrono::milliseconds>& requestReceivedDuration() const override {
+  std::chrono::microseconds requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override {
     request_received_duration_ =
-        std::chrono::duration_cast<std::chrono::milliseconds>(time - start_time_monotonic_);
+        std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 
-  const Optional<std::chrono::milliseconds>& responseReceivedDuration() const override {
+  std::chrono::microseconds responseReceivedDuration() const override {
     return request_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override {
     request_received_duration_ =
-        std::chrono::duration_cast<std::chrono::milliseconds>(time - start_time_monotonic_);
+        std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
@@ -42,9 +42,9 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  std::chrono::milliseconds duration() const override {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
-                                                                 start_time_);
+  std::chrono::microseconds duration() const override {
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() -
+                                                                 start_time_monotonic_);
   }
 
   void setResponseFlag(Http::AccessLog::ResponseFlag response_flag) override {
@@ -66,8 +66,8 @@ struct RequestInfoImpl : public RequestInfo {
   Protocol protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-  Optional<std::chrono::milliseconds> request_received_duration_;
-  Optional<std::chrono::milliseconds> response_received_duration_;
+  std::chrono::microseconds request_received_duration_{};
+  std::chrono::microseconds response_received_duration_{};
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};

@@ -67,9 +67,9 @@ public:
 
   /**
    * @return duration from request start to when the entire request was received from the
-   * downstream client.  Note: if unset, will return an empty optional.
+   * downstream client.  Note: if unset, will return 0 mircoseconds.
    */
-  virtual const Optional<std::chrono::milliseconds>& requestReceivedDuration() const PURE;
+  virtual std::chrono::microseconds requestReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the entire request was received from the
@@ -80,9 +80,9 @@ public:
 
   /**
    * @return the duration from request start to when the entire response was received from the
-   * upstream host.  Note: if unset, will return an empty optional.
+   * upstream host.  Note: if unset, will return 0 microseconds.
    */
-  virtual const Optional<std::chrono::milliseconds>& responseReceivedDuration() const PURE;
+  virtual std::chrono::microseconds responseReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the entire response was received from the
@@ -117,9 +117,9 @@ public:
   virtual uint64_t bytesSent() const PURE;
 
   /**
-   * @return the milliseconds duration of the first byte received to the last byte sent.
+   * @return the microseconds duration of the first byte received to the last byte sent.
    */
-  virtual std::chrono::milliseconds duration() const PURE;
+  virtual std::chrono::microseconds duration() const PURE;
 
   /**
    * @return whether response flag is set or not.
