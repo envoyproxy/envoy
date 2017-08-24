@@ -19,6 +19,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/json/config_schemas.h"
+#include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
@@ -224,6 +225,13 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
         std::chrono::milliseconds(config.getObject("sds")->getInteger("refresh_delay_ms"))};
 
     sds_config_.value(sds_config);
+  }
+
+  if (bootstrap.has_upstream_bind_config()) {
+    if (bootstrap.upstream_bind_config().has_source_address()) {
+      source_address_ = Network::Utility::fromProtoSocketAddress(
+          bootstrap.upstream_bind_config().source_address());
+    }
   }
 
   if (bootstrap.has_cds_config() || !bootstrap.bootstrap_clusters().empty()) {

@@ -112,7 +112,7 @@ public:
 
   /**
    * Bind a socket to this address. The socket should have been created with a call to socket() on
-   * this object.
+   * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
    * @return the platform error code.
    */

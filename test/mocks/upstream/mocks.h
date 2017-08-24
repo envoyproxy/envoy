@@ -49,6 +49,7 @@ public:
   MOCK_METHOD0(initialize, void());
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
+  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
 
   std::vector<HostSharedPtr> hosts_;
   std::vector<HostSharedPtr> healthy_hosts_;
@@ -58,6 +59,7 @@ public:
       member_update_cb_helper_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
+  Network::Address::InstanceConstSharedPtr source_address_;
 };
 
 class MockLoadBalancer : public LoadBalancer {
@@ -111,10 +113,12 @@ public:
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
   MOCK_METHOD1(removePrimaryCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
+  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
+  Network::Address::InstanceConstSharedPtr source_address_;
 };
 
 class MockHealthChecker : public HealthChecker {

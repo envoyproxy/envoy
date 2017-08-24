@@ -93,6 +93,20 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
+    RequestInfoFormatter request_duration_format("REQUEST_DURATION");
+    std::chrono::microseconds duration{5000};
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(Return(duration));
+    EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
+    std::chrono::microseconds duration{10000};
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(Return(duration));
+    EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(header, header, request_info));
@@ -126,7 +140,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter duration_format("DURATION");
-    std::chrono::milliseconds time{2};
+    std::chrono::microseconds time{2000};
     EXPECT_CALL(request_info, duration()).WillOnce(Return(time));
     EXPECT_EQ("2", duration_format.format(header, header, request_info));
   }
