@@ -13,9 +13,10 @@ public:
     }
     ASSERT(high_watermark_callbacks_ > 0);
     --high_watermark_callbacks_;
-    // TODO(alyssawilk) see if we can make this safe for disconnects mid-loop
     for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onBelowWriteBufferLowWatermark();
+      if (callbacks) {
+        callbacks->onBelowWriteBufferLowWatermark();
+      }
     }
   }
 
@@ -25,7 +26,9 @@ public:
     }
     ++high_watermark_callbacks_;
     for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onAboveWriteBufferHighWatermark();
+      if (callbacks) {
+        callbacks->onAboveWriteBufferHighWatermark();
+      }
     }
   }
 
