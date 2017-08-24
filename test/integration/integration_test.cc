@@ -275,10 +275,10 @@ TEST_P(BindIntegrationTest, TestBind) {
        // Request 1.
        [&]() -> void {
          codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/test/long/url"},
-                                                                   {":scheme", "http"},
-                                                                   {":authority", "host"}},
-                                           1024, *response_);
+                                                                    {":path", "/test/long/url"},
+                                                                    {":scheme", "http"},
+                                                                    {":authority", "host"}},
+                                            1024, *response_);
        },
        [&]() -> void {
          fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
