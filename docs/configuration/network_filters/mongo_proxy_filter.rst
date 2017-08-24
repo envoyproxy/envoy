@@ -27,7 +27,7 @@ access_log
   :ref:`runtime <config_network_filters_mongo_proxy_runtime>`.
 
 fault
-  *(optional, object)* If specified, the filter will inject faults  based on the values in the object.
+  *(optional, object)* If specified, the filter will inject faults based on the values in the object.
 
 Fault configuration
 -------------------  
