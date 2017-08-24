@@ -95,8 +95,8 @@ public:
   uint64_t delayDuration() const override { return duration_ms_; }
 
 private:
-  uint32_t delay_percent_;
-  uint64_t duration_ms_;
+  const uint32_t delay_percent_;
+  const uint64_t duration_ms_;
 };
 
 typedef std::shared_ptr<FaultConfig> FaultConfigSharedPtr;

@@ -245,11 +245,11 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-FaultConfigImpl::FaultConfigImpl(const Json::Object& fault_config) {
-  const Json::ObjectSharedPtr delay_config = fault_config.getObject("fixed_delay");
-
-  delay_percent_ = static_cast<uint32_t>(delay_config->getInteger("percent"));
-  duration_ms_ = static_cast<uint64_t>(delay_config->getInteger("duration_ms"));
+FaultConfigImpl::FaultConfigImpl(const Json::Object& fault_config)
+    : delay_percent_(
+          static_cast<uint32_t>(fault_config.getObject("fixed_delay")->getInteger("percent"))),
+      duration_ms_(
+          static_cast<uint64_t>(fault_config.getObject("fixed_delay")->getInteger("duration_ms"))) {
 }
 
 Optional<uint64_t> ProxyFilter::delayDuration() {
