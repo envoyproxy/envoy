@@ -7,7 +7,6 @@
           "type": "read",
           "name": "http_connection_manager",
           "config": {
-            "generate_request_id": true,
             "tracing": {
               "operation_name": "ingress"
             }, 
