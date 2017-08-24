@@ -268,34 +268,30 @@ public:
 };
 
 TEST_P(BindIntegrationTest, TestBind) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   executeActions(
       {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
        },
        // Request 1.
        [&]() -> void {
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                    {":path", "/test/long/url"},
                                                                    {":scheme", "http"},
                                                                    {":authority", "host"}},
-                                           1024, *response);
+                                           1024, *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
          std::string address =
-             fake_upstream_connection->connection().remoteAddress().ip()->addressAsString();
+             fake_upstream_connection_->connection().remoteAddress().ip()->addressAsString();
          EXPECT_EQ(address, address_string_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BindIntegrationTest,
