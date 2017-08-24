@@ -362,7 +362,7 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
       "fault" : {
         "type" : "object",
         "properties" : {
-          "delay" : {
+          "fixed_delay" : {
             "type" : "object",
             "properties" : {
               "percent" : {

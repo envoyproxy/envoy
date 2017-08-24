@@ -71,7 +71,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
   {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
-      "delay": {
+      "fixed_delay": {
         "duration_ms": 1
       }
     }
@@ -86,7 +86,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
-      "delay": {
+      "fixed_delay": {
         "delay_percent": 1
       }
     }
@@ -101,7 +101,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
   {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
-      "delay": {
+      "fixed_delay": {
         "percent": 1,
         "duration_ms": -1
       }
@@ -118,7 +118,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
     {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
-        "delay": {
+        "fixed_delay": {
           "percent": 101,
           "duration_ms": 1
         }
@@ -134,7 +134,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
     {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
-        "delay": {
+        "fixed_delay": {
           "percent": -1,
           "duration_ms": 1
         }
@@ -152,7 +152,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
     {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
-        "delay": {
+        "fixed_delay": {
           "percent": "df",
           "duration_ms": 1
         }
@@ -168,7 +168,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
     {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
-        "delay": {
+        "fixed_delay": {
           "percent": 3,
           "duration_ms": "ab"
         }
@@ -185,7 +185,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
-      "delay": {
+      "fixed_delay": {
         "percent": 1,
         "duration_ms": 1
       }

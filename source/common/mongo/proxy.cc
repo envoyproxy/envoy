@@ -246,7 +246,7 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
 }
 
 FaultConfigImpl::FaultConfigImpl(const Json::Object& fault_config) {
-  const Json::ObjectSharedPtr delay_config = fault_config.getObject("delay");
+  const Json::ObjectSharedPtr delay_config = fault_config.getObject("fixed_delay");
 
   delay_percent_ = static_cast<uint32_t>(delay_config->getInteger("percent"));
   duration_ms_ = static_cast<uint64_t>(delay_config->getInteger("duration_ms"));
