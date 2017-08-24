@@ -40,7 +40,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
   return http_connection_manager;
 }
 
-class RdsImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class RdsImplTest : public testing::Test {
 public:
   RdsImplTest() : request_(&cm_.async_client_) {
     EXPECT_CALL(admin_, addHandler("/routes",

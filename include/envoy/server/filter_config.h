@@ -123,7 +123,7 @@ public:
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
-   * @return Server::Admin& the server's Global admin HTTP endpoint.
+   * @return Server::Admin& the server's global admin HTTP endpoint.
    */
   virtual Server::Admin& admin() PURE;
 };
