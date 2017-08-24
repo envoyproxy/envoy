@@ -21,16 +21,8 @@ public:
    * @param data supplies the buffer to output compressed data
    * @return bool indicates whether operation succeeded or not.
    */
-  virtual bool compress(Buffer::Instance& in, Buffer::Instance& out) PURE;
+  virtual bool start(Buffer::Instance& in, Buffer::Instance& out) PURE;
   
-  /**
-   * Decompress data from one buffer into another buffer
-   * @param in supplies the buffer with compressed data
-   * @param data supplies the buffer to output decompressed data
-   * @return bool indicates whether operation succeeded or not.
-   */
-  //virtual bool decompress(Buffer::Instance& in, Buffer::Instance& out) PURE;
-
   /**
    * Clean up any internal memory allocated by the compressor.
    */

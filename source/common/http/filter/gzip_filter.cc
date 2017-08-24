@@ -90,10 +90,10 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
     return Http::FilterDataStatus::Continue;
   }
 
-  compressor_.compress(data, buffer_);
+  compressor_.start(data, buffer_);
   data.move(buffer_);
-  
-  if (data.length() == 0 || end_stream) {
+
+  if (end_stream) {  
     compressor_.finish();
   }
 
