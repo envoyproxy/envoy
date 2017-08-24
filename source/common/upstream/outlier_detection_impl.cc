@@ -250,6 +250,12 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
 
   stats_.ejections_consecutive_5xx_.inc();
   ejectHost(host, EjectionType::Consecutive5xx);
+
+  // Reset the DetectorHostSink's consecutive_5xx_ counter. The reset is performed here
+  // on the onConsecutive5xxWorker call to prevent thread thrashing. The consecutive_5xx_
+  // counter needs to be reset in order to allow the Sink to detect a bout of consecutive
+  // 5xx responses even if the sink is not charged with an interleaved non-5xx code.
+  host_sinks_[host]->resetConsecutive5xx();
 }
 
 Utility::EjectionPair Utility::successRateEjectionThreshold(

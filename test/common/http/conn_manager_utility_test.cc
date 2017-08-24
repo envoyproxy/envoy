@@ -23,7 +23,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::ReturnRefOfCopy;
 using testing::_;
 
 namespace Http {
@@ -115,7 +114,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).Times(2).WillRepeatedly(ReturnRef(canary_node_));
+  EXPECT_CALL(local_info_, nodeName()).Times(2).WillRepeatedly(Return(canary_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
 
@@ -241,7 +240,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_));
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
 

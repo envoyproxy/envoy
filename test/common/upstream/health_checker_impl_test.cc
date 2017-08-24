@@ -192,11 +192,11 @@ public:
     std::unique_ptr<Http::TestHeaderMapImpl> response_headers(
         new Http::TestHeaderMapImpl{{":status", code}});
     if (service_cluster.valid()) {
-      response_headers->addViaCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
-                                   service_cluster.value());
+      response_headers->addCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
+                                service_cluster.value());
     }
     if (conn_close) {
-      response_headers->addViaCopy("connection", "close");
+      response_headers->addCopy("connection", "close");
     }
 
     test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),

@@ -8,7 +8,7 @@ namespace Http {
 class StreamCallbackHelper {
 public:
   void runLowWatermarkCallbacks() {
-    if (reset_callbacks_started_) {
+    if (reset_callbacks_started_ || local_end_stream_) {
       return;
     }
     ASSERT(high_watermark_callbacks_ > 0);
@@ -20,7 +20,7 @@ public:
   }
 
   void runHighWatermarkCallbacks() {
-    if (reset_callbacks_started_) {
+    if (reset_callbacks_started_ || local_end_stream_) {
       return;
     }
     ++high_watermark_callbacks_;
@@ -30,6 +30,8 @@ public:
   }
 
   void runResetCallbacks(StreamResetReason reason) {
+    // Reset callbacks are a special case, and the only StreamCallbacks allowed
+    // to run after local_end_stream_.
     if (reset_callbacks_started_) {
       return;
     }
@@ -42,6 +44,8 @@ public:
     }
   }
 
+  bool local_end_stream_{};
+
 protected:
   StreamCallbackHelper() {
     // Set space for 8 callbacks (64 bytes).
@@ -49,7 +53,7 @@ protected:
   }
 
   void addCallbacks_(StreamCallbacks& callbacks) {
-    ASSERT(!reset_callbacks_started_);
+    ASSERT(!reset_callbacks_started_ && !local_end_stream_);
     callbacks_.push_back(&callbacks);
     for (uint32_t i = 0; i < high_watermark_callbacks_; ++i) {
       callbacks.onAboveWriteBufferHighWatermark();

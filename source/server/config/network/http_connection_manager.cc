@@ -29,30 +29,58 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-static constexpr char date_provider_singleton_name[] = "date_provider_singleton";
-static Registry::RegisterFactory<Singleton::RegistrationImpl<date_provider_singleton_name>,
-                                 Singleton::Registration>
-    date_provider_singleton_registered_;
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(date_provider);
+SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+namespace {
+
+NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
+    const envoy::api::v2::filter::HttpConnectionManager& http_connection_manager,
+    FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          date_provider_singleton_name, [&context] {
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
             return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
                                                                       context.threadLocal());
           });
 
-  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
-  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
-                                                     http_connection_manager);
-  std::shared_ptr<HttpConnectionManagerConfig> http_config(
-      new HttpConnectionManagerConfig(http_connection_manager, context, *date_provider));
-  return [http_config, &context, date_provider](Network::FilterManager& filter_manager) -> void {
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
+                context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
+                context.threadLocal());
+          });
+
+  std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
+      http_connection_manager, context, *date_provider, *route_config_provider_manager));
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count. Moreover, keep in mind the capture list determines
+  // destruction order.
+  return [route_config_provider_manager, http_config, &context,
+          date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
   };
+}
+
+} // namespace
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
+  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
+                                                     http_connection_manager);
+  return createHttpConnectionManagerFilterFactory(http_connection_manager, context);
+}
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, FactoryContext& context) {
+  return createHttpConnectionManagerFilterFactory(
+      dynamic_cast<const envoy::api::v2::filter::HttpConnectionManager&>(config), context);
 }
 
 /**
@@ -82,21 +110,24 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::api::v2::filter::HttpConnectionManager& config, FactoryContext& context,
-    Http::DateProvider& date_provider)
+    Http::DateProvider& date_provider,
+    Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
+
       date_provider_(date_provider) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
-      context_.initManager(), context_.routeConfigProviderManager());
+      context_.initManager(), route_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::api::v2::filter::HttpConnectionManager::SANITIZE:
@@ -195,23 +226,26 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    Protobuf::util::JsonOptions json_options;
-    ProtobufTypes::String json_config;
-    const auto status =
-        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
-    // This should always succeed unless something crash-worthy such as out-of-memory.
-    RELEASE_ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
-    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
-
+    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
     const HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
     NamedHttpFilterConfigFactory* factory =
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
     if (factory != nullptr) {
-      HttpFilterFactoryCb callback =
-          factory->createFilterFactory(*filter_config, stats_prefix_, context_);
+      HttpFilterFactoryCb callback;
+      if (filter_config->getBoolean("deprecated_v1", false)) {
+        callback = factory->createFilterFactory(*filter_config->getObject("value", true),
+                                                stats_prefix_, context);
+      } else {
+        auto message = factory->createEmptyConfigProto();
+        if (!message) {
+          throw EnvoyException(
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
+        }
+        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        callback = factory->createFilterFactoryFromProto(*message, stats_prefix_, context);
+      }
       filter_factories_.push_back(callback);
     } else {
       // DEPRECATED
@@ -219,7 +253,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       bool found_filter = false;
       for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
         HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config, stats_prefix_, context_.server());
+            type, string_name, *filter_config->getObject("value", true), stats_prefix_,
+            context_.server());
         if (callback) {
           filter_factories_.push_back(callback);
           found_filter = true;
@@ -272,7 +307,7 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
   } else if (type == "encoder") {
     return HttpFilterType::Encoder;
   } else {
-    ASSERT(type == "both");
+    ASSERT(type == "both" || type.empty());
     return HttpFilterType::Both;
   }
 }

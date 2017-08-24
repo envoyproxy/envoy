@@ -37,9 +37,23 @@ public:
 };
 
 /**
+ * Macro used to statically register singletons managed by the singleton manager
+ * defined in envoy/singleton/manager.h. After the NAME has been registered use the
+ * SINGLETON_MANAGER_REGISTERED_NAME macro to access the name registered with the
+ * singleton manager.
+ */
+#define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
+  static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
+  static Registry::RegisterFactory<Singleton::RegistrationImpl<NAME##_singleton_name>,             \
+                                   Singleton::Registration>                                        \
+      NAME##_singleton_registered_;
+
+#define SINGLETON_MANAGER_REGISTERED_NAME(NAME) NAME##_singleton_name
+
+/**
  * Callback function used to create a singleton.
  */
-typedef std::function<InstancePtr()> SingletonFactoryCb;
+typedef std::function<InstanceSharedPtr()> SingletonFactoryCb;
 
 /**
  * A manager for all server-side singletons.
@@ -66,7 +80,7 @@ public:
    *        singletons must store the shared_ptr for as long as the singleton is needed.
    * @return InstancePtr the singleton.
    */
-  virtual InstancePtr get(const std::string& name, SingletonFactoryCb) PURE;
+  virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
 };
 
 typedef std::unique_ptr<Manager> ManagerPtr;

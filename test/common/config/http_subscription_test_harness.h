@@ -64,12 +64,12 @@ public:
                     std::string(request->headers().Path()->value().c_str()));
           std::string expected_request = "{";
           if (!version_.empty()) {
-            expected_request += "\"versionInfo\":\"" + version + "\",";
+            expected_request += "\"version_info\":\"" + version + "\",";
           }
           expected_request += "\"node\":{\"id\":\"fo0\"},";
           if (!cluster_names.empty()) {
             expected_request +=
-                "\"resourceNames\":[\"" + StringUtil::join(cluster_names, "\",\"") + "\"]";
+                "\"resource_names\":[\"" + StringUtil::join(cluster_names, "\",\"") + "\"]";
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
@@ -93,10 +93,10 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
                            bool accept) override {
-    std::string response_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
+    std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
-                       "envoy.api.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
+                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
                        cluster + "\"},";
     }
     response_json.pop_back();

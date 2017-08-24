@@ -52,8 +52,8 @@ template <typename T> static T* remove_const(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
-      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+    : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_sent_(false),
+      remote_end_stream_(false), data_deferred_(false),
       waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false) {
@@ -802,6 +802,9 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
 
   StreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
+  if (connection_.aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   stream->decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);

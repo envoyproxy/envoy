@@ -27,6 +27,7 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::_;
 
 namespace Http {
@@ -40,7 +41,7 @@ public:
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(local_info_.zoneName()));
+    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRefOfCopy(local_info_.zoneName()));
   }
 
   void expectSuccess(uint64_t code) {
@@ -85,9 +86,9 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
@@ -124,9 +125,9 @@ TEST_F(AsyncClientImplTest, Basic) {
       }));
 
   TestHeaderMapImpl copy(message_->headers());
-  copy.addViaCopy("x-envoy-internal", "true");
-  copy.addViaCopy("x-forwarded-for", "127.0.0.1");
-  copy.addViaCopy(":scheme", "http");
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
@@ -476,9 +477,9 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -513,9 +514,9 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -550,9 +551,9 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
@@ -798,9 +799,9 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  headers.addViaCopy("x-envoy-internal", "true");
-  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
-  headers.addViaCopy(":scheme", "http");
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));

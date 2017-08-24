@@ -63,7 +63,6 @@ envoy_cc_library(
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -107,12 +106,14 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/protobuf",
     ],
 )
 

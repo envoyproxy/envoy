@@ -105,6 +105,15 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which hash on the fourth argument
+   */
+  static const std::vector<std::string>& evalCommands() {
+    static const std::vector<std::string>* commands =
+        new std::vector<std::string>{"eval", "evalsha"};
+    return *commands;
+  }
+
+  /**
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const std::vector<std::string>& hashMultipleSumResultCommands() {
@@ -128,8 +137,6 @@ struct SupportedCommands {
     static const std::string* command = new std::string("mset");
     return *command;
   }
-
-  // TODO(danielhochman): support for EVAL with argument enforcement
 };
 
 } // namespace Redis

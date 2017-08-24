@@ -34,15 +34,17 @@ protected:
   ConnPool::Instance& conn_pool_;
 };
 
-/**
- * SimpleRequest hashes the first argument as the key and sends the request to a single Redis.
- */
-class SimpleRequest : public SplitRequest, public ConnPool::PoolCallbacks {
-public:
-  ~SimpleRequest();
+class SplitRequestBase : public SplitRequest {
+protected:
+  static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const RespValue& request);
+};
 
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
-                                SplitCallbacks& callbacks);
+/**
+ * SingleServerRequest is a base class for commands that hash to a single backend.
+ */
+class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
+public:
+  ~SingleServerRequest();
 
   // Redis::ConnPool::PoolCallbacks
   void onResponse(RespValuePtr&& response) override;
@@ -51,14 +53,43 @@ public:
   // Redis::CommandSplitter::SplitRequest
   void cancel() override;
 
-private:
-  SimpleRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
+protected:
+  SingleServerRequest(SplitCallbacks& callbacks) : callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
   ConnPool::PoolRequest* handle_{};
 };
 
-class FragmentedRequest : public SplitRequest {
+/**
+ * SimpleRequest hashes the first argument as the key.
+ */
+class SimpleRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  SimpleRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
+
+/**
+ * EvalRequest hashes the fourth argument as the key.
+ */
+class EvalRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const RespValue& incoming_request,
+                                SplitCallbacks& callbacks);
+
+private:
+  EvalRequest(SplitCallbacks& callbacks) : SingleServerRequest(callbacks) {}
+};
+
+/**
+ * FragmentedRequest is a base class for requests that contains multiple keys. An individual request
+ * is sent to the appropriate server for each key. The responses from all servers are combined and
+ * returned to the client.
+ */
+class FragmentedRequest : public SplitRequestBase {
 public:
   ~FragmentedRequest();
 
@@ -194,6 +225,7 @@ private:
 
   ConnPool::InstancePtr conn_pool_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
+  CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;

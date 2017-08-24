@@ -133,9 +133,6 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Router::ServerRouteConfigProviderManager& routeConfigProviderManager() override {
-    return *route_config_provider_manager_;
-  }
 
 private:
   void flushStats();

@@ -9,12 +9,15 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "common/common/assert.h"
+#include "common/common/macros.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {
@@ -117,11 +120,6 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-
-  /**
-   * @return RouteConfigProviderManager& singleton for use by the entire server.
-   */
-  virtual Router::RouteConfigProviderManager& routeConfigProviderManager() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };
@@ -155,6 +153,25 @@ public:
    */
   virtual NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                      FactoryContext& context) PURE;
+
+  /**
+   * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
+   * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
+   */
+  virtual NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                              FactoryContext& context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    NOT_IMPLEMENTED;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+   *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -202,6 +219,28 @@ public:
   virtual HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
                                                   const std::string& stat_prefix,
                                                   FactoryContext& context) PURE;
+
+  /**
+   * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
+   * may be optionally implemented today, but will in the future become compulsory once v1 is
+   * deprecated.
+   */
+  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const ProtobufWkt::Message& config,
+                                                           const std::string& stat_prefix,
+                                                           FactoryContext& context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(stat_prefix);
+    UNREFERENCED_PARAMETER(context);
+    NOT_IMPLEMENTED;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+   *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter

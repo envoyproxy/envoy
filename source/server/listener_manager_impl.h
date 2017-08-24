@@ -58,6 +58,7 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_create_failure)                                                                 \
   GAUGE  (total_listeners_warming)                                                                 \
   GAUGE  (total_listeners_active)                                                                  \
@@ -222,9 +223,6 @@ public:
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
-  Router::RouteConfigProviderManager& routeConfigProviderManager() override {
-    return parent_.server_.routeConfigProviderManager();
-  }
 
   // Network::DrainDecision
   bool drainClose() const override;
