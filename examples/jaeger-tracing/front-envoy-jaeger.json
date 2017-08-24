@@ -7,7 +7,6 @@
           "type": "read",
           "name": "http_connection_manager",
           "config": {
-            "generate_request_id": true,
             "tracing": {
               "operation_name": "ingress"
             }, 
@@ -44,7 +43,7 @@
       "driver": {
         "type": "zipkin", 
         "config": {
-          "collector_cluster": "zipkin",
+          "collector_cluster": "jaeger",
           "collector_endpoint": "/api/v1/spans"
         }
       }
@@ -69,13 +68,13 @@
         ]
       },
       {
-        "name": "zipkin", 
+        "name": "jaeger",
         "connect_timeout_ms": 1000, 
         "type": "strict_dns", 
         "lb_type": "round_robin", 
         "hosts": [
           {
-            "url": "tcp://zipkin:9411"
+            "url": "tcp://jaeger:9411"
           }
         ]
       } 

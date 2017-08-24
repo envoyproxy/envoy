@@ -7,7 +7,6 @@
           "type": "read",
           "name": "http_connection_manager",
           "config": {
-            "generate_request_id": true,
             "tracing": {
               "operation_name": "ingress"
             }, 
@@ -16,12 +15,13 @@
             "route_config": {
               "virtual_hosts": [
                 {
-                  "name": "backend",
+                  "name": "service2",
                   "domains": ["*"],
                   "routes": [
                     {
+                      "timeout_ms": 0,
                       "prefix": "/",
-                      "cluster": "service1"
+                      "cluster": "local_service"
                     }
                   ]
                 }
@@ -44,7 +44,7 @@
       "driver": {
         "type": "zipkin", 
         "config": {
-          "collector_cluster": "zipkin",
+          "collector_cluster": "jaeger",
           "collector_endpoint": "/api/v1/spans"
         }
       }
@@ -57,25 +57,24 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "service1",
+        "name": "local_service",
         "connect_timeout_ms": 250,
         "type": "strict_dns",
         "lb_type": "round_robin",
-        "features": "http2",
         "hosts": [
           {
-            "url": "tcp://service1:80"
+            "url": "tcp://127.0.0.1:8080"
           }
         ]
       },
       {
-        "name": "zipkin", 
+        "name": "jaeger",
         "connect_timeout_ms": 1000, 
         "type": "strict_dns", 
         "lb_type": "round_robin", 
         "hosts": [
           {
-            "url": "tcp://zipkin:9411"
+            "url": "tcp://jaeger:9411"
           }
         ]
       } 
