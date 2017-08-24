@@ -36,7 +36,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   subscription_->onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled);
+  subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   verifyStats(1, 0, 0, 1);
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
