@@ -81,18 +81,10 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
  */
 class FaultConfig {
 public:
-  virtual ~FaultConfig() {}
+  FaultConfig(const Json::Object& fault_config);
 
-  virtual uint32_t delayPercent() const PURE;
-  virtual uint64_t delayDuration() const PURE;
-};
-
-class FaultConfigImpl : public FaultConfig {
-public:
-  FaultConfigImpl(const Json::Object& fault_config);
-
-  uint32_t delayPercent() const override { return delay_percent_; }
-  uint64_t delayDuration() const override { return duration_ms_; }
+  uint32_t delayPercent() const { return delay_percent_; }
+  uint64_t delayDuration() const { return duration_ms_; }
 
 private:
   const uint32_t delay_percent_;

@@ -53,15 +53,6 @@ public:
   DecoderCallbacks* callbacks_{};
 };
 
-class TestFaultConfig : public FaultConfig {
-public:
-  uint32_t delayPercent() const override { return delay_percent_; }
-  uint64_t delayDuration() const override { return duration_ms_; }
-
-  uint32_t delay_percent_;
-  uint64_t duration_ms_;
-};
-
 class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest() { setup(); }
@@ -86,10 +77,19 @@ public:
   }
 
   void setupDelayFault(uint64_t duration_ms, uint32_t delay_percent, bool enable_fault) {
-    TestFaultConfig* test_config = new TestFaultConfig();
-    test_config->duration_ms_ = duration_ms;
-    test_config->delay_percent_ = delay_percent;
-    fault_config_.reset(test_config);
+    const std::string json_fault_config_template = R"EOF(
+    {{
+      "fixed_delay": {{
+        "percent": {},
+        "duration_ms": {}
+      }}
+    }}
+    )EOF";
+    const std::string json_config =
+        fmt::format(json_fault_config_template, delay_percent, duration_ms);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json_config);
+
+    fault_config_.reset(new FaultConfig(*config));
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.delay.percent", delay_percent))

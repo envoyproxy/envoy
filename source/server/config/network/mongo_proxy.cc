@@ -26,7 +26,7 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
 
   Mongo::FaultConfigSharedPtr fault_config;
   if (config.hasObject("fault")) {
-    fault_config.reset(new Mongo::FaultConfigImpl(*config.getObject("fault")));
+    fault_config.reset(new Mongo::FaultConfig(*config.getObject("fault")));
   }
 
   return [stat_prefix, &context, access_log,
