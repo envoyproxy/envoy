@@ -56,13 +56,21 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
+  std::chrono::microseconds requestReceivedDuration() const override {
+    return request_received_duration_;
+  }
+  void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
+  std::chrono::microseconds responseReceivedDuration() const override {
+    return request_received_duration_;
+  }
+  void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
   Protocol protocol() const override { return protocol_; }
   void protocol(Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
-  std::chrono::milliseconds duration() const override {
-    return std::chrono::milliseconds(duration_);
+  std::chrono::microseconds duration() const override {
+    return std::chrono::microseconds(duration_);
   }
   bool getResponseFlag(ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
@@ -76,10 +84,12 @@ public:
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   SystemTime start_time_;
+  std::chrono::microseconds request_received_duration_{1000};
+  std::chrono::microseconds response_received_duration_{2000};
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};
-  uint64_t duration_{3};
+  uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
 };
@@ -225,7 +235,7 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   log->log(&request_headers_, &response_headers_, request_info_);
 
   request_info_.response_code_.value(200);
-  request_info_.duration_ = 1000000;
+  request_info_.duration_ = 1000000000;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -497,7 +507,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
-  request_info.duration_ = 100;
+  request_info.duration_ = 100000;
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
@@ -505,11 +515,11 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 100000001;
+  request_info.duration_ = 100000001000;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 10;
+  request_info.duration_ = 10000;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 }

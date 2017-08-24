@@ -79,7 +79,8 @@ bool StatusCodeFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
 }
 
 bool DurationFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
-  return compareAgainstValue(info.duration().count());
+  return compareAgainstValue(
+      std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config,
