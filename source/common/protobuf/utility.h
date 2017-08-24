@@ -52,7 +52,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
-    std::string text;
+    ProtobufTypes::String text;
     Protobuf::io::StringOutputStream string_stream(&text);
     Protobuf::io::CodedOutputStream coded_stream(&string_stream);
     coded_stream.SetSerializationDeterministic(true);
