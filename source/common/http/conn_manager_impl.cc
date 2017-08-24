@@ -1019,15 +1019,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
   return true;
 }
 
-uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::connectionId() {
-  return parent_.connectionId();
-}
-
 const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connection() {
   return parent_.connection();
 }
-
-Ssl::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::ssl() { return parent_.ssl(); }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();

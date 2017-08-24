@@ -8,7 +8,7 @@
 #include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
 
-#include "server/configuration_impl.h" // TODO(mattklein123): Remove post 1.4.0
+#include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 
 namespace Envoy {
@@ -16,7 +16,7 @@ namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters, Server::Instance& server,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -57,23 +57,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       }
       ret.push_back(callback);
     } else {
-      // DEPRECATED
-      // This name wasn't found in the named map, so search in the deprecated list registry.
-      bool found_filter = false;
-      for (Configuration::NetworkFilterConfigFactory* config_factory :
-           Configuration::MainImpl::filterConfigFactories()) {
-        Configuration::NetworkFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config->getObject("value", true), server);
-        if (callback) {
-          ret.push_back(callback);
-          found_filter = true;
-          break;
-        }
-      }
-
-      if (!found_filter) {
-        throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
-      }
+      throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
     }
   }
   return ret;
