@@ -158,8 +158,8 @@ public:
       streamError(Status::GrpcStatus::Internal);
       return;
     }
-    const std::string grpc_message = Common::getGrpcMessage(*trailers);
     if (grpc_status.value() != Status::GrpcStatus::Ok) {
+      const std::string grpc_message = Common::getGrpcMessage(*trailers);
       streamError(grpc_status.value(), grpc_message);
       return;
     }
