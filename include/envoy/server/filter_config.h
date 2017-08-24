@@ -231,7 +231,7 @@ public:
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const ProtobufWkt::Message& config,
+  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                            const std::string& stat_prefix,
                                                            FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
