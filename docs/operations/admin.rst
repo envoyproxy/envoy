@@ -97,6 +97,8 @@ modify different aspects of the server.
   that this does not drop any data sent to statsd. It just effects local output of the
   :http:get:`/stats` command.
 
+.. _operations_admin_interface_routes:
+
 .. http:get:: /routes?route_config_name=<name>
 
   This endpoint is only available if envoy has HTTP routes configured via RDS.

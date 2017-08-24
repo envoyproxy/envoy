@@ -7,6 +7,7 @@ Version history
 * macOS is :repo:`now supported </bazel#quick-start-bazel-build-for-developers>`. (A few features
   are missing such as hot restart and original destination routing).
 * YAML is now directly supported for :ref:`config files <config_overview>`.
+* Added :ref:`/routes <operations_admin_interface_routes>` admin endpoint.
 * End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control
   that includes filter buffering is incomplete and will be implemented in 1.5.0.
 * Log verbosity :repo:`compile time flag </bazel#log-verbosity>` added.
