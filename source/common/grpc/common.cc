@@ -71,8 +71,8 @@ Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& traile
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
-  auto entry = trailers.GrpcMessage();
-  return entry ? entry->value().c_str() : "";
+  const auto entry = trailers.GrpcMessage();
+  return entry ? entry->value().c_str() : EMPTY_STRING;
 }
 
 bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
