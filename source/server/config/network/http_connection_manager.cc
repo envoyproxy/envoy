@@ -8,6 +8,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -50,7 +51,7 @@ NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal());
+                context.threadLocal(), context.admin());
           });
 
   std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
@@ -226,7 +227,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
     const HttpFilterType type = stringToType(string_type);
 
     // Now see if there is a factory that will accept the config.
@@ -234,7 +235,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
     if (factory != nullptr) {
       HttpFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecatedV1", false)) {
+      if (filter_config->getBoolean("deprecated_v1", false)) {
         callback = factory->createFilterFactory(*filter_config->getObject("value", true),
                                                 stats_prefix_, context);
       } else {

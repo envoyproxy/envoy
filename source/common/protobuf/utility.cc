@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
 
@@ -22,6 +23,14 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
   const std::string contents = Filesystem::fileReadToEnd(path);
+  // If the filename ends with .pb, do a best-effort attempt to parse it as a proto.
+  if (StringUtil::endsWith(path, ".pb")) {
+    // Attempt to parse the binary format.
+    if (message.ParseFromString(contents)) {
+      return;
+    }
+    throw EnvoyException("Unable to parse proto " + path);
+  }
   if (StringUtil::endsWith(path, ".yaml")) {
     const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();
     loadFromJson(json, message);
@@ -30,13 +39,17 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
-Json::ObjectSharedPtr WktUtil::getJsonObjectFromStruct(const Protobuf::Struct& message) {
-  Protobuf::util::JsonOptions json_options;
+std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message) {
+  Protobuf::util::JsonPrintOptions json_options;
+  // By default, proto field names are converted to camelCase when the message is converted to JSON.
+  // Setting this option makes debugging easier because it keeps field names consistent in JSON
+  // printouts.
+  json_options.preserve_proto_field_names = true;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok());
-  return Json::Factory::loadFromString(json);
+  return json;
 }
 
 } // namespace Envoy

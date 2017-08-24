@@ -5,6 +5,16 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 envoy_package()
 
 envoy_cc_library(
+    name = "admin_lib",
+    srcs = ["admin.cc"],
+    hdrs = ["admin.h"],
+    deps = [
+        "//include/envoy/server:admin_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "api_lib",
     srcs = ["api.cc"],
     hdrs = ["api.h"],
@@ -65,6 +75,7 @@ envoy_cc_library(
     hdrs = ["server.h"],
     external_deps = ["envoy_bootstrap"],
     deps = [
+        ":admin_lib",
         ":api_lib",
         ":cluster_manager_lib",
         ":dns_lib",

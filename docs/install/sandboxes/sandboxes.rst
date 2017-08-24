@@ -12,5 +12,6 @@ different features. The following sandboxes are available:
 
   front_proxy
   zipkin_tracing
+  jaeger_tracing
   grpc_bridge
   local_docker_build

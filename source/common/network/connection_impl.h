@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optional.h"
 #include "envoy/network/connection.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -34,6 +35,15 @@ public:
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,
                                 Stats::Counter& stat_total, Stats::Gauge& stat_current);
+
+  /**
+   * Creates a network socket, optionally bound to a specific address
+   * @param peer_address supplies the address of the peer.
+   * @param source_address supplies an optional local address to bind to.
+   * @return int the file descriptor or -1 on error.
+   */
+  static int createSocket(Address::InstanceConstSharedPtr peer_address,
+                          Address::InstanceConstSharedPtr source_address);
 };
 
 /**
@@ -158,7 +168,9 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
+                       Address::InstanceConstSharedPtr remote_address,
+                       const Address::InstanceConstSharedPtr source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

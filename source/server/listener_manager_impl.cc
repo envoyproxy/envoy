@@ -25,7 +25,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     const auto& proto_config = filters[i].config();
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
     // Map filter type string to enum.
     Configuration::NetworkFilterType type;
@@ -44,7 +44,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
             string_name);
     if (factory != nullptr) {
       Configuration::NetworkFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecatedV1", false)) {
+      if (filter_config->getBoolean("deprecated_v1", false)) {
         callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
       } else {
         auto message = factory->createEmptyConfigProto();

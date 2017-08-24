@@ -1,10 +1,10 @@
-versionInfo: "0"
+version_info: "0"
 resources:
 - "@type": type.googleapis.com/envoy.api.v2.Cluster
   name: cluster_1
-  connectTimeout: { seconds: 5 }
+  connect_timeout: { seconds: 5 }
   type: EDS
-  edsClusterConfig:
-    edsConfig: { path: {{ eds_json_path }} }
-  lbPolicy: ROUND_ROBIN
-  http2ProtocolOptions: {}
+  eds_cluster_config:
+    eds_config: { path: {{ eds_json_path }} }
+  lb_policy: ROUND_ROBIN
+  http2_protocol_options: {}

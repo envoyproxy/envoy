@@ -27,6 +27,17 @@ TEST(GrpcCommonTest, getGrpcStatus) {
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 }
 
+TEST(GrpcCommonTest, getGrpcMessage) {
+  Http::TestHeaderMapImpl empty_trailers;
+  EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
+
+  Http::TestHeaderMapImpl error_trailers{{"grpc-message", "Some error"}};
+  EXPECT_EQ("Some error", Common::getGrpcMessage(error_trailers));
+
+  Http::TestHeaderMapImpl empty_error_trailers{{"grpc-message", ""}};
+  EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
+}
+
 TEST(GrpcCommonTest, chargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
   Common::chargeStat(cluster, "service", "method", true);

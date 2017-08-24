@@ -73,10 +73,12 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   if (alpn) {
     return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_, address);
+        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_, address,
+        Network::Address::InstanceConstSharedPtr());
   } else {
     return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_, address);
+        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_, address,
+        Network::Address::InstanceConstSharedPtr());
   }
 }
 

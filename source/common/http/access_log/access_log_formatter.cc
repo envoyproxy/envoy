@@ -231,6 +231,18 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo& request_info) {
       return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
     };
+  } else if (field_name == "REQUEST_DURATION") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                request_info.requestReceivedDuration())
+                                .count());
+    };
+  } else if (field_name == "RESPONSE_DURATION") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                request_info.responseReceivedDuration())
+                                .count());
+    };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.bytesReceived());
@@ -251,7 +263,8 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return std::to_string(request_info.duration().count());
+      return std::to_string(
+          std::chrono::duration_cast<std::chrono::milliseconds>(request_info.duration()).count());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo& request_info) {

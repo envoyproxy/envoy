@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/rest_api_fetcher.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "api/base.pb.h"
 #include "google/api/annotations.pb.h"
@@ -63,14 +64,9 @@ public:
   void createRequest(Http::Message& request) override {
     ENVOY_LOG(debug, "Sending REST request for {}", path_);
     stats_.update_attempt_.inc();
-    Protobuf::util::JsonOptions json_options;
-    ProtobufTypes::String request_json;
-    const auto status = Protobuf::util::MessageToJsonString(request_, &request_json, json_options);
-    // If the status isn't OK, we just send an empty body.
-    ASSERT(status.ok());
     request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
-    request.body().reset(new Buffer::OwnedImpl(request_json));
+    request.body().reset(new Buffer::OwnedImpl(MessageUtil::getJsonStringFromMessage(request_)));
   }
 
   void parseResponse(const Http::Message& response) override {
