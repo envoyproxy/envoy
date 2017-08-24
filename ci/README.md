@@ -92,4 +92,4 @@ The final call will run against your local copy of the build image.
 
 The MacOS builds are hosted on [CircleCI](https://circleci.com/gh/turbinelabs/envoy) and managed by [TurbineLabs](https://turbinelabs.io/), whom did the initial MacOS port. In order to make possible this integration without granting full repo control, a custom webhook handles arbitrating PR events that in turn initiate builds on CircleCI.
 
-[MacOS flow](macosflow.png)
+![MacOS flow](macosflow.png)
