@@ -121,10 +121,6 @@ void XfccIntegrationTest::startTestServerWithXfccConfig(std::string fcc, std::st
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientConnectionPtr&& conn,
                                                                std::string previous_xfcc,
                                                                std::string expected_xfcc) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr upstream_request;
   Http::TestHeaderMapImpl header_map;
   if (previous_xfcc.empty()) {
     header_map = Http::TestHeaderMapImpl{{":method", "GET"},
@@ -141,33 +137,33 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientCo
 
   executeActions(
       {[&]() -> void {
-         codec_client = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
+         codec_client_ = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
        },
-       [&]() -> void { codec_client->makeHeaderOnlyRequest(header_map, *response); },
+       [&]() -> void { codec_client_->makeHeaderOnlyRequest(header_map, *response_); },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { upstream_request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { upstream_request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
          if (expected_xfcc.empty()) {
-           EXPECT_EQ(nullptr, upstream_request->headers().ForwardedClientCert());
+           EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
          } else {
            EXPECT_STREQ(expected_xfcc.c_str(),
-                        upstream_request->headers().ForwardedClientCert()->value().c_str());
+                        upstream_request_->headers().ForwardedClientCert()->value().c_str());
          }
-         upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
        },
        [&]() -> void {
-         response->waitForEndStream();
-         EXPECT_TRUE(upstream_request->complete());
+         response_->waitForEndStream();
+         EXPECT_TRUE(upstream_request_->complete());
        },
 
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
-  EXPECT_TRUE(response->complete());
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+  EXPECT_TRUE(response_->complete());
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,

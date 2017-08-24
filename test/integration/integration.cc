@@ -359,12 +359,8 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
                                                                uint64_t request_size,
                                                                uint64_t response_size,
                                                                bool big_header) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
        [&]() -> void {
          Http::TestHeaderMapImpl headers{
              {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
@@ -373,59 +369,55 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
            headers.addCopy("big", std::string(4096, 'a'));
          }
 
-         codec_client->makeRequestWithBody(headers, request_size, *response);
+         codec_client_->makeRequestWithBody(headers, request_size, *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         request->encodeData(response_size, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(response_size, true);
        },
-       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { response_->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(request->complete());
-  EXPECT_EQ(request_size, request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(response_size, response->body().size());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(response_size, response_->body().size());
 }
 
 void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, bool close_upstream) {
 
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
        [&]() -> void {
-         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                     {":path", "/test/long/url"},
-                                                                     {":scheme", "http"},
-                                                                     {":authority", "host"},
-                                                                     {"x-lyft-user-id", "123"}},
-                                             *response);
+         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                      {":path", "/test/long/url"},
+                                                                      {":scheme", "http"},
+                                                                      {":authority", "host"},
+                                                                      {"x-lyft-user-id", "123"}},
+                                              *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
        },
-       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { response_->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); }});
+       [&]() -> void { codec_client_->close(); }});
 
   // The following allows us to test shutting down the server with active connection pool
   // connections. Either way we need to clean up the upstream connections to avoid race conditions.
@@ -433,15 +425,15 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     test_server_.reset();
   }
 
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect();
+  fake_upstream_connection_->close();
+  fake_upstream_connection_->waitForDisconnect();
 
-  EXPECT_TRUE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(0U, response->body().size());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(0U, response_->body().size());
 }
 
 void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
@@ -470,24 +462,22 @@ void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
 void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
   test_server_->drainManager().draining_ = true;
 
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
-                    codec_client->makeHeaderOnlyRequest(
+                    codec_client_->makeHeaderOnlyRequest(
                         Http::TestHeaderMapImpl{{":method", "GET"},
                                                 {":path", "/healthcheck"},
                                                 {":scheme", "http"},
                                                 {":authority", "host"}},
-                        *response);
+                        *response_);
                   },
-                  [&]() -> void { response->waitForEndStream(); },
-                  [&]() -> void { codec_client->waitForDisconnect(); }});
+                  [&]() -> void { response_->waitForEndStream(); },
+                  [&]() -> void { codec_client_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   if (type == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client->sawGoAway());
+    EXPECT_TRUE(codec_client_->sawGoAway());
   }
 
   test_server_->drainManager().draining_ = false;
@@ -495,401 +485,368 @@ void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
 
 void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
       [&]() -> void {
-        codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                           {":path", "/test/long/url"},
-                                                           {":scheme", "http"},
-                                                           {":authority", "host"}},
-                                   *response);
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                            {":path", "/test/long/url"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"}},
+                                    *response_);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForHeadersComplete(); },
-      [&]() -> void { fake_upstream_connection->close(); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-      [&]() -> void { response->waitForEndStream(); }};
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+      [&]() -> void { upstream_request_->waitForHeadersComplete(); },
+      [&]() -> void { fake_upstream_connection_->close(); },
+      [&]() -> void { fake_upstream_connection_->waitForDisconnect(); },
+      [&]() -> void { response_->waitForEndStream(); }};
 
   if (type == Http::CodecClient::Type::HTTP1) {
-    actions.push_back([&]() -> void { codec_client->waitForDisconnect(); });
+    actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { codec_client->close(); });
+    actions.push_back([&]() -> void { codec_client_->close(); });
   }
 
   executeActions(actions);
 
-  EXPECT_FALSE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers", response->body());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+  EXPECT_EQ("upstream connect error or disconnect/reset before headers", response_->body());
 }
 
 void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
       [&]() -> void {
-        codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"}},
-                                            *response);
+        codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                     {":path", "/test/long/url"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"}},
+                                             *response_);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForEndStream(*dispatcher_); },
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+      [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
       [&]() -> void {
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+        upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
       },
-      [&]() -> void { fake_upstream_connection->close(); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); }};
+      [&]() -> void { fake_upstream_connection_->close(); },
+      [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }};
 
   if (type == Http::CodecClient::Type::HTTP1) {
-    actions.push_back([&]() -> void { codec_client->waitForDisconnect(); });
+    actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { response->waitForReset(); });
-    actions.push_back([&]() -> void { codec_client->close(); });
+    actions.push_back([&]() -> void { response_->waitForReset(); });
+    actions.push_back([&]() -> void { codec_client_->close(); });
   }
 
   executeActions(actions);
 
-  EXPECT_TRUE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(0U, response->body().size());
+  EXPECT_FALSE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(0U, response_->body().size());
 }
 
 void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
       [&]() -> void {
-        codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                           {":path", "/test/long/url"},
-                                                           {":scheme", "http"},
-                                                           {":authority", "host"}},
-                                   *response);
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                            {":path", "/test/long/url"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"}},
+                                    *response_);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForHeadersComplete(); },
-      [&]() -> void { codec_client->close(); }};
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+      [&]() -> void { upstream_request_->waitForHeadersComplete(); },
+      [&]() -> void { codec_client_->close(); }};
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { request->waitForReset(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->close(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { upstream_request_->waitForReset(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->close(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   }
 
   executeActions(actions);
 
-  EXPECT_FALSE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_FALSE(response->complete());
+  EXPECT_FALSE(response_->complete());
 }
 
 void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
       [&]() -> void {
-        codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"}},
-                                            *response);
+        codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                     {":path", "/test/long/url"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"}},
+                                             *response_);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForEndStream(*dispatcher_); },
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+      [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
       [&]() -> void {
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-        request->encodeData(512, false);
+        upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+        upstream_request_->encodeData(512, false);
       },
-      [&]() -> void { response->waitForBodyData(512); },
-      [&]() -> void { codec_client->close(); }};
+      [&]() -> void { response_->waitForBodyData(512); },
+      [&]() -> void { codec_client_->close(); }};
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { request->waitForReset(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->close(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { upstream_request_->waitForReset(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->close(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   }
 
   executeActions(actions);
 
-  EXPECT_TRUE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(512U, response->body().size());
+  EXPECT_FALSE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response_->body().size());
 }
 
 void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
       [&]() -> void {
-        codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                           {":path", "/test/long/url"},
-                                                           {":scheme", "http"},
-                                                           {":authority", "host"}},
-                                   *response);
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                            {":path", "/test/long/url"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"}},
+                                    *response_);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-      [&]() -> void { request->waitForHeadersComplete(); },
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+      [&]() -> void { upstream_request_->waitForHeadersComplete(); },
       [&]() -> void {
-        request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-        request->encodeData(512, true);
+        upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+        upstream_request_->encodeData(512, true);
       },
-      [&]() -> void { response->waitForEndStream(); }};
+      [&]() -> void { response_->waitForEndStream(); }};
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { request->waitForReset(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->close(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { upstream_request_->waitForReset(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->close(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   }
 
   if (type == Http::CodecClient::Type::HTTP1) {
-    actions.push_back([&]() -> void { codec_client->waitForDisconnect(); });
+    actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { codec_client->close(); });
+    actions.push_back([&]() -> void { codec_client_->close(); });
   }
 
   executeActions(actions);
 
-  EXPECT_FALSE(request->complete());
-  EXPECT_EQ(0U, request->bodyLength());
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(512U, response->body().size());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response_->body().size());
 }
 
 void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
        [&]() -> void {
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/test/long/url"},
-                                                                   {":scheme", "http"},
-                                                                   {":authority", "host"},
-                                                                   {"x-forwarded-for", "10.0.0.1"},
-                                                                   {"x-envoy-retry-on", "5xx"}},
-                                           1024, *response);
+         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                    {":path", "/test/long/url"},
+                                                                    {":scheme", "http"},
+                                                                    {":authority", "host"},
+                                                                    {"x-forwarded-for", "10.0.0.1"},
+                                                                    {"x-envoy-retry-on", "5xx"}},
+                                            1024, *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
        },
        [&]() -> void {
          if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-           fake_upstream_connection->waitForDisconnect();
-           fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+           fake_upstream_connection_->waitForDisconnect();
+           fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
          } else {
-           request->waitForReset();
+           upstream_request_->waitForReset();
          }
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         request->encodeData(512, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(512, true);
        },
        [&]() -> void {
-         response->waitForEndStream();
-         EXPECT_TRUE(request->complete());
-         EXPECT_EQ(1024U, request->bodyLength());
+         response_->waitForEndStream();
+         EXPECT_TRUE(upstream_request_->complete());
+         EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
-         EXPECT_TRUE(response->complete());
-         EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-         EXPECT_EQ(512U, response->body().size());
+         EXPECT_TRUE(response_->complete());
+         EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+         EXPECT_EQ(512U, response_->body().size());
        },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
 void BaseIntegrationTest::testGrpcRetry() {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"grpc-status", "0"}};
   executeActions(
       {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
        },
        [&]() -> void {
-         Http::StreamEncoder* request_encoder;
-         request_encoder = &codec_client->startRequest(
+         request_encoder_ = &codec_client_->startRequest(
              Http::TestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-grpc-on", "cancelled"}},
-             *response);
-         codec_client->sendData(*request_encoder, 1024, true);
+             *response_);
+         codec_client_->sendData(*request_encoder_, 1024, true);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}},
-                                false);
+         upstream_request_->encodeHeaders(
+             Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}}, false);
        },
        [&]() -> void {
          if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-           fake_upstream_connection->waitForDisconnect();
-           fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+           fake_upstream_connection_->waitForDisconnect();
+           fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
          } else {
-           request->waitForReset();
+           upstream_request_->waitForReset();
          }
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         request->encodeData(512,
-                             fake_upstreams_[0]->httpType() != FakeHttpConnection::Type::HTTP2);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(512, fake_upstreams_[0]->httpType() !=
+                                                FakeHttpConnection::Type::HTTP2);
          if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-           request->encodeTrailers(response_trailers);
+           upstream_request_->encodeTrailers(response_trailers);
          }
        },
        [&]() -> void {
-         response->waitForEndStream();
-         EXPECT_TRUE(request->complete());
-         EXPECT_EQ(1024U, request->bodyLength());
+         response_->waitForEndStream();
+         EXPECT_TRUE(upstream_request_->complete());
+         EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
-         EXPECT_TRUE(response->complete());
-         EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-         EXPECT_EQ(512U, response->body().size());
+         EXPECT_TRUE(response_->complete());
+         EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+         EXPECT_EQ(512U, response_->body().size());
          if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-           EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+           EXPECT_THAT(*response_->trailers(), HeaderMapEqualRef(&response_trailers));
          }
        },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
 void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
        // Request 1.
        [&]() -> void {
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/test/long/url"},
-                                                                   {":scheme", "http"},
-                                                                   {":authority", "host"}},
-                                           1024, *response);
+         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                    {":path", "/test/long/url"},
+                                                                    {":scheme", "http"},
+                                                                    {":authority", "host"}},
+                                            1024, *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         request->encodeData(512, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(512, true);
        },
        [&]() -> void {
-         response->waitForEndStream();
-         EXPECT_TRUE(request->complete());
-         EXPECT_EQ(1024U, request->bodyLength());
+         response_->waitForEndStream();
+         EXPECT_TRUE(upstream_request_->complete());
+         EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
-         EXPECT_TRUE(response->complete());
-         EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-         EXPECT_EQ(512U, response->body().size());
+         EXPECT_TRUE(response_->complete());
+         EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+         EXPECT_EQ(512U, response_->body().size());
        },
        // Request 2.
        [&]() -> void {
-         response.reset(new IntegrationStreamDecoder(*dispatcher_));
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/test/long/url"},
-                                                                   {":scheme", "http"},
-                                                                   {":authority", "host"}},
-                                           512, *response);
+         response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                    {":path", "/test/long/url"},
+                                                                    {":scheme", "http"},
+                                                                    {":authority", "host"}},
+                                            512, *response_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         request->encodeData(1024, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(1024, true);
        },
        [&]() -> void {
-         response->waitForEndStream();
-         EXPECT_TRUE(request->complete());
-         EXPECT_EQ(512U, request->bodyLength());
+         response_->waitForEndStream();
+         EXPECT_TRUE(upstream_request_->complete());
+         EXPECT_EQ(512U, upstream_request_->bodyLength());
 
-         EXPECT_TRUE(response->complete());
-         EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-         EXPECT_EQ(1024U, response->body().size());
+         EXPECT_TRUE(response_->complete());
+         EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+         EXPECT_EQ(1024U, response_->body().size());
        },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
@@ -1058,93 +1015,85 @@ void BaseIntegrationTest::testBadPath() {
 }
 
 void BaseIntegrationTest::testValidZeroLengthContent(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeHttpConnectionPtr fake_upstream_connection;
-  FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
        [&]() -> void {
-         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                     {":path", "/test/long/url"},
-                                                                     {":scheme", "http"},
-                                                                     {":authority", "host"},
-                                                                     {"content-length", "0"}},
-                                             *response);
+         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                      {":path", "/test/long/url"},
+                                                                      {":scheme", "http"},
+                                                                      {":authority", "host"},
+                                                                      {"content-length", "0"}},
+                                              *response_);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
        },
-       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { response_->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "-1"}},
-                                               *response);
+                    codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":authority", "host"},
+                                                                        {"content-length", "-1"}},
+                                                *response_);
                   },
                   [&]() -> void {
                     if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
+                      codec_client_->waitForDisconnect();
                     } else {
-                      response->waitForReset();
-                      codec_client->close();
+                      response_->waitForReset();
+                      codec_client_->close();
                     }
                   }});
 
   if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+    ASSERT_TRUE(response_->complete());
+    EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    ASSERT_TRUE(response_->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response_->reset_reason());
   }
 }
 
 void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type type) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"},
-                                                                       {"content-length", "3,2"}},
-                                               *response);
+                    codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":authority", "host"},
+                                                                        {"content-length", "3,2"}},
+                                                *response_);
                   },
                   [&]() -> void {
                     if (type == Http::CodecClient::Type::HTTP1) {
-                      codec_client->waitForDisconnect();
+                      codec_client_->waitForDisconnect();
                     } else {
-                      response->waitForReset();
-                      codec_client->close();
+                      response_->waitForReset();
+                      codec_client_->close();
                     }
                   }});
 
   if (type == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+    ASSERT_TRUE(response_->complete());
+    EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    ASSERT_TRUE(response_->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response_->reset_reason());
   }
 }
 
@@ -1153,32 +1102,28 @@ void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   big_headers.addCopy("big", std::string(60 * 1024, 'a'));
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
                     std::string long_value(7500, 'x');
-                    codec_client->startRequest(big_headers, *response);
+                    codec_client_->startRequest(big_headers, *response_);
                   },
-                  [&]() -> void { codec_client->waitForDisconnect(); }});
+                  [&]() -> void { codec_client_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("431", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("431", response_->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testUpstreamProtocolError() {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeRawConnectionPtr fake_upstream_connection;
   executeActions(
       {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
        },
        [&]() -> void {
-         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                            {":path", "/test/long/url"},
-                                                            {":authority", "host"}},
-                                    *response);
+         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":authority", "host"}},
+                                     *response_);
        },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
        // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
@@ -1186,118 +1131,108 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
        [&]() -> void { fake_upstream_connection->waitForData(187); },
        [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-       [&]() -> void { codec_client->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
 }
 
 void BaseIntegrationTest::testDownstreamResetBeforeResponseComplete() {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  Http::StreamEncoder* downstream_request{};
-  FakeStreamPtr upstream_request;
   std::list<std::function<void()>> actions = {
       [&]() -> void {
-        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+        codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
       [&]() -> void {
-        downstream_request =
-            &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                {":path", "/test/long/url"},
-                                                                {":scheme", "http"},
-                                                                {":authority", "host"},
-                                                                {"cookie", "a=b"},
-                                                                {"cookie", "c=d"}},
-                                        *response);
-        codec_client->sendData(*downstream_request, 0, true);
+        request_encoder_ =
+            &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"cookie", "a=b"},
+                                                                 {"cookie", "c=d"}},
+                                         *response_);
+        codec_client_->sendData(*request_encoder_, 0, true);
       },
       [&]() -> void {
-        fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+        fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
       },
-      [&]() -> void { upstream_request = fake_upstream_connection->waitForNewStream(); },
+      [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
       [&]() -> void {
-        upstream_request->waitForEndStream(*dispatcher_);
-        EXPECT_EQ(upstream_request->headers().get(Http::Headers::get().Cookie)->value(),
+        upstream_request_->waitForEndStream(*dispatcher_);
+        EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)->value(),
                   "a=b; c=d");
       },
       [&]() -> void {
-        upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-        upstream_request->encodeData(512, false);
+        upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+        upstream_request_->encodeData(512, false);
       },
-      [&]() -> void { response->waitForBodyData(512); },
-      [&]() -> void { codec_client->sendReset(*downstream_request); }};
+      [&]() -> void { response_->waitForBodyData(512); },
+      [&]() -> void { codec_client_->sendReset(*request_encoder_); }};
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   } else {
-    actions.push_back([&]() -> void { upstream_request->waitForReset(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->close(); });
-    actions.push_back([&]() -> void { fake_upstream_connection->waitForDisconnect(); });
+    actions.push_back([&]() -> void { upstream_request_->waitForReset(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->close(); });
+    actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   }
 
-  actions.push_back([&]() -> void { codec_client->close(); });
+  actions.push_back([&]() -> void { codec_client_->close(); });
   executeActions(actions);
 
-  EXPECT_TRUE(upstream_request->complete());
-  EXPECT_EQ(0U, upstream_request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
 
-  EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(512U, response->body().size());
+  EXPECT_FALSE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response_->body().size());
 }
 
 void BaseIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  Http::StreamEncoder* request_encoder;
-  FakeStreamPtr upstream_request;
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
   executeActions(
       {[&]() -> void {
-         codec_client =
+         codec_client_ =
              makeHttpConnection(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP2);
        },
        [&]() -> void {
-         request_encoder =
-             &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         *response);
-         codec_client->sendData(*request_encoder, request_size, false);
-         codec_client->sendTrailers(*request_encoder, request_trailers);
+         request_encoder_ =
+             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                  {":path", "/test/long/url"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "host"}},
+                                          *response_);
+         codec_client_->sendData(*request_encoder_, request_size, false);
+         codec_client_->sendTrailers(*request_encoder_, request_trailers);
        },
        [&]() -> void {
-         fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
-       [&]() -> void { upstream_request = fake_upstream_connection->waitForNewStream(); },
-       [&]() -> void { upstream_request->waitForEndStream(*dispatcher_); },
+       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
        [&]() -> void {
-         upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request->encodeData(response_size, false);
-         upstream_request->encodeTrailers(response_trailers);
+         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+         upstream_request_->encodeData(response_size, false);
+         upstream_request_->encodeTrailers(response_trailers);
        },
-       [&]() -> void { response->waitForEndStream(); },
+       [&]() -> void { response_->waitForEndStream(); },
        // Cleanup both downstream and upstream
-       [&]() -> void { codec_client->close(); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+       [&]() -> void { codec_client_->close(); },
+       [&]() -> void { fake_upstream_connection_->close(); },
+       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(upstream_request->complete());
-  EXPECT_EQ(request_size, upstream_request->bodyLength());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_THAT(*upstream_request->trailers(), HeaderMapEqualRef(&request_trailers));
+    EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
   }
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_EQ(response_size, response->body().size());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(response_size, response_->body().size());
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+    EXPECT_THAT(*response_->trailers(), HeaderMapEqualRef(&response_trailers));
   }
 }
 } // namespace Envoy
