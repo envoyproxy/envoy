@@ -38,7 +38,7 @@ TEST_F(ZlibCompressorImplTest, CompressDataWithGzipEnconding) {
   ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init());
-  EXPECT_EQ(true, compressor.start(in, out));
+  EXPECT_EQ(true, compressor.compress(in, out));
   EXPECT_EQ(200, compressor.getTotalIn());
   EXPECT_EQ(out.length(), compressor.getTotalOut());
   EXPECT_EQ(0, in.length());
@@ -77,7 +77,7 @@ TEST_F(ZlibCompressorImplTest, CompressDataPassingEmptyBuffer) {
   ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init());
-  EXPECT_EQ(true, compressor.start(in, out));
+  EXPECT_EQ(true, compressor.compress(in, out));
   EXPECT_EQ(0, compressor.getTotalIn());
   EXPECT_EQ(0, compressor.getTotalOut());
   EXPECT_EQ(0, out.length());

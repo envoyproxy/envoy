@@ -35,7 +35,7 @@ bool ZlibCompressorImpl::finish() {
   return result != Z_STREAM_ERROR;
 }
 
-bool ZlibCompressorImpl::start(Buffer::Instance& in, Buffer::Instance& out) {
+bool ZlibCompressorImpl::compress(Buffer::Instance& in, Buffer::Instance& out) {
   if (!in.length()) {
     return true;
   }
@@ -66,6 +66,11 @@ bool ZlibCompressorImpl::start(Buffer::Instance& in, Buffer::Instance& out) {
   out_slice.len_ = out_slice.len_ - ZlibPtr_->avail_out;
   out.commit(&out_slice, 1);
 
+  return true;
+}
+
+bool ZlibCompressorImpl::decompress(Buffer::Instance&, Buffer::Instance&) {
+  NOT_IMPLEMENTED;
   return true;
 }
 

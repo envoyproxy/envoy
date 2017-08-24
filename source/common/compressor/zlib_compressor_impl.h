@@ -2,6 +2,8 @@
 
 #include "envoy/compressor/compressor.h"
 
+#include "common/common/assert.h"
+
 #include "zlib.h"
 
 namespace Envoy {
@@ -88,7 +90,13 @@ public:
    * Move and encode data from one buffer into another
    * @return true if compression succeeded or false otherwise.
    */
-  bool start(Buffer::Instance& in, Buffer::Instance& out) override;
+  bool compress(Buffer::Instance& in, Buffer::Instance& out) override;
+
+  /**
+   * Move and decode data from one buffer into another
+   * @return true if decompression succeeded or false otherwise.
+   */
+  bool decompress(Buffer::Instance& in, Buffer::Instance& out) override;
 
 private:
   std::unique_ptr<z_stream> ZlibPtr_{nullptr};
