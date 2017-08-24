@@ -34,28 +34,28 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
   request_headers_ = &headers;
   dumpHeaders("decodeHeaders", request_headers_);
 
-  MessagePtr request(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
+  MessagePtr reqmsg(new RequestMessageImpl(HeaderMapPtr{new HeaderMapImpl(headers)}));
 
   if (!config_->path_prefix_.empty()) {
-    std::string path = request->headers().insertPath().value().c_str();
+    std::string path = reqmsg->headers().insertPath().value().c_str();
 
     path = config_->path_prefix_ + path;
 
-    request->headers().insertPath().value(path);
+    reqmsg->headers().insertPath().value(path);
   }
 
-  // request->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
-  // request->headers().insertPath().value(std::string("/ambassador/auth"));
-  request->headers().insertHost().value(config_->cluster_); // cluster name is Host: header value!
-  request->headers().insertContentLength().value(uint64_t(0));
+  // reqmsg->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
+  // reqmsg->headers().insertPath().value(std::string("/ambassador/auth"));
+  reqmsg->headers().insertHost().value(config_->cluster_); // cluster name is Host: header value!
+  reqmsg->headers().insertContentLength().value(uint64_t(0));
 
-  request->headers().addReference(header_to_add, value_to_add.get());
+  reqmsg->headers().addReference(header_to_add, value_to_add.get());
 
   log().info("ExtAuth contacting auth server");
-  // request->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
+  // reqmsg->body() = Buffer::InstancePtr(new Buffer::OwnedImpl(request_body));
   auth_request_ =
       config_->cm_.httpAsyncClientForCluster(config_->cluster_)
-          .send(std::move(request), *this, Optional<std::chrono::milliseconds>(config_->timeout_));
+          .send(std::move(reqmsg), *this, Optional<std::chrono::milliseconds>(config_->timeout_));
   // .send(...) -> onSuccess(...) or onFailure(...)
   // This handle can be used to ->cancel() the request.
 
