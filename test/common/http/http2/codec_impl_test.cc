@@ -418,10 +418,20 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   request_encoder_->getStream().addCallbacks(callbacks2);
 
+  // Add a third callback to make testing removal mid-watermark call below more interesting.
+  MockStreamCallbacks callbacks3;
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  request_encoder_->getStream().addCallbacks(callbacks3);
+
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
+  // and ensure it is not called.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
+    request_encoder_->getStream().removeCallbacks(callbacks2);
+  }));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_.getStream(1)->readDisable(false);
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the

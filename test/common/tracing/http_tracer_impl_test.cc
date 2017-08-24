@@ -236,11 +236,14 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
 TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
+  const std::string path_prefix = "http://";
   const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}};
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                          {"x-envoy-original-path", path},
+                                          {":method", "GET"},
+                                          {"x-forwarded-proto", "http"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   Http::Protocol protocol = Http::Protocol::Http2;
@@ -251,7 +254,9 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
+  EXPECT_CALL(*span, setTag("http.url", path_prefix + expected_path));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/2"));
   NiceMock<MockConfig> config;
 
   HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
@@ -268,7 +273,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
-  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -292,7 +297,7 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   EXPECT_CALL(request_info, upstreamHost()).Times(2);
 
   EXPECT_CALL(*span, setTag("upstream_cluster", "my_upstream_cluster"));
-  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -306,8 +311,10 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
 TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                          {":path", "/test"},
+                                          {":method", "GET"},
+                                          {"x-forwarded-proto", "https"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
   Http::Protocol protocol = Http::Protocol::Http10;
@@ -317,9 +324,10 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
-  EXPECT_CALL(*span, setTag("host_header", "-"));
+  EXPECT_CALL(*span, setTag("http.url", "https:///test"));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/1.0"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
 
@@ -328,7 +336,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
-  EXPECT_CALL(*span, setTag("response_code", "0"));
+  EXPECT_CALL(*span, setTag("http.status_code", "0"));
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
@@ -342,25 +350,28 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
 TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                          {":path", "/test"},
+                                          {":method", "GET"},
+                                          {"x-forwarded-proto", "http"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  Http::Protocol protocol = Http::Protocol::Http10;
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
 
   request_headers.insertHost().value(std::string("api"));
   request_headers.insertUserAgent().value(std::string("agent"));
   request_headers.insertEnvoyDownstreamServiceCluster().value(std::string("downstream_cluster"));
   request_headers.insertClientTraceId().value(std::string("client_trace_id"));
 
+  Http::Protocol protocol = Http::Protocol::Http10;
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
-  EXPECT_CALL(*span, setTag("host_header", "api"));
+  EXPECT_CALL(*span, setTag("http.url", "http://api/test"));
+  EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("user_agent", "agent"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/1.0"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "downstream_cluster"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
@@ -385,7 +396,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag("error", "true"));
-  EXPECT_CALL(*span, setTag("response_code", "503"));
+  EXPECT_CALL(*span, setTag("http.status_code", "503"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
   EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);

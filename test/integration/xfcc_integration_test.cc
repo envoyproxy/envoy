@@ -91,21 +91,23 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("plain")));
-  return dispatcher_->createClientConnection(address);
+  return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr());
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTlsClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("ssl")));
-  return dispatcher_->createSslClientConnection(*client_tls_ssl_ctx_, address);
+  return dispatcher_->createSslClientConnection(*client_tls_ssl_ctx_, address,
+                                                Network::Address::InstanceConstSharedPtr());
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("ssl")));
-  return dispatcher_->createSslClientConnection(*client_mtls_ssl_ctx_, address);
+  return dispatcher_->createSslClientConnection(*client_mtls_ssl_ctx_, address,
+                                                Network::Address::InstanceConstSharedPtr());
 }
 
 void XfccIntegrationTest::startTestServerWithXfccConfig(std::string fcc, std::string sccd) {

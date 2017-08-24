@@ -54,7 +54,8 @@ private:
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
   ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                       Network::Address::InstanceConstSharedPtr address);
+                       Network::Address::InstanceConstSharedPtr address,
+                       Network::Address::InstanceConstSharedPtr source_address);
 
   // Network::ClientConnection
   void connect() override;

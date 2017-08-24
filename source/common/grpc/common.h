@@ -35,6 +35,14 @@ public:
   static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& headers);
 
   /**
+   * Returns the grpc-message from a given set of headers, if present.
+   * @param headers the headers to parse.
+   * @return std::string the gRPC status message or empty string if grpc-message is not present in
+   *         headers.
+   */
+  static std::string getGrpcMessage(const Http::HeaderMap& headers);
+
+  /**
    * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
    * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
    * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
