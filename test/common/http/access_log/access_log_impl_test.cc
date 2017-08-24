@@ -56,21 +56,13 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
-  std::chrono::microseconds requestReceivedDuration() const override {
-    return request_received_duration_;
-  }
-  void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
-  std::chrono::microseconds responseReceivedDuration() const override {
-    return request_received_duration_;
-  }
-  void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
   Protocol protocol() const override { return protocol_; }
   void protocol(Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
-  std::chrono::microseconds duration() const override {
-    return std::chrono::microseconds(duration_);
+  std::chrono::milliseconds duration() const override {
+    return std::chrono::milliseconds(duration_);
   }
   bool getResponseFlag(ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
@@ -84,12 +76,10 @@ public:
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   SystemTime start_time_;
-  std::chrono::microseconds request_received_duration_{1000};
-  std::chrono::microseconds response_received_duration_{2000};
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};
-  uint64_t duration_{3000};
+  uint64_t duration_{3};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
 };
