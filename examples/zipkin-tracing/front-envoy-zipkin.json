@@ -20,8 +20,7 @@
                   "domains": ["*"],
                   "routes": [
                     {
-                      "timeout_ms": 0,
-                      "prefix": "/trace/1",
+                      "prefix": "/",
                       "cluster": "service1"
                     }
                   ]

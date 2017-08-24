@@ -19,7 +19,6 @@
                   "domains": ["*"],
                   "routes": [
                     {
-                      "timeout_ms": 0,
                       "prefix": "/",
                       "cluster": "local_service"
                     }
