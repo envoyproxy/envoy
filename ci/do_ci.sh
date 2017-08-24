@@ -33,8 +33,13 @@ if [[ "$1" == "bazel.release" ]]; then
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
+  # We are bumping up on time limits just compiling/running release tests. Switch to fat test
+  # binary for CI for now.
+  # TODO(mattklein123): Revert this when we are off Travis.
+  cd "${ENVOY_BUILD_DIR}"
+  NO_GCOV=1 "${ENVOY_SRCDIR}"/test/coverage/gen_build.sh
   echo "Testing..."
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/coverage:coverage_tests
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_gcc_toolchain
@@ -58,6 +63,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests..."
   # Due to Travis CI limits, we build and run the single fat coverage test binary rather than
   # build O(100) * O(200MB) static test binaries. This saves 20GB of disk space, see #1400.
+  # TODO(mattklein123): Revert this when we are off Travis.
   cd "${ENVOY_BUILD_DIR}"
   NO_GCOV=1 "${ENVOY_SRCDIR}"/test/coverage/gen_build.sh
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
