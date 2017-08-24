@@ -256,7 +256,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("http.url", path_prefix + expected_path));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
-  EXPECT_CALL(*span, setTag("protocol", "HTTP/2"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/2"));
   NiceMock<MockConfig> config;
 
   HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
@@ -327,7 +327,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("http.url", "https:///test"));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
-  EXPECT_CALL(*span, setTag("protocol", "HTTP/1.0"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/1.0"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
 
@@ -371,7 +371,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("http.url", "http://api/test"));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("user_agent", "agent"));
-  EXPECT_CALL(*span, setTag("protocol", "HTTP/1.0"));
+  EXPECT_CALL(*span, setTag("http.protocol", "HTTP/1.0"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "downstream_cluster"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));

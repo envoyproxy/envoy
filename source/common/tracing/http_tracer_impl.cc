@@ -17,6 +17,7 @@
 namespace Envoy {
 namespace Tracing {
 
+// TODO(mattklein123) PERF: Avoid string creations/copies in this entire file.
 static std::string buildResponseCode(const Http::AccessLog::RequestInfo& info) {
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
@@ -129,7 +130,7 @@ void HttpConnManFinalizerImpl::finalize(Span& span) {
     span.setTag("downstream_cluster",
                 valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
-    span.setTag("protocol",
+    span.setTag("http.protocol",
                 Http::AccessLog::AccessLogFormatUtils::protocolToString(request_info_.protocol()));
 
     if (request_headers_->ClientTraceId()) {
