@@ -12,7 +12,8 @@ MongoDB :ref:`architecture overview <arch_overview_mongo>`.
     "name": "mongo_proxy",
     "config": {
       "stat_prefix": "...",
-      "access_log": "..."
+      "access_log": "...",
+      "fault": {}
     }
   }
 
@@ -24,6 +25,30 @@ access_log
   *(optional, string)* The optional path to use for writing Mongo access logs. If not access log
   path is specified no access logs will be written. Note that access log is also gated by
   :ref:`runtime <config_network_filters_mongo_proxy_runtime>`.
+
+fault
+  *(optional, object)* If specified, the filter will inject faults  based on the values in the object.
+
+Fault configuration
+-------------------  
+
+Configuration for fixed duration delays into `Query` mongo operation. 
+
+.. code-block:: json
+
+  {
+    "fixed_delay": {
+      "percent": "...",
+      "duration_ms": "..."
+    }
+  }
+
+percent
+  *(required, integer)* Percentage of requests affected by injected faults. Valid values are integers 
+  in a range of [0, 100].
+
+duration_ms
+  *(required, integer)* Non negative delay duration in milliseconds.
 
 .. _config_network_filters_mongo_proxy_stats:
 
@@ -38,6 +63,7 @@ following statistics:
   :widths: 1, 1, 2
 
   decoding_error, Counter, Number of MongoDB protocol decoding errors
+  delay_injected, Counter, Number of delays injected
   op_get_more, Counter, Number of OP_GET_MORE messages
   op_insert, Counter, Number of OP_INSERT messages
   op_kill_cursors, Counter, Number of OP_KILL_CURSORS messages
@@ -151,6 +177,12 @@ mongo.logging_enabled
   % of messages that will be logged. Defaults to 100. If less than 100, queries may be logged
   without replies, etc.
 
+mongo.fault.delay.percent
+  % of requests that will be delayed. Defaults to the *percent* specified in the config.
+
+mongo.fault.delay.duration_ms
+  The delay duration in milliseconds. Defaults to the *duration_ms* specified in the config.
+  
 Access log format
 -----------------
 
