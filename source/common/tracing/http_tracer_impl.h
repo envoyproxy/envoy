@@ -64,6 +64,11 @@ public:
 
 class NullSpan : public Span {
 public:
+  static NullSpan& instance() {
+    static NullSpan* instance = new NullSpan();
+    return *instance;
+  }
+
   // Tracing::Span
   void setTag(const std::string&, const std::string&) override {}
   void finishSpan(SpanFinalizer&) override {}
@@ -76,6 +81,8 @@ public:
   // Tracing::SpanFinalizer
   void finalize(Span&) override {}
 };
+
+typedef ConstSingleton<NullFinalizer> NullFinalizerInstance;
 
 /**
  * Finalizer for Spans covering standard request ingress.

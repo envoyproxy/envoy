@@ -193,7 +193,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<Envoy::RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
-                              Tracing::EMPTY_CONTEXT))
+                              EMPTY_STRING, Tracing::NullSpan::instance()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(Envoy::RateLimit::LimitStatus::OK);
       })));
@@ -402,7 +402,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<Envoy::RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
-                              Tracing::EMPTY_CONTEXT))
+                              EMPTY_STRING, Tracing::NullSpan::instance()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(Envoy::RateLimit::LimitStatus::OK);
       })));
@@ -441,7 +441,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<Envoy::RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
-                              Tracing::EMPTY_CONTEXT))
+                              EMPTY_STRING, Tracing::NullSpan::instance()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(Envoy::RateLimit::LimitStatus::OK);
       })));
@@ -477,7 +477,7 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<Envoy::RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
-                              Tracing::EMPTY_CONTEXT))
+                              EMPTY_STRING, Tracing::NullSpan::instance()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(Envoy::RateLimit::LimitStatus::OK);
       })));
