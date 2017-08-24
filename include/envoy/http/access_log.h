@@ -67,7 +67,7 @@ public:
 
   /**
    * @return duration from request start to when the entire request was received from the
-   * downstream client.  Note: if unset, will return 0 mircoseconds.
+   * downstream client in microseconds. Note: if unset, will return 0 microseconds.
    */
   virtual std::chrono::microseconds requestReceivedDuration() const PURE;
 
@@ -80,7 +80,7 @@ public:
 
   /**
    * @return the duration from request start to when the entire response was received from the
-   * upstream host.  Note: if unset, will return 0 microseconds.
+   * upstream host in microseconds. Note: if unset, will return 0 microseconds.
    */
   virtual std::chrono::microseconds responseReceivedDuration() const PURE;
 
