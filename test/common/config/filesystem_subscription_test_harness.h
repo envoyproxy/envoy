@@ -26,8 +26,8 @@ typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
-      : path_(TestEnvironment::temporaryPath("eds.pb")), subscription_(dispatcher_, path_, stats_) {
-  }
+      : path_(TestEnvironment::temporaryPath("eds.json")),
+        subscription_(dispatcher_, path_, stats_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
 
@@ -44,10 +44,7 @@ public:
   void updateFile(const std::string json, bool run_dispatcher = true) {
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
-    const std::string temp_path = path_ + ".tmp";
-    std::ofstream temp_file(temp_path);
-    temp_file << json;
-    temp_file.close();
+    const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
     EXPECT_EQ(0, ::rename(temp_path.c_str(), path_.c_str()));
     if (run_dispatcher) {
       dispatcher_.run(Event::Dispatcher::RunType::NonBlock);

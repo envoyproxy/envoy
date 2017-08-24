@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
 
 #include "spdlog/spdlog.h"
 
@@ -22,6 +23,14 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
   const std::string contents = Filesystem::fileReadToEnd(path);
+  // If the filename ends with .pb, do a best-effort attempt to parse it as a proto.
+  if (StringUtil::endsWith(path, ".pb")) {
+    // Attempt to parse the binary format.
+    if (message.ParseFromString(contents)) {
+      return;
+    }
+    throw EnvoyException("Unable to parse proto " + path);
+  }
   if (StringUtil::endsWith(path, ".yaml")) {
     const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();
     loadFromJson(json, message);

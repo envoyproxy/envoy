@@ -36,8 +36,8 @@ static void errorCallbackTest(Address::IpVersion version) {
                                  .use_original_dst_ = false,
                                  .per_connection_buffer_limit_bytes_ = 0});
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -113,8 +113,8 @@ TEST_P(ListenerImplTest, NormalRedirect) {
                                         listener_callbacks2, stats_store,
                                         Network::ListenerOptions());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -154,8 +154,8 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
                                         listener_callbacks2, stats_store,
                                         Network::ListenerOptions());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -193,8 +193,8 @@ TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(local_dst_address);
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
@@ -230,8 +230,8 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(local_dst_address);
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
@@ -270,8 +270,8 @@ TEST_P(ListenerImplTest, UseActualDst) {
                                         listener_callbacks2, stats_store,
                                         Network::ListenerOptions());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -307,8 +307,8 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(local_dst_address);
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));

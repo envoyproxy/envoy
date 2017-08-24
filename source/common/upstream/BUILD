@@ -71,6 +71,7 @@ envoy_cc_library(
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/upstream:upstream_lib",
