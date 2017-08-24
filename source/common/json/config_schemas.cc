@@ -379,7 +379,7 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
             "additionalProperties" : false
           }
         },
-        "required": ["delay"],
+        "required": ["fixed_delay"],
         "additionalProperties" : false
       }
     },
