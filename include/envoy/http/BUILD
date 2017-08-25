@@ -14,9 +14,11 @@ envoy_cc_library(
     deps = [
         ":header_map_interface",
         ":protocol_interface",
+        "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/protobuf",
     ],
 )
 

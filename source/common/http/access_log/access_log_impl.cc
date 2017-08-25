@@ -5,6 +5,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
@@ -14,6 +15,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -144,36 +146,44 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
   return !info.healthCheck();
 }
 
-InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filter,
-                           FormatterPtr&& formatter,
-                           Envoy::AccessLog::AccessLogManager& log_manager)
-    : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-  log_file_ = log_manager.createAccessLog(access_log_path);
-}
-
-InstanceSharedPtr InstanceImpl::fromProto(const envoy::api::v2::filter::AccessLog& config,
-                                          Runtime::Loader& runtime,
-                                          Envoy::AccessLog::AccessLogManager& log_manager) {
-  std::string access_log_path = config.path();
-
+InstanceSharedPtr AccessLogFactory::fromProto(const envoy::api::v2::filter::AccessLog& config,
+                                              Runtime::Loader& runtime,
+                                              Envoy::AccessLog::AccessLogManager& log_manager) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), runtime);
   }
 
-  FormatterPtr formatter;
-  if (config.format().empty()) {
-    formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
-  } else {
-    formatter.reset(new FormatterImpl(config.format()));
+  if (config.name().empty()) {
+    throw EnvoyException("Name field not found in proto for AccessLog configuration");
   }
 
-  return InstanceSharedPtr{
-      new InstanceImpl(access_log_path, std::move(filter), std::move(formatter), log_manager)};
+  AccessLogInstanceFactory* factory =
+      Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(config.name());
+
+  if (factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Didn't find a registered AccessLog::Instance implementation for name: '{}'",
+                    config.name()));
+  }
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  if (config.has_config()) {
+    MessageUtil::jsonConvert(config.config(), *message);
+  }
+
+  return factory->createAccessLogInstance(*message, std::move(filter), log_manager);
 }
 
-void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
-                       const RequestInfo& request_info) {
+FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& filter,
+                             FormatterPtr&& formatter,
+                             Envoy::AccessLog::AccessLogManager& log_manager)
+    : filter_(std::move(filter)), formatter_(std::move(formatter)) {
+  log_file_ = log_manager.createAccessLog(access_log_path);
+}
+
+void FileAccessLog::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
+                        const RequestInfo& request_info) {
   static HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;

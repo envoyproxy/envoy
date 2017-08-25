@@ -2,9 +2,14 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/http/access_log/access_log_impl.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
+#include "server/config/http/file_access_log.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
@@ -14,6 +19,7 @@
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -282,6 +288,28 @@ TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
       "Double registration for name: 'envoy.zipkin'");
+}
+
+TEST(AccessLogConfigTest, FileAccessLogTest) {
+  auto factory = Registry::FactoryRegistry<Http::AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.file_access_log");
+  ASSERT_NE(nullptr, factory);
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  ASSERT_NE(nullptr, message);
+
+  envoy::api::v2::filter::FileAccessLog file_access_log;
+  file_access_log.set_path("/dev/null");
+  file_access_log.set_format("%START_TIME%");
+  MessageUtil::jsonConvert(file_access_log, *message);
+
+  Http::AccessLog::FilterPtr filter;
+  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager;
+
+  Http::AccessLog::InstanceSharedPtr instance =
+      factory->createAccessLogInstance(*message, std::move(filter), log_manager);
+  EXPECT_NE(nullptr, instance);
+  EXPECT_NE(nullptr, dynamic_cast<Http::AccessLog::FileAccessLog*>(instance.get()));
 }
 
 } // namespace Configuration

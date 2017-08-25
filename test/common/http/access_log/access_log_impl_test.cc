@@ -12,6 +12,8 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/stats/stats_impl.h"
@@ -25,6 +27,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/http_connection_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -118,7 +121,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
@@ -141,7 +144,7 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
@@ -160,7 +163,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
     )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -181,7 +184,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
       )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -203,7 +206,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -226,7 +229,7 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -248,7 +251,7 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   // Value is taken from random generator.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
@@ -281,7 +284,7 @@ TEST_F(AccessLogImplTest, PathRewrite) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -299,7 +302,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
@@ -317,7 +320,7 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
@@ -343,7 +346,7 @@ TEST_F(AccessLogImplTest, requestTracing) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
 
   {
     TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
@@ -376,7 +379,7 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
       }
     )EOF";
 
-    EXPECT_THROW(InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
                  EnvoyException);
   }
 
@@ -388,7 +391,7 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
       }
     )EOF";
 
-    EXPECT_THROW(InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime, log_manager),
                  EnvoyException);
   }
 }
@@ -406,7 +409,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -437,7 +440,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -471,7 +474,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   InstanceSharedPtr log =
-      InstanceImpl::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
+      AccessLogFactory::fromProto(parseAccessLogFromJson(json), runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -488,6 +491,32 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
     log->log(&header_map, &response_headers_, request_info_);
   }
+}
+
+TEST_F(AccessLogImplTest, ConfigureFromProto) {
+  envoy::api::v2::filter::AccessLog config;
+
+  envoy::api::v2::filter::FileAccessLog fal_config;
+  fal_config.set_path("/dev/null");
+
+  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+
+  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, runtime_, log_manager_),
+                            EnvoyException,
+                            "Name field not found in proto for AccessLog configuration");
+
+  config.set_name("envoy.file_access_log");
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(config, runtime_, log_manager_);
+
+  EXPECT_NE(nullptr, log);
+  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
+
+  config.set_name("INVALID");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      AccessLogFactory::fromProto(config, runtime_, log_manager_), EnvoyException,
+      "Didn't find a registered AccessLog::Instance implementation for name: 'INVALID'");
 }
 
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {

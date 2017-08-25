@@ -193,8 +193,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (const auto& access_log : config.access_log()) {
     Http::AccessLog::InstanceSharedPtr current_access_log =
-        Http::AccessLog::InstanceImpl::fromProto(access_log, context_.runtime(),
-                                                 context_.accessLogManager());
+        Http::AccessLog::AccessLogFactory::fromProto(access_log, context_.runtime(),
+                                                     context_.accessLogManager());
     access_logs_.push_back(current_access_log);
   }
 

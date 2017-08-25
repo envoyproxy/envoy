@@ -88,8 +88,18 @@ void FilterJson::translateAccessLogFilter(
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
                                     envoy::api::v2::filter::AccessLog& access_log) {
-  JSON_UTIL_SET_STRING(json_access_log, access_log, path);
-  JSON_UTIL_SET_STRING(json_access_log, access_log, format);
+  envoy::api::v2::filter::FileAccessLog file_access_log;
+
+  JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
+  JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
+
+  ProtobufWkt::Struct& custom_config = *access_log.mutable_config();
+  MessageUtil::jsonConvert(file_access_log, custom_config);
+
+  // Statically registered access logs are a v2-only feature, so use the standard internal file
+  // access log for json config conversion.
+  access_log.set_name("envoy.file_access_log");
+
   if (json_access_log.hasObject("filter")) {
     translateAccessLogFilter(*json_access_log.getObject("filter"), *access_log.mutable_filter());
   }
