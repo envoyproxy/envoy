@@ -53,10 +53,14 @@ public:
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
     ProtobufTypes::String text;
-    Protobuf::io::StringOutputStream string_stream(&text);
-    Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-    coded_stream.SetSerializationDeterministic(true);
-    message.SerializeToCodedStream(&coded_stream);
+    {
+      // For memory safety, the StringOutputStream needs to be destroyed before
+      // we read the string.
+      Protobuf::io::StringOutputStream string_stream(&text);
+      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
+      coded_stream.SetSerializationDeterministic(true);
+      message.SerializeToCodedStream(&coded_stream);
+    }
     return std::hash<std::string>{}(text);
   }
 
