@@ -50,6 +50,25 @@ private:
 /**
  * Well-known network filter names.
  */
+class ListenerFilterNameValues {
+public:
+  // Original destination listener filter
+  const std::string ORIGINAL_DST = "envoy.original_dst";
+  // Proxy Protocol listener filter
+  const std::string PROXY_PROTOCOL = "envoy.proxy_protocol";
+
+  // Converts names from v1 to v2
+  const V1Converter v1_converter_;
+
+  ListenerFilterNameValues()
+    : v1_converter_({ORIGINAL_DST, PROXY_PROTOCOL}) {}
+};
+
+typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
+ 
+/**
+ * Well-known network filter names.
+ */
 class NetworkFilterNameValues {
 public:
   // Client ssl auth filter

@@ -17,7 +17,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
-#include "common/network/proxy_protocol.h"
+#include "common/filter/proxy_protocol.h"
 
 #include "spdlog/spdlog.h"
 
@@ -76,6 +76,7 @@ private:
 
     ~ActiveListener();
 
+    // Network::ListenerCallbacks
     /**
      * Fires when a new connection is received from the listener.
      * @param socket supplies the accepted socket to take control of.
@@ -99,16 +100,14 @@ private:
      */
     void newConnection(Network::AcceptSocketPtr&& accept_socket);
 
-    virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
-
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     ListenerStats stats_;
     std::list<ActiveSocketPtr> sockets_;
     std::list<ActiveConnectionPtr> connections_;
     const uint64_t listener_tag_;
-    Network::ProxyProtocol proxy_protocol_;
     Listener& config_;
+    Filter::ProxyProtocol::ConfigSharedPtr legacy_stats_;
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
@@ -141,13 +140,31 @@ private:
   /**
    * Wrapper for an active accept socket owned by this handler.
    */
-  struct ActiveSocket : LinkedObject<ActiveSocket>, public Event::DeferredDeletable {
+  struct ActiveSocket : public Network::ListenerFilterManager,
+                        public Network::ListenerFilterCallbacks,
+                        LinkedObject<ActiveSocket>,
+                        public Event::DeferredDeletable {
     ActiveSocket(ActiveListener& listener, Network::AcceptSocketPtr&& socket)
-        : listener_(&listener), socket_(std::move(socket)) {}
-    ~ActiveSocket() {}
+        : listener_(&listener), socket_(std::move(socket)), iter_(accept_filters_.end()) {}
+    ~ActiveSocket() {
+      ASSERT(iter_ == accept_filters_.end());
+      accept_filters_.clear();
+    }
+
+    // Network::ListenerFilterManager
+    void addAcceptFilter(Network::ListenerFilterSharedPtr filter) override {
+      accept_filters_.emplace_back(filter);
+    }
+
+    // Network::ListenerFilterCallbacks
+    Network::AcceptSocket& socket() override { return *socket_.get(); }
+    Event::Dispatcher& dispatcher() override { return listener_->parent_.dispatcher_; }
+    void continueFilterChain(bool success) override;
 
     ActiveListener* listener_;
     Network::AcceptSocketPtr socket_;
+    std::list<Network::ListenerFilterSharedPtr> accept_filters_;
+    std::list<Network::ListenerFilterSharedPtr>::iterator iter_;
   };
 
   static ListenerStats generateStats(Stats::Scope& scope);

@@ -41,6 +41,16 @@ public:
                           Configuration::FactoryContext& context) PURE;
 
   /**
+   * Creates a list of listener filter factories.
+   * @param filters supplies the JSON configuration.
+   * @param context supplies the factory creation context.
+   * @return std::vector<Configuration::ListenerFilterFactoryCb> the list of filter factories.
+   */
+  virtual std::vector<Configuration::ListenerFilterFactoryCb>
+  createListenerFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                  Configuration::FactoryContext& context) PURE;
+
+  /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
@@ -169,7 +179,7 @@ public:
   virtual void startWorkers(GuardDog& guard_dog) PURE;
 
   /**
-   * Stop all listeners from accepting new connections without actually removing any of them. This
+   * Stop all listeners from accepting new connectins without actually removing any of them. This
    * is used for server draining.
    */
   virtual void stopListeners() PURE;

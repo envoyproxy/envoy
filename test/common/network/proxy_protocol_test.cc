@@ -21,8 +21,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::A;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::_;
 
 namespace Envoy {
@@ -43,6 +45,8 @@ public:
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
+
+    ON_CALL(factory_, createFilterChain(A<ListenerFilterManager&>())).WillByDefault(Return(true));
   }
 
   // Listener
@@ -60,7 +64,9 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createFilterChain(_))
+    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()))
+        .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
+    EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>()))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
@@ -74,6 +80,7 @@ public:
 
   void connectNoRead() {
     conn_->connect();
+    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -295,6 +302,7 @@ TEST_P(ProxyProtocolTest, Closed) {
 
 TEST_P(ProxyProtocolTest, ClosedEmpty) {
   conn_->connect();
+  EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()));
   conn_->close(ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -332,7 +340,9 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createFilterChain(_))
+    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()))
+        .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
+    EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>()))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);

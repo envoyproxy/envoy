@@ -75,4 +75,6 @@ bool AutonomousUpstream::createFilterChain(Network::Connection& connection) {
   return true;
 }
 
+bool AutonomousUpstream::createFilterChain(Network::ListenerFilterManager&) { return true; }
+
 } // namespace Envoy

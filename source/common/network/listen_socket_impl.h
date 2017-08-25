@@ -77,6 +77,8 @@ public:
     return fd;
   }
 
+  void clearReset() override { local_address_reset_ = false; }
+
   void close() override {
     if (fd_ != -1) {
       ::close(fd_);

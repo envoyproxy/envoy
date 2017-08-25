@@ -5,6 +5,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
+#include "common/filter/original_dst.h"
+#include "common/filter/proxy_protocol.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
@@ -63,7 +65,7 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
                                                       Listener& config)
     : parent_(parent), listener_(std::move(listener)),
       stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
-      proxy_protocol_(config.listenerScope()), config_(config) {}
+      config_(config), legacy_stats_(new Filter::ProxyProtocol::Config(config.listenerScope())) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   while (!sockets_.empty()) {
@@ -90,7 +92,7 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
   // We do not return stopped listeners.
-  auto listener = std::find_if(
+  auto iter = std::find_if(
       listeners_.begin(), listeners_.end(),
       [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
@@ -98,80 +100,83 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
       });
 
   // If there is exact address match, return the corresponding listener.
-  if (listener != listeners_.end()) {
-    return listener->second.get();
+  if (iter != listeners_.end()) {
+    return iter->second.get();
   }
 
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  listener = std::find_if(
+  iter = std::find_if(
       listeners_.begin(), listeners_.end(),
       [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });
-  return (listener != listeners_.end()) ? listener->second.get() : nullptr;
+  return (iter != listeners_.end()) ? iter->second.get() : nullptr;
 }
 
-Network::Address::InstanceConstSharedPtr
-ConnectionHandlerImpl::ActiveListener::getOriginalDst(int fd) {
-  return Network::Utility::getOriginalDst(fd);
+void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
+  if (success) {
+    if (iter_ == accept_filters_.end()) {
+      iter_ = accept_filters_.begin();
+    } else {
+      iter_ = std::next(iter_);
+    }
+
+    for (; iter_ != accept_filters_.end(); iter_++) {
+      Network::FilterStatus status = (*iter_)->onAccept(*this);
+      if (status == Network::FilterStatus::StopIteration) {
+        return;
+      }
+      // Check if another listener may have to be used.
+      if (socket_->localAddressReset()) {
+        // Hands off redirected connections (from iptables) to the listener associated with the
+        // original destination address. If there is no listener associated with the original
+        // destination address, the connection is handled by the listener that receives it.
+        ActiveListener* new_listener =
+            listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
+
+        if (new_listener != nullptr) {
+          // Reset the accept socket transiet state and hand it to the new listener.
+          socket_->clearReset();
+          new_listener->onAccept(std::move(socket_));
+          goto out;
+        }
+      }
+    }
+    // Successfully ran all the accept filters, create a new connection.
+    listener_->newConnection(std::move(socket_));
+  } else {
+    // current filter failed, connection must be abandoned.
+    socket_->close();
+  }
+out:
+  // Filter execution concluded, clear state.
+  iter_ = accept_filters_.end();
+  ActiveSocketPtr removed = removeFromList(listener_->sockets_);
+  listener_->parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
 void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptSocketPtr&& accept_socket) {
-  Network::AcceptSocket* socket = accept_socket.get();
-  Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
-  ActiveSocketPtr active_socket(new ActiveSocket(*this, std::move(accept_socket)));
+  Network::Address::InstanceConstSharedPtr local_address = accept_socket->localAddress();
+  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(accept_socket)));
 
-#if 0
-  /* Not needed yet. */
-  active_socket->moveIntoList(std::move(active_socket), sockets_);
-#endif
-
-  // This logic will move to Original Dst Filter
-  if (config_.useOriginalDst() && local_address->type() == Network::Address::Type::Ip) {
-    Network::Address::InstanceConstSharedPtr original_local_address = getOriginalDst(socket->fd());
-
-    // A listener that has the use_original_dst flag set to true can still receive
-    // connections that are NOT redirected using iptables. If a connection was not redirected,
-    // the address returned by getOriginalDst() matches the local address of the new socket.
-    // In this case the listener handles the connection directly and does not hand it off.
-    if (original_local_address && (*original_local_address != *local_address)) {
-      socket->resetLocalAddress(original_local_address);
-      local_address = original_local_address;
-
-      // Hands off redirected connections (from iptables) to the listener associated with the
-      // original destination address. If there is no listener associated with the original
-      // destination address, the connection is handled by the listener that receives it.
-      ActiveListener* new_listener = parent_.findActiveListenerByAddress(*original_local_address);
-
-      if (new_listener != nullptr) {
-        active_socket->listener_ = new_listener;
-      }
-    }
+  // Implicitly add legacy filters
+  if (config_.useOriginalDst()) {
+    active_socket->accept_filters_.emplace_back(
+        Network::ListenerFilterSharedPtr{new Filter::OriginalDst()});
+  }
+  if (config_.useProxyProto()) {
+    active_socket->accept_filters_.emplace_back(
+        Network::ListenerFilterSharedPtr{new Filter::ProxyProtocol::Instance(legacy_stats_)});
   }
 
-  // 'this' may not be the listener any more, must use 'active_socket->listener_'.
-
-  // This logic will move to Proxy Protocol Filter
-  // XXX: Race if listener is removed while proxy protocol is waiting for more data?
-  //      Seems this race affects the existing implementation in master as well.
-  if (active_socket->listener_->config_.useProxyProto()) {
-    ActiveListener* listener = active_socket->listener_;
-    listener->proxy_protocol_.newConnection(
-        listener->parent_.dispatcher_, std::move(active_socket->socket_),
-        [listener](Network::AcceptSocketPtr&& socketPtr, bool success) mutable {
-          if (success) {
-            listener->newConnection(std::move(socketPtr));
-          }
-        });
-  } else {
-    // TODO(jamessynge): We need to keep per-family stats. BUT, should it be based on the original
-    // family or the local family? Probably local family, as the original proxy can take care of
-    // stats for the original family.
-    active_socket->listener_->newConnection(std::move(active_socket->socket_));
-  }
+  // Create and run the filters
+  config_.filterChainFactory().createFilterChain(*active_socket);
+  ActiveSocketPtr as(active_socket);
+  as->moveIntoListBack(std::move(as), sockets_);
+  active_socket->continueFilterChain(true);
 }
 
 void ConnectionHandlerImpl::ActiveListener::newConnection(

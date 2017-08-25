@@ -150,6 +150,10 @@ public:
                std::vector<Configuration::NetworkFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                    Configuration::FactoryContext& context));
+  MOCK_METHOD2(createListenerFilterFactoryList,
+               std::vector<Configuration::ListenerFilterFactoryCb>(
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
+                   Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port));

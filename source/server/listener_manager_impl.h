@@ -30,13 +30,25 @@ public:
   static std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                            Configuration::FactoryContext& context);
+  /**
+   * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
+   */
+  static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+      Configuration::FactoryContext& context);
 
-  // Server::ListenSocketFactory
+  // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, context);
   }
+  std::vector<Configuration::ListenerFilterFactoryCb>
+  createListenerFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                  Configuration::FactoryContext& context) override {
+    return createListenerFilterFactoryList_(filters, context);
+  }
+
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
@@ -237,6 +249,7 @@ public:
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
+  bool createFilterChain(Network::ListenerFilterManager& manager) override;
 
 private:
   ListenerManagerImpl& parent_;
@@ -257,6 +270,7 @@ private:
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  std::vector<Configuration::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
 };

@@ -108,28 +108,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "proxy_protocol_lib",
-    srcs = [
-        "proxy_protocol.cc",
-    ],
-    hdrs = [
-        "proxy_protocol.h",
-    ],
-    deps = [
-        ":address_lib",
-        ":listen_socket_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:file_event_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
-        "//source/common/common:empty_string",
-        "//source/common/common:linked_object",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:libevent_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "listener_impl.cc",

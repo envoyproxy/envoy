@@ -49,6 +49,7 @@ public:
       : FakeUpstream(port, type, version) {}
   ~AutonomousUpstream();
   bool createFilterChain(Network::Connection& connection) override;
+  bool createFilterChain(Network::ListenerFilterManager& listener) override;
 
 private:
   std::vector<AutonomousHttpConnectionPtr> http_connections_;

@@ -287,6 +287,8 @@ bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   return true;
 }
 
+bool FakeUpstream::createFilterChain(Network::ListenerFilterManager&) { return true; }
+
 void FakeUpstream::threadRoutine() {
   handler_->addListener(listener_);
 
