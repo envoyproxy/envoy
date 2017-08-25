@@ -64,16 +64,6 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
                               server.listenerManager()));
   }
 
-  if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
-    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
-                         "are mutually exclusive.");
-  }
-
-  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
-  if (json.hasObject("statsd_local_udp_port")) {
-    statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
-  }
-
   if (json.hasObject("statsd_udp_ip_address")) {
     statsd_udp_ip_address_.value(json.getString("statsd_udp_ip_address"));
   }

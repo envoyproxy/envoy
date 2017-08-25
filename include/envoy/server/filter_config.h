@@ -22,10 +22,6 @@
 
 namespace Envoy {
 namespace Server {
-
-class Instance; // TODO(mattklein123): Remove post 1.4.0. Forward declare to avoid circular
-                // includes.
-
 namespace Configuration {
 
 /**
@@ -99,12 +95,6 @@ public:
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Envoy::Runtime::Loader& runtime() PURE;
-
-  /**
-   * DEPRECATED: Do not call this function. It will be removed post 1.4.0 and is needed for other
-   * deprecated functionality.
-   */
-  virtual Instance& server() PURE;
 
   /**
    * @return Stats::Scope& the filter's stats scope.

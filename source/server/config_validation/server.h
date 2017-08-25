@@ -92,7 +92,7 @@ public:
   std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
-    return ProdListenerComponentFactory::createFilterFactoryList_(filters, *this, context);
+    return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                                     bool) override {

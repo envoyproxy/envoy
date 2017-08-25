@@ -303,7 +303,6 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
-  MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
   MOCK_METHOD0(statsdUdpIpAddress, Optional<std::string>());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
@@ -338,7 +337,6 @@ public:
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
-  MOCK_METHOD0(server, Instance&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(admin, Server::Admin&());
@@ -353,7 +351,6 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   Stats::IsolatedStoreImpl scope_;
-  testing::NiceMock<MockInstance> server_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;

@@ -68,12 +68,6 @@ public:
    */
   virtual Optional<std::string> statsdTcpClusterName() PURE;
 
-  // TODO(hennna): DEPRECATED - will be removed in 1.4.0.
-  /**
-   * @return Optional<uint32_t> the optional local UDP statsd port to write to.
-   */
-  virtual Optional<uint32_t> statsdUdpPort() PURE;
-
   /**
    * @return Optional<std::string> the optional UDP statsd address to write to.
    */

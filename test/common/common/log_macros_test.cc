@@ -13,13 +13,6 @@ namespace Envoy {
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
-  void deprecatedLogMessage() {
-    log_trace("fake message");
-    log_debug("fake message");
-    conn_log_info("fake message", connection_);
-    stream_log_info("fake message", stream_);
-  }
-
   void logMessage() {
     ENVOY_LOG(trace, "fake message");
     ENVOY_LOG(debug, "fake message");
@@ -37,9 +30,6 @@ TEST(Logger, All) {
 
   TestFilterLog filter;
   filter.logMessage();
-
-  // Ensure the deprecated log macros are still operational.
-  filter.deprecatedLogMessage();
 
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");

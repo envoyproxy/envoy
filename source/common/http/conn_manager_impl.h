@@ -319,9 +319,7 @@ private:
     virtual const HeaderMapPtr& trailers() PURE;
 
     // Http::StreamFilterCallbacks
-    uint64_t connectionId() override;
     const Network::Connection* connection() override;
-    Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;

@@ -29,20 +29,6 @@ namespace Server {
 namespace Configuration {
 
 /**
- * DEPRECATED - Implemented by each network filter and registered via
- * registerNetworkFilterConfigFactory() or the convenience class RegisterNetworkFilterConfigFactory.
- */
-class NetworkFilterConfigFactory {
-public:
-  virtual ~NetworkFilterConfigFactory() {}
-
-  virtual NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type,
-                                                        const std::string& name,
-                                                        const Json::Object& config,
-                                                        Instance& server) PURE;
-};
-
-/**
  * Implemented by each HttpTracer and registered via Registry::registerFactory() or
  * the convenience class RegisterFactory.
  */
@@ -88,22 +74,6 @@ public:
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * DEPRECATED - Register an NetworkFilterConfigFactory implementation as an option to create
-   * instances of NetworkFilterFactoryCb.
-   * @param factory the NetworkFilterConfigFactory implementation
-   */
-  static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
-    filterConfigFactories_().push_back(&factory);
-  }
-
-  /**
-   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
-   */
-  static const std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
-    return filterConfigFactories_();
-  }
-
-  /**
    * Initialize the configuration. This happens here vs. the constructor because the initialization
    * will call through the server into the config to get the cluster manager so the config object
    * must be created already.
@@ -120,8 +90,6 @@ public:
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
-  // TODO(hennna): DEPRECATED - statsdUdpPort() will be removed in 1.4.0
-  Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
   Optional<std::string> statsdUdpIpAddress() override { return statsd_udp_ip_address_; }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
@@ -139,20 +107,10 @@ private:
    */
   void initializeTracers(const Json::Object& tracing_configuration, Instance& server);
 
-  /**
-   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
-   */
-  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories_() {
-    static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
-        new std::list<NetworkFilterConfigFactory*>;
-    return *filter_config_factories;
-  }
-
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
   Optional<std::string> statsd_tcp_cluster_name_;
-  Optional<uint32_t> statsd_udp_port_;
   Optional<std::string> statsd_udp_ip_address_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
@@ -160,22 +118,6 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-};
-
-/**
- * DEPRECATED - @see NetworkFilterConfigFactory.  An instantiation of this class registers a
- * NetworkFilterConfigFactory implementation (T) so it can be used to create instances of
- * NetworkFilterFactoryCb.
- */
-template <class T> class RegisterNetworkFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterNetworkFilterConfigFactory() {
-    static T* instance = new T;
-    MainImpl::registerNetworkFilterConfigFactory(*instance);
-  }
 };
 
 /**

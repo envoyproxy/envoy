@@ -39,20 +39,6 @@ public:
 };
 
 /**
- * DEPRECATED - Implemented by each HTTP filter and registered via registerHttpFilterConfigFactory()
- * or the convenience class RegisterHttpFilterConfigFactory.
- */
-class HttpFilterConfigFactory {
-public:
-  virtual ~HttpFilterConfigFactory() {}
-
-  virtual HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                                     const Json::Object& config,
-                                                     const std::string& stat_prefix,
-                                                     Server::Instance& server) PURE;
-};
-
-/**
  * Utilities for the HTTP connection manager that facilitate testing.
  */
 class HttpConnectionManagerConfigUtility {
@@ -107,29 +93,10 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
-  /**
-   * DEPRECATED - Register an HttpFilterConfigFactory implementation as an option to create
-   * instances of HttpFilterFactoryCb.
-   * @param factory the HttpFilterConfigFactory implementation
-   */
-  static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {
-    filterConfigFactories().push_back(&factory);
-  }
-
   static const std::string DEFAULT_SERVER_STRING;
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
-
-  /**
-   * DEPRECATED - Returns a list of the currently registered HttpFilterConfigFactory
-   * implementations.
-   */
-  static std::list<HttpFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<HttpFilterConfigFactory*>* filter_config_factories =
-        new std::list<HttpFilterConfigFactory*>;
-    return *filter_config_factories;
-  }
 
   HttpFilterType stringToType(const std::string& type);
 
@@ -154,22 +121,6 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
-};
-
-/**
- * DEPRECATED @see HttpFilterConfigFactory.  An instantiation of this class registers a
- * HttpFilterConfigFactory implementation (T) so it can be used to create instances of
- * HttpFilterFactoryCb.
- */
-template <class T> class RegisterHttpFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterHttpFilterConfigFactory() {
-    static T* instance = new T;
-    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(*instance);
-  }
 };
 
 } // namespace Configuration
