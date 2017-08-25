@@ -15,7 +15,7 @@ struct CorsFilterConfig {};
 
 typedef std::shared_ptr<const CorsFilterConfig> CorsFilterConfigConstSharedPtr;
 
-class CorsFilter : public StreamFilter {
+class CorsFilter : public StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   CorsFilter(CorsFilterConfigConstSharedPtr config);
   ~CorsFilter();
@@ -23,7 +23,7 @@ public:
   void initialize();
 
   // Http::StreamFilterBase
-  void onDestroy() override;
+  void onDestroy() override{};
 
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
@@ -45,21 +45,27 @@ public:
   };
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
-  }
+  };
 
 private:
+  friend class CorsFilterTest;
+
+  const std::string& allowOrigin();
+  const std::string& allowMethods();
+  const std::string& allowHeaders();
+  const std::string& exposeHeaders();
+  const std::string& maxAge();
+  bool allowCredentials();
+  bool enabled();
+
   CorsFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  bool cors_enabled_{};
+  const Envoy::Router::CorsPolicy* routeCorsPolicy_{};
+  const Envoy::Router::CorsPolicy* virtualHostCorsPolicy_{};
   bool is_cors_request_{};
-  std::string allow_origin_{};
-  std::string allow_methods_{};
-  std::string allow_headers_{};
-  std::string expose_headers_{};
-  std::string max_age_{};
-  bool allow_credentials_{};
   Http::HeaderEntry* origin_{};
+  std::string origin__{};
 };
 
 } // namespace Http

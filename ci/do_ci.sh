@@ -86,7 +86,8 @@ elif [[ "$1" == "bazel.dev" ]]; then
     "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   echo "Building and testing..."
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  #bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/common/http/filter:cors_filter_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain

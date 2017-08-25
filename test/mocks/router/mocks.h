@@ -46,15 +46,7 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   bool allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
-  /*
-  MOCK_CONST_METHOD0(allowOrigin, const std::string&());
-  MOCK_CONST_METHOD0(allowMethods, const std::string&());
-  MOCK_CONST_METHOD0(allowHeaders, const std::string&());
-  MOCK_CONST_METHOD0(exposeHeaders, const std::string&());
-  MOCK_CONST_METHOD0(maxAge, const std::string&());
-  MOCK_CONST_METHOD0(allowCredentials, bool());
-  MOCK_CONST_METHOD0(enabled, bool());
-  */
+
   std::string allow_origin_{};
   std::string allow_methods_{};
   std::string allow_headers_{};

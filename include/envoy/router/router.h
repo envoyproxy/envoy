@@ -64,7 +64,7 @@ public:
   virtual const std::string& maxAge() const PURE;
 
   /**
-   * @return bool Whether access-control-allow-credentials is true.
+   * @return bool Whether access-control-allow-credentials should be true.
    */
   virtual bool allowCredentials() const PURE;
 
