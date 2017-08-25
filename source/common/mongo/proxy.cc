@@ -17,6 +17,12 @@
 namespace Envoy {
 namespace Mongo {
 
+const std::string ProxyFilter::FIXED_DELAY_PERCENT_KEY = "mongo.fault.delay.percent";
+const std::string ProxyFilter::FIXED_DELAY_DURATION_MS_KEY = "mongo.fault.delay.duration_ms";
+const std::string ProxyFilter::LOGGING_ENABLED_KEY = "mongo.logging_enabled";
+const std::string ProxyFilter::PROXY_ENABLED_KEY = "mongo.proxy_enabled";
+const std::string ProxyFilter::CONNECTION_LOGGING_ENABLED_KEY = "mongo.connection_logging_enabled";
+
 AccessLog::AccessLog(const std::string& file_name,
                      Envoy::AccessLog::AccessLogManager& log_manager) {
   file_ = log_manager.createAccessLog(file_name);
@@ -42,7 +48,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
       runtime_(runtime), access_log_(access_log), fault_config_(fault_config),
       dispatcher_(dispatcher) {
 
-  if (!runtime_.snapshot().featureEnabled("mongo.connection_logging_enabled", 100)) {
+  if (!runtime_.snapshot().featureEnabled(CONNECTION_LOGGING_ENABLED_KEY, 100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
     // don't ever log.
     access_log_.reset();
@@ -193,7 +199,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {
-  if (!sniffing_ || !runtime_.snapshot().featureEnabled("mongo.proxy_enabled", 100)) {
+  if (!sniffing_ || !runtime_.snapshot().featureEnabled(PROXY_ENABLED_KEY, 100)) {
     // Safety measure just to make sure that if we have a decoding error we keep going and lose
     // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
@@ -214,7 +220,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 void ProxyFilter::logMessage(Message& message, bool full) {
-  if (access_log_ && runtime_.snapshot().featureEnabled("mongo.logging_enabled", 100)) {
+  if (access_log_ && runtime_.snapshot().featureEnabled(LOGGING_ENABLED_KEY, 100)) {
     access_log_->logMessage(message, full, read_callbacks_->upstreamHost().get());
   }
 }
@@ -229,6 +235,9 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
 }
 
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
+  if (delay_timer_)
+    return Network::FilterStatus::StopIteration;
+
   read_buffer_.add(data);
   doDecode(read_buffer_);
 
@@ -245,26 +254,18 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-FaultConfig::FaultConfig(const Json::Object& fault_config)
-    : delay_percent_(
-          static_cast<uint32_t>(fault_config.getObject("fixed_delay")->getInteger("percent"))),
-      duration_ms_(
-          static_cast<uint64_t>(fault_config.getObject("fixed_delay")->getInteger("duration_ms"))) {
-}
-
 Optional<uint64_t> ProxyFilter::delayDuration() {
   Optional<uint64_t> result;
 
   if (!fault_config_)
     return result;
 
-  if (!runtime_.snapshot().featureEnabled("mongo.fault.delay.percent",
-                                          fault_config_->delayPercent())) {
+  if (!runtime_.snapshot().featureEnabled(FIXED_DELAY_PERCENT_KEY, fault_config_->delayPercent())) {
     return result;
   }
 
-  uint64_t duration = runtime_.snapshot().getInteger("mongo.fault.delay.duration_ms",
-                                                     fault_config_->delayDuration());
+  uint64_t duration =
+      runtime_.snapshot().getInteger(FIXED_DELAY_DURATION_MS_KEY, fault_config_->delayDuration());
 
   // Delay only if the duration is > 0ms.
   if (duration > 0) {
@@ -275,10 +276,7 @@ Optional<uint64_t> ProxyFilter::delayDuration() {
 }
 
 void ProxyFilter::delayInjectionTimerCallback() {
-  if (delay_timer_) {
-    delay_timer_->disableTimer();
-    delay_timer_.reset();
-  }
+  delay_timer_.reset();
 
   // Continue request processing.
   read_callbacks_->continueReading();

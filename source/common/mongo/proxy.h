@@ -81,7 +81,11 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
  */
 class FaultConfig {
 public:
-  FaultConfig(const Json::Object& fault_config);
+  FaultConfig(const Json::Object& fault_config)
+      : delay_percent_(
+            static_cast<uint32_t>(fault_config.getObject("fixed_delay")->getInteger("percent"))),
+        duration_ms_(static_cast<uint64_t>(
+            fault_config.getObject("fixed_delay")->getInteger("duration_ms"))) {}
 
   uint32_t delayPercent() const { return delay_percent_; }
   uint64_t delayDuration() const { return duration_ms_; }
@@ -178,6 +182,12 @@ private:
   FaultConfigSharedPtr fault_config_;
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr delay_timer_;
+
+  const static std::string FIXED_DELAY_PERCENT_KEY;
+  const static std::string FIXED_DELAY_DURATION_MS_KEY;
+  const static std::string LOGGING_ENABLED_KEY;
+  const static std::string PROXY_ENABLED_KEY;
+  const static std::string CONNECTION_LOGGING_ENABLED_KEY;
 };
 
 class ProdProxyFilter : public ProxyFilter {

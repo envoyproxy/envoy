@@ -132,7 +132,17 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
 
-  EXPECT_CALL(*delay_timer, disableTimer());
+  // Request during active delay.
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+
   delay_timer->callback_();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
