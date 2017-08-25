@@ -89,6 +89,7 @@ public:
   }
 
   void connect() {
+    int expected_callbacks = 2;
     client_connection_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -96,9 +97,19 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
+
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
         }));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
+        }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
