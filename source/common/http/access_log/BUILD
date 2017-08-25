@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "access_log_formatter_lib",
     srcs = ["access_log_formatter.cc"],
     hdrs = ["access_log_formatter.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/http:access_log_interface",
         "//source/common/common:assert_lib",

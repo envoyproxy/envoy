@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test_library(
     name = "config_load_check_lib",
     srcs = ["config_load_check.cc"],
+    external_deps = ["fmtlib"],
     deps = ["//test/config_test:config_test_lib"],
 )
 

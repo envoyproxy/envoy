@@ -33,6 +33,7 @@ envoy_cc_library(
     name = "http_connection_manager_lib",
     srcs = ["http_connection_manager.cc"],
     hdrs = ["http_connection_manager.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",

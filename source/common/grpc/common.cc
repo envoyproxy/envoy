@@ -16,7 +16,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Grpc {

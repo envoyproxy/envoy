@@ -6,6 +6,8 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Router {
 

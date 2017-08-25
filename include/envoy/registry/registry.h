@@ -5,7 +5,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Registry {

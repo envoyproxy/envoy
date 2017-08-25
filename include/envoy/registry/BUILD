@@ -11,4 +11,5 @@ envoy_package()
 envoy_cc_library(
     name = "registry",
     hdrs = ["registry.h"],
+    external_deps = ["fmtlib"],
 )

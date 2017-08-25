@@ -19,6 +19,7 @@ envoy_cc_library(
     srcs = ["json_loader.cc"],
     hdrs = ["json_loader.h"],
     external_deps = [
+        "fmtlib",
         "rapidjson",
         "yaml_cpp",
     ],

@@ -24,6 +24,7 @@ envoy_cc_library(
     name = "statsd_lib",
     srcs = ["statsd.cc"],
     hdrs = ["statsd.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",

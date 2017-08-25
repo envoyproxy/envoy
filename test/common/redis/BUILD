@@ -23,6 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/redis:command_splitter_lib",
         "//source/common/stats:stats_lib",

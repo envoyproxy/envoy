@@ -11,8 +11,8 @@
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 
+#include "fmt/format.h"
 #include "openssl/x509v3.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Ssl {

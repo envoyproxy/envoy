@@ -9,7 +9,7 @@
 
 #include "common/common/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 std::string Hex::encode(const uint8_t* data, size_t length) {

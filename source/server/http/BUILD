@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "admin_lib",
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",

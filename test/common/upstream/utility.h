@@ -4,6 +4,8 @@
 #include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 
+#include "fmt/printf.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {

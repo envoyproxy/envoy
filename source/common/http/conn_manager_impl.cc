@@ -29,7 +29,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {

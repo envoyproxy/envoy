@@ -30,6 +30,7 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

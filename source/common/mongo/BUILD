@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "bson_lib",
     srcs = ["bson_impl.cc"],
     hdrs = ["bson_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/mongo:bson_interface",
@@ -27,6 +28,7 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":bson_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -40,6 +42,7 @@ envoy_cc_library(
     name = "proxy_lib",
     srcs = ["proxy.cc"],
     hdrs = ["proxy.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":codec_lib",
         ":utility_lib",

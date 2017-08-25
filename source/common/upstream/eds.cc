@@ -9,6 +9,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Upstream {
 

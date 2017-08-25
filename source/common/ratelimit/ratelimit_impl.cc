@@ -12,7 +12,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace RateLimit {
