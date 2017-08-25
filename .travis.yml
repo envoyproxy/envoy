@@ -10,7 +10,10 @@ before_install:
 matrix:
   fast_finish: true
 env:
-  - TEST_TYPE=bazel.release
+  # TODO(mattklein123): Travis is too slow to continue doing release tests. We are very
+  # close to the time limit. Revert this when we get off Travis. We are getting OK 
+  # coverage from other test runs.
+  - TEST_TYPE=bazel.release.server_only
   - TEST_TYPE=bazel.asan
   - TEST_TYPE=bazel.tsan
   - TEST_TYPE=bazel.coverage
