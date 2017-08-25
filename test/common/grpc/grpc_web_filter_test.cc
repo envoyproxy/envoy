@@ -97,26 +97,12 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
   Http::TestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType, "unsupported");
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        uint64_t code;
-        StringUtil::atoul(headers.Status()->value().c_str(), code);
-        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
-      }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 }
 
 TEST_F(GrpcWebFilterTest, NoContentType) {
   Http::TestHeaderMapImpl request_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        uint64_t code;
-        StringUtil::atoul(headers.Status()->value().c_str(), code);
-        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
-      }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 }
 
 TEST_F(GrpcWebFilterTest, InvalidBase64) {
