@@ -179,14 +179,12 @@ void ClusterManagerImpl::initializeClustersFromV1Json(const Json::Object& config
 }
 
 void ClusterManagerImpl::initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap) {
-  if (bootstrap.has_static_resources()) {
-    for (const auto& cluster : bootstrap.static_resources().clusters()) {
-      loadCluster(cluster, false);
-    }
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    loadCluster(cluster, false);
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  if (bootstrap.has_dynamic_resources() && bootstrap.dynamic_resources().has_cds_config()) {
+  if (bootstrap.dynamic_resources().has_cds_config()) {
     cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), sds_config_, *this);
     init_helper_.setCds(cds_api_.get());
   } else {
@@ -229,14 +227,13 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
     sds_config_.value(sds_config);
   }
 
-  if (bootstrap.has_cluster_manager() && bootstrap.cluster_manager().has_upstream_bind_config() &&
-      bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
+  if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
     source_address_ = Network::Utility::fromProtoSocketAddress(
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
-  if ((bootstrap.has_dynamic_resources() && bootstrap.dynamic_resources().has_cds_config()) ||
-      (bootstrap.has_static_resources() && !bootstrap.static_resources().clusters().empty())) {
+  if (bootstrap.dynamic_resources().has_cds_config() ||
+      !bootstrap.static_resources().clusters().empty()) {
     initializeClustersFromV2Proto(bootstrap);
   } else {
     // TODO(htuch): Make this similar to the v1 -> v2 translation elsewhere,

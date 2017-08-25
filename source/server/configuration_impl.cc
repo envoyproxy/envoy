@@ -52,7 +52,7 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
     server.listenerManager().addOrUpdateListener(listener);
   }
 
-  if (bootstrap.has_dynamic_resources() && bootstrap.dynamic_resources().has_lds_config()) {
+  if (bootstrap.dynamic_resources().has_lds_config()) {
     lds_api_.reset(new LdsApi(bootstrap.dynamic_resources().lds_config(), *cluster_manager_,
                               server.dispatcher(), server.random(), server.initManager(),
                               server.localInfo(), server.stats(), server.listenerManager()));
