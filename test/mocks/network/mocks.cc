@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

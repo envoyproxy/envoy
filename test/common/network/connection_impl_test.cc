@@ -83,9 +83,7 @@ public:
     if (dispatcher_.get() == nullptr) {
       dispatcher_.reset(new Event::DispatcherImpl);
     }
-    listener_ =
-        dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
-                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
@@ -100,6 +98,12 @@ public:
     int expected_callbacks = 2;
     client_connection_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+          Network::ConnectionPtr new_connection =
+              dispatcher_->createConnection(std::move(socket), nullptr);
+          listener_callbacks_.onNewConnection(std::move(new_connection));
+        }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);
@@ -188,6 +192,13 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createConnection(std::move(socket), nullptr);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);
@@ -236,6 +247,12 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
   MockConnectionStats server_connection_stats;
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createConnection(std::move(socket), nullptr);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);
@@ -561,9 +578,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   dispatcher_.reset(new Event::DispatcherImpl);
-  listener_ =
-      dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
-                                  Network::ListenerOptions::listenerOptionsWithBindToPort());
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_,
                                                            Network::Test::createRawBufferSocket());
@@ -740,12 +755,7 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_.reset(new Event::DispatcherImpl);
-    listener_ =
-        dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
-                                    {.bind_to_port_ = true,
-                                     .use_proxy_proto_ = false,
-                                     .use_original_dst_ = false,
-                                     .per_connection_buffer_limit_bytes_ = read_buffer_limit});
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -754,6 +764,13 @@ public:
     client_connection_->connect();
 
     read_filter_.reset(new NiceMock<MockReadFilter>());
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+          Network::ConnectionPtr new_connection =
+              dispatcher_->createConnection(std::move(socket), nullptr);
+          new_connection->setBufferLimits(read_buffer_limit);
+          listener_callbacks_.onNewConnection(std::move(new_connection));
+        }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);

@@ -108,32 +108,48 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "listener_lib",
+    name = "proxy_protocol_lib",
     srcs = [
-        "listener_impl.cc",
         "proxy_protocol.cc",
     ],
     hdrs = [
-        "listener_impl.h",
         "proxy_protocol.h",
     ],
     deps = [
         ":address_lib",
-        ":connection_lib",
         ":listen_socket_lib",
-        ":utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
-        "//include/envoy/network:connection_handler_interface",
-        "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
-        "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:libevent_lib",
-        "//source/common/ssl:connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_lib",
+    srcs = [
+        "listener_impl.cc",
+    ],
+    hdrs = [
+        "listener_impl.h",
+    ],
+    deps = [
+        ":address_lib",
+        ":listen_socket_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:linked_object",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:libevent_lib",
     ],
 )
 

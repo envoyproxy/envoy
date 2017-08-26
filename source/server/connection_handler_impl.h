@@ -12,10 +12,12 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
+#include "common/network/proxy_protocol.h"
 
 #include "spdlog/spdlog.h"
 
@@ -47,34 +49,38 @@ public:
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
-  void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   Stats::Scope& scope, uint64_t listener_tag,
-                   const Network::ListenerOptions& listener_options) override;
-  void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, Stats::Scope& scope, uint64_t listener_tag,
-                      const Network::ListenerOptions& listener_options) override;
-  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
+  void addListener(Listener& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
 
+  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
+
 private:
+  struct ActiveListener;
+  ActiveListener* findActiveListenerByAddress(const Network::Address::Instance& address);
+
   struct ActiveConnection;
   typedef std::unique_ptr<ActiveConnection> ActiveConnectionPtr;
+  struct ActiveSocket;
+  typedef std::unique_ptr<ActiveSocket> ActiveSocketPtr;
 
   /**
    * Wrapper for an active listener owned by this handler.
    */
   struct ActiveListener : public Network::ListenerCallbacks {
-    ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
-                   Network::FilterChainFactory& factory, Stats::Scope& scope, uint64_t listener_tag,
-                   const Network::ListenerOptions& listener_options);
+    ActiveListener(ConnectionHandlerImpl& parent, Listener& config);
 
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                   Network::FilterChainFactory& factory, Stats::Scope& scope,
-                   uint64_t listener_tag);
+                   Listener& config);
 
     ~ActiveListener();
+
+    /**
+     * Fires when a new connection is received from the listener.
+     * @param socket supplies the accepted socket to take control of.
+     */
+    void onAccept(Network::AcceptSocketPtr&& socket) override;
 
     /**
      * Fires when a new connection is received from the listener.
@@ -88,19 +94,21 @@ private:
      */
     void removeConnection(ActiveConnection& connection);
 
+    /**
+     * Create a new connection from a socket accepted by the listener.
+     */
+    void newConnection(Network::AcceptSocketPtr&& accept_socket);
+
+    virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
+
     ConnectionHandlerImpl& parent_;
-    Network::FilterChainFactory& factory_;
     Network::ListenerPtr listener_;
     ListenerStats stats_;
+    std::list<ActiveSocketPtr> sockets_;
     std::list<ActiveConnectionPtr> connections_;
     const uint64_t listener_tag_;
-  };
-
-  struct SslActiveListener : public ActiveListener {
-    SslActiveListener(ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      Stats::Scope& scope, uint64_t listener_tag,
-                      const Network::ListenerOptions& listener_options);
+    Network::ProxyProtocol proxy_protocol_;
+    Listener& config_;
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
@@ -128,6 +136,18 @@ private:
     ActiveListener& listener_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
+  };
+
+  /**
+   * Wrapper for an active accept socket owned by this handler.
+   */
+  struct ActiveSocket : LinkedObject<ActiveSocket>, public Event::DeferredDeletable {
+    ActiveSocket(ActiveListener& listener, Network::AcceptSocketPtr&& socket)
+        : listener_(&listener), socket_(std::move(socket)) {}
+    ~ActiveSocket() {}
+
+    ActiveListener* listener_;
+    Network::AcceptSocketPtr socket_;
   };
 
   static ListenerStats generateStats(Stats::Scope& scope);

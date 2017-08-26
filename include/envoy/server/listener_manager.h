@@ -109,7 +109,7 @@ public:
   /**
    * @return uint64_t the tag the listener should use for connection handler tracking.
    */
-  virtual uint64_t listenerTag() PURE;
+  virtual uint64_t listenerTag() const PURE;
 
   /**
    * @return const std::string& the listener's name.

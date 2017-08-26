@@ -193,8 +193,10 @@ public:
   MockListenerCallbacks();
   ~MockListenerCallbacks();
 
+  void onAccept(AcceptSocketPtr&& socket) override { onAccept_(socket); }
   void onNewConnection(ConnectionPtr&& conn) override { onNewConnection_(conn); }
 
+  MOCK_METHOD1(onAccept_, void(AcceptSocketPtr& socket));
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
@@ -226,6 +228,23 @@ public:
   Address::InstanceConstSharedPtr local_address_;
 };
 
+class MockAcceptSocket : public AcceptSocket {
+public:
+  MockAcceptSocket();
+  ~MockAcceptSocket();
+
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(resetLocalAddress, void(Address::InstanceConstSharedPtr&));
+  MOCK_CONST_METHOD0(localAddressReset, bool());
+  MOCK_CONST_METHOD0(remoteAddress, Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(resetRemoteAddress, void(Address::InstanceConstSharedPtr&));
+  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(takeFd, int());
+  MOCK_METHOD0(close, void());
+
+  Address::InstanceConstSharedPtr local_address_;
+};
+
 class MockListener : public Listener {
 public:
   MockListener();
@@ -240,14 +259,7 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD5(addListener,
-               void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    Stats::Scope& scope, uint64_t listener_tag,
-                    const Network::ListenerOptions& listener_options));
-  MOCK_METHOD6(addSslListener,
-               void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                    Network::ListenSocket& socket, Stats::Scope& scope, uint64_t listener_tag,
-                    const Network::ListenerOptions& listener_options));
+  MOCK_METHOD1(addListener, void(Server::Listener& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));

@@ -14,7 +14,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -23,17 +22,21 @@ namespace Network {
 ProxyProtocol::ProxyProtocol(Stats::Scope& scope)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
 
-void ProxyProtocol::newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener) {
-  std::unique_ptr<ActiveConnection> p{new ActiveConnection(*this, dispatcher, fd, listener)};
+void ProxyProtocol::newConnection(Event::Dispatcher& dispatcher, AcceptSocketPtr&& socket,
+                                  ProxyProtocolCompletion newConnectionCb) {
+  std::unique_ptr<ActiveConnection> p{
+      new ActiveConnection(*this, dispatcher, std::move(socket), newConnectionCb)};
   p->moveIntoList(std::move(p), connections_);
 }
 
 ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
-                                                  Event::Dispatcher& dispatcher, int fd,
-                                                  ListenerImpl& listener)
-    : parent_(parent), fd_(fd), listener_(listener), search_index_(1) {
+                                                  Event::Dispatcher& dispatcher,
+                                                  AcceptSocketPtr&& socket,
+                                                  ProxyProtocolCompletion newConnectionCb)
+    : parent_(parent), socket_(std::move(socket)), newConnectionCb_(newConnectionCb),
+      search_index_(1) {
   file_event_ =
-      dispatcher.createFileEvent(fd,
+      dispatcher.createFileEvent(socket_->fd(),
                                  [this](uint32_t events) {
                                    ASSERT(events == Event::FileReadyType::Read);
                                    UNREFERENCED_PARAMETER(events);
@@ -42,11 +45,7 @@ ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
                                  Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
-ProxyProtocol::ActiveConnection::~ActiveConnection() {
-  if (fd_ != -1) {
-    ::close(fd_);
-  }
-}
+ProxyProtocol::ActiveConnection::~ActiveConnection() {}
 
 void ProxyProtocol::ActiveConnection::onRead() {
   try {
@@ -59,7 +58,7 @@ void ProxyProtocol::ActiveConnection::onRead() {
 
 void ProxyProtocol::ActiveConnection::onReadWorker() {
   std::string proxy_line;
-  if (!readLine(fd_, proxy_line)) {
+  if (!readLine(socket_->fd(), proxy_line)) {
     return;
   }
 
@@ -77,7 +76,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   if (line_parts[1] == "UNKNOWN") {
     // At this point we know it's a proxy protocol line, so we can remove it from the socket
     // and continue.
-    Address::InstanceConstSharedPtr local_address = Envoy::Network::Address::addressFromFd(fd_);
+    Address::InstanceConstSharedPtr local_address = Envoy::Network::Address::addressFromFd(socket_->fd());
     Address::InstanceConstSharedPtr remote_address;
     // The remote address not known.
     if (local_address->ip()->version() == Address::IpVersion::v4) {
@@ -130,20 +129,20 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
 void ProxyProtocol::ActiveConnection::finishConnection(
     Address::InstanceConstSharedPtr remote_address, Address::InstanceConstSharedPtr local_address) {
-
-  ListenerImpl& listener = listener_;
-  int fd = fd_;
-  fd_ = -1;
-
+  socket_->resetLocalAddress(local_address);
+  socket_->resetRemoteAddress(remote_address);
+  ProxyProtocolCompletion newConnectionCb = newConnectionCb_;
+  AcceptSocketPtr socket(std::move(socket_));
   removeFromList(parent_.connections_);
 
-  listener.newConnection(fd, remote_address, local_address, true);
+  newConnectionCb(std::move(socket), true);
 }
 
 void ProxyProtocol::ActiveConnection::close() {
-  ::close(fd_);
-  fd_ = -1;
+  ProxyProtocolCompletion newConnectionCb = newConnectionCb_;
+  AcceptSocketPtr&& socket(std::move(socket_));
   removeFromList(parent_.connections_);
+  newConnectionCb(std::move(socket), false);
 }
 
 bool ProxyProtocol::ActiveConnection::readLine(int fd, std::string& s) {

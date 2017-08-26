@@ -19,12 +19,8 @@ public:
                                                       Network::TransportSocketPtr&&) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
-  Network::ListenerPtr createListener(Network::ConnectionHandler&, Network::ListenSocket&,
-                                      Network::ListenerCallbacks&, Stats::Scope&,
-                                      const Network::ListenerOptions&) override;
-  Network::ListenerPtr createSslListener(Network::ConnectionHandler&, Ssl::ServerContext&,
-                                         Network::ListenSocket&, Network::ListenerCallbacks&,
-                                         Stats::Scope&, const Network::ListenerOptions&) override;
+  Network::ListenerPtr createListener(Network::ListenSocket&, Network::ListenerCallbacks&,
+                                      bool bind_to_port) override;
 };
 
 } // namespace Event

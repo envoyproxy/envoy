@@ -186,7 +186,7 @@ public:
   MOCK_METHOD0(useOriginalDst, bool());
   MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
-  MOCK_METHOD0(listenerTag, uint64_t());
+  MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
 
   testing::NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;

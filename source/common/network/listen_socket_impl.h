@@ -50,5 +50,46 @@ public:
   UdsListenSocket(const std::string& uds_path);
 };
 
+class AcceptSocketImpl : public AcceptSocket {
+public:
+  AcceptSocketImpl(int fd, Address::InstanceConstSharedPtr&& local_address,
+                   Address::InstanceConstSharedPtr&& remote_address)
+      : fd_(fd), local_address_reset_(false), local_address_(std::move(local_address)),
+        remote_address_(std::move(remote_address)) {}
+  ~AcceptSocketImpl() { close(); }
+
+  // Network::AcceptSocket
+  Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
+  void resetLocalAddress(Address::InstanceConstSharedPtr& local_address) override {
+    local_address_ = local_address;
+    local_address_reset_ = true;
+  }
+  bool localAddressReset() const override { return local_address_reset_; }
+  Address::InstanceConstSharedPtr remoteAddress() const override { return remote_address_; }
+  void resetRemoteAddress(Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
+  int fd() const override { return fd_; }
+
+  int takeFd() override {
+    int fd = fd_;
+    fd_ = -1;
+    return fd;
+  }
+
+  void close() override {
+    if (fd_ != -1) {
+      ::close(fd_);
+      fd_ = -1;
+    }
+  }
+
+protected:
+  int fd_;
+  bool local_address_reset_;
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
+};
+
 } // namespace Network
 } // namespace Envoy

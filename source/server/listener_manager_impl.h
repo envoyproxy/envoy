@@ -207,7 +207,7 @@ public:
   bool useOriginalDst() override { return use_original_dst_; }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
-  uint64_t listenerTag() override { return listener_tag_; }
+  uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
 
   // Server::Configuration::FactoryContext

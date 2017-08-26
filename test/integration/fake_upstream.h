@@ -14,6 +14,7 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -303,6 +304,28 @@ protected:
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
                FakeHttpConnection::Type type);
+
+  class FakeListener : public Server::Listener {
+  public:
+    FakeListener(FakeUpstream& parent) : parent_(parent), name_("fake_upstream") {}
+
+  private:
+    // Server::Listener
+    Network::FilterChainFactory& filterChainFactory() override { return parent_; }
+    Network::ListenSocket& socket() override { return *parent_.socket_; }
+    Ssl::ServerContext* defaultSslContext() override { return parent_.ssl_ctx_; }
+    bool useProxyProto() override { return false; }
+    bool bindToPort() override { return true; }
+    bool useOriginalDst() override { return false; }
+    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    uint64_t listenerTag() const override { return 0; }
+    const std::string& name() const override { return name_; }
+
+    FakeUpstream& parent_;
+    std::string name_;
+  };
+
   void threadRoutine();
 
   Ssl::ServerContext* ssl_ctx_{};
@@ -318,5 +341,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_; // Guarded by lock_
   bool allow_unexpected_disconnects_;
+  FakeListener listener_;
 };
 } // namespace Envoy

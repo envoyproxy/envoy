@@ -50,7 +50,6 @@ public:
   void stopListeners() override;
 
 private:
-  void addListenerWorker(Listener& listener);
   void threadRoutine(GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;

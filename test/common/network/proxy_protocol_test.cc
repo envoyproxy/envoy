@@ -9,6 +9,8 @@
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "server/connection_handler_impl.h"
+
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -26,33 +28,47 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
-class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion> {
+// Build again on the basis of the connection_handler_test.cc
+
+class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
+                          public Server::Listener,
+                          protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
       : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), true),
-        listener_(dispatcher_.createListener(connection_handler_, socket_, callbacks_, stats_store_,
-                                             {.bind_to_port_ = true,
-                                              .use_proxy_proto_ = true,
-                                              .use_original_dst_ = false,
-                                              .per_connection_buffer_limit_bytes_ = 0})) {
+        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
+        name_("proxy") {
+    connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
+  // Listener
+  Network::FilterChainFactory& filterChainFactory() override { return factory_; }
+  Network::ListenSocket& socket() override { return socket_; }
+  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+  bool useProxyProto() override { return true; }
+  bool bindToPort() override { return true; }
+  bool useOriginalDst() override { return false; }
+  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  Stats::Scope& listenerScope() override { return stats_store_; }
+  uint64_t listenerTag() const override { return 1; }
+  const std::string& name() const override { return name_; }
+
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          server_connection_ = std::move(conn);
-          server_connection_->addConnectionCallbacks(server_callbacks_);
-          server_connection_->addReadFilter(read_filter_);
+    EXPECT_CALL(factory_, createFilterChain(_))
+        .WillOnce(Invoke([&](Connection& connection) -> bool {
+          server_connection_ = &connection;
+          connection.addConnectionCallbacks(server_callbacks_);
+          connection.addReadFilter(read_filter_);
+          return true;
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
@@ -90,14 +106,14 @@ public:
   Event::DispatcherImpl dispatcher_;
   TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockListenerCallbacks callbacks_;
-  Network::MockConnectionHandler connection_handler_;
-  Network::ListenerPtr listener_;
+  Network::ConnectionHandlerPtr connection_handler_;
+  Network::MockFilterChainFactory factory_;
   ClientConnectionPtr conn_;
   NiceMock<MockConnectionCallbacks> connection_callbacks_;
-  Network::ConnectionPtr server_connection_;
+  Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
+  std::string name_;
 };
 
 // Parameterize the listener socket address version.
@@ -152,9 +168,9 @@ TEST_P(ProxyProtocolTest, Fragmented) {
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  disconnect();
-
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
+
+  disconnect();
 }
 
 TEST_P(ProxyProtocolTest, PartialRead) {
@@ -171,9 +187,9 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  disconnect();
-
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
+
+  disconnect();
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
@@ -283,32 +299,45 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersion> {
+class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
+                                  public Server::Listener,
+                                  protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
       : socket_(Network::Test::getAnyAddress(GetParam()), true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
-        listener_(dispatcher_.createListener(connection_handler_, socket_, callbacks_, stats_store_,
-                                             {.bind_to_port_ = true,
-                                              .use_proxy_proto_ = true,
-                                              .use_original_dst_ = false,
-                                              .per_connection_buffer_limit_bytes_ = 0})) {
+        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
+        name_("proxy") {
+    connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
+  // Server::Listener
+  Network::FilterChainFactory& filterChainFactory() override { return factory_; }
+  Network::ListenSocket& socket() override { return socket_; }
+  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+  bool useProxyProto() override { return true; }
+  bool bindToPort() override { return true; }
+  bool useOriginalDst() override { return false; }
+  uint32_t perConnectionBufferLimitBytes() override { return 0; }
+  Stats::Scope& listenerScope() override { return stats_store_; }
+  uint64_t listenerTag() const override { return 1; }
+  const std::string& name() const override { return name_; }
+
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          server_connection_ = std::move(conn);
-          server_connection_->addConnectionCallbacks(server_callbacks_);
-          server_connection_->addReadFilter(read_filter_);
+    EXPECT_CALL(factory_, createFilterChain(_))
+        .WillOnce(Invoke([&](Connection& connection) -> bool {
+          server_connection_ = &connection;
+          connection.addConnectionCallbacks(server_callbacks_);
+          connection.addReadFilter(read_filter_);
+          return true;
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
@@ -333,14 +362,14 @@ public:
   TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockListenerCallbacks callbacks_;
-  Network::MockConnectionHandler connection_handler_;
-  ListenerPtr listener_;
+  Network::ConnectionHandlerPtr connection_handler_;
+  Network::MockFilterChainFactory factory_;
   ClientConnectionPtr conn_;
   NiceMock<MockConnectionCallbacks> connection_callbacks_;
-  Network::ConnectionPtr server_connection_;
+  Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
+  std::string name_;
 };
 
 // Parameterize the listener socket address version.

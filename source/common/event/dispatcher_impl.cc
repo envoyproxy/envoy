@@ -68,6 +68,19 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
+Network::ConnectionPtr DispatcherImpl::createConnection(Network::AcceptSocketPtr&& socket,
+                                                        Ssl::Context* ssl_ctx) {
+  ASSERT(isThreadSafe());
+  return Network::ConnectionPtr{
+      ssl_ctx ? new Ssl::ConnectionImpl(
+                    *this, socket->takeFd(), socket->remoteAddress(), socket->localAddress(),
+                    Network::Address::InstanceConstSharedPtr(), socket->localAddressReset(), true,
+                    *ssl_ctx, Ssl::InitialState::Server)
+              : new Network::ConnectionImpl(
+                    *this, socket->takeFd(), socket->remoteAddress(), socket->localAddress(),
+                    Network::Address::InstanceConstSharedPtr(), socket->localAddressReset(), true)};
+}
+
 Network::ClientConnectionPtr
 DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
                                        Network::Address::InstanceConstSharedPtr source_address,
@@ -94,24 +107,11 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr
-DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
-                               Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                               Stats::Scope& scope,
-                               const Network::ListenerOptions& listener_options) {
+Network::ListenerPtr DispatcherImpl::createListener(Network::ListenSocket& socket,
+                                                    Network::ListenerCallbacks& cb,
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{
-      new Network::ListenerImpl(conn_handler, *this, socket, cb, scope, listener_options)};
-}
-
-Network::ListenerPtr
-DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
-                                  Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                  Network::ListenerCallbacks& cb, Stats::Scope& scope,
-                                  const Network::ListenerOptions& listener_options) {
-  ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
-                                                           scope, listener_options)};
+  return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

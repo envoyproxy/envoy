@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Network {
 
-class ListenerImpl;
+typedef std::function<void(AcceptSocketPtr&&, bool success)> ProxyProtocolCompletion;
 
 /**
  * All stats for the proxy protocol. @see stats_macros.h
@@ -37,8 +37,8 @@ class ProxyProtocol {
 public:
   class ActiveConnection : public LinkedObject<ActiveConnection> {
   public:
-    ActiveConnection(ProxyProtocol& parent, Event::Dispatcher& dispatcher, int fd,
-                     ListenerImpl& listener);
+    ActiveConnection(ProxyProtocol& parent, Event::Dispatcher& dispatcher, AcceptSocketPtr&& socket,
+                     ProxyProtocolCompletion newConnectionCb);
     ~ActiveConnection();
 
   private:
@@ -62,8 +62,8 @@ public:
                           Address::InstanceConstSharedPtr local_address);
 
     ProxyProtocol& parent_;
-    int fd_;
-    ListenerImpl& listener_;
+    AcceptSocketPtr socket_;
+    ProxyProtocolCompletion newConnectionCb_;
     Event::FileEventPtr file_event_;
 
     // The offset in buf_ that has been fully read
@@ -78,7 +78,8 @@ public:
 
   ProxyProtocol(Stats::Scope& scope);
 
-  void newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener);
+  void newConnection(Event::Dispatcher& dispatcher, AcceptSocketPtr&& socket,
+                     ProxyProtocolCompletion newConnectionCb);
 
 private:
   ProxyProtocolStats stats_;
