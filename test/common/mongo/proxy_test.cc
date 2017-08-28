@@ -70,8 +70,7 @@ public:
   }
 
   void initializeFilter() {
-    filter_.reset(
-        new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_, dispatcher_));
+    filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
   }
@@ -118,7 +117,8 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   setupDelayFault(delay, 50, true);
   initializeFilter();
 
-  Event::MockTimer* delay_timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* delay_timer =
+      new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay)));
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
@@ -131,8 +131,9 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+  EXPECT_EQ(1U, store_.counter("test.op_query").value());
 
-  // Request during active delay.
+  // Requests during active delay.
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
@@ -142,6 +143,16 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+  EXPECT_EQ(2U, store_.counter("test.op_query").value());
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->cursorId(1);
+    filter_->callbacks_->decodeGetMore(std::move(message));
+  }));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
 
   delay_timer->callback_();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());

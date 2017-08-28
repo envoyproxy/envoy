@@ -43,11 +43,9 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         FaultConfigSharedPtr fault_config, Event::Dispatcher& dispatcher)
+                         FaultConfigSharedPtr fault_config)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
-      runtime_(runtime), access_log_(access_log), fault_config_(fault_config),
-      dispatcher_(dispatcher) {
-
+      runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
   if (!runtime_.snapshot().featureEnabled(CONNECTION_LOGGING_ENABLED_KEY, 100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
     // don't ever log.
@@ -58,12 +56,16 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 ProxyFilter::~ProxyFilter() {}
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_get_more_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded GET_MORE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_insert_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded INSERT: {}", message->toString(true));
@@ -76,10 +78,11 @@ void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
 }
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_query_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded QUERY: {}", message->toString(true));
-  tryInjectDelay();
 
   if (message->flags() & QueryMessage::Flags::TailableCursor) {
     stats_.op_query_tailable_cursor_.inc();
@@ -235,9 +238,6 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
 }
 
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
-  if (delay_timer_)
-    return Network::FilterStatus::StopIteration;
-
   read_buffer_.add(data);
   doDecode(read_buffer_);
 
@@ -283,10 +283,17 @@ void ProxyFilter::delayInjectionTimerCallback() {
 }
 
 void ProxyFilter::tryInjectDelay() {
+  // Do not try to inject delays if there is an active delay.
+  // Make sure to capture stats for the request otherwise.
+  if (delay_timer_) {
+    return;
+  }
+
   Optional<uint64_t> delay_ms = delayDuration();
 
   if (delay_ms.valid()) {
-    delay_timer_ = dispatcher_.createTimer([this]() -> void { delayInjectionTimerCallback(); });
+    delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { delayInjectionTimerCallback(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(delay_ms.value()));
     stats_.delays_injected_.inc();
   }

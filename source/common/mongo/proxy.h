@@ -107,8 +107,7 @@ class ProxyFilter : public Network::Filter,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-              AccessLogSharedPtr access_log, FaultConfigSharedPtr fault_config,
-              Event::Dispatcher& dispatcher);
+              AccessLogSharedPtr access_log, FaultConfigSharedPtr fault_config);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -180,7 +179,6 @@ private:
   AccessLogSharedPtr access_log_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   FaultConfigSharedPtr fault_config_;
-  Event::Dispatcher& dispatcher_;
   Event::TimerPtr delay_timer_;
 
   const static std::string FIXED_DELAY_PERCENT_KEY;
