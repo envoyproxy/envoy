@@ -25,7 +25,6 @@ public:
     filtered = Z_FILTERED,
     huffman = Z_HUFFMAN_ONLY,
     rle = Z_RLE,
-    fixed = Z_FIXED,
     default_strategy = Z_DEFAULT_STRATEGY,
   };
 
@@ -37,12 +36,18 @@ public:
 
   /**
    * Used for compression initialization.
-   * @param level compression level applied, default = default_compression.
-   * @param strategy compression strategy applied, default = default_strategy.
-   * @param window_bits allows setting the zlib's window bits for different encoding types,
-   * default = 31 (gzip encoding).
-   * @param memory_level allows setting how much memory should be allocated for the internal
-   * compression state, default = 8.
+   * @param level sets compression level. 'best' gives best compression, 'speed' gives best
+   * performance, 'default_compression' gives normal compression. default = default_compression.
+   * @param strategy sets the compression algorithm. 'default_strategy' is used for normal data,
+   * 'filtered' is used for data produced by a predictor, 'huffman' is used to enforce Huffman
+   * encoding, 'rle' is used to limit match distances to one. default = default_strategy.
+   * @param window_bits sets the size of the history buffer. Larger values result in better
+   * compression, but will use more memory. It normally ranges from 8 to 15, but larger values can
+   * be applied, e.g. 31 (gzip). Larger window_bits will result in better compression at memory
+   * cost. A negative window_bits strips off zlib header and checksum from the stream.
+   * @param memory_level sets how much memory should be allocated for the internal compression
+   * state. memory_level = 1 uses the least amount of memory but is slow and degrades compression
+   * ratio, memory_level = 9 uses max memory for optimal speed.
    * @return bool true if initialization succceeded or has been already initialized and false if an
    * error occurred.
    */
@@ -51,10 +56,9 @@ public:
 
   /**
    * Used for decompression initialization.
-   * @param window_bits is used for setting different encoding types. It should be set as the same
-   * as used during compression, but if that's not known, setting window bits to zero will tell the
-   * decompressor to use whatever is set in the header of the encoded data. default = 31 (gzip
-   * encoding).
+   * @param window_bits sets the size of the history buffer. Larger values result in better
+   * decompression, but will use more memory. If the window_bits input is less than the one used
+   * during compression, decompress will return false.
    * @return bool true if initialization succceeded or has been already initialized and false if an
    * error occurred.
    */
@@ -62,8 +66,9 @@ public:
 
   /**
    * Returns the final state of the compression/decompression and resets zlib internal counters (e.g
-   * total_in). This function does not free and reallocate the internal decompression state. The The
-   * stream will keep attributes that may have been set during initialization.
+   * total_in). This function does not free and reallocate the internal decompression state. The
+   * stream will keep attributes that may have been set during initialization. It must be called
+   * after calling init() and after some compression/decompression has been done.
    * @return bool true if success, or false if the source stream state was inconsistent.
    */
   bool reset();
