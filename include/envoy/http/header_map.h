@@ -201,9 +201,11 @@ private:
  * O(1) access to these headers without even a hash lookup.
  */
 #define ALL_INLINE_HEADERS(HEADER_FUNC)                                                            \
+  HEADER_FUNC(AcceptEncoding)                                                                      \
   HEADER_FUNC(Authorization)                                                                       \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(Connection)                                                                          \
+  HEADER_FUNC(ContentEncoding)                                                                     \
   HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
   HEADER_FUNC(Date)                                                                                \
@@ -224,6 +226,7 @@ private:
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
+  HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \

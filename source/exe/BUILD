@@ -23,6 +23,7 @@ envoy_cc_binary(
 envoy_cc_library(
     name = "envoy_common_lib",
     deps = [
+        "//source/common/compressor:compressor_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -37,6 +38,7 @@ envoy_cc_library(
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:grpc_web_lib",
+        "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",

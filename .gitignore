@@ -8,7 +8,9 @@
 /ci/prebuilt/thirdparty_build
 /test/coverage/BUILD
 cscope.*
-BROWSE
 .deps
+.vscode
 *.pyc
 SOURCE_VERSION
+BROWSE
+

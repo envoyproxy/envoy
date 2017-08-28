@@ -50,6 +50,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "gzip_filter_lib",
+    srcs = ["gzip_filter.cc"],
+    hdrs = ["gzip_filter.h"],
+    external_deps = ["zlib"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/compressor:compressor_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ip_tagging_filter_lib",
     srcs = ["ip_tagging_filter.cc"],
     hdrs = ["ip_tagging_filter.h"],
