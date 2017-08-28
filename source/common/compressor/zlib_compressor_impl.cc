@@ -6,6 +6,7 @@ namespace Compressor {
 ZlibCompressorImpl::ZlibCompressorImpl() : zlib_ptr_(new z_stream()) {}
 
 ZlibCompressorImpl::~ZlibCompressorImpl() {
+  // deflateEnd/inflateEnd must be called, otherwise it will cause memory leaks.
   if (is_deflate_) {
     deflateEnd(zlib_ptr_.get());
   } else {
@@ -17,6 +18,7 @@ void ZlibCompressorImpl::setChunk(uint64_t chunk) { chunk_ = chunk; }
 
 bool ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
                               int window_bits, uint memory_level) {
+  // prevents deflateInit2() of being called multiple times, which would cause memory leaks.
   if (is_initialized_) {
     return true;
   }
@@ -33,6 +35,7 @@ bool ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
 }
 
 bool ZlibCompressorImpl::init(int window_bits) {
+  // prevents inflateInit2() of being called multiple times, which would cause memory leaks.
   if (is_initialized_) {
     return true;
   }
