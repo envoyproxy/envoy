@@ -197,6 +197,24 @@ public:
   Event::DispatcherPtr dispatcher_;
 
 protected:
+  // Sends |request_headers| and |request_body_size| bytes of body upstream.
+  // Configured upstream to send |response_headers| and |response_body_size|
+  // bytes of body downstream.
+  //
+  // Waits for the complete downstream response before returning.
+  // Requires |codec_client_| to be initialized.
+  void sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
+                                     uint32_t request_body_size,
+                                     Http::TestHeaderMapImpl& response_headers,
+                                     uint32_t response_body_size);
+
+  // Wait for the end of stream on the next upstream stream on fake_upstreams_
+  // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
+  void waitForNextUpstreamRequest();
+
+  // Close |codec_client_| and |fake_upstream_connection_| cleanly.
+  void cleanupUpstreamAndDownstream();
+
   void testRouterRedirect(Http::CodecClient::Type type);
   void testRouterNotFound(Http::CodecClient::Type type);
   void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
@@ -254,6 +272,8 @@ protected:
   FakeStreamPtr upstream_request_;
   // A pointer to the request encoder, if used.
   Http::StreamEncoder* request_encoder_{nullptr};
+  // The response headers sent by sendRequestAndWaitForResponse() by default.
+  Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
