@@ -3,9 +3,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/http/header_map_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/compressor/zlib_compressor_impl.h"
+#include "common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -33,14 +33,15 @@ public:
 private:
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-  Http::HeaderEntry* content_encoding_header_{nullptr};
   Compressor::ZlibCompressorImpl compressor_;
+  // TODO: Just for testing.. remove it later
+  Compressor::ZlibCompressorImpl decompressor_;
   Buffer::OwnedImpl buffer_;
-  
-  bool deflate_{false};
-  bool is_compressed_{true};
-  
+
+  bool compress_{false};
+  uint memory_level_{8};
+  int gzip_header_{15 + 16};
 };
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

@@ -1,27 +1,26 @@
 #include "common/http/filter/gzip_filter.h"
-#include "common/common/assert.h"
-
-#include <iostream>
 
 #include <chrono>
+#include <iostream>
+#include <thread>
 
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Http {
 
-GzipFilter::GzipFilter() { }
+GzipFilter::GzipFilter() {}
 
-GzipFilter::~GzipFilter() { }
+GzipFilter::~GzipFilter() {}
 
-void GzipFilter::onDestroy() { }
+void GzipFilter::onDestroy() {}
 
 FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
-  Http::HeaderEntry* content_encoding_header = headers.AcceptEncoding();
-  if (content_encoding_header &&
-      content_encoding_header->value().find(
-          Http::Headers::get().AcceptEncodingValues.Deflate.c_str())) {
-    deflate_ = true;
+  if (headers.AcceptEncoding() &&
+      headers.AcceptEncoding()->value().find(Headers::get().AcceptEncodingValues.Deflate.c_str())) {
+    compress_ = true;
   }
+
   return FilterHeadersStatus::Continue;
 }
 
@@ -37,65 +36,35 @@ void GzipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& c
   decoder_callbacks_ = &callbacks;
 }
 
-FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
-  content_encoding_header_ = headers.ContentEncoding();
-
-  if (!deflate_ || end_stream) {
-    return Http::FilterHeadersStatus::Continue;
+FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
+  if (compress_ && headers.ContentEncoding() == nullptr) {
+    compressor_.init(Compressor::ZlibCompressorImpl::CompressionLevel::default_compression,
+                     Compressor::ZlibCompressorImpl::CompressionStrategy::default_strategy,
+                     gzip_header_, memory_level_);
+    // TODO: Just for testing.. remove it later
+    decompressor_.init(gzip_header_);
+    headers.removeContentLength();
+    headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
+    headers.removeEtag();
+  } else {
+    compress_ = false;
   }
 
-  if (content_encoding_header_ &&
-      content_encoding_header_->value().find(
-          Http::Headers::get().ContentEncodingValues.Br.c_str())) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (content_encoding_header_ &&
-      content_encoding_header_->value().find(
-          Http::Headers::get().ContentEncodingValues.Compress.c_str())) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (content_encoding_header_ &&
-      content_encoding_header_->value().find(
-          Http::Headers::get().ContentEncodingValues.Deflate.c_str())) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (content_encoding_header_ &&
-      content_encoding_header_->value().find(
-          Http::Headers::get().ContentEncodingValues.Gzip.c_str())) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (content_encoding_header_ &&
-      content_encoding_header_->value().find(
-          Http::Headers::get().ContentEncodingValues.Gzip.c_str())) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-  
-  is_compressed_ = false;
-
-  headers.removeContentLength();
-  headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-  headers.removeEtag();
-
-  compressor_.init();
-  
   return Http::FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (!deflate_ || is_compressed_) {
+FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool) {
+  if (!compress_) {
     return Http::FilterDataStatus::Continue;
   }
 
-  compressor_.start(data, buffer_);
-  data.move(buffer_);
+  uint64_t length{data.length()};
+  compressor_.compress(data, buffer_);
+  data.drain(length);
 
-  if (end_stream) {  
-    compressor_.finish();
-  }
+  // TODO: Just for testing.. remove it later
+  decompressor_.decompress(buffer_, data);
+  buffer_.drain(buffer_.length());
 
   return Http::FilterDataStatus::Continue;
 }
@@ -108,5 +77,5 @@ void GzipFilter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& c
   encoder_callbacks_ = &callbacks;
 }
 
-} // Http
-} // Envoy
+} // namespace Http
+} // namespace Envoy

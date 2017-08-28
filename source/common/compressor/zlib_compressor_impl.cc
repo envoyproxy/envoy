@@ -1,88 +1,97 @@
 #include "common/compressor/zlib_compressor_impl.h"
+
 #include <iostream>
 
 namespace Envoy {
 namespace Compressor {
 
-  ZlibCompressorImpl::ZlibCompressorImpl() {
-    ZlibPtr_ = std::unique_ptr<z_stream>(new z_stream());
+ZlibCompressorImpl::ZlibCompressorImpl() : zlib_ptr_(new z_stream()) {}
+
+ZlibCompressorImpl::~ZlibCompressorImpl() {
+  if (is_deflate_) {
+    deflateEnd(zlib_ptr_.get());
+  } else {
+    inflateEnd(zlib_ptr_.get());
+  }
+}
+
+void ZlibCompressorImpl::setChunk(uint64_t chunk) { chunk_ = chunk; }
+
+bool ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
+                              int window_bits, uint memory_level) {
+  zlib_ptr_->zalloc = Z_NULL;
+  zlib_ptr_->zfree = Z_NULL;
+  zlib_ptr_->opaque = Z_NULL;
+
+  int result = deflateInit2(zlib_ptr_.get(), comp_level, Z_DEFLATED, window_bits, memory_level,
+                            comp_strategy);
+
+  return result == Z_OK;
+}
+
+bool ZlibCompressorImpl::init(int window_bits) {
+  is_deflate_ = false;
+
+  zlib_ptr_->zalloc = Z_NULL;
+  zlib_ptr_->zfree = Z_NULL;
+  zlib_ptr_->opaque = Z_NULL;
+
+  int result = inflateInit2(zlib_ptr_.get(), window_bits);
+
+  return result == Z_OK;
+}
+
+bool ZlibCompressorImpl::finish() {
+  int result{};
+
+  if (is_deflate_) {
+    result = deflateEnd(zlib_ptr_.get());
+  } else {
+    result = inflateEnd(zlib_ptr_.get());
   }
 
-  // Not calling deflateEnd() will cause leaks.
-  ZlibCompressorImpl::~ZlibCompressorImpl() {  
-    deflateEnd(ZlibPtr_.get());
-  }
+  return result != Z_STREAM_ERROR;
+}
 
-  uint64_t ZlibCompressorImpl::getTotalIn() {
-    return ZlibPtr_->total_in;
-  }
+bool ZlibCompressorImpl::compress(const Buffer::Instance& in, Buffer::Instance& out) {
+  return process(in, out, &deflate);
+}
 
-  uint64_t ZlibCompressorImpl::getTotalOut() {
-    return ZlibPtr_->total_out;
-  }
+bool ZlibCompressorImpl::decompress(const Buffer::Instance& in, Buffer::Instance& out) {
+  return process(in, out, &inflate);
+}
 
-  void ZlibCompressorImpl::setMemoryLevel(uint mem_level) {
-    memory_level_ = mem_level;
-  }
-
-  void ZlibCompressorImpl::setWindowBits(int win_bits) {
-    window_bits_ = win_bits;
-  }
-
-  void ZlibCompressorImpl::setChunk(uint64_t chunk) {
-    chunk_ = chunk;
-  }
-
-  bool ZlibCompressorImpl::init(CompressionLevel level, CompressionStrategy strategy) {
-    ZlibPtr_->zalloc = Z_NULL;
-    ZlibPtr_->zfree = Z_NULL;
-    ZlibPtr_->opaque = Z_NULL;  
-
-    int result = deflateInit2(ZlibPtr_.get(), level, Z_DEFLATED, 
-                              window_bits_, memory_level_, strategy);
-              
-    return result == Z_OK;
-  }
-
-  bool ZlibCompressorImpl::finish() {
-    int result = deflateEnd(ZlibPtr_.get());
-    
-    return result != Z_STREAM_ERROR;
-  }
-
-  bool ZlibCompressorImpl::start(Buffer::Instance& in, Buffer::Instance& out) {
-    if (!in.length()) {
-      return true;
-    }
-
-    Buffer::RawSlice in_slice{};
-    Buffer::RawSlice out_slice{};
-
-    out.reserve(chunk_ , &out_slice, 1);
-    
-    ZlibPtr_->avail_out = out_slice.len_;
-    ZlibPtr_->next_out = static_cast<Bytef *>(out_slice.mem_);
-    
-    while (in.getRawSlices(&in_slice, 1)) {
-      ZlibPtr_->avail_in = in_slice.len_;
-      ZlibPtr_->next_in = static_cast<Bytef *>(in_slice.mem_);
-     
-      if (deflate(ZlibPtr_.get(), Z_NO_FLUSH) != Z_OK) {
-        return false;
-      }
-      
-      in.drain(in_slice.len_ - ZlibPtr_->avail_in);
-    }; 
-
-    if (deflate(ZlibPtr_.get(), Z_SYNC_FLUSH) != Z_OK) {
-      return false;
-    }
-   
-    out_slice.len_ = out_slice.len_ - ZlibPtr_->avail_out;
-    out.commit(&out_slice, 1);
-
+bool ZlibCompressorImpl::process(const Buffer::Instance& in, Buffer::Instance& out,
+                                 int (*fptr)(z_stream*, int)) {
+  if (!in.length()) {
     return true;
   }
 
-} // namespace compressor 
-} // namespace envoy
+  Buffer::RawSlice out_slice{};
+  out.reserve(chunk_, &out_slice, 1);
+
+  zlib_ptr_->avail_out = out_slice.len_;
+  zlib_ptr_->next_out = static_cast<Bytef*>(out_slice.mem_);
+
+  uint64_t num_slices = in.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  in.getRawSlices(slices, num_slices);
+  uint64_t t_bytes{0};
+
+  for (Buffer::RawSlice& slice : slices) {
+    zlib_ptr_->avail_in = slice.len_;
+    zlib_ptr_->next_in = static_cast<Bytef*>(slice.mem_);
+    t_bytes += zlib_ptr_->avail_in;
+    if (fptr(zlib_ptr_.get(), t_bytes < in.length() ? Z_NO_FLUSH : Z_SYNC_FLUSH) != Z_OK) {
+      return false;
+    }
+  }
+
+  out_slice.len_ = out_slice.len_ - zlib_ptr_->avail_out;
+  out.commit(&out_slice, 1);
+
+  return true;
+}
+
+} // namespace Compressor
+} // namespace Envoy

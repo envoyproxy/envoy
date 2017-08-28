@@ -9,92 +9,83 @@ namespace Compressor {
 
 class ZlibCompressorImpl : public Compressor {
 
-enum CompressionLevel {
-  default_compression = Z_DEFAULT_COMPRESSION,
-  best = Z_BEST_COMPRESSION,
-  speed = Z_BEST_SPEED,
-};
-
-enum CompressionStrategy {
-  filtered = Z_FILTERED,
-  huffman = Z_HUFFMAN_ONLY,
-  rle = Z_RLE,
-  fixed = Z_FIXED,
-  default_strategy = Z_DEFAULT_STRATEGY,
-};
-
 public:
+  enum CompressionLevel {
+    zero = Z_NO_COMPRESSION,
+    default_compression = Z_DEFAULT_COMPRESSION,
+    best = Z_BEST_COMPRESSION,
+    speed = Z_BEST_SPEED,
+  };
+
+  enum CompressionStrategy {
+    filtered = Z_FILTERED,
+    huffman = Z_HUFFMAN_ONLY,
+    rle = Z_RLE,
+    fixed = Z_FIXED,
+    default_strategy = Z_DEFAULT_STRATEGY,
+  };
+
   ZlibCompressorImpl();
   ~ZlibCompressorImpl();
 
   /**
-   * Gets current total bytes passed into the compressor 
-   * @return current bytes moved into the compressor.
-   */
-   uint64_t getTotalIn();
-   
-  /**
-   * Gets current total bytes moved out of the compressor 
-   * @return bytes returned by the compressor.
-   */
-  uint64_t getTotalOut();   
-
-  /**
-   * Sets how much memory should be allocated by zlib 
-   * for the internal compression state.
-   * @param mem_level level of allocated memory, default = 8 | max = 9.
-   */
-  void setMemoryLevel(uint mem_level);
-
-  /**
    * Buffer size for feeding data to and pulling data from the zlib routines.
-   * For this implementation, it should never be less than the length of evbuffer 
+   * For this implementation, it should never be less than the length of evbuffer
    * passsed into ZlibCompressorImpl::start(Buffer::Instance& in, Buffer::Instance& out).
    * @param chunk available memory to deflate data, default = 4096.
    */
   void setChunk(uint64_t chunk);
 
   /**
-   * The windowBits parameter shall be a base 2 logarithm of the window size 
-   * to use, and shall be a value between 8 and 15 (15 + 16 to write a simple gzip). 
-   * A smaller value will use less memory, but will result in a poorer compression 
-   * ratio, while a higher value will give better compression but utilize more memory.
-   * @param window_bits memory window size, default = 31 gzip.
-   */
-  void setWindowBits(int window_bits);
-  
-  /**
-   * Initialize the compression engine and allows to adjust compression level
-   * as well strategy  
+   * Used for compression initialization
    * @param level compression level applied, default = Z_DEFAULT_COMPRESSION.
    * @param strategy compression strategy applied, default = Z_DEFAULT_STRATEGY.
-   * @return true if initialization succceeded or false if an error occurred
+   * @param window_bits
+   * @param memory_level
+   * @return bool true if initialization succceeded or false if an error occurred
    */
-  bool init(CompressionLevel level = CompressionLevel::default_compression,
-            CompressionStrategy strategy = CompressionStrategy::default_strategy);
- 
+  bool init(CompressionLevel level, CompressionStrategy strategy, int window_bits,
+            uint memory_level);
+
+  /**
+   * Used for decompression initialization
+   * @param window_bits
+   * @return bool true if initialization succceeded or false if an error occurred
+   */
+  bool init(int window_bits = 0);
+
   /**
    * Finalize the compression engine and free all dynamic memory allocated during
-   * compression. If this function does not get called, distructor will take care 
-   * of the memmory by calling deflateEnd(). Calling this method though allows to 
+   * compression. If this function does not get called, distructor will take care
+   * of the memmory by calling deflateEnd(). Calling this method though allows to
    * inspect the compressor has errors.
-   * @return true if compressor finalized without error or false otherwise.
+   * @return bool if compressor finalized without error or false otherwise.
    */
-  bool finish() override;
-  
-  /**
-   * Move and encode data from one buffer into another   
-   * @return true if compression succeeded or false otherwise.
-   */
-  bool start(Buffer::Instance& in, Buffer::Instance& out) override;
-  
+  bool finish();
+
+  bool compress(const Buffer::Instance& in, Buffer::Instance& out) override;
+
+  bool decompress(const Buffer::Instance& in, Buffer::Instance& out) override;
+
 private:
-  std::unique_ptr<z_stream> ZlibPtr_{nullptr};
+  bool process(const Buffer::Instance& in, Buffer::Instance& out, int (*fptr)(z_stream*, int));
+
+  bool is_deflate_{true};
   uint64_t chunk_{4096};
-  uint memory_level_{8};
-  int window_bits_{15 + 16};
-  
+
+  // struct ZstreamDeleter {
+  //   void operator()(z_stream* z) const {
+  //     if (is_deflate_) {
+  //       deflateEnd(z);
+  //     } else {
+  //       inflateEnd(z);
+  //     }
+  //     delete z;
+  //   }
+  // };
+
+  std::unique_ptr<z_stream> zlib_ptr_{nullptr};
 };
 
-} // namespace zlib
-} // namespace envoy
+} // namespace Compressor
+} // namespace Envoy

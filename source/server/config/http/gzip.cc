@@ -8,17 +8,15 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb GzipFilterConfig::createFilterFactory(const Json::Object&,
-                                                          const std::string&,
+HttpFilterFactoryCb GzipFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
                                                           FactoryContext&) {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(
-          Http::StreamFilterSharedPtr{new Http::GzipFilter()});
-    };
+  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Http::GzipFilter()});
+  };
 }
 
 static Registry::RegisterFactory<GzipFilterConfig, NamedHttpFilterConfigFactory> register_;
 
-} // Configuration
-} // Server
-} // Envoy
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

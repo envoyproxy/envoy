@@ -15,19 +15,9 @@ class Compressor {
 public:
   virtual ~Compressor() {}
 
-  /**
-   * Compress data from one buffer into another buffer
-   * @param in supplies the buffer with data to be compressed 
-   * @param data supplies the buffer to output compressed data
-   * @return bool indicates whether operation succeeded or not.
-   */
-  virtual bool start(Buffer::Instance& in, Buffer::Instance& out) PURE;
-  
-  /**
-   * Clean up any internal memory allocated by the compressor.
-   */
-  virtual bool finish() PURE;
-  
+  virtual bool compress(const Buffer::Instance& in, Buffer::Instance& out) PURE;
+
+  virtual bool decompress(const Buffer::Instance& in, Buffer::Instance& out) PURE;
 };
 
 } // namespace Compressor

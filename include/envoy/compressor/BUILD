@@ -12,6 +12,6 @@ envoy_cc_library(
     name = "compressor_interface",
     hdrs = ["compressor.h"],
     deps = [
-      "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
