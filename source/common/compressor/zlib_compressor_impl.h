@@ -30,7 +30,7 @@ public:
   };
 
   /**
-   * Allows setting the buffer size for feeding data to and pulling data from the zlib routines.
+   * Sets buffer size for feeding data to and pulling data from the zlib routines.
    * @param chunk amout of memory that is reserved for zlib to inflate/deflate data, default = 4096.
    */
   void setChunk(uint64_t chunk);
@@ -43,23 +43,27 @@ public:
    * default = 31 (gzip encoding).
    * @param memory_level allows setting how much memory should be allocated for the internal
    * compression state, default = 8.
-   * @return bool true if initialization succceeded or false if an error occurred.
+   * @return bool true if initialization succceeded or has been already initialized and false if an
+   * error occurred.
    */
   bool init(CompressionLevel level, CompressionStrategy strategy, int window_bits,
             uint memory_level);
 
   /**
-   * Used for decompression initialization
+   * Used for decompression initialization.
    * @param window_bits is used for setting different encoding types. It should be set as the same
    * as used during compression, but if that's not known, setting window bits to zero will tell the
    * decompressor to use whatever is set in the header of the encoded data. default = 31 (gzip
    * encoding).
-   * @return bool true if initialization succceeded or false if an error occurred.
+   * @return bool true if initialization succceeded or has been already initialized and false if an
+   * error occurred.
    */
   bool init(int window_bits);
 
   /**
-   * Allows verify the final state of the compression/decompression.
+   * Returns the final state of the compression and resets zlib internal counters (e.g total_in).
+   * This function does not free and reallocate the internal decompression state. The The stream
+   * will keep attributes that may have been set during initialization.
    * @return bool true if success, or false if the source stream state was inconsistent.
    */
   bool finish();
@@ -79,6 +83,7 @@ private:
 
   uint64_t chunk_{4096};
   bool is_deflate_{true};
+  bool is_initialized_{false};
 };
 
 } // namespace Compressor

@@ -13,7 +13,7 @@ public:
   virtual ~Compressor() {}
 
   /**
-   * Compress data from one buffer into another buffer.
+   * Compresses data from one buffer into another buffer.
    * @param in supplies the buffer with data to be compressed.
    * @param out supplies the buffer to output compressed data.
    * @return bool indicating whether operation succeeded or not.
@@ -21,7 +21,7 @@ public:
   virtual bool compress(const Buffer::Instance& in, Buffer::Instance& out) PURE;
 
   /**
-   * Decompress encoded data from one buffer into another buffer
+   * Decompresses encoded data from one buffer into another buffer
    * @param in supplies the buffer with data to be decompressed.
    * @param out supplies the buffer to output uncompressed data.
    * @return bool indicating whether operation succeeded or not.

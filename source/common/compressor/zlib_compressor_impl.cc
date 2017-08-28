@@ -17,17 +17,25 @@ void ZlibCompressorImpl::setChunk(uint64_t chunk) { chunk_ = chunk; }
 
 bool ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
                               int window_bits, uint memory_level) {
+  if (is_initialized_) {
+    return true;
+  }
+
   zlib_ptr_->zalloc = Z_NULL;
   zlib_ptr_->zfree = Z_NULL;
   zlib_ptr_->opaque = Z_NULL;
 
   int result = deflateInit2(zlib_ptr_.get(), comp_level, Z_DEFLATED, window_bits, memory_level,
                             comp_strategy);
+  is_initialized_ = true;
 
   return result == Z_OK;
 }
 
 bool ZlibCompressorImpl::init(int window_bits) {
+  if (is_initialized_) {
+    return true;
+  }
   is_deflate_ = false;
 
   zlib_ptr_->zalloc = Z_NULL;
@@ -35,6 +43,7 @@ bool ZlibCompressorImpl::init(int window_bits) {
   zlib_ptr_->opaque = Z_NULL;
 
   int result = inflateInit2(zlib_ptr_.get(), window_bits);
+  is_initialized_ = true;
 
   return result == Z_OK;
 }
@@ -74,7 +83,7 @@ bool ZlibCompressorImpl::process(const Buffer::Instance& in, Buffer::Instance& o
   uint64_t num_slices = in.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   in.getRawSlices(slices, num_slices);
-  uint64_t t_bytes{0};
+  uint64_t t_bytes{};
 
   for (Buffer::RawSlice& slice : slices) {
     zlib_ptr_->avail_in = slice.len_;

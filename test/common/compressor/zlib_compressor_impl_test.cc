@@ -24,7 +24,36 @@ protected:
   }
 };
 
-TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeCompressor) {
+/**
+ * Tests if init() is preventing multiple initialization calls.
+ * If is_initialized conditional inside init()'s fail, calling it
+ * more than once would cause memory leaks.
+ */
+TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
+  ZlibCompressorImpl compressor;
+
+  EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                                  ZlibCompressorImpl::CompressionStrategy::default_strategy,
+                                  gzip_window_bits, memory_level));
+
+  EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                                  ZlibCompressorImpl::CompressionStrategy::default_strategy,
+                                  gzip_window_bits, memory_level));
+}
+
+/**
+ * Tests if init() is preventing multiple initialization calls.
+ * If is_initialized conditional inside init()'s fail, calling it
+ * more than once would cause memory leaks.
+ */
+TEST_F(ZlibCompressorImplTest, InitilizeDecompressor) {
+  ZlibCompressorImpl decompressor;
+
+  EXPECT_EQ(true, decompressor.init(gzip_window_bits));
+  EXPECT_EQ(true, decompressor.init(gzip_window_bits));
+}
+
+TEST_F(ZlibCompressorImplTest, FinalizeCompressor) {
   ZlibCompressorImpl compressor;
 
   EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
@@ -33,8 +62,8 @@ TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeCompressor) {
   EXPECT_EQ(true, compressor.finish());
 }
 
-TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeDecompressor) {
-  Envoy::Compressor::ZlibCompressorImpl decompressor;
+TEST_F(ZlibCompressorImplTest, FinalizeDecompressor) {
+  ZlibCompressorImpl decompressor;
 
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   EXPECT_EQ(true, decompressor.finish());
