@@ -24,11 +24,10 @@ protected:
   }
 };
 
-
 /**
  * Init() should always return true when called multiple times.
- * This test checks if deflateInit2(), internal of init(), is 
- * not being called more than once. That would cause memory leaks. 
+ * This test checks if deflateInit2(), internal of init(), is
+ * not being called more than once. That would cause memory leaks.
  */
 TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
   ZlibCompressorImpl compressor;
@@ -44,8 +43,8 @@ TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
 
 /**
  * Init() should always return true when called multiple times.
- * This test checks if inflateInit2(), internal of init(), is 
- * not being called more than once. That would cause memory leaks. 
+ * This test checks if inflateInit2(), internal of init(), is
+ * not being called more than once. That would cause memory leaks.
  */
 TEST_F(ZlibCompressorImplTest, InitilizeDecompressor) {
   ZlibCompressorImpl decompressor;
