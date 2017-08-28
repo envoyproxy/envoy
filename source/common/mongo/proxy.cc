@@ -17,8 +17,8 @@
 namespace Envoy {
 namespace Mongo {
 
-const std::string ProxyFilter::FIXED_DELAY_PERCENT_KEY = "mongo.fault.delay.percent";
-const std::string ProxyFilter::FIXED_DELAY_DURATION_MS_KEY = "mongo.fault.delay.duration_ms";
+const std::string ProxyFilter::FIXED_DELAY_PERCENT_KEY = "mongo.fault.fixed_delay.percent";
+const std::string ProxyFilter::FIXED_DELAY_DURATION_MS_KEY = "mongo.fault.fixed_delay.duration_ms";
 const std::string ProxyFilter::LOGGING_ENABLED_KEY = "mongo.logging_enabled";
 const std::string ProxyFilter::PROXY_ENABLED_KEY = "mongo.proxy_enabled";
 const std::string ProxyFilter::CONNECTION_LOGGING_ENABLED_KEY = "mongo.connection_logging_enabled";
