@@ -43,8 +43,8 @@ enum class FilterDataStatus {
   // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
   //
-  // This should be called by buffers which must parse a larger block of the incoming data before
-  // contuing processing and so can not push back on streaming data via watermarks.
+  // This should be called by filters which must parse a larger block of the incoming data before
+  // continuing processing and so can not push back on streaming data via watermarks.
   //
   // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
   // be sent to the user.  On the response path exceeding buffer limits will result in a 500.
@@ -247,7 +247,7 @@ public:
    * This routine may be called to increase the buffer limit for decoder filters.
    * If the limit set would lower the buffer limit it will be ignored.
    *
-   * @limit settings supplies the desired buffer limit.
+   * @param boolean supplies the desired buffer limit.
    */
   virtual void setDecoderBufferLimit(uint32_t limit) PURE;
 

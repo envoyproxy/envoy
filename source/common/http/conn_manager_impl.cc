@@ -935,11 +935,12 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t limit) {
-  uint32_t new_limit = morePermissiveLimit(limit, buffer_limit_);
-  if (new_limit == buffer_limit_)
+  const uint32_t new_limit = morePermissiveLimit(limit, buffer_limit_);
+  if (new_limit == buffer_limit_) {
     return;
+  }
 
-  buffer_limit_ = limit;
+  buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
   }
