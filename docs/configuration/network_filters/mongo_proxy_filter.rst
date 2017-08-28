@@ -178,10 +178,10 @@ mongo.logging_enabled
   % of messages that will be logged. Defaults to 100. If less than 100, queries may be logged
   without replies, etc.
 
-mongo.fault.delay.percent
+mongo.fault.fixed_delay.percent
   % of requests that will be delayed. Defaults to the *percent* specified in the config.
 
-mongo.fault.delay.duration_ms
+mongo.fault.fixed_delay.duration_ms
   The delay duration in milliseconds. Defaults to the *duration_ms* specified in the config.
   
 Access log format
