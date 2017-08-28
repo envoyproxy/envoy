@@ -61,12 +61,12 @@ public:
   bool init(int window_bits);
 
   /**
-   * Returns the final state of the compression and resets zlib internal counters (e.g total_in).
-   * This function does not free and reallocate the internal decompression state. The The stream
-   * will keep attributes that may have been set during initialization.
+   * Returns the final state of the compression/decompression and resets zlib internal counters (e.g
+   * total_in). This function does not free and reallocate the internal decompression state. The The
+   * stream will keep attributes that may have been set during initialization.
    * @return bool true if success, or false if the source stream state was inconsistent.
    */
-  bool finish();
+  bool reset();
 
   /**
    * Implements Envoy::Compressor

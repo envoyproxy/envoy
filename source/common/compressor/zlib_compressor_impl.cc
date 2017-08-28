@@ -51,7 +51,7 @@ bool ZlibCompressorImpl::init(int window_bits) {
   return result == Z_OK;
 }
 
-bool ZlibCompressorImpl::finish() {
+bool ZlibCompressorImpl::reset() {
   int result{};
 
   if (is_deflate_) {

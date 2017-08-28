@@ -35,7 +35,6 @@ TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
   EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
                                   ZlibCompressorImpl::CompressionStrategy::default_strategy,
                                   gzip_window_bits, memory_level));
-
   EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
                                   ZlibCompressorImpl::CompressionStrategy::default_strategy,
                                   gzip_window_bits, memory_level));
@@ -59,14 +58,14 @@ TEST_F(ZlibCompressorImplTest, FinalizeCompressor) {
   EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
                                   ZlibCompressorImpl::CompressionStrategy::default_strategy,
                                   gzip_window_bits, memory_level));
-  EXPECT_EQ(true, compressor.finish());
+  EXPECT_EQ(true, compressor.reset());
 }
 
 TEST_F(ZlibCompressorImplTest, FinalizeDecompressor) {
   ZlibCompressorImpl decompressor;
 
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
-  EXPECT_EQ(true, decompressor.finish());
+  EXPECT_EQ(true, decompressor.reset());
 }
 
 TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {
@@ -85,15 +84,61 @@ TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {
   Buffer::RawSlice slice{};
   out.getRawSlices(&slice, 1);
 
-  const std::string str_hex =
-      Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_ - 1);
+  const std::string str_hex = Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_);
 
   // HEADER 0x1f = 31 (window_bits)
   EXPECT_EQ("1f8b", str_hex.substr(0, 4));
-  // CM
+  // CM 0x8 = deflate (Compression Method)
   EXPECT_EQ("08", str_hex.substr(4, 2));
-  // FOOTER
-  EXPECT_EQ("00ff", str_hex.substr(str_hex.size() - 4, 4));
+  // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", str_hex.substr(str_hex.size() - 8, 10));
+  EXPECT_EQ(true, compressor.reset());
+}
+
+TEST_F(ZlibCompressorImplTest, CompressFinishAndCompressMore) {
+  Buffer::OwnedImpl in;
+  Buffer::OwnedImpl out;
+  in.add(get200CharsText());
+
+  Envoy::Compressor::ZlibCompressorImpl compressor;
+  compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                  ZlibCompressorImpl::CompressionStrategy::default_strategy, gzip_window_bits,
+                  memory_level);
+
+  EXPECT_EQ(true, compressor.compress(in, out));
+  EXPECT_TRUE(out.length() < 200);
+
+  Buffer::RawSlice slice{};
+  out.getRawSlices(&slice, 1);
+
+  const std::string str_hex = Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_);
+
+  // HEADER 0x1f = 31 (window_bits)
+  EXPECT_EQ("1f8b", str_hex.substr(0, 4));
+  // CM 0x8 = deflate (Compression Method)
+  EXPECT_EQ("08", str_hex.substr(4, 2));
+  // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", str_hex.substr(str_hex.size() - 8, 10));
+  EXPECT_EQ(true, compressor.reset());
+
+  // COMPRESS MORE
+  in.add(get200CharsText());
+
+  EXPECT_EQ(true, compressor.compress(in, out));
+  EXPECT_TRUE(out.length() > 300);
+
+  Buffer::RawSlice slice_resume{};
+  out.getRawSlices(&slice_resume, 1);
+
+  const std::string str_hex_resume =
+      Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_);
+
+  // HEADER 0x1f = 31 (window_bits)
+  EXPECT_EQ("1f8b", str_hex_resume.substr(0, 4));
+  // CM 0x8 = deflate (Compression Method)
+  EXPECT_EQ("08", str_hex_resume.substr(4, 2));
+  // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", str_hex_resume.substr(str_hex.size() - 8, 10));
 }
 
 TEST_F(ZlibCompressorImplTest, CompressWithSmallChunk) {
@@ -114,15 +159,15 @@ TEST_F(ZlibCompressorImplTest, CompressWithSmallChunk) {
   Buffer::RawSlice slice{};
   out.getRawSlices(&slice, 1);
 
-  const std::string str_hex =
-      Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_ - 1);
+  const std::string str_hex = Hex::encode(reinterpret_cast<unsigned char*>(slice.mem_), slice.len_);
 
   // HEADER 0x1f = 31 (window_bits)
   EXPECT_EQ("1f8b", str_hex.substr(0, 4));
-  // CM
+  // CM 0x8 = deflate (Compression Method)
   EXPECT_EQ("08", str_hex.substr(4, 2));
-  // FOOTER
-  EXPECT_EQ("00ff", str_hex.substr(str_hex.size() - 4, 4));
+  // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", str_hex.substr(str_hex.size() - 8, 10));
+  EXPECT_EQ(true, compressor.reset());
 }
 
 TEST_F(ZlibCompressorImplTest, DecompressGzipEnconding) {
@@ -131,17 +176,17 @@ TEST_F(ZlibCompressorImplTest, DecompressGzipEnconding) {
   in.add(get200CharsText());
 
   ZlibCompressorImpl compressor;
-  compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
-                  ZlibCompressorImpl::CompressionStrategy::default_strategy, gzip_window_bits,
-                  memory_level);
-  compressor.compress(in, out);
+  EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                                  ZlibCompressorImpl::CompressionStrategy::default_strategy,
+                                  gzip_window_bits, memory_level));
+  EXPECT_EQ(true, compressor.compress(in, out));
   in.drain(200);
 
   ZlibCompressorImpl decompressor;
-  decompressor.init(gzip_window_bits);
-
+  EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   EXPECT_EQ(true, decompressor.decompress(out, in));
   EXPECT_EQ(200, in.length());
+  EXPECT_EQ(true, decompressor.reset());
 
   std::string decomp_str{};
   uint64_t num_slices = in.getRawSlices(nullptr, 0);
@@ -160,14 +205,14 @@ TEST_F(ZlibCompressorImplTest, DecompressWithSmallChunk) {
   in.add(get200CharsText());
 
   ZlibCompressorImpl compressor;
-  compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
-                  ZlibCompressorImpl::CompressionStrategy::default_strategy, gzip_window_bits,
-                  memory_level);
-  compressor.compress(in, out);
+  EXPECT_EQ(true, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                                  ZlibCompressorImpl::CompressionStrategy::default_strategy,
+                                  gzip_window_bits, memory_level));
+  EXPECT_EQ(true, compressor.compress(in, out));
   in.drain(200);
 
   ZlibCompressorImpl decompressor;
-  decompressor.init(gzip_window_bits);
+  EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   decompressor.setChunk(1);
 
   EXPECT_EQ(true, decompressor.decompress(out, in));
