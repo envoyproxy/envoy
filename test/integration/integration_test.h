@@ -19,8 +19,8 @@ public:
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer("test/config/integration/server.json", api_filesystem_config_,
                         {"http", "http_forward", "http_with_buffer_limits",
-                          "dynamo_with_buffer_limits", "bridge_with_buffer_limits", "http_buffer",
-                          "tcp_proxy", "rds"});
+                         "dynamo_with_buffer_limits", "bridge_with_buffer_limits", "http_buffer",
+                         "tcp_proxy", "rds"});
   }
 
   /**
