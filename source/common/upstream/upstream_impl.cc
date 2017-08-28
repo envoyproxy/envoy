@@ -40,7 +40,7 @@ const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const Network::Address::InstanceConstSharedPtr source_address) {
   // The source address from cluster config takes precedence.
-  if (cluster.has_upstream_bind_config() && cluster.upstream_bind_config().has_source_address()) {
+  if (cluster.upstream_bind_config().has_source_address()) {
     return Network::Utility::fromProtoSocketAddress(
         cluster.upstream_bind_config().source_address());
   }
