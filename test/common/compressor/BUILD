@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["zlib_compressor_impl_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:hex_lib",
         "//source/common/compressor:compressor_lib",
     ],
 )

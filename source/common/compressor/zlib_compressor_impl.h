@@ -2,15 +2,13 @@
 
 #include "envoy/compressor/compressor.h"
 
-#include "common/common/assert.h"
-
 #include "zlib.h"
 
 namespace Envoy {
 namespace Compressor {
 
 /**
- * Deflate implementation of compressor's interface.
+ * Zlib implementation of compressor's interface.
  */
 class ZlibCompressorImpl : public Compressor {
 public:
@@ -32,77 +30,55 @@ public:
   };
 
   /**
-   * Gets current total bytes passed into the compressor
-   * @return current bytes moved into the compressor.
-   */
-  uint64_t getTotalIn();
-
-  /**
-   * Gets current total bytes moved out of the compressor
-   * @return bytes returned by the compressor.
-   */
-  uint64_t getTotalOut();
-
-  /**
-   * Sets how much memory should be allocated by zlib
-   * for the internal compression state.
-   * @param mem_level level of allocated memory, default = 8 | max = 9.
-   */
-  void setMemoryLevel(uint mem_level);
-
-  /**
-   * Buffer size for feeding data to and pulling data from the zlib routines.
-   * For this implementation, it should never be less than the length of evbuffer
-   * passsed into ZlibCompressorImpl::start(Buffer::Instance& in, Buffer::Instance& out).
-   * @param chunk available memory to deflate data, default = 4096.
+   * Allows setting the buffer size for feeding data to and pulling data from the zlib routines.
+   * @param chunk amout of memory that is reserved for zlib to inflate/deflate data, default = 4096.
    */
   void setChunk(uint64_t chunk);
 
   /**
-   * The windowBits parameter shall be a base 2 logarithm of the window size
-   * to use, and shall be a value between 8 and 15 (15 + 16 to write a simple gzip).
-   * A smaller value will use less memory, but will result in a poorer compression
-   * ratio, while a higher value will give better compression but utilize more memory.
-   * @param window_bits memory window size, default = 31 gzip.
+   * Used for compression initialization.
+   * @param level compression level applied, default = default_compression.
+   * @param strategy compression strategy applied, default = default_strategy.
+   * @param window_bits allows setting the zlib's window bits for different encoding types,
+   * default = 31 (gzip encoding).
+   * @param memory_level allows setting how much memory should be allocated for the internal
+   * compression state, default = 8.
+   * @return bool true if initialization succceeded or false if an error occurred.
    */
-  void setWindowBits(int window_bits);
+  bool init(CompressionLevel level, CompressionStrategy strategy, int window_bits,
+            uint memory_level);
 
   /**
-   * Initialize the compression engine and allows to adjust compression level
-   * as well strategy
-   * @param level compression level applied, default = Z_DEFAULT_COMPRESSION.
-   * @param strategy compression strategy applied, default = Z_DEFAULT_STRATEGY.
-   * @return true if initialization succceeded or false if an error occurred
+   * Used for decompression initialization
+   * @param window_bits is used for setting different encoding types. It should be set as the same
+   * as used during compression, but if that's not known, setting window bits to zero will tell the
+   * decompressor to use whatever is set in the header of the encoded data. default = 31 (gzip
+   * encoding).
+   * @return bool true if initialization succceeded or false if an error occurred.
    */
-  bool init(CompressionLevel level = CompressionLevel::default_compression,
-            CompressionStrategy strategy = CompressionStrategy::default_strategy);
+  bool init(int window_bits);
 
   /**
-   * Finalize the compression engine and free all dynamic memory allocated during
-   * compression. If this function does not get called, distructor will take care
-   * of the memmory by calling deflateEnd(). Calling this method though allows to
-   * inspect the compressor has errors.
-   * @return true if compressor finalized without error or false otherwise.
+   * Allows verify the final state of the compression/decompression.
+   * @return bool true if success, or false if the source stream state was inconsistent.
    */
-  bool finish() override;
+  bool finish();
 
   /**
-   * Move and encode data from one buffer into another
-   * @return true if compression succeeded or false otherwise.
+   * Implements Envoy::Compressor
    */
-  bool compress(Buffer::Instance& in, Buffer::Instance& out) override;
+  bool compress(const Buffer::Instance& in, Buffer::Instance& out) override;
 
-  /**
-   * Move and decode data from one buffer into another
-   * @return true if decompression succeeded or false otherwise.
-   */
-  bool decompress(Buffer::Instance& in, Buffer::Instance& out) override;
+  bool decompress(const Buffer::Instance& in, Buffer::Instance& out) override;
 
 private:
-  std::unique_ptr<z_stream> ZlibPtr_{nullptr};
+  bool process(const Buffer::Instance& in, Buffer::Instance& out,
+               int (*zlib_func_ptr)(z_stream*, int));
+
+  std::unique_ptr<z_stream> zlib_ptr_{nullptr};
+
   uint64_t chunk_{4096};
-  uint memory_level_{8};
-  int window_bits_{15 + 16};
+  bool is_deflate_{true};
 };
 
 } // namespace Compressor
