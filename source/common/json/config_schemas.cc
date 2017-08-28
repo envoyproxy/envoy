@@ -260,10 +260,6 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       },
       "add_user_agent" : {"type" : "boolean"},
       "tracing" : {"$ref" : "#/definitions/tracing"},
-      "http_codec_options" : {
-        "type" : "string",
-        "enum" : ["no_compression"]
-      },
       "http1_settings": {
         "type": "object",
         "properties": {
@@ -1183,7 +1179,6 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
       },
       "cluster_manager" : {"type" : "object"},
       "flags_path" : {"type" : "string"},
-      "statsd_local_udp_port" : {"type" : "integer"},
       "statsd_udp_ip_address" : {"type" : "string"},
       "statsd_tcp_cluster_name" : {"type" : "string"},
       "stats_flush_interval_ms" : {"type" : "integer"},
@@ -1378,10 +1373,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "features" : {
         "type" : "string",
         "enum" : ["http2"]
-      },
-      "http_codec_options" : {
-        "type" : "string",
-        "enum" : ["no_compression"]
       },
       "http2_settings" : {
         "type" : "object",

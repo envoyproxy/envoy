@@ -235,7 +235,7 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   log->log(&request_headers_, &response_headers_, request_info_);
 
   request_info_.response_code_.value(200);
-  request_info_.duration_ = 1000000;
+  request_info_.duration_ = 1000000000;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -507,7 +507,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
-  request_info.duration_ = 100;
+  request_info.duration_ = 100000;
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
@@ -515,11 +515,11 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 100000001;
+  request_info.duration_ = 100000001000;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 10;
+  request_info.duration_ = 10000;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 }

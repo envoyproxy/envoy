@@ -125,7 +125,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
   cluster.setInitializedCb([&]() -> void { initialized.ready(); });
@@ -166,13 +166,15 @@ TEST(StrictDnsClusterImplTest, Basic) {
       }
     },
     "max_requests_per_connection": 3,
-    "http_codec_options": "no_compression",
+    "http2_settings": {
+       "hpack_table_size": 0
+     },
     "hosts": [{"url": "tcp://localhost1:11001"},
               {"url": "tcp://localhost2:11002"}]
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -316,7 +318,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
@@ -338,7 +340,7 @@ TEST(StaticClusterImplTest, RingHash) {
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             true);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
@@ -361,7 +363,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
 
@@ -403,7 +405,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
 
@@ -462,7 +464,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   }
   )EOF";
 
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -489,7 +491,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  MockClusterManager cm;
+  NiceMock<MockClusterManager> cm;
   const std::string json = R"EOF(
   {
     "name": "addressportconfig",

@@ -94,11 +94,10 @@ public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(Invoke([this](
-                                  const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                  Configuration::FactoryContext& context)
+        .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                 Configuration::FactoryContext& context)
                                   -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, server_, context);
+          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
         }));
   }
 };
@@ -251,46 +250,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
-}
-
-/**
- * Config registration for the echo filter using the deprecated registration class.
- */
-class TestDeprecatedEchoConfigFactory : public Configuration::NetworkFilterConfigFactory {
-public:
-  // NetworkFilterConfigFactory
-  Configuration::NetworkFilterFactoryCb
-  tryCreateFilterFactory(Configuration::NetworkFilterType type, const std::string& name,
-                         const Json::Object&, Instance&) override {
-    if (type != Configuration::NetworkFilterType::Read || name != "echo_deprecated") {
-      return nullptr;
-    }
-
-    return [](Network::FilterManager&) -> void {};
-  }
-};
-
-TEST_F(ListenerManagerImplWithRealFiltersTest, DeprecatedFilterConfigFactoryRegistrationTest) {
-  // Test ensures that the deprecated network filter registration still works without error.
-
-  // Register the config factory
-  Configuration::RegisterNetworkFilterConfigFactory<TestDeprecatedEchoConfigFactory> registered;
-
-  const std::string json = R"EOF(
-  {
-    "address": "tcp://127.0.0.1:1234",
-    "filters": [
-      {
-        "type" : "read",
-        "name" : "echo_deprecated",
-        "config" : {}
-      }
-    ]
-  }
-  )EOF";
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {

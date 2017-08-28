@@ -428,11 +428,12 @@ TEST_F(ClusterManagerImplTest, CdsBootstrap) {
                             "document key: #/name");
 
   envoy::api::v2::Bootstrap cds_config_bootstrap;
-  cds_config_bootstrap.mutable_cds_config();
+  cds_config_bootstrap.mutable_dynamic_resources()->mutable_cds_config();
   createWithBootstrap(*loader, cds_config_bootstrap);
 
   envoy::api::v2::Bootstrap clusters_bootstrap;
-  clusters_bootstrap.mutable_bootstrap_clusters()->Add()->CopyFrom(defaultStaticCluster("foo"));
+  clusters_bootstrap.mutable_static_resources()->mutable_clusters()->Add()->CopyFrom(
+      defaultStaticCluster("foo"));
   createWithBootstrap(*loader, clusters_bootstrap);
 }
 

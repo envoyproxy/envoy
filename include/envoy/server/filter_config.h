@@ -22,10 +22,6 @@
 
 namespace Envoy {
 namespace Server {
-
-class Instance; // TODO(mattklein123): Remove post 1.4.0. Forward declare to avoid circular
-                // includes.
-
 namespace Configuration {
 
 /**
@@ -99,12 +95,6 @@ public:
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Envoy::Runtime::Loader& runtime() PURE;
-
-  /**
-   * DEPRECATED: Do not call this function. It will be removed post 1.4.0 and is needed for other
-   * deprecated functionality.
-   */
-  virtual Instance& server() PURE;
 
   /**
    * @return Stats::Scope& the filter's stats scope.
@@ -231,7 +221,7 @@ public:
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const ProtobufWkt::Message& config,
+  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                            const std::string& stat_prefix,
                                                            FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);

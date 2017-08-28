@@ -225,8 +225,10 @@ public:
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = TestUtility::getIpv4Loopback();
     }
-    bootstrap.mutable_upstream_bind_config()->mutable_source_address()->set_address(
-        address_string_);
+    bootstrap.mutable_cluster_manager()
+        ->mutable_upstream_bind_config()
+        ->mutable_source_address()
+        ->set_address(address_string_);
 
     api_filesystem_config_.bootstrap_path_ =
         TestEnvironment::writeStringToFileForTest("bootstrap.pb", bootstrap.SerializeAsString());
