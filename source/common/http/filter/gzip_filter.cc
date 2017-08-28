@@ -41,8 +41,6 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
     compressor_.init(Compressor::ZlibCompressorImpl::CompressionLevel::default_compression,
                      Compressor::ZlibCompressorImpl::CompressionStrategy::default_strategy,
                      gzip_header_, memory_level_);
-    // TODO: Just for testing.. remove it later
-    decompressor_.init(gzip_header_);
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     headers.removeEtag();
@@ -59,12 +57,13 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool) {
   }
 
   uint64_t length{data.length()};
-  compressor_.compress(data, buffer_);
-  data.drain(length);
-
-  // TODO: Just for testing.. remove it later
-  decompressor_.decompress(buffer_, data);
-  buffer_.drain(buffer_.length());
+  if (compressor_.compress(data, buffer_)) {
+    data.drain(length);
+    data.move(buffer_);
+  } else {
+    // TODO: return some error response here..
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   return Http::FilterDataStatus::Continue;
 }

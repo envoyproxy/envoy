@@ -12,11 +12,9 @@ namespace Compressor {
 namespace {
 
 class ZlibCompressorImplTest : public testing::Test {
-public:
-  int gzip_window_bits{31};
-  uint memory_level{8};
-
 protected:
+  const int gzip_window_bits{31};
+  const uint memory_level{8};
   static const std::string get200CharsText() {
     const std::string str{"Lorem ipsum dolor sit amet, consectetuer "
                           "adipiscing elit. Aenean commodo montes ridiculus "
@@ -35,7 +33,6 @@ TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeCompressor) {
                                   ZlibCompressorImpl::CompressionStrategy::default_strategy,
                                   gzip_window_bits, memory_level));
   EXPECT_EQ(true, compressor.finish());
-  EXPECT_EQ(false, compressor.finish());
 }
 
 TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeDecompressor) {
@@ -43,7 +40,6 @@ TEST_F(ZlibCompressorImplTest, InitializeAndFinalizeDecompressor) {
 
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   EXPECT_EQ(true, decompressor.finish());
-  EXPECT_EQ(false, decompressor.finish());
 }
 
 TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {
@@ -142,7 +138,7 @@ TEST_F(ZlibCompressorImplTest, DecompressWithSmallChunk) {
                   memory_level);
   compressor.compress(in, out);
   in.drain(200);
-                
+
   ZlibCompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
   decompressor.setChunk(1);

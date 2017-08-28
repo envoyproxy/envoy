@@ -34,8 +34,6 @@ private:
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   Compressor::ZlibCompressorImpl compressor_;
-  // TODO: Just for testing.. remove it later
-  Compressor::ZlibCompressorImpl decompressor_;
   Buffer::OwnedImpl buffer_;
 
   bool compress_{false};

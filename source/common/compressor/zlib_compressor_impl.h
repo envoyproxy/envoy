@@ -52,7 +52,7 @@ public:
    * @param window_bits
    * @return bool true if initialization succceeded or false if an error occurred
    */
-  bool init(int window_bits = 0);
+  bool init(int window_bits);
 
   /**
    * Finalize the compression engine and free all dynamic memory allocated during
@@ -69,22 +69,9 @@ public:
 
 private:
   bool process(const Buffer::Instance& in, Buffer::Instance& out, int (*fptr)(z_stream*, int));
-
-  bool is_deflate_{true};
-  uint64_t chunk_{4096};
-
-  // struct ZstreamDeleter {
-  //   void operator()(z_stream* z) const {
-  //     if (is_deflate_) {
-  //       deflateEnd(z);
-  //     } else {
-  //       inflateEnd(z);
-  //     }
-  //     delete z;
-  //   }
-  // };
-
   std::unique_ptr<z_stream> zlib_ptr_{nullptr};
+  uint64_t chunk_{4096};
+  bool is_deflate_{true};
 };
 
 } // namespace Compressor

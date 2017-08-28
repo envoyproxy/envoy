@@ -45,9 +45,9 @@ bool ZlibCompressorImpl::finish() {
   int result{};
 
   if (is_deflate_) {
-    result = deflateEnd(zlib_ptr_.get());
+    result = deflateReset(zlib_ptr_.get());
   } else {
-    result = inflateEnd(zlib_ptr_.get());
+    result = inflateReset(zlib_ptr_.get());
   }
 
   return result != Z_STREAM_ERROR;
