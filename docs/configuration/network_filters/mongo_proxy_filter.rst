@@ -32,7 +32,8 @@ fault
 Fault configuration
 -------------------  
 
-Configuration for fixed duration delays into `Query` mongo operation. 
+Configuration for MongoDB fixed duration delays. Once delay is injected all of the multiplexed
+operations on the same connection will be buffered/delayed and executed after a delay time.
 
 .. code-block:: json
 

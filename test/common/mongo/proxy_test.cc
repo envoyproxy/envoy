@@ -154,6 +154,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
 
+  EXPECT_CALL(read_filter_callbacks_, continueReading());
   delay_timer->callback_();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
