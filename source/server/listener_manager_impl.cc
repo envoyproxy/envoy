@@ -8,7 +8,7 @@
 #include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
 
-#include "server/configuration_impl.h" // TODO(mattklein123): Remove post 1.4.0
+#include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 
 namespace Envoy {
@@ -16,7 +16,7 @@ namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters, Server::Instance& server,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -25,18 +25,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     const auto& proto_config = filters[i].config();
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
-
-    // Map filter type string to enum.
-    Configuration::NetworkFilterType type;
-    if (string_type == "read") {
-      type = Configuration::NetworkFilterType::Read;
-    } else if (string_type == "write") {
-      type = Configuration::NetworkFilterType::Write;
-    } else {
-      ASSERT(string_type == "both" || string_type.empty());
-      type = Configuration::NetworkFilterType::Both;
-    }
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
     // Now see if there is a factory that will accept the config.
     Configuration::NamedNetworkFilterConfigFactory* factory =
@@ -57,23 +46,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       }
       ret.push_back(callback);
     } else {
-      // DEPRECATED
-      // This name wasn't found in the named map, so search in the deprecated list registry.
-      bool found_filter = false;
-      for (Configuration::NetworkFilterConfigFactory* config_factory :
-           Configuration::MainImpl::filterConfigFactories()) {
-        Configuration::NetworkFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config->getObject("value", true), server);
-        if (callback) {
-          ret.push_back(callback);
-          found_filter = true;
-          break;
-        }
-      }
-
-      if (!found_filter) {
-        throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
-      }
+      throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
     }
   }
   return ret;

@@ -343,66 +343,6 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
-/**
- * Deprecated version of config registration for http dynamodb filter.
- */
-class TestDeprecatedDynamoFilterConfig : public HttpFilterConfigFactory {
-public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string& stat_prefix,
-                                             Server::Instance& server) override {
-    if (type != HttpFilterType::Both || name != "http_dynamo_filter_deprecated") {
-      return nullptr;
-    }
-
-    return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
-          new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
-    };
-  }
-};
-
-TEST(NetworkFilterConfigTest, DeprecatedHttpFilterConfigFactoryTest) {
-  // Test just ensures that the deprecated http filter registration still works without error.
-
-  // Register the config factory
-  RegisterHttpFilterConfigFactory<TestDeprecatedDynamoFilterConfig> registered;
-
-  std::string json = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter_deprecated",
-        "config" : {}
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-
-  HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockFactoryContext> context;
-  factory.createFilterFactory(*loader, context);
-}
-
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),

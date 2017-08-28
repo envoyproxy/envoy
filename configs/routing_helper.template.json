@@ -18,7 +18,6 @@
   "type": "sds",
   "lb_type": "least_request",
   "features": "http2",
-  "http_codec_options": "no_compression",
   "service_name": "{{ service }}",
   {% if 'max_requests' in options %}
   "circuit_breakers": {

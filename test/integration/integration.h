@@ -249,6 +249,17 @@ protected:
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
 
+  // The client making requests to Envoy.
+  IntegrationCodecClientPtr codec_client_;
+  // A placeholder for the first upstream connection.
+  FakeHttpConnectionPtr fake_upstream_connection_;
+  // A placeholder for the first response received by the client.
+  IntegrationStreamDecoderPtr response_{new IntegrationStreamDecoder(*dispatcher_)};
+  // A placeholder for the first request received at upstream.
+  FakeStreamPtr upstream_request_;
+  // A pointer to the request encoder, if used.
+  Http::StreamEncoder* request_encoder_{nullptr};
+
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;

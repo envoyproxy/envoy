@@ -65,8 +65,10 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
       false, "")};
   Http::CodecClientProd client(
       type,
-      dispatcher->createClientConnection(Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
+      dispatcher->createClientConnection(
+          Network::Utility::resolveUrl(fmt::format(
+              "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
+          Network::Address::InstanceConstSharedPtr()),
       host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
@@ -92,8 +94,10 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          Network::Address::IpVersion version) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
-  client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
+  client_ = dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
+      Network::Address::InstanceConstSharedPtr());
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();

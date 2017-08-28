@@ -52,26 +52,16 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
     server.listenerManager().addOrUpdateListener(listener);
   }
 
-  if (bootstrap.has_lds_config()) {
-    lds_api_.reset(new LdsApi(bootstrap.lds_config(), *cluster_manager_, server.dispatcher(),
-                              server.random(), server.initManager(), server.localInfo(),
-                              server.stats(), server.listenerManager()));
+  if (bootstrap.dynamic_resources().has_lds_config()) {
+    lds_api_.reset(new LdsApi(bootstrap.dynamic_resources().lds_config(), *cluster_manager_,
+                              server.dispatcher(), server.random(), server.initManager(),
+                              server.localInfo(), server.stats(), server.listenerManager()));
   } else if (json.hasObject("lds")) {
     envoy::api::v2::ConfigSource lds_config;
     Config::Utility::translateLdsConfig(*json.getObject("lds"), lds_config);
     lds_api_.reset(new LdsApi(lds_config, *cluster_manager_, server.dispatcher(), server.random(),
                               server.initManager(), server.localInfo(), server.stats(),
                               server.listenerManager()));
-  }
-
-  if (json.hasObject("statsd_local_udp_port") && json.hasObject("statsd_udp_ip_address")) {
-    throw EnvoyException("statsd_local_udp_port and statsd_udp_ip_address "
-                         "are mutually exclusive.");
-  }
-
-  // TODO(hennna): DEPRECATED - statsd_local_udp_port will be removed in 1.4.0.
-  if (json.hasObject("statsd_local_udp_port")) {
-    statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
   }
 
   if (json.hasObject("statsd_udp_ip_address")) {

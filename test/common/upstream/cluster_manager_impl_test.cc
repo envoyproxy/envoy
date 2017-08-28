@@ -338,8 +338,9 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(
-                                        Network::Utility::resolveUrl("tcp://127.0.0.1:11001"))))
+  EXPECT_CALL(
+      factory_.dispatcher_,
+      createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
       .WillOnce(Return(connection));
   create(*loader);
   factory_.tls_.shutdownThread();
@@ -381,7 +382,8 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   create(*loader);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_)).WillOnce(Return(connection));
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _))
+      .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
   factory_.tls_.shutdownThread();
@@ -426,11 +428,12 @@ TEST_F(ClusterManagerImplTest, CdsBootstrap) {
                             "document key: #/name");
 
   envoy::api::v2::Bootstrap cds_config_bootstrap;
-  cds_config_bootstrap.mutable_cds_config();
+  cds_config_bootstrap.mutable_dynamic_resources()->mutable_cds_config();
   createWithBootstrap(*loader, cds_config_bootstrap);
 
   envoy::api::v2::Bootstrap clusters_bootstrap;
-  clusters_bootstrap.mutable_bootstrap_clusters()->Add()->CopyFrom(defaultStaticCluster("foo"));
+  clusters_bootstrap.mutable_static_resources()->mutable_clusters()->Add()->CopyFrom(
+      defaultStaticCluster("foo"));
   createWithBootstrap(*loader, clusters_bootstrap);
 }
 

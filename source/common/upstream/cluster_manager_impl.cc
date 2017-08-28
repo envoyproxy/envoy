@@ -19,6 +19,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/json/config_schemas.h"
+#include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
@@ -178,13 +179,13 @@ void ClusterManagerImpl::initializeClustersFromV1Json(const Json::Object& config
 }
 
 void ClusterManagerImpl::initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap) {
-  for (const auto& cluster : bootstrap.bootstrap_clusters()) {
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
     loadCluster(cluster, false);
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  if (bootstrap.has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.cds_config(), sds_config_, *this);
+  if (bootstrap.dynamic_resources().has_cds_config()) {
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), sds_config_, *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -226,7 +227,13 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config,
     sds_config_.value(sds_config);
   }
 
-  if (bootstrap.has_cds_config() || !bootstrap.bootstrap_clusters().empty()) {
+  if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
+    source_address_ = Network::Utility::fromProtoSocketAddress(
+        bootstrap.cluster_manager().upstream_bind_config().source_address());
+  }
+
+  if (bootstrap.dynamic_resources().has_cds_config() ||
+      !bootstrap.static_resources().clusters().empty()) {
     initializeClustersFromV2Proto(bootstrap);
   } else {
     // TODO(htuch): Make this similar to the v1 -> v2 translation elsewhere,

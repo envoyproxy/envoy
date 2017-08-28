@@ -6,8 +6,7 @@ CLUSTER_BLOB = {
     "connect_timeout_ms": 250, 
     "type": "sds", 
     "lb_type": "least_request", 
-    "features": "http2", 
-    "http_codec_options": "no_compression", 
+    "features": "http2",
     "service_name": "foo", 
     "health_check": {
         "type": "http", 

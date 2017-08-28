@@ -270,15 +270,6 @@ void InstanceImpl::initializeStatSinks() {
         thread_local_,
         Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
     stats_store_.addSink(*stat_sinks_.back());
-  } else if (config_->statsdUdpPort().valid()) {
-    // TODO(hennna): DEPRECATED - statsdUdpPort will be removed in 1.4.0.
-    ENVOY_LOG(warn, "statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0. "
-                    "Consider setting statsd_udp_ip_address instead.");
-    ENVOY_LOG(info, "statsd UDP port: {}", config_->statsdUdpPort().value());
-    Network::Address::InstanceConstSharedPtr address(
-        new Network::Address::Ipv4Instance(config_->statsdUdpPort().value()));
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(thread_local_, address));
-    stats_store_.addSink(*stat_sinks_.back());
   }
 
   if (config_->statsdTcpClusterName().valid()) {

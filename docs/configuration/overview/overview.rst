@@ -23,7 +23,6 @@ name (which should be a string) is called *true*, it should be written in the co
     "admin": "{...}",
     "cluster_manager": "{...}",
     "flags_path": "...",
-    "statsd_local_udp_port": "...",
     "statsd_udp_ip_address": "...",
     "statsd_tcp_cluster_name": "...",
     "stats_flush_interval_ms": "...",
@@ -60,9 +59,7 @@ flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.
 
-statsd_local_udp_port (Warning: DEPRECATED and will be removed in 1.4.0)
-  *(optional, integer)* The UDP port of a locally running statsd compliant listener. If specified,
-  :ref:`statistics <arch_overview_statistics>` will be flushed to this port.
+.. _config_overview_statsd_udp_ip_address:
 
 statsd_udp_ip_address
   *(optional, string)* The UDP address of a running statsd compliant listener. If specified,

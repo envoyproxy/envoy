@@ -112,8 +112,8 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onRemoteClose(Grpc::Status::GrpcStatus status) override {
-    ENVOY_LOG(warn, "gRPC config stream closed: {}", status);
+  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
+    ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
     handleFailure();
     stream_ = nullptr;
   }

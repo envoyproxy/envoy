@@ -44,7 +44,7 @@ public:
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response) override;
-  void onFailure(Grpc::Status::GrpcStatus status) override;
+  void onFailure(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
