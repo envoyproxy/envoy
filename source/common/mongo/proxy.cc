@@ -257,8 +257,9 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
 Optional<uint64_t> ProxyFilter::delayDuration() {
   Optional<uint64_t> result;
 
-  if (!fault_config_)
+  if (!fault_config_) {
     return result;
+  }
 
   if (!runtime_.snapshot().featureEnabled(FIXED_DELAY_PERCENT_KEY, fault_config_->delayPercent())) {
     return result;
