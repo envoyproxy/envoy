@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "runtime_lib",
     srcs = ["runtime_impl.cc"],
     hdrs = ["runtime_impl.h"],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",

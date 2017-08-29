@@ -30,7 +30,7 @@
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         "//test/common/json/config_schemas_test_data:generate_test_data",
     ],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",

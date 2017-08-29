@@ -18,7 +18,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["protobuf"],
+    external_deps = [
+        "protobuf",
+        "fmtlib",
+    ],
     deps = [
         ":protobuf",
         "//source/common/common:assert_lib",

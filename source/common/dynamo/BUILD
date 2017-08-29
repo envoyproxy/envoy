@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "dynamo_filter_lib",
     srcs = ["dynamo_filter.cc"],
     hdrs = ["dynamo_filter.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":dynamo_request_parser_lib",
         ":dynamo_utility_lib",

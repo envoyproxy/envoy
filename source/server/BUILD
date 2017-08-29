@@ -24,6 +24,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_bootstrap",
         "envoy_lds",
+        "fmtlib",
     ],
     deps = [
         ":lds_api_lib",
@@ -86,6 +87,7 @@ envoy_cc_library(
     name = "guarddog_lib",
     srcs = ["guarddog_impl.cc"],
     hdrs = ["guarddog_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":watchdog_lib",
         "//include/envoy/common:optional",
@@ -105,6 +107,7 @@ envoy_cc_library(
     name = "hot_restart_lib",
     srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
     hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
@@ -140,7 +143,10 @@ envoy_cc_library(
     name = "options_lib",
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
-    external_deps = ["tclap"],
+    external_deps = [
+        "tclap",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
@@ -168,7 +174,10 @@ envoy_cc_library(
     name = "lds_subscription_lib",
     srcs = ["lds_subscription.cc"],
     hdrs = ["lds_subscription.h"],
-    external_deps = ["envoy_lds"],
+    external_deps = [
+        "envoy_lds",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
@@ -184,7 +193,10 @@ envoy_cc_library(
     name = "listener_manager_lib",
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
-    external_deps = ["envoy_lds"],
+    external_deps = [
+        "envoy_lds",
+        "fmtlib",
+    ],
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",

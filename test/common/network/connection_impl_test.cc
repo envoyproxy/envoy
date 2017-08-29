@@ -21,6 +21,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

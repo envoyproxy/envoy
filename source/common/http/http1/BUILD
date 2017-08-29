@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["http_parser"],
+    external_deps = [
+        "http_parser",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",

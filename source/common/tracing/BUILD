@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = [
         "http_tracer_impl.h",
     ],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -45,7 +46,10 @@ envoy_cc_library(
     hdrs = [
         "lightstep_tracer_impl.h",
     ],
-    external_deps = ["lightstep"],
+    external_deps = [
+        "lightstep",
+        "fmtlib",
+    ],
     deps = [
         ":http_tracer_lib",
     ],

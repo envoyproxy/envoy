@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":config_utility_lib",
         ":retry_state_lib",
@@ -55,6 +56,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_filter_http_connection_manager",
         "envoy_rds",
+        "fmtlib",
     ],
     deps = [
         ":config_lib",
@@ -83,6 +85,7 @@ envoy_cc_library(
     hdrs = ["rds_subscription.h"],
     external_deps = [
         "envoy_filter_http_connection_manager",
+        "fmtlib",
     ],
     deps = [
         "//include/envoy/config:subscription_interface",

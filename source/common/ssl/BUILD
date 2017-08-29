@@ -47,7 +47,10 @@ envoy_cc_library(
         "context_impl.h",
         "context_manager_impl.h",
     ],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_config_interface",

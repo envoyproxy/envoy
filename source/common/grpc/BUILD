@@ -34,6 +34,7 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/grpc:status",

@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "manager_impl_lib",
     srcs = ["manager_impl.cc"],
     hdrs = ["manager_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/singleton:manager_interface",

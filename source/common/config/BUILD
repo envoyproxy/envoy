@@ -211,6 +211,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_base",
         "envoy_filter_http_connection_manager",
+        "fmtlib",
     ],
     deps = [
         ":json_utility_lib",

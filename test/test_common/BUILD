@@ -35,6 +35,7 @@ envoy_cc_test_library(
     name = "network_utility_lib",
     srcs = ["network_utility.cc"],
     hdrs = ["network_utility.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":utility_lib",
         "//source/common/common:assert_lib",
@@ -59,6 +60,7 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",

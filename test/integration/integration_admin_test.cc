@@ -6,6 +6,7 @@
 
 #include "test/integration/utility.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 

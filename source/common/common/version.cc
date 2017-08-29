@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
