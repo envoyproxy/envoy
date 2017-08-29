@@ -33,8 +33,8 @@ Fault configuration
 -------------------  
 
 Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB operations: Query, Insert,
-GetMore, KillCursors. First command that arrives with no active delays enabled will get the full delay duration and
-all subsequent commands arriving on that connection up until the timer event fires will be apart of that delay.
+GetMore, KillCursors. Once an active delay is in progress, all incoming data up until the timer event fires
+will be apart of the delay.
 
 .. code-block:: json
 
