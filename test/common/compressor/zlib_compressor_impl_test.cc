@@ -24,11 +24,6 @@ protected:
   }
 };
 
-/**
- * Init() should always return true when called multiple times.
- * This test checks if deflateInit2(), internal of init(), is
- * not being called more than once. That would cause memory leaks.
- */
 TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
   ZlibCompressorImpl compressor;
 
@@ -40,16 +35,19 @@ TEST_F(ZlibCompressorImplTest, InitilizeCompressor) {
                                   gzip_window_bits, memory_level));
 }
 
-/**
- * Init() should always return true when called multiple times.
- * This test checks if inflateInit2(), internal of init(), is
- * not being called more than once. That would cause memory leaks.
- */
 TEST_F(ZlibCompressorImplTest, InitilizeDecompressor) {
   ZlibCompressorImpl decompressor;
 
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
+}
+
+TEST_F(ZlibCompressorImplTest, InitilizeDecompressorWithFailure) {
+  ZlibCompressorImpl compressor;
+
+  EXPECT_EQ(false, compressor.init(ZlibCompressorImpl::CompressionLevel::default_compression,
+                                   ZlibCompressorImpl::CompressionStrategy::default_strategy, 5000,
+                                   10000));
 }
 
 TEST_F(ZlibCompressorImplTest, FinalizeCompressor) {
@@ -66,6 +64,28 @@ TEST_F(ZlibCompressorImplTest, FinalizeDecompressor) {
 
   EXPECT_EQ(true, decompressor.init(gzip_window_bits));
   EXPECT_EQ(true, decompressor.reset());
+}
+
+TEST_F(ZlibCompressorImplTest, ResetWithoutInitializingCompressor) {
+  ZlibCompressorImpl compressor;
+
+  EXPECT_EQ(true, compressor.reset());
+}
+
+TEST_F(ZlibCompressorImplTest, CompressWithoutInitializingCompressor) {
+  Buffer::OwnedImpl in;
+  Buffer::OwnedImpl out;
+  ZlibCompressorImpl compressor;
+
+  EXPECT_EQ(true, compressor.compress(in, out));
+}
+
+TEST_F(ZlibCompressorImplTest, DecompressWithoutInitializingCompressor) {
+  Buffer::OwnedImpl in;
+  Buffer::OwnedImpl out;
+  ZlibCompressorImpl compressor;
+
+  EXPECT_EQ(true, compressor.decompress(in, out));
 }
 
 TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {

@@ -30,7 +30,8 @@ public:
 
   /**
    * Sets buffer size for feeding data to and pulling data from the zlib routines.
-   * @param chunk amout of memory that is reserved for zlib to inflate/deflate data, default = 4096.
+   * @param chunk amount of memory that is reserved for zlib to inflate/deflate data, default =
+   * 4096.
    */
   void setChunk(uint64_t chunk);
 
@@ -86,9 +87,10 @@ private:
 
   std::unique_ptr<z_stream> zlib_ptr_{nullptr};
 
+  int (*end_func_ptr_)(z_stream*){nullptr};
+  int (*reset_func_ptr_)(z_stream*){nullptr};
+
   uint64_t chunk_{4096};
-  bool is_deflate_{true};
-  bool is_initialized_{false};
 };
 
 } // namespace Compressor
