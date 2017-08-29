@@ -180,7 +180,9 @@ mongo.logging_enabled
   without replies, etc.
 
 mongo.fault.fixed_delay.percent
-  % of requests that will be delayed. Defaults to the *percent* specified in the config.
+  Probability of an elibible MongoDB operation to be affected by
+  injected faults when there is no active faults.
+  Defaults to the *percent* specified in the config.
 
 mongo.fault.fixed_delay.duration_ms
   The delay duration in milliseconds. Defaults to the *duration_ms* specified in the config.
