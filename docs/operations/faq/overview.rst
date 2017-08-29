@@ -8,5 +8,6 @@ The purpose of this document is to link examples of commonly used deployment sce
 .. toctree::
   :maxdepth: 1
 
+  hc_grpc
   zone_aware_routing
   zipkin_tracing
