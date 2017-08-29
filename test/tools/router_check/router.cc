@@ -124,6 +124,17 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
         }
       }
     }
+
+    if (validate->hasObject("custom_header_fields")) {
+      ENVOY_LOG(info, "processing custom_header_fields.");
+      for (const Json::ObjectSharedPtr& header_field :
+           validate->getObjectArray("custom_header_fields")) {
+        if (!compareCustomHeaderField(tool_config, header_field->getString("field"),
+                                      header_field->getString("value"))) {
+          no_failures = false;
+        }
+      }
+    }
   }
   return no_failures;
 }
@@ -158,9 +169,9 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-
+  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
@@ -168,9 +179,9 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-
+  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");
@@ -189,8 +200,19 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
 bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
                                          const std::string& expected) {
   std::string actual = tool_config.headers_->get_(field);
-
   return compareResults(actual, expected, "check_header");
+}
+
+bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
+                                               const std::string& expected) {
+  std::string actual = "";
+  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  request_info.downstream_address_ = "127.0.0.1";
+  if (tool_config.route_->routeEntry() != nullptr) {
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
+    actual = tool_config.headers_->get_(field);
+  }
+  return compareResults(actual, expected, "custom_header");
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,

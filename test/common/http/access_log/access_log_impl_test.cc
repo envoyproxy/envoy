@@ -82,6 +82,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
+  const std::string& getDownstreamAddress() const override { return downstream_address_; }
 
   SystemTime start_time_;
   std::chrono::microseconds request_received_duration_{1000};
@@ -92,6 +93,7 @@ public:
   uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
+  std::string downstream_address_;
 };
 
 class AccessLogImplTest : public testing::Test {

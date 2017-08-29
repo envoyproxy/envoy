@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/router/config_utility.h"
+#include "common/router/req_header_formatter.h"
 #include "common/router/router_ratelimit.h"
 
 #include "api/rds.pb.h"
@@ -86,6 +87,8 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
@@ -117,6 +120,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ConfigImpl& global_route_config_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserPtr request_headers_parser_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -194,7 +198,9 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers,
+                              const Http::AccessLog::RequestInfo& request_info) const override;
+
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
@@ -227,6 +233,7 @@ protected:
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
 
 private:
   struct RuntimeData {
@@ -242,8 +249,9 @@ private:
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
 
-    void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
-      return parent_->finalizeRequestHeaders(headers);
+    void finalizeRequestHeaders(Http::HeaderMap& headers,
+                                const Http::AccessLog::RequestInfo& request_info) const override {
+      return parent_->finalizeRequestHeaders(headers, request_info);
     }
 
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
@@ -330,6 +338,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -344,7 +353,8 @@ public:
                        Runtime::Loader& loader);
 
   // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers,
+                              const Http::AccessLog::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -362,7 +372,8 @@ public:
                      Runtime::Loader& loader);
 
   // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  void finalizeRequestHeaders(Http::HeaderMap& headers,
+                              const Http::AccessLog::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -436,12 +447,15 @@ public:
 
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
+  const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  RequestHeaderParserPtr request_headers_parser_;
 };
 
 /**

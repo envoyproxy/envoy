@@ -186,6 +186,8 @@ A few very important notes about XFF:
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
 
+.. _config_http_conn_man_headers_x-forwarded-proto:
+
 x-forwarded-proto
 -----------------
 

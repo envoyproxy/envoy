@@ -507,8 +507,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
         connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-            *request_headers_, *route_entry, *this, connection_manager_.cluster_manager_,
-            connection_manager_.read_callbacks_));
+            *request_headers_, request_info_, *route_entry, *this,
+            connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
         connection_manager_.ws_connection_->onNewConnection();
         connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
         connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
@@ -543,7 +543,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.
-  downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
+  request_info_.downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
@@ -1128,7 +1128,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
 uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() { return parent_.stream_id_; }
 
 const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddress() {
-  return parent_.downstream_address_;
+  return parent_.request_info_.getDownstreamAddress();
 }
 
 } // namespace Http

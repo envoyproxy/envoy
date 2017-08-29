@@ -228,8 +228,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
-
-  route_entry_->finalizeRequestHeaders(headers);
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
