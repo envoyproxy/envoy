@@ -159,7 +159,7 @@ protected:
 #define ENVOY_LOGGER() __log_do_not_use_read_comment()
 
 /**
- * Convenience
+ * Convenience macro to flush logger.
  */
 #define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
 
