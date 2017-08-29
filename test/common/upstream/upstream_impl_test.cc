@@ -540,6 +540,42 @@ TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
+TEST(StaticClusterImplTest, SourceAddressPriority) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  envoy::api::v2::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+
+  Network::Address::InstanceConstSharedPtr bootstrap_address =
+      Network::Utility::parseInternetAddress("1.2.3.5");
+  {
+    // If the cluster manager gets a source address from the bootstrap proto, use it.
+    NiceMock<MockClusterManager> cm;
+    cm.source_address_ = bootstrap_address;
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
+    EXPECT_EQ(bootstrap_address->asString(), cluster.info()->sourceAddress()->asString());
+  }
+
+  const std::string cluster_address = "5.6.7.8";
+  config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+  {
+    // Verify source address from cluster config is used when present.
+    NiceMock<MockClusterManager> cm;
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+  }
+
+  {
+    // The source address from cluster config takes precedence over one from the bootstrap proto.
+    NiceMock<MockClusterManager> cm;
+    cm.source_address_ = bootstrap_address;
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+  }
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
