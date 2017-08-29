@@ -65,7 +65,7 @@ following statistics:
   :widths: 1, 1, 2
 
   decoding_error, Counter, Number of MongoDB protocol decoding errors
-  delay_injected, Counter, Number of delays injected
+  delay_injected, Counter, Number of times delay is started. Note, it's not number of operations delayed
   op_get_more, Counter, Number of OP_GET_MORE messages
   op_insert, Counter, Number of OP_INSERT messages
   op_kill_cursors, Counter, Number of OP_KILL_CURSORS messages
