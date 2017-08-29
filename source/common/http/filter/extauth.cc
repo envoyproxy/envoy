@@ -115,39 +115,44 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   }
 
   log().info("ExtAuth accepting request");
+  bool addedHeaders = false;
 
-  // If we actually add any headers, we need to invalidate the route cache.
-  // If we don't, we don't want to invalidate the route cache because it's
-  // slow.
-  addedHeaders_ = false;
+  // Do we have any headers configured to copy?
 
-  response->headers().iterate(
-    [](const HeaderEntry& header, void* vctx) -> void {
-      ExtAuth *self = static_cast<ExtAuth *>(vctx);
+  if (!config_->allowed_headers_.empty()) {
+    // Yup. Let's see if any of them are present. 
 
-      std::string key(header.key().c_str());
-      std::string value(header.value().c_str());
+    for (std::string allowed_header : config_->allowed_headers_) {
+      LowerCaseString key(allowed_header);
 
-      // log().info("ExtAuth response header {}: {}", key, value);
+      // OK, do we have this header?
 
-      // Should we use a map<> for this? We don't expect there to be many
-      // allowed headers.
+      const HeaderEntry* hdr = response->headers().get(key);
 
-      for (std::string allowed_header : self->config_->allowed_headers_) {
-        if (key == allowed_header) {
-          log().info("ExtAuth allowing response header {}: {}", key, value);
-          self->addedHeaders_ = true;
-          self->request_headers_->addCopy(LowerCaseString(key), value);
+      if (hdr) {
+        // Well, the header exists at all. Does it have a value?
+
+        const HeaderString& value = hdr->value();
+
+        if (!value.empty()) {
+          // Not empty! Copy it into our request_headers_.
+
+          std::string valstr(value.c_str());
+
+          ENVOY_STREAM_LOG(trace, "ExtAuth allowing response header {}: {}", *callbacks_, allowed_header, valstr);
+          addedHeaders = true;
+          request_headers_->addCopy(key, valstr);
         }
       }
-    },
-    static_cast<void *>(this)
-  );
+    }
+  }
 
-  if (addedHeaders_) {
+  if (addedHeaders) {
+    // Yup, we added headers. Invalidate the route cache in case any of 
+    // the headers will affect routing decisions.
+
     dumpHeaders("ExtAuth invalidating route cache", request_headers_);
 
-    // callbacks_->encodeHeaders(HeaderMapPtr(new HeaderMapImpl{request_headers_}), false);
     callbacks_->clearRouteCache();
   }
 

@@ -71,7 +71,6 @@ private:
   ExtAuthConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   bool auth_complete_;
-  bool addedHeaders_;
   Http::AsyncClient::Request* auth_request_{};
   Http::HeaderMap* request_headers_;
 };
