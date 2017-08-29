@@ -324,6 +324,15 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
 
+void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
+                                                       const std::vector<std::string>& port_names) {
+  test_server_ = IntegrationTestServer::create(std::string(), bootstrap_path, version_);
+  // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
+  // needs to know about the bound listener ports.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  registerTestServerPorts(port_names);
+}
+
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                                               const std::vector<std::string>& port_names) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
@@ -334,16 +343,11 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       api_filesystem_config.rds_path_, port_map_, version_);
   const std::string lds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.lds_path_, {{"rds_json_path", rds_path}}, port_map_, version_);
-  test_server_ = IntegrationTestServer::create(
-      std::string(),
-      TestEnvironment::temporaryFileSubstitute(
-          api_filesystem_config.bootstrap_path_,
-          {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
-      version_);
-  // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
-  // needs to know about the bound listener ports.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  registerTestServerPorts(port_names);
+  createGeneratedApiTestServer(TestEnvironment::temporaryFileSubstitute(
+                                   api_filesystem_config.bootstrap_path_,
+                                   {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
+                                   port_map_, version_),
+                               port_names);
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,

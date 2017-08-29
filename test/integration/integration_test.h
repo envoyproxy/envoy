@@ -17,7 +17,8 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(api_filesystem_config_, {"http", "http_forward", "http_buffer", "rds"});
+    createTestServer("test/config/integration/server.json",
+                     {"http", "http_forward", "http_buffer", "rds"});
   }
 
   /**
@@ -27,7 +28,5 @@ public:
     test_server_.reset();
     fake_upstreams_.clear();
   }
-
-  ApiFilesystemConfig api_filesystem_config_;
 };
 } // namespace Envoy

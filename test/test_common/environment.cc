@@ -151,11 +151,6 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
                                                      const ParamMap& param_map,
                                                      const PortMap& port_map,
                                                      Network::Address::IpVersion version) {
-  // Protobufs should be generated dynamically so not need port substitution.
-  if (path.size() > 3 && path.substr(path.size() - 3) == ".pb") {
-    return path;
-  }
-
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
   const std::string json_path = TestEnvironment::runfilesPath(path);

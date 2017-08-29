@@ -153,7 +153,7 @@ Address::InstanceConstSharedPtr Utility::fromProtoAddress(const envoy::api::v2::
   case envoy::api::v2::Address::kPipe:
     return Address::InstanceConstSharedPtr{new Address::PipeInstance(address.pipe().path())};
   default:
-    NOT_REACHED;
+    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
   }
 }
 
