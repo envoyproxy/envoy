@@ -120,7 +120,9 @@ protected:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   Buffer::InstancePtr read_buffer_;
-  Buffer::WatermarkBuffer write_buffer_;
+  // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
+  // a generic pointer.
+  Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:

@@ -74,10 +74,9 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
-      read_buffer_(dispatcher.getBufferFactory().create()),
-      write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
-                    [this]() -> void { this->onLowWatermark(); },
-                    [this]() -> void { this->onHighWatermark(); }),
+      read_buffer_(new Buffer::OwnedImpl), write_buffer_(dispatcher.getBufferFactory().create(
+                                               [this]() -> void { this->onLowWatermark(); },
+                                               [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
       using_original_dst_(using_original_dst) {
 
@@ -123,7 +122,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  uint64_t data_to_write = write_buffer_.length();
+  uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
@@ -298,7 +297,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
     // That code assumes that we never change existing write_buffer_ chain elements between calls
     // to SSL_write(). That code will have to change if we ever copy here.
-    write_buffer_.move(data);
+    write_buffer_->move(data);
 
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
@@ -331,7 +330,7 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
-    write_buffer_.setWatermarks(limit + 1);
+    static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
   }
 }
 
@@ -439,11 +438,11 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
-    if (write_buffer_.length() == 0) {
+    if (write_buffer_->length() == 0) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    int rc = write_buffer_.write(fd_);
+    int rc = write_buffer_->write(fd_);
     ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
@@ -491,7 +490,7 @@ void ConnectionImpl::onWriteReady() {
   }
 
   IoResult result = doWriteToSocket();
-  uint64_t new_buffer_size = write_buffer_.length();
+  uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   if (result.action_ == PostIoAction::Close) {

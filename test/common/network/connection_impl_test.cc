@@ -134,16 +134,17 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
-    EXPECT_CALL(*factory, create_())
+    EXPECT_CALL(*factory, create_(_, _))
         .Times(AnyNumber())
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          return new MockBuffer; // client read buffer.
-        }))
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          client_write_buffer_ = new StrictMock<MockBuffer>;
+        .WillOnce(Invoke([&](std::function<void()> below_low,
+                             std::function<void()> above_high) -> Buffer::Instance* {
+          client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high);
           return client_write_buffer_;
         }))
-        .WillRepeatedly(Invoke([]() -> Buffer::Instance* { return new Buffer::OwnedImpl; }));
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high);
+        }));
   }
 
 protected:
@@ -158,7 +159,7 @@ protected:
   Network::ConnectionPtr server_connection_;
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
-  MockBuffer* client_write_buffer_ = nullptr;
+  MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
 };
 
@@ -292,7 +293,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
   int buffer_len = buffer->length();
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::failWrite));
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
   EXPECT_CALL(*client_write_buffer_, move(_));
   client_write_buffer_->move(*buffer);
 
@@ -347,9 +348,9 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   std::string data_written;
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   client_connection_->write(buffer_to_write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
@@ -372,9 +373,9 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   std::string data_written;
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark but the subsequent drain immediately brings it back below.
   // A nice future performance optimization would be to latch if the socket is writable in the
@@ -391,7 +392,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   Buffer::OwnedImpl second_buffer_to_write(data_to_write);
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                            Invoke(client_write_buffer_, &MockBuffer::baseMove)));
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, write(_)).WillOnce(Invoke([&](int fd) -> int {
     dispatcher_->exit();
     return client_write_buffer_->failWrite(fd);
@@ -406,7 +407,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // Clean up the connection.  The close() (called via disconnect) will attempt to flush.  The
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockBuffer::trackWrites));
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -428,9 +429,9 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   bool is_above = false;
 
   ON_CALL(*client_write_buffer_, write(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::failWrite));
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
   ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::baseDrain));
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   // Randomly write 1-20 bytes and read 1-30 bytes per loop.
@@ -473,11 +474,11 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // Do the actual work.  Write |buffer_to_write| bytes to the connection and
     // drain |bytes_to_flush| before having the buffer failWrite()
     EXPECT_CALL(*client_write_buffer_, move(_))
-        .WillOnce(Invoke(client_write_buffer_, &MockBuffer::baseMove));
+        .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
     EXPECT_CALL(*client_write_buffer_, write(_))
         .WillOnce(DoAll(Invoke([&](int) -> void { client_write_buffer_->drain(bytes_to_flush); }),
                         Return(bytes_to_flush)))
-        .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockBuffer::failWrite));
+        .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
     client_connection_->write(buffer_to_write);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

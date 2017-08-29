@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::FactoryPtr{new Buffer::OwnedImplFactory}) {}
+    : DispatcherImpl(Buffer::FactoryPtr{new Buffer::WatermarkBufferFactory}) {}
 
 DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
     : buffer_factory_(std::move(factory)), base_(event_base_new()),

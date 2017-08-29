@@ -515,22 +515,21 @@ public:
   }
 
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
-    MockBuffer* client_write_buffer = nullptr;
+    MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_())
-        .Times(4)
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          return new StrictMock<MockBuffer>; // client read buffer.
-        }))
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          client_write_buffer = new StrictMock<MockBuffer>;
+    EXPECT_CALL(*factory, create_(_, _))
+        .Times(2)
+        .WillOnce(Invoke([&](std::function<void()> below_low,
+                             std::function<void()> above_high) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
           return client_write_buffer;
         }))
-        .WillRepeatedly(Invoke([]() -> Buffer::Instance* {
-          return new Buffer::OwnedImpl; // server buffers.
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
     initialize(read_buffer_limit);
@@ -557,7 +556,7 @@ public:
     std::string data_written;
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                              Invoke(client_write_buffer, &MockBuffer::baseMove)));
+                              Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
     EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
       client_write_buffer->baseDrain(n);
       dispatcher_->exit();

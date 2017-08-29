@@ -195,13 +195,11 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            Network::Address::IpVersion version)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, create_())
-      .Times(2)
-      .WillOnce(Invoke([&]() -> Buffer::Instance* {
-        return new Buffer::OwnedImpl; // client read buffer.
-      }))
-      .WillOnce(Invoke([&]() -> Buffer::Instance* {
-        client_write_buffer_ = new MockBuffer;
+  EXPECT_CALL(factory, create_(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](std::function<void()> below_low,
+                           std::function<void()> above_high) -> Buffer::Instance* {
+        client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high);
         return client_write_buffer_;
       }));
 
@@ -211,7 +209,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
       Network::Address::InstanceConstSharedPtr());
 
   ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockBuffer::baseDrain));
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->addConnectionCallbacks(*callbacks_);
@@ -267,9 +265,11 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, create_()).WillByDefault(Invoke([&]() -> Buffer::Instance* {
-    return new Buffer::OwnedImpl;
-  }));
+  ON_CALL(*mock_buffer_factory_, create_(_, _))
+      .WillByDefault(Invoke([](std::function<void()> below_low,
+                               std::function<void()> above_high) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high);
+      }));
 }
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {

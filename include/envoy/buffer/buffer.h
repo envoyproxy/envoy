@@ -142,9 +142,14 @@ public:
 
   /**
    * Creates and returns a unique pointer to a new buffer.
+   * @param below_low_watermark supplies a function to call if the buffer goes under a configuerd
+   *   low watermark.
+   * @param above_high_watermark supplies a function to call if the buffer goes over a configured
+   *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create() PURE;
+  virtual InstancePtr create(std::function<void()> below_low_watermark,
+                             std::function<void()> above_high_watermark) PURE;
 };
 
 typedef std::unique_ptr<Factory> FactoryPtr;
