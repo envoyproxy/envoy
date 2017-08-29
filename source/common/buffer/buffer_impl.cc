@@ -61,23 +61,23 @@ void* OwnedImpl::linearize(uint32_t size) {
 }
 
 void OwnedImpl::move(Instance& rhs) {
-  // We do the static cast here because in practice we only have one buffer implementation right
+  // We do the cast here because in practice we only have one buffer implementation right
   // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
   // This is a reasonable compromise in a high performance path where we want to maintain an
   // abstraction in case we get rid of evbuffer later.
-  int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
+  int rc = evbuffer_add_buffer(buffer_.get(), dynamic_cast<LibEventInstance&>(rhs).buffer().get());
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
-  static_cast<LibEventInstance&>(rhs).postProcess();
+  dynamic_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
-  // See move() above for why we do the static cast.
-  int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
-                                  length);
+  // See move() above for why we do the dynamic cast.
+  int rc = evbuffer_remove_buffer(dynamic_cast<LibEventInstance&>(rhs).buffer().get(),
+                                  buffer_.get(), length);
   ASSERT(static_cast<uint64_t>(rc) == length);
   UNREFERENCED_PARAMETER(rc);
-  static_cast<LibEventInstance&>(rhs).postProcess();
+  dynamic_cast<LibEventInstance&>(rhs).postProcess();
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {

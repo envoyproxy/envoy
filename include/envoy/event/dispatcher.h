@@ -162,7 +162,7 @@ public:
    * Returns a factory which connections may use for buffer creation.
    * @return the buffer factory for this dispatcher.
    */
-  virtual Buffer::Factory& getBufferFactory() PURE;
+  virtual Buffer::WatermarkInstanceFactory& getBufferFactory() PURE;
 };
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;

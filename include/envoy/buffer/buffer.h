@@ -134,25 +134,53 @@ public:
 typedef std::unique_ptr<Instance> InstancePtr;
 
 /**
- * A factory for creating buffers.
+ * Additional functions for buffer instances which discourage infinite buffering.
+ * Watermark buffers are configured with high watermark callbacks which fire
+ * when the buffered data is above the configured high watemark limit set via setWatermarks,
+ * and low watermark callbacks when fire when the buffered data is drained below
+ * the configured low watermarks set via the same method.
  */
-class Factory {
+class WatermarkInstance : public virtual Instance {
 public:
-  virtual ~Factory() {}
+  /**
+   * Set the high and low watermarks for a buffer which enforces limited buffering.
+   * @param low_watermark supplies the number of bytes below which the low watermark callbacks may
+   * fire.
+   * @param high_watermark supplies the number of bytes the buffer may contain before calling high
+   * watermark callbacks.
+   */
+  virtual void setWatermarks(uint32_t low_watermark, uint32_t high_watermark) PURE;
 
   /**
-   * Creates and returns a unique pointer to a new buffer.
+   * A convenience function for setting a sensible watermarks given only a high watermark.
+   * @param high_watermark supplies the number of bytes the buffer may contain before calling high
+   * watermark callbacks.
+   */
+  virtual void setWatermarks(uint32_t high_watermark) PURE;
+};
+
+typedef std::unique_ptr<WatermarkInstance> WatermarkInstancePtr;
+
+/**
+ * A factory for creating WatermarkInstances.
+ */
+class WatermarkInstanceFactory {
+public:
+  virtual ~WatermarkInstanceFactory() {}
+
+  /**
+   * Creates and returns a unique pointer to a new WatermarkInstance.
    * @param below_low_watermark supplies a function to call if the buffer goes under a configuerd
    *   low watermark.
    * @param above_high_watermark supplies a function to call if the buffer goes over a configured
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark) PURE;
+  virtual WatermarkInstancePtr create(std::function<void()> below_low_watermark,
+                                      std::function<void()> above_high_watermark) PURE;
 };
 
-typedef std::unique_ptr<Factory> FactoryPtr;
+typedef std::unique_ptr<WatermarkInstanceFactory> WatermarkInstanceFactoryPtr;
 
 } // namespace Buffer
 } // namespace Envoy

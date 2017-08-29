@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Buffer {
 
-class LibEventInstance : public Instance {
+class LibEventInstance : public virtual Instance {
 public:
   // Allows access into the underlying buffer for move() optimizations.
   virtual Event::Libevent::BufferPtr& buffer() PURE;

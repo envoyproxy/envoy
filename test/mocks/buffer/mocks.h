@@ -83,15 +83,15 @@ public:
   }
 };
 
-class MockBufferFactory : public Buffer::Factory {
+class MockBufferFactory : public Buffer::WatermarkInstanceFactory {
 public:
-  Buffer::InstancePtr create(std::function<void()> below_low,
-                             std::function<void()> above_high) override {
-    return Buffer::InstancePtr{create_(below_low, above_high)};
+  Buffer::WatermarkInstancePtr create(std::function<void()> below_low,
+                                      std::function<void()> above_high) override {
+    return Buffer::WatermarkInstancePtr{create_(below_low, above_high)};
   }
 
-  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
-                                          std::function<void()> above_high));
+  MOCK_METHOD2(create_, Buffer::WatermarkBuffer*(std::function<void()> below_low,
+                                                 std::function<void()> above_high));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
