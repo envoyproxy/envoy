@@ -437,7 +437,13 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
+  const uint64_t delay = 10;
+  setupDelayFault(delay, 50, true);
   initializeFilter();
+
+  Event::MockTimer* delay_timer =
+      new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay)));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
@@ -449,13 +455,20 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
   }));
   filter_->onData(fake_data_);
 
+  EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
+  const uint64_t delay = 10;
+  setupDelayFault(delay, 50, true);
   initializeFilter();
+
+  Event::MockTimer* delay_timer =
+      new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay)));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
@@ -467,6 +480,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
   }));
   filter_->onData(fake_data_);
 
+  EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());

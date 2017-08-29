@@ -229,10 +229,17 @@ void ProxyFilter::logMessage(Message& message, bool full) {
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    if (delay_timer_) {
+      delay_timer_->disableTimer();
+      delay_timer_.reset();
+    }
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
     stats_.cx_destroy_local_with_active_rq_.inc();
-  }
-  if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
+  } else if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 }
@@ -257,9 +264,8 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
 Optional<uint64_t> ProxyFilter::delayDuration() {
   Optional<uint64_t> result;
 
-  if (!fault_config_) {
+  if (!fault_config_)
     return result;
-  }
 
   if (!runtime_.snapshot().featureEnabled(FIXED_DELAY_PERCENT_KEY, fault_config_->delayPercent())) {
     return result;
