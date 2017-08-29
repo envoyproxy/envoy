@@ -111,13 +111,12 @@ public:
 };
 
 TEST_F(MongoProxyFilterTest, DelayFaults) {
-  const uint64_t delay = 10;
   setupDelayFault(true);
   initializeFilter();
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
