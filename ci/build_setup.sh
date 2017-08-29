@@ -77,7 +77,7 @@ then
 fi
 
 # This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 8442ed70a5fc55662ca1a6d45fde2d23a4cb4adf)
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 77fdf641a61b5a8f20e2568c4e7eb6a3644fe7c9)
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # Also setup some space for building Envoy standalone.

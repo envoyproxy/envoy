@@ -218,7 +218,7 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,
                RouteConfigProviderSharedPtr(const envoy::api::v2::filter::Rds& rds,
                                             Upstream::ClusterManager& cm, Stats::Scope& scope,

@@ -111,6 +111,21 @@ public:
    * @return envoy::api::v2::Bootstrap.
    */
   static envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string);
+
+  /**
+   * Returns a "novel" IPv4 loopback address, if available.
+   * For many tests, we want a loopback address other than 127.0.0.1 where possible.  For some
+   * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
+   *
+   * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.
+   */
+  static std::string getIpv4Loopback() {
+#ifdef __APPLE__
+    return "127.0.0.1";
+#else
+    return "127.0.0.9";
+#endif
+  }
 };
 
 /**

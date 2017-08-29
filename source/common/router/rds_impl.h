@@ -6,14 +6,17 @@
 #include <unordered_map>
 
 #include "envoy/config/subscription.h"
+#include "envoy/http/codes.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/server/admin.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/utility.h"
 
 #include "api/filter/http_connection_manager.pb.h"
 #include "api/rds.pb.h"
@@ -70,11 +73,11 @@ struct RdsStats {
 class RouteConfigProviderManagerImpl;
 
 /**
- * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
+ * Implementation of RdsRouteConfigProvider that fetches the route configuration dynamically using
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl
-    : public RouteConfigProvider,
+    : public RdsRouteConfigProvider,
       public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
@@ -89,6 +92,13 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
+
+  // Router::RdsRouteConfigProvider
+  std::string configAsJson() const override {
+    return MessageUtil::getJsonStringFromMessage(route_config_proto_);
+  }
+  const std::string& routeConfigName() const override { return route_config_name_; }
+  const std::string& clusterName() const override { return cluster_name_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
@@ -115,6 +125,7 @@ private:
   Upstream::ClusterManager& cm_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
+  std::string cluster_name_;
   const std::string route_config_name_;
   bool initialized_{};
   uint64_t last_config_hash_{};
@@ -123,6 +134,7 @@ private:
   std::function<void()> initialize_callback_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -133,11 +145,11 @@ public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
-                                 ThreadLocal::SlotAllocator& tls);
-  ~RouteConfigProviderManagerImpl() {}
+                                 ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
+  ~RouteConfigProviderManagerImpl();
 
   // ServerRouteConfigProviderManager
-  std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() override;
+  std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::Rds& rds,
                                                       Upstream::ClusterManager& cm,
@@ -146,12 +158,31 @@ public:
                                                       Init::Manager& init_manager) override;
 
 private:
-  std::unordered_map<std::string, std::weak_ptr<RouteConfigProvider>> route_config_providers_;
+  /**
+   * Add the RdsRouteConfigProvider information to the buffer.
+   * @param provider supplies the Provider to extract information from.
+   * @param response supplies the buffer to fill with information.
+   */
+  void addRouteInfo(const RdsRouteConfigProvider& provider, Buffer::Instance& response);
+
+  /**
+   * The handler used in the Admin /routes endpoint. This handler is used to
+   * populate the response Buffer::Instance with information about the currently
+   * loaded dynamic HTTP Route Tables.
+   * @param url supplies the url sent to the Admin endpoint.
+   * @param response supplies the buffer to fill with information.
+   * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
+   */
+  Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
+
+  std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
+      route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotAllocator& tls_;
+  Server::Admin& admin_;
 
   friend class RdsRouteConfigProviderImpl;
 };

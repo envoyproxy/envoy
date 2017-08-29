@@ -10,6 +10,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -21,10 +22,6 @@
 
 namespace Envoy {
 namespace Server {
-
-class Instance; // TODO(mattklein123): Remove post 1.4.0. Forward declare to avoid circular
-                // includes.
-
 namespace Configuration {
 
 /**
@@ -100,12 +97,6 @@ public:
   virtual Envoy::Runtime::Loader& runtime() PURE;
 
   /**
-   * DEPRECATED: Do not call this function. It will be removed post 1.4.0 and is needed for other
-   * deprecated functionality.
-   */
-  virtual Instance& server() PURE;
-
-  /**
    * @return Stats::Scope& the filter's stats scope.
    */
   virtual Stats::Scope& scope() PURE;
@@ -120,6 +111,11 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+
+  /**
+   * @return Server::Admin& the server's global admin HTTP endpoint.
+   */
+  virtual Server::Admin& admin() PURE;
 };
 
 enum class NetworkFilterType { Read, Write, Both };
@@ -225,7 +221,7 @@ public:
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const ProtobufWkt::Message& config,
+  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                            const std::string& stat_prefix,
                                                            FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);

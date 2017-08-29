@@ -59,6 +59,8 @@ flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.
 
+.. _config_overview_statsd_udp_ip_address:
+
 statsd_udp_ip_address
   *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
   :ref:`statistics <arch_overview_statistics>` will be flushed to this address. IPv4 addresses should

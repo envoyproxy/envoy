@@ -129,6 +129,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

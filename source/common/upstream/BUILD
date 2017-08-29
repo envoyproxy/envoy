@@ -69,6 +69,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/upstream:upstream_lib",

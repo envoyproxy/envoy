@@ -12,6 +12,15 @@ namespace Envoy {
 namespace Server {
 
 /**
+ * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
+ * a callback that executes X when the specified admin handler is hit. This macro can be
+ * used to add static handlers as in source/server/http/admin.cc and also dynamic handlers as
+ * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
+ */
+#define MAKE_ADMIN_HANDLER(X)                                                                      \
+  [this](const std::string& url, Buffer::Instance& data) -> Http::Code { return X(url, data); }
+
+/**
  * Global admin HTTP endpoint for the server.
  */
 class Admin {

@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/network:listen_socket_interface",
     ],
 )
 
@@ -100,6 +101,7 @@ envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
     deps = [
+        ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",

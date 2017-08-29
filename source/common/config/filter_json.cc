@@ -159,7 +159,6 @@ void FilterJson::translateHttpConnectionManager(
 
   if (json_http_connection_manager.hasObject("http2_settings")) {
     ProtocolJson::translateHttp2ProtocolOptions(
-        json_http_connection_manager.getString("http_codec_options", ""),
         *json_http_connection_manager.getObject("http2_settings"),
         *http_connection_manager.mutable_http2_protocol_options());
   }

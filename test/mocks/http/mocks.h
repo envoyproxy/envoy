@@ -48,12 +48,16 @@ public:
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
+  MOCK_CONST_METHOD0(requestReceivedDuration, std::chrono::microseconds());
+  MOCK_METHOD1(requestReceivedDuration, void(MonotonicTime time));
+  MOCK_CONST_METHOD0(responseReceivedDuration, std::chrono::microseconds());
+  MOCK_METHOD1(responseReceivedDuration, void(MonotonicTime time));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, Protocol());
   MOCK_METHOD1(protocol, void(Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
-  MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(duration, std::chrono::microseconds());
   MOCK_CONST_METHOD1(getResponseFlag, bool(Http::AccessLog::ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
@@ -62,6 +66,8 @@ public:
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
+  std::chrono::microseconds request_received_duration_;
+  std::chrono::microseconds response_received_duration_;
 };
 
 } // namespace AccessLog
@@ -232,9 +238,7 @@ public:
   ~MockStreamDecoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(connection, const Network::Connection*());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
@@ -272,9 +276,7 @@ public:
   ~MockStreamEncoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(connection, const Network::Connection*());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());

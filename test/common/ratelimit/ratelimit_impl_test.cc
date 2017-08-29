@@ -104,7 +104,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::Error));
-    client_.onFailure(Grpc::Status::Unknown);
+    client_.onFailure(Grpc::Status::Unknown, "");
   }
 }
 
@@ -120,7 +120,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
 }
 
 TEST(RateLimitGrpcFactoryTest, NoCluster) {
-  envoy::api::v2::RateLimitService config;
+  envoy::api::v2::RateLimitServiceConfig config;
   config.set_cluster_name("foo");
   Upstream::MockClusterManager cm;
 
@@ -129,7 +129,7 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
 }
 
 TEST(RateLimitGrpcFactoryTest, Create) {
-  envoy::api::v2::RateLimitService config;
+  envoy::api::v2::RateLimitServiceConfig config;
   config.set_cluster_name("foo");
   Upstream::MockClusterManager cm;
 

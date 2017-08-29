@@ -19,6 +19,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/json/config_schemas.h"
+#include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
@@ -179,6 +180,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     loadCluster(cluster, false);
+  }
+
+  if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
+    source_address_ = Network::Utility::fromProtoSocketAddress(
+        bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.

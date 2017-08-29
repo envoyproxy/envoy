@@ -260,10 +260,6 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       },
       "add_user_agent" : {"type" : "boolean"},
       "tracing" : {"$ref" : "#/definitions/tracing"},
-      "http_codec_options" : {
-        "type" : "string",
-        "enum" : ["no_compression"]
-      },
       "http1_settings": {
         "type": "object",
         "properties": {
@@ -1377,10 +1373,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "features" : {
         "type" : "string",
         "enum" : ["http2"]
-      },
-      "http_codec_options" : {
-        "type" : "string",
-        "enum" : ["no_compression"]
       },
       "http2_settings" : {
         "type" : "object",

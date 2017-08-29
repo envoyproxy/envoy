@@ -34,6 +34,20 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+const Network::Address::InstanceConstSharedPtr
+getSourceAddress(const envoy::api::v2::Cluster& cluster,
+                 const Network::Address::InstanceConstSharedPtr source_address) {
+  // The source address from cluster config takes precedence.
+  if (cluster.upstream_bind_config().has_source_address()) {
+    return Network::Utility::fromProtoSocketAddress(
+        cluster.upstream_bind_config().source_address());
+  }
+  // If there's no source address in the cluster config, use any default from the bootstrap proto.
+  return source_address;
+}
+} // namespace
 
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
 
@@ -45,8 +59,9 @@ Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address) {
   Network::ClientConnectionPtr connection =
-      cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
-                           : dispatcher.createClientConnection(address);
+      cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address,
+                                                                  cluster.sourceAddress())
+                           : dispatcher.createClientConnection(address, cluster.sourceAddress());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -57,9 +72,10 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                 bool added_via_api)
+ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -72,7 +88,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime:
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      added_via_api_(added_via_api) {
+      source_address_(getSourceAddress(config, source_address)), added_via_api_(added_via_api) {
   ssl_ctx_ = nullptr;
   if (config.has_tls_context()) {
     Ssl::ClientContextConfigImpl context_config(config.tls_context());
@@ -138,22 +154,24 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
     new_cluster.reset(
-        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api));
+        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, cm, added_via_api));
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               selected_dns_resolver, dispatcher, added_via_api));
+                                               selected_dns_resolver, cm, dispatcher,
+                                               added_via_api));
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
-                                            selected_dns_resolver, tls, dispatcher, added_via_api));
+                                            selected_dns_resolver, tls, cm, dispatcher,
+                                            added_via_api));
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:
     if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
       throw EnvoyException(fmt::format(
           "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
     }
-    new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager,
+    new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager, cm,
                                              dispatcher, added_via_api));
     break;
   case envoy::api::v2::Cluster::EDS:
@@ -181,11 +199,12 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                 bool added_via_api)
-    : runtime_(runtime),
-      info_(new ClusterInfoImpl(cluster, runtime, stats, ssl_context_manager, added_via_api)) {}
+ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
+    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
+                                                   ssl_context_manager, added_via_api)) {}
 
 HostVectorConstSharedPtr
 ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
@@ -312,8 +331,10 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, stats, ssl_context_manager, added_via_api) {
+                                     Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
+                                     bool added_via_api)
+    : ClusterImplBase(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+                      added_via_api) {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const auto& host : cluster.hosts()) {
     new_hosts->emplace_back(HostSharedPtr{
@@ -411,8 +432,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            Runtime::Loader& runtime, Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolverSharedPtr dns_resolver,
-                                           Event::Dispatcher& dispatcher, bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
+                                           ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                           bool added_via_api)
+    : BaseDynamicClusterImpl(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+                             added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {

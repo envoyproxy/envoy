@@ -116,7 +116,7 @@ void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, I
 
   // TODO(htuch): Make this dynamically pluggable one day.
   Json::ObjectSharedPtr driver_config =
-      WktUtil::getJsonObjectFromStruct(configuration.http().config());
+      MessageUtil::getJsonObjectFromMessage(configuration.http().config());
 
   // Now see if there is a factory that will accept the config.
   HttpTracerFactory* factory = Registry::FactoryRegistry<HttpTracerFactory>::getFactory(type);

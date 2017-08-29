@@ -174,7 +174,7 @@ public:
       return new CodecClientForTest(std::move(conn_data.connection_), codec, nullptr, nullptr);
     };
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _))
         .WillOnce(Return(test_session.client_connection_));
     EXPECT_CALL(*health_checker_, createCodecClient_(_)).WillOnce(Invoke(create_codec_client));
   }
@@ -736,7 +736,7 @@ public:
 
   void expectClientCreate() {
     connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(dispatcher_, createClientConnection_(_)).WillOnce(Return(connection_));
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _)).WillOnce(Return(connection_));
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 

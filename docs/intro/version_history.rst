@@ -1,6 +1,53 @@
 Version history
 ---------------
 
+1.4.0
+=====
+
+* macOS is :repo:`now supported </bazel#quick-start-bazel-build-for-developers>`. (A few features
+  are missing such as hot restart and original destination routing).
+* YAML is now directly supported for :ref:`config files <config_overview>`.
+* Added :ref:`/routes <operations_admin_interface_routes>` admin endpoint.
+* End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control
+  that includes filter buffering is incomplete and will be implemented in 1.5.0.
+* Log verbosity :repo:`compile time flag </bazel#log-verbosity>` added.
+* Hot restart :repo:`compile time flag </bazel#hot-restart>` added.
+* Original destination :ref:`cluster <arch_overview_service_discovery_types_original_destination>`
+  and :ref:`load balancer <arch_overview_load_balancing_types_original_destination>` added.
+* :ref:`WebSocket <arch_overview_websocket>` is now supported.
+* Virtual cluster priorities have been hard removed without deprecation as we are reasonably sure
+  no one is using this feature.
+* Route :ref:`validate_clusters <config_http_conn_man_route_table_validate_clusters>` option added.
+* :ref:`x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-node>`
+  header added.
+* :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>` header
+  added.
+* Initial HTTP/1 forward proxy support for :ref:`absolute URLs
+  <config_http_conn_man_http1_settings>` has been added.
+* HTTP/2 codec settings are now :ref:`configurable <config_http_conn_man_http2_settings>`.
+* gRPC/JSON transcoder :ref:`filter <config_http_filters_grpc_json_transcoder>` added.
+* gRPC web :ref:`filter <config_http_filters_grpc_web>` added.
+* Configurable timeout for the rate limit service call in the :ref:`network
+  <config_network_filters_rate_limit>` and :ref:`HTTP <config_http_filters_rate_limit>` rate limit
+  filters.
+* :ref:`x-envoy-grpc-retry-on <config_http_filters_router_x-envoy-grpc-retry-on>` header added.
+* :ref:`LDS API <arch_overview_dynamic_config_lds>` added.
+* TLS :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`
+  option added.
+* :ref:`Configuration check tool <install_tools_config_load_check_tool>` added.
+* :ref:`JSON schema check tool <install_tools_schema_validator_check_tool>` added.
+* Config validation mode added via the :option:`--mode` option.
+* :option:`--local-address-ip-version` option added.
+* IPv6 support is now complete.
+* UDP :ref:`statsd_ip_address <config_overview_statsd_udp_ip_address>` option added.
+* Per-cluster :ref:`DNS resolvers <config_cluster_manager_cluster_dns_resolvers>` added.
+* :ref:`Fault filter <config_http_filters_fault_injection>` enhancements and fixes.
+* Several features are :repo:`deprecated as of the 1.4.0 release </DEPRECATED.md#version-140>`. They
+  will be removed at the beginning of the 1.5.0 release cycle. We explicitly call out that the
+  `HttpFilterConfigFactory` filter API has been deprecated in favor of
+  `NamedHttpFilterConfigFactory`.
+* Many small bug fixes and performance improvements not listed.
+
 1.3.0
 =====
 
@@ -58,8 +105,8 @@ Version history
 * The CPU profiler output path is now :ref:`configurable <config_admin>`.
 * A :ref:`watchdog system <config_overview>` has been added that can kill the server if a deadlock
   is detected.
-* A :ref:`route table checking tool <install_tools_route_table_check_tool>` has been added that can be used to test route
-  tables before use.
+* A :ref:`route table checking tool <install_tools_route_table_check_tool>` has been added that can
+  be used to test route tables before use.
 * We have added an :ref:`example repo <extending>` that shows how to compile/link a custom filter.
 * Added additional cluster wide information related to outlier detection to the :ref:`/clusters
   admin endpoint <operations_admin_interface>`.

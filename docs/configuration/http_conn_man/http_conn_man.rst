@@ -19,7 +19,6 @@ HTTP connection manager
       "filters": [],
       "add_user_agent": "...",
       "tracing": "{...}",
-      "http_codec_options": "...",
       "http1_settings": "{...}",
       "http2_settings": "{...}",
       "server_name": "...",
@@ -90,22 +89,6 @@ add_user_agent
 :ref:`tracing <config_http_conn_man_tracing>`
   *(optional, object)* Presence of the object defines whether the connection manager
   emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider <config_tracing>`.
-
-.. _config_http_conn_man_http_codec_options:
-
-http_codec_options (Warning: DEPRECATED and will be removed in 1.4.0)
-  **DEPRECATED**, use :ref:`http2_settings <config_http_conn_man_http2_settings>` instead.
-
-  *(optional, string)* Additional options that are passed directly to the codec. Not all options
-  are applicable to all codecs. Possible values are:
-
-  no_compression
-    The codec will not use compression. In practice this only applies to HTTP/2 which will disable
-    header compression if set.
-
-  These are the same options available in the upstream cluster :ref:`http_codec_options
-  <config_cluster_manager_cluster_http_codec_options>` option. See the comment there about
-  disabling HTTP/2 header compression.
 
 .. _config_http_conn_man_http1_settings:
 

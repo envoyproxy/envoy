@@ -38,6 +38,7 @@ public:
   MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};
@@ -46,6 +47,7 @@ public:
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+  Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
 };
 

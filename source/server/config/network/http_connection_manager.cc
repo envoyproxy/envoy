@@ -8,6 +8,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -50,7 +51,7 @@ NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal());
+                context.threadLocal(), context.admin());
           });
 
   std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
@@ -219,15 +220,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    const std::string& string_type = filters[i].deprecated_v1().type();
     const std::string& string_name = filters[i].name();
     const auto& proto_config = filters[i].config();
 
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    const Json::ObjectSharedPtr filter_config = WktUtil::getJsonObjectFromStruct(proto_config);
-    const HttpFilterType type = stringToType(string_type);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
     // Now see if there is a factory that will accept the config.
     NamedHttpFilterConfigFactory* factory =
@@ -248,24 +247,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       }
       filter_factories_.push_back(callback);
     } else {
-      // DEPRECATED
-      // This name wasn't found in the named map, so search in the deprecated list registry.
-      bool found_filter = false;
-      for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
-        HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config->getObject("value", true), stats_prefix_,
-            context_.server());
-        if (callback) {
-          filter_factories_.push_back(callback);
-          found_filter = true;
-          break;
-        }
-      }
-
-      if (!found_filter) {
-        throw EnvoyException(
-            fmt::format("unable to create http filter factory for '{}'", string_name));
-      }
+      throw EnvoyException(
+          fmt::format("unable to create http filter factory for '{}'", string_name));
     }
   }
 }

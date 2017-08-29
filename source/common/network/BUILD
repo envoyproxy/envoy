@@ -41,6 +41,7 @@ envoy_cc_library(
         ":address_lib",
         ":filter_manager_lib",
         ":utility_lib",
+        "//include/envoy/common:optional",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
