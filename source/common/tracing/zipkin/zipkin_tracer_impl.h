@@ -90,7 +90,7 @@ public:
    * It starts a new Zipkin span. Depending on the request headers, it can create a root span,
    * a child span, or a shared-context span.
    *
-   * The second parameter (operation_name) does not actually make sense for Zipkin.
+   * The third parameter (operation_name) does not actually make sense for Zipkin.
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */

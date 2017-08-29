@@ -62,6 +62,7 @@ public:
   /**
    * Creates a "root" Zipkin span.
    *
+   * @param config The tracing configuration
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    */
@@ -70,6 +71,7 @@ public:
   /**
    * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
    *
+   * @param config The tracing configuration
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.

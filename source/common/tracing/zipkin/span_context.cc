@@ -79,7 +79,6 @@ SpanContext::SpanContext(const Span& span) {
 }
 
 const std::string SpanContext::serializeToString() {
-
   if (!is_initialized_) {
     return unitializedSpanContext();
   }
