@@ -220,7 +220,10 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
 
 class BindIntegrationTest : public IntegrationTest {
 public:
-  void SetUp() override {
+  // Delay base class SetUp until initialize().
+  void SetUp() override {}
+
+  void initialize() {
     envoy::api::v2::Bootstrap bootstrap;
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = TestUtility::getIpv4Loopback();
@@ -239,6 +242,8 @@ public:
 };
 
 TEST_P(BindIntegrationTest, TestBind) {
+  initialize();
+
   executeActions(
       {[&]() -> void {
          codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
@@ -263,6 +268,36 @@ TEST_P(BindIntegrationTest, TestBind) {
        [&]() -> void { codec_client_->close(); },
        [&]() -> void { fake_upstream_connection_->close(); },
        [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+}
+
+TEST_P(BindIntegrationTest, DISABLED_TestFailedBind) {
+  // Invert the addresses to create a bind failure.
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    address_string_ = TestUtility::getIpv4Loopback();
+  } else {
+    address_string_ = "::1";
+  }
+
+  initialize();
+
+  IntegrationCodecClientPtr codec_client;
+  FakeStreamPtr request;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  executeActions(
+      {[&]() -> void {
+         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+       },
+       [&]() -> void {
+         // With no ability to successfully bind on an upstream connection Envoy should send a 500.
+         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}},
+                                           1024, *response);
+         codec_client->waitForDisconnect();
+       }});
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BindIntegrationTest,

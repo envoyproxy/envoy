@@ -32,10 +32,11 @@ getNullLocalAddress(const Network::Address::Instance& address) {
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
                                Network::Address::InstanceConstSharedPtr local_address,
+                               Network::Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, using_original_dst,
-                              connected),
+    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
+                              using_original_dst, connected),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -307,9 +308,9 @@ std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address,
                                            Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher,
-                     Network::ConnectionImplUtility::createSocket(address, source_address), address,
-                     getNullLocalAddress(*address), false, false, ctx, InitialState::Client) {}
+    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
+                     getNullLocalAddress(*address), source_address, false, false, ctx,
+                     InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 

@@ -68,7 +68,8 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
   EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
                               Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                              Network::Test::getCanonicalLoopbackAddress(GetParam()), false, false),
+                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                              Network::Address::InstanceConstSharedPtr(), false, false),
                ".*assert failure: fd_ != -1.*");
 }
 
@@ -500,6 +501,33 @@ TEST_P(ConnectionImplTest, BindTest) {
   EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
 
   disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, BindFailureTest) {
+  std::string address_string = TestUtility::getIpv4Loopback();
+
+  // Swap the constraints from BindTest to create an address family mismatch.
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+
+  if (dispatcher_.get() == nullptr) {
+    dispatcher_.reset(new Event::DispatcherImpl);
+  }
+  listener_ =
+      dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
+                                  Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {
