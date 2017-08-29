@@ -20,5 +20,5 @@ fi
 
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run -t -i -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
-  -v "$PWD":/source lyft/envoy-build:"${IMAGE_ID}" /bin/bash -c "cd source && $*"
+docker run --rm -t -i -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
+  -v "$PWD":/source -e NUM_CPUS lyft/envoy-build:"${IMAGE_ID}" /bin/bash -c "cd source && $*"
