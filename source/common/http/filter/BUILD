@@ -53,10 +53,10 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:logger_lib",
         "//source/common/http:message_lib",
-        "//source/common/http:utility_lib"
+        "//source/common/http:utility_lib",
     ],
 )
 

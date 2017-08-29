@@ -79,7 +79,7 @@ envoy_cc_library(
     deps = [
         "//source/common/http/filter:extauth_lib",
         "//source/server:configuration_lib",
-        "//source/server/config/network:http_connection_manager_lib"
+        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 

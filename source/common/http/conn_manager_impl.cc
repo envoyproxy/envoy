@@ -642,6 +642,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+#ifndef NVLOG
+    headers.iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          ENVOY_STREAM_LOG(trace, "  H'{}':'{}'", *static_cast<ActiveStream*>(context),
+                           header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        this);
+#endif
+
     if (!(*entry)->commonHandleAfterHeadersCallback(status) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
@@ -1254,6 +1264,8 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
+  ENVOY_STREAM_LOG(trace, "clearing route cache: filter={}", parent_,
+                   static_cast<const void*>(this));
   parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
 }
 
