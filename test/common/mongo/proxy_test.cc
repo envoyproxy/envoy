@@ -75,17 +75,15 @@ public:
     filter_->onNewConnection();
   }
 
-  void setupDelayFault(uint64_t duration_ms, uint32_t delay_percent, bool enable_fault) {
-    const std::string json_fault_config_template = R"EOF(
-    {{
-      "fixed_delay": {{
-        "percent": {},
-        "duration_ms": {}
-      }}
-    }}
+  void setupDelayFault(bool enable_fault) {
+    const std::string json_config = R"EOF(
+    {
+      "fixed_delay": {
+        "percent": 50,
+        "duration_ms": 10
+      }
+    }
     )EOF";
-    const std::string json_config =
-        fmt::format(json_fault_config_template, delay_percent, duration_ms);
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json_config);
 
     fault_config_.reset(new FaultConfig(*config));
@@ -116,7 +114,7 @@ public:
 
 TEST_F(MongoProxyFilterTest, DelayFaults) {
   const uint64_t delay = 10;
-  setupDelayFault(delay, 50, true);
+  setupDelayFault(true);
   initializeFilter();
 
   Event::MockTimer* delay_timer =
@@ -156,13 +154,22 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
 
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
+    message->numberOfCursorIds(1);
+    message->cursorIds({1});
+    filter_->callbacks_->decodeKillCursors(std::move(message));
+  }));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_));
+  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
+
   EXPECT_CALL(read_filter_callbacks_, continueReading());
   delay_timer->callback_();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
-  setupDelayFault(10, 50, false);
+  setupDelayFault(false);
   initializeFilter();
 
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
@@ -438,7 +445,7 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
   const uint64_t delay = 10;
-  setupDelayFault(delay, 50, true);
+  setupDelayFault(true);
   initializeFilter();
 
   Event::MockTimer* delay_timer =
@@ -463,7 +470,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
   const uint64_t delay = 10;
-  setupDelayFault(delay, 50, true);
+  setupDelayFault(true);
   initializeFilter();
 
   Event::MockTimer* delay_timer =

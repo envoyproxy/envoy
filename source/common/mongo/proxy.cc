@@ -53,7 +53,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
   }
 }
 
-ProxyFilter::~ProxyFilter() {}
+ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   tryInjectDelay();
@@ -72,6 +72,8 @@ void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
