@@ -116,7 +116,7 @@ protected:
   /**
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& log() {
+  static spdlog::logger& logger() {
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
@@ -155,7 +155,7 @@ protected:
 /**
  * Convenience macro to log to the class' logger.
  */
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(logger(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
@@ -171,7 +171,7 @@ protected:
   ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+  ENVOY_CONN_LOG_TO_LOGGER(logger(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
@@ -182,6 +182,6 @@ protected:
                       (STREAM).streamId(), ##__VA_ARGS__)
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  ENVOY_STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+  ENVOY_STREAM_LOG_TO_LOGGER(logger(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 } // namespace Envoy
