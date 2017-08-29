@@ -178,6 +178,22 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
 
     handleInvalidConfiguration(json_string);
   }
+
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": 3,
+          "duration_ms": "0"
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
 }
 
 TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {

@@ -89,14 +89,12 @@ public:
     fault_config_.reset(new FaultConfig(*config));
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("mongo.fault.fixed_delay.percent", delay_percent))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
-      EXPECT_CALL(runtime_.snapshot_,
-                  getInteger("mongo.fault.fixed_delay.duration_ms", duration_ms))
-          .WillOnce(Return(duration_ms));
+      EXPECT_CALL(runtime_.snapshot_, getInteger("mongo.fault.fixed_delay.duration_ms", 10))
+          .WillOnce(Return(10));
     }
   }
 

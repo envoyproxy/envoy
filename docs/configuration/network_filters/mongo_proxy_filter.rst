@@ -32,8 +32,8 @@ fault
 Fault configuration
 -------------------  
 
-Configuration for MongoDB fixed duration delays. Once delay is injected all of the multiplexed
-operations on the same connection will be buffered/delayed and executed after a delay time.
+Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB operations: Query, Insert,
+GetMore, KillCursors. First command that arrives with no active delays enabled will get the full delay duration and all subsequent data arriving on that connection up until the timer is 'complete' will be apart of that delay.
 
 .. code-block:: json
 
@@ -45,8 +45,8 @@ operations on the same connection will be buffered/delayed and executed after a 
   }
 
 percent
-  *(required, integer)* Percentage of requests affected by injected faults. Valid values are integers 
-  in a range of [0, 100].
+  *(required, integer)* Probability of an elibible MongoDB operation to be affected by injected
+  faults when there is no active faults. Valid values are integers in a range of [0, 100].
 
 duration_ms
   *(required, integer)* Non negative delay duration in milliseconds.
