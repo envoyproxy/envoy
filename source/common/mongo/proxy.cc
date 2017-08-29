@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 
