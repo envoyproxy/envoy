@@ -102,10 +102,13 @@ public:
   /**
    * @return const std::vector<Logger>& the installed loggers.
    */
-  static const std::vector<Logger>& loggers() { return all_loggers_; }
+  static const std::vector<Logger>& loggers() { return allLoggers(); }
 
 private:
-  static std::vector<Logger> all_loggers_;
+  /*
+   * @return std::vector<Logger>& return the installed loggers.
+   */
+  static std::vector<Logger>& allLoggers();
 };
 
 /**
