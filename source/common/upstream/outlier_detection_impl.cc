@@ -13,7 +13,7 @@
 #include "common/http/codes.h"
 #include "common/protobuf/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

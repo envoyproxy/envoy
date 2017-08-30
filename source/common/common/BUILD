@@ -55,6 +55,7 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
+    external_deps = ["fmtlib"],
     deps = [":utility_lib"],
 )
 
@@ -120,6 +121,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    external_deps = ["fmtlib"],
     linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",

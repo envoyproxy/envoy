@@ -28,7 +28,10 @@ envoy_cc_library(
     name = "cds_subscription_lib",
     srcs = ["cds_subscription.cc"],
     hdrs = ["cds_subscription.h"],
-    external_deps = ["envoy_cds"],
+    external_deps = [
+        "envoy_cds",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -49,7 +52,10 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "fmtlib",
+    ],
     deps = [
         ":cds_api_lib",
         ":load_balancer_lib",
@@ -134,6 +140,7 @@ envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":upstream_includes",
         "//include/envoy/thread_local:thread_local_interface",
@@ -162,7 +169,10 @@ envoy_cc_library(
     name = "outlier_detection_lib",
     srcs = ["outlier_detection_impl.cc"],
     hdrs = ["outlier_detection_impl.h"],
-    external_deps = ["envoy_cds"],
+    external_deps = [
+        "envoy_cds",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -207,6 +217,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_base",
         "envoy_eds",
+        "fmtlib",
     ],
     deps = [
         ":sds_subscription_lib",
@@ -245,7 +256,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "fmtlib",
+    ],
     deps = [
         ":eds_lib",
         ":health_checker_lib",

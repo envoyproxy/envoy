@@ -12,7 +12,7 @@
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Tracing {

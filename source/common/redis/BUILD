@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/redis:codec_interface",
         "//source/common/common:assert_lib",
@@ -24,6 +25,7 @@ envoy_cc_library(
     name = "command_splitter_lib",
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":supported_commands_lib",
         "//include/envoy/redis:command_splitter_interface",
@@ -57,6 +59,7 @@ envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/network:filter_interface",
         "//include/envoy/redis:codec_interface",

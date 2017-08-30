@@ -31,6 +31,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/server:configuration_lib",
         "//test/integration:integration_lib",

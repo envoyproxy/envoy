@@ -164,6 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/config:protocol_json_lib",
         "//source/common/http:exception_lib",

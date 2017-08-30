@@ -13,6 +13,7 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit_impl.cc"],
     hdrs = ["ratelimit_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":ratelimit_proto",
         "//include/envoy/grpc:async_client_interface",

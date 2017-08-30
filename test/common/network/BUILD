@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "address_impl_test",
     srcs = ["address_impl_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -23,6 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
@@ -33,6 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",

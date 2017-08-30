@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "filesystem_lib",
     srcs = ["filesystem_impl.cc"],
     hdrs = ["filesystem_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -38,7 +39,10 @@ envoy_cc_library(
             "inotify/watcher_impl.h",
         ],
     }),
-    external_deps = ["event"],
+    external_deps = [
+        "event",
+        "fmtlib",
+    ],
     strip_include_prefix = select({
         "@bazel_tools//tools/osx:darwin": "kqueue",
         "//conditions:default": "inotify",

@@ -29,7 +29,10 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
-    external_deps = ["rapidjson"],
+    external_deps = [
+        "rapidjson",
+        "fmtlib",
+    ],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",

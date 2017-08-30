@@ -67,6 +67,7 @@ envoy_cc_library(
     name = "codes_lib",
     srcs = ["codes.cc"],
     hdrs = ["codes.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":headers_lib",
         ":utility_lib",
@@ -88,6 +89,7 @@ envoy_cc_library(
         "conn_manager_impl.h",
         "conn_manager_utility.h",
     ],
+    external_deps = ["fmtlib"],
     deps = [
         ":codes_lib",
         ":date_provider_lib",
@@ -223,7 +225,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_protocol"],
+    external_deps = [
+        "envoy_protocol",
+        "fmtlib",
+    ],
     deps = [
         ":exception_lib",
         ":header_map_lib",

@@ -7,7 +7,7 @@
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Zipkin {

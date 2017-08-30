@@ -113,6 +113,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -253,6 +254,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",

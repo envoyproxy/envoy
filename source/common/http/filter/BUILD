@@ -31,6 +31,7 @@ envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -65,6 +66,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
+    external_deps = ["fmtlib"],
     deps = [
         ":ratelimit_includes",
         "//include/envoy/http:codes_interface",

@@ -91,6 +91,7 @@ envoy_cc_test(
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
+    external_deps = ["fmtlib"],
     deps = [
         ":integration_lib",
         "//include/envoy/http:header_map_interface",
@@ -114,6 +115,7 @@ envoy_cc_test_library(
         "utility.h",
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",

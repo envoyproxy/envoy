@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "address_lib",
     srcs = ["address_impl.cc"],
     hdrs = ["address_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
@@ -23,6 +24,7 @@ envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":address_lib",
         ":utility_lib",
@@ -93,6 +95,7 @@ envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
     hdrs = ["listen_socket_impl.h"],
+    external_deps = ["fmtlib"],
     deps = [
         ":address_lib",
         ":utility_lib",
@@ -112,6 +115,7 @@ envoy_cc_library(
         "listener_impl.h",
         "proxy_protocol.h",
     ],
+    external_deps = ["fmtlib"],
     deps = [
         ":address_lib",
         ":connection_lib",
@@ -136,7 +140,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "envoy_base",
+        "fmtlib",
+    ],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
