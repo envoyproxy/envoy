@@ -131,7 +131,7 @@ If a buffer is a streaming buffer, i.e. the buffered data will resolve over
 time, it should return `FilterDataStatus::StopIterationAndWatermark` to pause
 further data processing, which will cause the `ConnectionManagerImpl` to trigger
 watermark callbacks on behalf of the filter.  If a filter can not make forward progress without the
-complete body, it should return `FilterDataStatus::StopIterationAndWatermark`.
+complete body, it should return `FilterDataStatus::StopIterationAndBuffer`.
 in this case if the `ConnectionManagerImpl` buffers more than the allowed data
 it will return an error downstream: a 413 on the request path, 500 or `resetStream()` on the
 response path.

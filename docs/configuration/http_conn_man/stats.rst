@@ -44,6 +44,7 @@ statistics:
    downstream_rq_rx_reset, Counter, Total request resets received
    downstream_rq_tx_reset, Counter, Total request resets sent
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
+   downstream_cx_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body.
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
    downstream_rq_4xx, Counter, Total 4xx responses

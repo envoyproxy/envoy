@@ -102,10 +102,6 @@ void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) 
 }
 
 void Filter::onDestroy() {
-  if (high_watermark_called_) {
-    high_watermark_called_ = false;
-    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
-  }
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
@@ -115,10 +111,6 @@ void Filter::onDestroy() {
 void Filter::complete(Envoy::RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
-  if (high_watermark_called_) {
-    high_watermark_called_ = false;
-    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
-  }
   switch (status) {
   case Envoy::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();

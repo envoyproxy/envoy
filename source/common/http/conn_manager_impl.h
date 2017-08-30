@@ -75,11 +75,13 @@ namespace Http {
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(downstream_rq_non_ws_on_ws_route)                                                        \
+  COUNTER(downstream_cx_rq_too_large)                                                              \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
-  TIMER  (downstream_rq_time)
+  TIMER  (downstream_rq_time)                                                                      \
+  COUNTER(rs_too_large)
 // clang-format on
 
 /**
@@ -518,6 +520,9 @@ private:
       State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
 
       uint32_t filter_call_state_{0};
+      bool encoder_filters_streaming_{true};
+      bool decoder_filters_streaming_{true};
+      bool destroyed_{false};
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
@@ -532,10 +537,10 @@ private:
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;
-    Buffer::WatermarkBufferPtr buffered_response_data_; // TODO(mattklein123): buffer data stat
+    Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
     HeaderMapPtr request_headers_;
-    Buffer::WatermarkBufferPtr buffered_request_data_; // TODO(mattklein123): buffer data stat
+    Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
@@ -548,9 +553,6 @@ private:
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
-    bool encoder_filters_streaming_{true};
-    bool decoder_filters_streaming_{true};
-    bool destroyed_{false};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

@@ -157,7 +157,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
-  stream.destroyed_ = true;
+  stream.state_.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
     filter->handle_->onDestroy();
   }
@@ -632,7 +632,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, decoder_filters_streaming_)) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_)) {
       return;
     }
   }
@@ -643,7 +643,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
     // Make sure if this triggers watermarks, the correct action is taken.
-    decoder_filters_streaming_ = streaming;
+    state_.decoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -816,7 +816,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
     // Make sure if this triggers watermarks, the correct action is taken.
-    encoder_filters_streaming_ = streaming;
+    state_.encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -841,7 +841,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, encoder_filters_streaming_)) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
       return;
     }
   }
@@ -1119,10 +1119,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
-  if (parent_.decoder_filters_streaming_) {
+  if (parent_.state_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
-    Http::Utility::sendLocalReply(*this, parent_.destroyed_, Http::Code::PayloadTooLarge,
+    parent_.connection_manager_.stats_.named_.downstream_cx_rq_too_large_.inc();
+    Http::Utility::sendLocalReply(*this, parent_.state_.destroyed_, Http::Code::PayloadTooLarge,
                                   CodeUtility::toString(Http::Code::PayloadTooLarge));
   }
 }
@@ -1188,29 +1189,28 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
-  if (parent_.encoder_filters_streaming_) {
+  if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
     // If headers have not been sent to the user, send a 500.
     if (!headers_continued_) {
       // Make sure we won't end up with nested watermark calls from the body buffer.
-      parent_.encoder_filters_streaming_ = true;
+      parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
-      HeaderMapPtr response_headers{new HeaderMapImpl{
-          {Headers::get().Status, std::to_string(enumToInt(Http::Code::InternalServerError))}}};
-      std::string body_text = CodeUtility::toString(Http::Code::InternalServerError);
-      response_headers->insertContentLength().value(body_text.size());
-      response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
 
-      parent_.response_headers_ = std::move(response_headers);
-      // Bypass the filters and send the response headers and body directly to the encoder.
-      parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, false);
-      if (!parent_.destroyed_) {
-        Buffer::OwnedImpl buffer(body_text);
-        parent_.response_encoder_->encodeData(buffer, true);
-        parent_.state_.local_complete_ = true;
-        parent_.maybeEndEncode(true);
-      }
+      parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
+      Http::Utility::sendLocalReply(
+          [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+            parent_.response_headers_ = std::move(response_headers);
+            parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
+          },
+          [&](Buffer::Instance& data, bool end_stream) -> void {
+            parent_.response_encoder_->encodeData(data, end_stream);
+            parent_.state_.local_complete_ = end_stream;
+            parent_.maybeEndEncode(end_stream);
+          },
+          parent_.state_.destroyed_, Http::Code::InternalServerError,
+          CodeUtility::toString(Http::Code::InternalServerError));
     } else {
       resetStream();
     }

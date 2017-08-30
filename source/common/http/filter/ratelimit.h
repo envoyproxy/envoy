@@ -106,7 +106,6 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  bool high_watermark_called_{false};
 };
 
 } // namespace RateLimit

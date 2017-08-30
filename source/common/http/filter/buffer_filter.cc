@@ -38,14 +38,9 @@ FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
   if (end_stream) {
     resetInternalState();
     return FilterDataStatus::Continue;
-  } else if (callbacks_->decodingBuffer() &&
-             callbacks_->decodingBuffer()->length() > config_->max_request_bytes_) {
-    Http::Utility::sendLocalReply(*callbacks_, stream_reset_, Http::Code::PayloadTooLarge,
-                                  CodeUtility::toString(Http::Code::PayloadTooLarge));
-    config_->stats_.rq_too_large_.inc();
   }
 
-  // Buffer until the complete request has been processed.
+  // Buffer until the complete request has been processed or the ConnectionManagerImpl sends a 413.
   return FilterDataStatus::StopIterationAndBuffer;
 }
 

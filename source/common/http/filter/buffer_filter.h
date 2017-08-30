@@ -18,8 +18,7 @@ namespace Http {
  */
 // clang-format off
 #define ALL_BUFFER_FILTER_STATS(COUNTER)                                                           \
-  COUNTER(rq_timeout)                                                                              \
-  COUNTER(rq_too_large)
+  COUNTER(rq_timeout)
 // clang-format on
 
 /**
