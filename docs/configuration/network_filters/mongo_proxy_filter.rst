@@ -33,8 +33,8 @@ Fault configuration
 -------------------  
 
 Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB operations: Query, Insert,
-GetMore, KillCursors. Once an active delay is in progress, all incoming data up until the timer event fires
-will be apart of the delay.
+GetMore, and KillCursors. Once an active delay is in progress, all incoming data up until the timer event fires
+will be a part of the delay.
 
 .. code-block:: json
 
@@ -46,11 +46,11 @@ will be apart of the delay.
   }
 
 percent
-  *(required, integer)* Probability of an elibible MongoDB operation to be affected by injected
-  faults when there is no active faults. Valid values are integers in a range of [0, 100].
+  *(required, integer)* Probability of an eligible MongoDB operation to be affected by the
+  injected fault when there is no active fault. Valid values are integers in a range of [0, 100].
 
 duration_ms
-  *(required, integer)* Non negative delay duration in milliseconds.
+  *(required, integer)* Non-negative delay duration in milliseconds.
 
 .. _config_network_filters_mongo_proxy_stats:
 
@@ -65,7 +65,7 @@ following statistics:
   :widths: 1, 1, 2
 
   decoding_error, Counter, Number of MongoDB protocol decoding errors
-  delay_injected, Counter, Number of times delay is started and it's not number of operations delayed
+  delay_injected, Counter, Number of times the delay is injected
   op_get_more, Counter, Number of OP_GET_MORE messages
   op_insert, Counter, Number of OP_INSERT messages
   op_kill_cursors, Counter, Number of OP_KILL_CURSORS messages
@@ -180,8 +180,8 @@ mongo.logging_enabled
   without replies, etc.
 
 mongo.fault.fixed_delay.percent
-  Probability of an elibible MongoDB operation to be affected by
-  injected faults when there is no active faults.
+  Probability of an eligible MongoDB operation to be affected by
+  the injected fault when there is no active fault.
   Defaults to the *percent* specified in the config.
 
 mongo.fault.fixed_delay.duration_ms

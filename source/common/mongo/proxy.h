@@ -94,7 +94,7 @@ private:
   const uint64_t duration_ms_;
 };
 
-typedef std::shared_ptr<FaultConfig> FaultConfigSharedPtr;
+typedef std::shared_ptr<const FaultConfig> FaultConfigSharedPtr;
 
 /**
  * A sniffing filter for mongo traffic. The current implementation makes a copy of read/written
@@ -106,7 +106,7 @@ class ProxyFilter : public Network::Filter,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-              AccessLogSharedPtr access_log, FaultConfigSharedPtr fault_config);
+              AccessLogSharedPtr access_log, const FaultConfigSharedPtr fault_config);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -177,7 +177,7 @@ private:
   std::list<ActiveQueryPtr> active_query_list_;
   AccessLogSharedPtr access_log_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  FaultConfigSharedPtr fault_config_;
+  const FaultConfigSharedPtr fault_config_;
   Event::TimerPtr delay_timer_;
 
   const static std::string FIXED_DELAY_PERCENT_KEY;

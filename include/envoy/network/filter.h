@@ -77,7 +77,7 @@ public:
   virtual ~ReadFilter() {}
 
   /**
-   * Called when data is ready on the connection.
+   * Called when data is read on the connection.
    * @param data supplies the read data which may be modified.
    * @return status used by the filter manager to manage further filter iteration.
    */

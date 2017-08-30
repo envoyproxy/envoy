@@ -44,7 +44,7 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         FaultConfigSharedPtr fault_config)
+                         const FaultConfigSharedPtr fault_config)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
   if (!runtime_.snapshot().featureEnabled(CONNECTION_LOGGING_ENABLED_KEY, 100)) {
@@ -242,7 +242,9 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
     stats_.cx_destroy_local_with_active_rq_.inc();
-  } else if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
+  }
+
+  if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 }
@@ -275,7 +277,7 @@ Optional<uint64_t> ProxyFilter::delayDuration() {
     return result;
   }
 
-  uint64_t duration =
+  const uint64_t duration =
       runtime_.snapshot().getInteger(FIXED_DELAY_DURATION_MS_KEY, fault_config_->delayDuration());
 
   // Delay only if the duration is > 0ms.
@@ -300,7 +302,7 @@ void ProxyFilter::tryInjectDelay() {
     return;
   }
 
-  Optional<uint64_t> delay_ms = delayDuration();
+  const Optional<uint64_t> delay_ms = delayDuration();
 
   if (delay_ms.valid()) {
     delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
