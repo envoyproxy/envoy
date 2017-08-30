@@ -66,9 +66,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
-              options.configPath() +
-                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
@@ -153,9 +151,13 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::api::v2::Bootstrap bootstrap;
-  if (!options.bootstrapPath().empty()) {
-    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
-  } else if (!options.configPath().empty()) {
+  try {
+    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  }
+  if (!bootstrap.has_admin()) {
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
     Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }

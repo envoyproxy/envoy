@@ -326,7 +326,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(std::string(), bootstrap_path, version_);
+  test_server_ = IntegrationTestServer::create(bootstrap_path, version_);
   // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
   // needs to know about the bound listener ports.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
@@ -353,8 +353,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), std::string(),
-      version_);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
   registerTestServerPorts(port_names);
 }
 

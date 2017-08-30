@@ -40,10 +40,11 @@ protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 
   void initialize(const std::string& bootstrap_path) {
-    options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-        "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    if (!bootstrap_path.empty()) {
-      options_.bootstrap_path_ = TestEnvironment::temporaryFileSubstitute(
+    if (bootstrap_path.empty()) {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+    } else {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
     server_.reset(new InstanceImpl(

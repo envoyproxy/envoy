@@ -61,10 +61,15 @@ void ValidationInstance::initialize(Options& options,
   //
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
+  // Handle configuration that needs to take place prior to the main configuration load.
   envoy::api::v2::Bootstrap bootstrap;
-  if (!options.bootstrapPath().empty()) {
-    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
-  } else if (!options.configPath().empty()) {
+  try {
+    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  }
+  if (!bootstrap.has_admin()) {
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
     Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
