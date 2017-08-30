@@ -16,9 +16,9 @@ namespace Server {
 
 WorkerPtr ProdWorkerFactory::createWorker() {
   Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
-  return WorkerPtr{
-      new WorkerImpl(tls_, hooks_, std::move(dispatcher),
-                     Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(log(), *dispatcher)})};
+  return WorkerPtr{new WorkerImpl(
+      tls_, hooks_, std::move(dispatcher),
+      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)})};
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,

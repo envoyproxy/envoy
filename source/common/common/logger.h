@@ -114,9 +114,10 @@ private:
 template <Id id> class Loggable {
 protected:
   /**
+   * Do not use this directly, use macros defined below.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& log() {
+  static spdlog::logger& __log_do_not_use_read_comment() {
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
@@ -153,9 +154,19 @@ protected:
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
 
 /**
+ * Convenience macro to get logger.
+ */
+#define ENVOY_LOGGER() __log_do_not_use_read_comment()
+
+/**
+ * Convenience macro to flush logger.
+ */
+#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
+
+/**
  * Convenience macro to log to the class' logger.
  */
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
@@ -171,7 +182,7 @@ protected:
   ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
@@ -182,6 +193,6 @@ protected:
                       (STREAM).streamId(), ##__VA_ARGS__)
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  ENVOY_STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 } // namespace Envoy
