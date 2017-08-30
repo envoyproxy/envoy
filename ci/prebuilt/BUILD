@@ -43,7 +43,6 @@ cc_library(
     ]),
     defines = ["FMT_HEADER_ONLY"],
     includes = ["thirdparty/fmtlib"],
-
 )
 
 cc_library(
