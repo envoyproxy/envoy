@@ -504,21 +504,17 @@ TEST_P(ConnectionImplTest, BindTest) {
 }
 
 TEST_P(ConnectionImplTest, BindFailureTest) {
-  std::string address_string = TestUtility::getIpv4Loopback();
-
   // Swap the constraints from BindTest to create an address family mismatch.
   if (GetParam() == Network::Address::IpVersion::v6) {
+    const std::string address_string = TestUtility::getIpv4Loopback();
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance(address_string, 0)};
   } else {
-    address_string = "::1";
+    const std::string address_string = "::1";
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
-
-  if (dispatcher_.get() == nullptr) {
-    dispatcher_.reset(new Event::DispatcherImpl);
-  }
+  dispatcher_.reset(new Event::DispatcherImpl);
   listener_ =
       dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                   Network::ListenerOptions::listenerOptionsWithBindToPort());

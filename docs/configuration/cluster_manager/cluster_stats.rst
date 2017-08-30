@@ -64,6 +64,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   update_success, Counter, Total cluster membership update successes
   update_failure, Counter, Total cluster membership update failures
   max_host_weight, Gauge, Maximum weight of any host in the cluster
+  bind_errors, Counter, Total errors binding the socket to the configured source address.
 
 Health check statistics
 -----------------------

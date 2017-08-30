@@ -84,12 +84,13 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   if (bind_to_address != nullptr) {
     int rc = bind_to_address->bind(fd);
     if (rc < 0) {
-      ENVOY_LOG_MISC(warn, "Bind failure. Failed to bind to {}: {}", bind_to_address->asString(),
+      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", bind_to_address->asString(),
                      strerror(errno));
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
       state_ |= InternalState::BindError;
-      close(ConnectionCloseType::NoFlush);
+      // Indicate this bind close should "flush", i.e. wait for a dispatcher callback cycle.
+      close(ConnectionCloseType::FlushWrite);
     }
   }
 }
@@ -123,8 +124,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_.length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (!(state_ & InternalState::BindError) &&
-      (data_to_write == 0 || type == ConnectionCloseType::NoFlush)) {
+  if ((data_to_write == 0 && !(state_ & InternalState::BindError)) ||
+      type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
@@ -134,7 +135,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     closeSocket(ConnectionEvent::LocalClose);
   } else {
     // TODO(mattklein123): We need a flush timer here. We might never get open socket window.
-    ASSERT(type == ConnectionCloseType::FlushWrite || (state_ & InternalState::BindError));
+    ASSERT(type == ConnectionCloseType::FlushWrite);
     state_ |= InternalState::CloseWithFlush;
     state_ &= ~InternalState::ReadEnabled;
     file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);

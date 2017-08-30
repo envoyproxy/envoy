@@ -308,7 +308,7 @@ std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address,
                                            Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
+    : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
                      getNullLocalAddress(*address), source_address, false, false, ctx,
                      InitialState::Client) {}
 

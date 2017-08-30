@@ -235,7 +235,8 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr
     : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
       api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
-      handler_(new Server::ConnectionHandlerImpl(log(), *dispatcher_)), http_type_(type) {
+      handler_(new Server::ConnectionHandlerImpl(log(), *dispatcher_)), http_type_(type),
+      allow_unexpected_disconnects_(false) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
@@ -248,7 +249,8 @@ FakeUpstream::~FakeUpstream() {
 bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
-  new_connections_.emplace_back(new QueuedConnectionWrapper(connection));
+  new_connections_.emplace_back(
+      new QueuedConnectionWrapper(connection, allow_unexpected_disconnects_));
   new_connection_event_.notify_one();
   return true;
 }

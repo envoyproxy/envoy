@@ -220,14 +220,15 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
 
 class BindIntegrationTest : public IntegrationTest {
 public:
-  // Delay base class SetUp until initialize().
-  void SetUp() override {}
-
-  void initialize() {
-    envoy::api::v2::Bootstrap bootstrap;
+  // Delay base class SetUp until initialize() to allow TestFailedBind to override address_string_.
+  void SetUp() override {
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = TestUtility::getIpv4Loopback();
     }
+  }
+
+  void initialize() {
+    envoy::api::v2::Bootstrap bootstrap;
     bootstrap.mutable_cluster_manager()
         ->mutable_upstream_bind_config()
         ->mutable_source_address()
@@ -264,40 +265,39 @@ TEST_P(BindIntegrationTest, TestBind) {
        },
        [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
        [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+       [&]() -> void { cleanupUpstreamAndDownstream(); }});
 }
 
-TEST_P(BindIntegrationTest, DISABLED_TestFailedBind) {
-  // Invert the addresses to create a bind failure.
-  if (GetParam() == Network::Address::IpVersion::v6) {
-    address_string_ = TestUtility::getIpv4Loopback();
-  } else {
-    address_string_ = "::1";
-  }
-
+TEST_P(BindIntegrationTest, TestFailedBind) {
+  address_string_ = "8.8.8.8";
   initialize();
 
-  IntegrationCodecClientPtr codec_client;
-  FakeStreamPtr request;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions(
-      {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-       },
-       [&]() -> void {
-         // With no ability to successfully bind on an upstream connection Envoy should send a 500.
-         codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/test/long/url"},
-                                                                   {":scheme", "http"},
-                                                                   {":authority", "host"}},
-                                           1024, *response);
-         codec_client->waitForDisconnect();
-       }});
+  executeActions({[&]() -> void {
+                    // Envoy will create and close some number of connections when trying to bind.
+                    // Make sure they don't cause assertion failures when we ignore them.
+                    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+                  },
+                  [&]() -> void {
+                    codec_client_ =
+                        makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+                  },
+                  [&]() -> void {
+                    // With no ability to successfully bind on an upstream connection Envoy should
+                    // send a 500.
+                    codec_client_->makeHeaderOnlyRequest(
+                        Http::TestHeaderMapImpl{{":method", "GET"},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"},
+                                                {"x-forwarded-for", "10.0.0.1"},
+                                                {"x-envoy-upstream-rq-timeout-ms", "1000"}},
+                        *response_);
+                    response_->waitForEndStream();
+                  },
+                  [&]() -> void { cleanupUpstreamAndDownstream(); }});
   EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
+  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+  EXPECT_LT(0, test_server_->counter("cluster.cds.bind_errors")->value());
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BindIntegrationTest,
