@@ -36,6 +36,16 @@ cc_library(
 )
 
 cc_library(
+    name = "fmtlib",
+    hdrs = glob([
+        "thirdparty/fmtlib/fmt/*.cc",
+        "thirdparty/fmtlib/fmt/*.h",
+    ]),
+    defines = ["FMT_HEADER_ONLY"],
+    includes = ["thirdparty/fmtlib"],
+)
+
+cc_library(
     name = "googletest",
     srcs = [
         "thirdparty_build/lib/libgmock.a",
@@ -101,6 +111,7 @@ cc_library(
         "thirdparty/spdlog/include/**/*.h",
     ]),
     includes = ["thirdparty/spdlog/include"],
+    deps = ["fmtlib"],
 )
 
 cc_library(

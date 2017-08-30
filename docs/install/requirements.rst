@@ -24,6 +24,7 @@ Envoy has the following requirements:
 * `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
 * `zlib <https://github.com/madler/zlib>`_ (last tested with 1.2.11)
 * `yaml-cpp <https://github.com/jbeder/yaml-cpp>`_ (last tested with sha e2818c423e5058a02f46ce2e519a82742a8ccac9).
+* `fmtlib <https://github.com/fmtlib/fmt/>`_ (last tested with 4.0.0)
 
 In order to compile and run the tests the following is required:
 
