@@ -21,7 +21,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   if (config.operationName() == Tracing::OperationName::Egress) {
     cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
   } else {
-    cs.setValue(ZipkinCoreConstants::get().SERVER_SEND);
+    cs.setValue(ZipkinCoreConstants::get().SERVER_RECV);
   }
 
   // Create an all-new span, with no parent id
