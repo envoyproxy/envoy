@@ -36,11 +36,13 @@ public:
   MOCK_METHOD1(finishSpan, void(SpanFinalizer& finalizer));
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
 
-  SpanPtr spawnChild(const std::string& name, SystemTime start_time) override {
-    return SpanPtr{spawnChild_(name, start_time)};
+  SpanPtr spawnChild(const Config& config, const std::string& name,
+                     SystemTime start_time) override {
+    return SpanPtr{spawnChild_(config, name, start_time)};
   }
 
-  MOCK_METHOD2(spawnChild_, Span*(const std::string& name, SystemTime start_time));
+  MOCK_METHOD3(spawnChild_,
+               Span*(const Config& config, const std::string& name, SystemTime start_time));
 };
 
 class MockFinalizer : public SpanFinalizer {
@@ -70,12 +72,12 @@ public:
   MockDriver();
   ~MockDriver();
 
-  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
-                    SystemTime start_time) override {
-    return SpanPtr{startSpan_(request_headers, operation_name, start_time)};
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+                    const std::string& operation_name, SystemTime start_time) override {
+    return SpanPtr{startSpan_(config, request_headers, operation_name, start_time)};
   }
 
-  MOCK_METHOD3(startSpan_, Span*(Http::HeaderMap& request_headers,
+  MOCK_METHOD4(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
                                  const std::string& operation_name, SystemTime start_time));
 };
 

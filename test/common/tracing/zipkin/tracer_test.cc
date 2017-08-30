@@ -8,6 +8,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,11 +39,14 @@ TEST(ZipkinTracerTest, spanCreation) {
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
+  Tracing::MockConfig config;
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
   // ==============
   // Test the creation of a root span --> CS
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
-  SpanPtr root_span = tracer.startSpan("my_span", timestamp);
+  SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
   EXPECT_NE(0LL, root_span->startTime());
@@ -76,9 +80,11 @@ TEST(ZipkinTracerTest, spanCreation) {
   // Test the creation of a shared-context span --> SR
   // ==============
 
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+
   SpanContext root_span_context(*root_span);
   SpanPtr server_side_shared_context_span =
-      tracer.startSpan("my_span", timestamp, root_span_context);
+      tracer.startSpan(config, "my_span", timestamp, root_span_context);
 
   EXPECT_NE(0LL, server_side_shared_context_span->startTime());
 
@@ -118,9 +124,11 @@ TEST(ZipkinTracerTest, spanCreation) {
   // ==============
   // Test the creation of a child span --> CS
   // ==============
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
   SpanContext server_side_context(*server_side_shared_context_span);
-  SpanPtr child_span = tracer.startSpan("my_child_span", timestamp, server_side_context);
+  SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, server_side_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
   EXPECT_NE(0LL, child_span->startTime());
@@ -163,6 +171,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   // Test the creation of a shared-context span with a parent --> SR
   // ==============
 
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   const std::string generated_parent_id = Hex::uint64ToHex(Util::generateRandom64());
   const std::string modified_root_span_context_str =
       root_span_context.traceIdAsHexString() + ";" + root_span_context.idAsHexString() + ";" +
@@ -170,7 +179,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   SpanContext modified_root_span_context;
   modified_root_span_context.populateFromString(modified_root_span_context_str);
   SpanPtr new_shared_context_span =
-      tracer.startSpan("new_shared_context_span", timestamp, modified_root_span_context);
+      tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
   EXPECT_NE(0LL, new_shared_context_span->startTime());
 
   // span name should NOT be set (it was set in the CS side)
@@ -220,8 +229,11 @@ TEST(ZipkinTracerTest, finishSpan) {
   // Test finishing a span containing a CS annotation
   // ==============
 
+  Tracing::MockConfig config;
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
   // Creates a root-span with a CS annotation
-  SpanPtr span = tracer.startSpan("my_span", timestamp);
+  SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
 
   // Finishing a root span with a CS annotation must add a CR annotation
   span->finish();
@@ -251,8 +263,10 @@ TEST(ZipkinTracerTest, finishSpan) {
   // Test finishing a span containing an SR annotation
   // ==============
 
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+
   SpanContext context(*span);
-  SpanPtr server_side = tracer.startSpan("my_span", timestamp, context);
+  SpanPtr server_side = tracer.startSpan(config, "my_span", timestamp, context);
 
   // Associate a reporter with the tracer
   TestReporterImpl* reporter_object = new TestReporterImpl(135);

@@ -421,7 +421,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
 
   span_ptr->setTag("foo", "bar");
   span_ptr->injectContext(request_headers);
-  EXPECT_NE(nullptr, span_ptr->spawnChild("foo", std::chrono::system_clock::now()));
+  EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", std::chrono::system_clock::now()));
 }
 
 class HttpTracerImplTest : public Test {
@@ -445,7 +445,7 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   EXPECT_CALL(config_, operationName()).Times(2);
   EXPECT_CALL(request_info_, startTime());
   const std::string operation_name = "ingress";
-  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
+  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
       .WillOnce(Return(nullptr));
 
   tracer_->startSpan(config_, request_headers_, request_info_);
@@ -458,7 +458,7 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
-  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
+  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
       .WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
