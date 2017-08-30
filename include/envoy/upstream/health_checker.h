@@ -36,7 +36,7 @@ public:
   virtual void start() PURE;
 };
 
-typedef std::unique_ptr<HealthChecker> HealthCheckerPtr;
+typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
 
 } // namespace Upstream
 } // namespace Envoy

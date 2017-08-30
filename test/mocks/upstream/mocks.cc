@@ -22,8 +22,8 @@ using testing::_;
 namespace Upstream {
 namespace Outlier {
 
-MockDetectorHostSink::MockDetectorHostSink() {}
-MockDetectorHostSink::~MockDetectorHostSink() {}
+MockDetectorHostMonitor::MockDetectorHostMonitor() {}
+MockDetectorHostMonitor::~MockDetectorHostMonitor() {}
 
 MockEventLogger::MockEventLogger() {}
 MockEventLogger::~MockEventLogger() {}
@@ -38,6 +38,9 @@ MockDetector::~MockDetector() {}
 
 } // namespace Outlier
 
+MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() {}
+MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() {}
+
 MockHostDescription::MockHostDescription()
     : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
   ON_CALL(*this, hostname()).WillByDefault(ReturnRef(hostname_));
@@ -45,6 +48,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
 }
 
 MockHostDescription::~MockHostDescription() {}

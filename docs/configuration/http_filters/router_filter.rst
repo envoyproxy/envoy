@@ -209,6 +209,19 @@ If the route utilizes :ref:`prefix_rewrite <config_http_conn_man_route_table_rou
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 
+.. _config_http_filters_router_x-envoy-immediate-health-check-fail:
+
+x-envoy-immediate-health-check-fail
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If the upstream host returns this header (set to any value), Envoy will immediately assume the
+upstream host has failed :ref:`active health checking <arch_overview_health_checking>` (if the
+cluster has been :ref:`configured <config_cluster_manager_cluster_hc>` for active health checking).
+This can be used to fast fail an upstream host via standard data plane processing without waiting
+for the next health check interval. The host can become healthy again via standard active health
+checks. See the :ref:`health checking overview <arch_overview_health_checking>` for more
+information.
+
 .. _config_http_filters_router_stats:
 
 Statistics

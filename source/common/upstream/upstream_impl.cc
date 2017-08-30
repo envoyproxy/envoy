@@ -49,8 +49,6 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
 }
 } // namespace
 
-Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
-
 Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
@@ -263,9 +261,9 @@ void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts
   HostSetImpl::runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
-void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
+void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
-  health_checker_ = std::move(health_checker);
+  health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
     // If we get a health check completion that resulted in a state change, signal to
@@ -276,12 +274,12 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
   });
 }
 
-void ClusterImplBase::setOutlierDetector(Outlier::DetectorSharedPtr outlier_detector) {
+void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector) {
   if (!outlier_detector) {
     return;
   }
 
-  outlier_detector_ = std::move(outlier_detector);
+  outlier_detector_ = outlier_detector;
   outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
 }
 

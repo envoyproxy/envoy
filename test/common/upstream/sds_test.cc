@@ -218,10 +218,10 @@ TEST_F(SdsTest, NoHealthChecker) {
 
 TEST_F(SdsTest, HealthChecker) {
   InSequence s;
-  MockHealthChecker* health_checker = new MockHealthChecker();
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster_->setHealthChecker(HealthCheckerPtr{health_checker});
+  cluster_->setHealthChecker(health_checker);
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   setupRequest();

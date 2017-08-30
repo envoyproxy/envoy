@@ -18,6 +18,11 @@ DrainManagerImpl::DrainManagerImpl(Instance& server) : server_(server) {}
 
 bool DrainManagerImpl::drainClose() const {
   // If we are actively HC failed, always drain close.
+  //
+  // TODO(mattklein123): In relation to x-envoy-immediate-health-check-fail, it would be better
+  // if even in the case of server health check failure we had some period of drain ramp up. This
+  // would allow the other side to fail health check for the host which will require some thread
+  // jumps versus immediately start GOAWAY/connection thrashing.
   if (server_.healthCheckFailed()) {
     return true;
   }

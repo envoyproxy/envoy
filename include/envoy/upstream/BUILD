@@ -35,9 +35,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_check_host_monitor_interface",
+    hdrs = ["health_check_host_monitor.h"],
+)
+
+envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
     deps = [
+        ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_macros",
@@ -78,6 +84,7 @@ envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
     deps = [
+        ":health_check_host_monitor_interface",
         ":load_balancer_type_interface",
         ":resource_manager_interface",
         "//include/envoy/common:callback",

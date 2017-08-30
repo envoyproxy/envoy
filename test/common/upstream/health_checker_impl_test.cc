@@ -217,7 +217,7 @@ public:
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<TestSessionPtr> test_sessions_;
-  std::unique_ptr<TestHttpHealthCheckerImpl> health_checker_;
+  std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 };
@@ -742,7 +742,7 @@ public:
 
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::unique_ptr<TcpHealthCheckerImpl> health_checker_;
+  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
   Network::MockClientConnection* connection_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
@@ -847,6 +847,95 @@ TEST_F(TcpHealthCheckerImplTest, NoData) {
   interval_timer_->callback_();
 }
 
+TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
+  InSequence s;
+
+  setupNoData();
+  cluster_->hosts_ = {HostSharedPtr{new HostImpl(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // Do multiple passive failures. This will not reset the active HC timers.
+  cluster_->hosts_[0]->healthChecker().setUnhealthy();
+  cluster_->hosts_[0]->healthChecker().setUnhealthy();
+  EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->hosts_[0]->healthy());
+
+  // A single success should not bring us back to healthy.
+  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->hosts_[0]->healthy());
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+}
+
+TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
+  InSequence s;
+
+  setupNoData();
+  cluster_->hosts_ = {HostSharedPtr{new HostImpl(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // Do a passive failure. This will not reset the active HC timers.
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  cluster_->hosts_[0]->healthChecker().setUnhealthy();
+
+  // Remove before the cross thread event comes in.
+  EXPECT_CALL(*connection_, close(_));
+  std::vector<HostSharedPtr> old_hosts = std::move(cluster_->hosts_);
+  cluster_->runCallbacks({}, old_hosts);
+  post_cb();
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+}
+
+TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
+  InSequence s;
+
+  setupNoData();
+  cluster_->hosts_ = {HostSharedPtr{new HostImpl(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // Do a passive failure. This will not reset the active HC timers.
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  cluster_->hosts_[0]->healthChecker().setUnhealthy();
+
+  // Remove before the cross thread event comes in.
+  EXPECT_CALL(*connection_, close(_));
+  health_checker_.reset();
+  post_cb();
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+}
+
 class RedisHealthCheckerImplTest : public testing::Test, public Redis::ConnPool::ClientFactory {
 public:
   RedisHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {
@@ -897,7 +986,7 @@ public:
   Redis::ConnPool::MockClient* client_{};
   Redis::ConnPool::MockPoolRequest pool_request_;
   Redis::ConnPool::PoolCallbacks* pool_callbacks_{};
-  std::unique_ptr<RedisHealthCheckerImpl> health_checker_;
+  std::shared_ptr<RedisHealthCheckerImpl> health_checker_;
 };
 
 TEST_F(RedisHealthCheckerImplTest, All) {
