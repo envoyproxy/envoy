@@ -218,37 +218,6 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
 }
 
-TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-       [&]() -> void { tcp_client->write("hello"); },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-       [&]() -> void { tcp_client->waitForDisconnect(); }});
-
-  EXPECT_EQ("world", tcp_client->data());
-}
-
-TEST_P(IntegrationTest, TcpProxyDownstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-       [&]() -> void { tcp_client->write("hello"); },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
-       [&]() -> void { tcp_client->waitForData("world"); },
-       [&]() -> void { tcp_client->write("hello"); }, [&]() -> void { tcp_client->close(); },
-       [&]() -> void { fake_upstream_connection->waitForData(10); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
-}
-
 class BindIntegrationTest : public IntegrationTest {
 public:
   void SetUp() override {
@@ -256,8 +225,10 @@ public:
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = TestUtility::getIpv4Loopback();
     }
-    bootstrap.mutable_upstream_bind_config()->mutable_source_address()->set_address(
-        address_string_);
+    bootstrap.mutable_cluster_manager()
+        ->mutable_upstream_bind_config()
+        ->mutable_source_address()
+        ->set_address(address_string_);
 
     api_filesystem_config_.bootstrap_path_ =
         TestEnvironment::writeStringToFileForTest("bootstrap.pb", bootstrap.SerializeAsString());
