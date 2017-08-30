@@ -110,6 +110,7 @@ cc_library(
         "thirdparty/spdlog/include/**/*.cc",
         "thirdparty/spdlog/include/**/*.h",
     ]),
+    defines = ["SPDLOG_FMT_EXTERNAL"],
     includes = ["thirdparty/spdlog/include"],
     deps = ["fmtlib"],
 )
