@@ -46,8 +46,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
-      handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
@@ -331,7 +331,7 @@ void InstanceImpl::run() {
   handler_.reset();
   thread_local_.shutdownThread();
   ENVOY_LOG(warn, "exiting");
-  log().flush();
+  ENVOY_FLUSH_LOG();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }

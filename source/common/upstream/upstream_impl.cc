@@ -34,6 +34,20 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+const Network::Address::InstanceConstSharedPtr
+getSourceAddress(const envoy::api::v2::Cluster& cluster,
+                 const Network::Address::InstanceConstSharedPtr source_address) {
+  // The source address from cluster config takes precedence.
+  if (cluster.upstream_bind_config().has_source_address()) {
+    return Network::Utility::fromProtoSocketAddress(
+        cluster.upstream_bind_config().source_address());
+  }
+  // If there's no source address in the cluster config, use any default from the bootstrap proto.
+  return source_address;
+}
+} // namespace
 
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
 
@@ -74,7 +88,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(source_address), added_via_api_(added_via_api) {
+      source_address_(getSourceAddress(config, source_address)), added_via_api_(added_via_api) {
   ssl_ctx_ = nullptr;
   if (config.has_tls_context()) {
     Ssl::ClientContextConfigImpl context_config(config.tls_context());
@@ -185,7 +199,6 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-// TODO(alyssawilk) allow pulling source address from cluster config a well
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const Network::Address::InstanceConstSharedPtr source_address,
                                  Runtime::Loader& runtime, Stats::Store& stats,
