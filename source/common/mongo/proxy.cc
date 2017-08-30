@@ -18,12 +18,6 @@
 namespace Envoy {
 namespace Mongo {
 
-const std::string ProxyFilter::FIXED_DELAY_PERCENT_KEY = "mongo.fault.fixed_delay.percent";
-const std::string ProxyFilter::FIXED_DELAY_DURATION_MS_KEY = "mongo.fault.fixed_delay.duration_ms";
-const std::string ProxyFilter::LOGGING_ENABLED_KEY = "mongo.logging_enabled";
-const std::string ProxyFilter::PROXY_ENABLED_KEY = "mongo.proxy_enabled";
-const std::string ProxyFilter::CONNECTION_LOGGING_ENABLED_KEY = "mongo.connection_logging_enabled";
-
 AccessLog::AccessLog(const std::string& file_name,
                      Envoy::AccessLog::AccessLogManager& log_manager) {
   file_ = log_manager.createAccessLog(file_name);
@@ -47,7 +41,8 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          const FaultConfigSharedPtr fault_config)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
-  if (!runtime_.snapshot().featureEnabled(CONNECTION_LOGGING_ENABLED_KEY, 100)) {
+  if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
+                                          100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
     // don't ever log.
     access_log_.reset();
@@ -205,7 +200,8 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {
-  if (!sniffing_ || !runtime_.snapshot().featureEnabled(PROXY_ENABLED_KEY, 100)) {
+  if (!sniffing_ ||
+      !runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ProxyEnabled, 100)) {
     // Safety measure just to make sure that if we have a decoding error we keep going and lose
     // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
@@ -226,7 +222,8 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 void ProxyFilter::logMessage(Message& message, bool full) {
-  if (access_log_ && runtime_.snapshot().featureEnabled(LOGGING_ENABLED_KEY, 100)) {
+  if (access_log_ &&
+      runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().LoggingEnabled, 100)) {
     access_log_->logMessage(message, full, read_callbacks_->upstreamHost().get());
   }
 }
@@ -273,12 +270,13 @@ Optional<uint64_t> ProxyFilter::delayDuration() {
     return result;
   }
 
-  if (!runtime_.snapshot().featureEnabled(FIXED_DELAY_PERCENT_KEY, fault_config_->delayPercent())) {
+  if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
+                                          fault_config_->delayPercent())) {
     return result;
   }
 
-  const uint64_t duration =
-      runtime_.snapshot().getInteger(FIXED_DELAY_DURATION_MS_KEY, fault_config_->delayDuration());
+  const uint64_t duration = runtime_.snapshot().getInteger(
+      MongoRuntimeConfig::get().FixedDelayDurationMs, fault_config_->delayDuration());
 
   // Delay only if the duration is > 0ms.
   if (duration > 0) {

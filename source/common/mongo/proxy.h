@@ -18,12 +18,24 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/common/singleton.h"
 #include "common/json/json_loader.h"
 #include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Mongo {
+
+class MongoRuntimeConfigKeys {
+public:
+  const std::string FixedDelayPercent{"mongo.fault.fixed_delay.percent"};
+  const std::string FixedDelayDurationMs{"mongo.fault.fixed_delay.duration_ms"};
+  const std::string LoggingEnabled{"mongo.logging_enabled"};
+  const std::string ProxyEnabled{"mongo.proxy_enabled"};
+  const std::string ConnectionLoggingEnabled{"mongo.connection_logging_enabled"};
+};
+
+typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
 
 /**
  * All mongo proxy stats. @see stats_macros.h
@@ -179,12 +191,6 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   const FaultConfigSharedPtr fault_config_;
   Event::TimerPtr delay_timer_;
-
-  const static std::string FIXED_DELAY_PERCENT_KEY;
-  const static std::string FIXED_DELAY_DURATION_MS_KEY;
-  const static std::string LOGGING_ENABLED_KEY;
-  const static std::string PROXY_ENABLED_KEY;
-  const static std::string CONNECTION_LOGGING_ENABLED_KEY;
 };
 
 class ProdProxyFilter : public ProxyFilter {
@@ -195,5 +201,5 @@ public:
   DecoderPtr createDecoder(DecoderCallbacks& callbacks) override;
 };
 
-} // Mongo
+} // namespace Mongo
 } // namespace Envoy
