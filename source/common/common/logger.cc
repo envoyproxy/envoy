@@ -21,8 +21,8 @@ Logger::Logger(const std::string& name) {
 }
 
 std::vector<Logger>& Registry::allLoggers() {
-  static std::vector<Logger> all_loggers = {ALL_LOGGER_IDS(GENERATE_LOGGER)};
-  return all_loggers;
+  static std::vector<Logger>* all_loggers = new std::vector<Logger>({ALL_LOGGER_IDS(GENERATE_LOGGER)});
+  return *all_loggers;
 }
 
 void LockingStderrSink::log(const spdlog::details::log_msg& msg) {
