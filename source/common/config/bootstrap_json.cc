@@ -94,18 +94,13 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
   JSON_UTIL_SET_DURATION(json_config, *watchdog, kill_timeout);
   JSON_UTIL_SET_DURATION(json_config, *watchdog, multikill_timeout);
 
-  if (json_config.hasObject("tracing")) {
-    const auto tracing = json_config.getObject("tracing");
-    if (tracing->hasObject("http")) {
-      const auto http = tracing->getObject("http");
-      if (http->hasObject("driver")) {
-        const auto driver = http->getObject("driver");
-        auto* http_tracing = bootstrap.mutable_tracing()->mutable_http();
-        http_tracing->set_name("envoy." + driver->getString("type"));
-        MessageUtil::loadFromJson(driver->getObject("config")->asJsonString(),
-                                  *http_tracing->mutable_config());
-      }
-    }
+  const auto http = json_config.getObject("tracing", true)->getObject("http", true);
+  if (http->hasObject("driver")) {
+    const auto driver = http->getObject("driver");
+    auto* http_tracing = bootstrap.mutable_tracing()->mutable_http();
+    http_tracing->set_name("envoy." + driver->getString("type"));
+    MessageUtil::loadFromJson(driver->getObject("config")->asJsonString(),
+                              *http_tracing->mutable_config());
   }
 
   if (json_config.hasObject("rate_limit_service")) {

@@ -86,6 +86,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:version_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",

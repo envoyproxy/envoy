@@ -1,5 +1,6 @@
 #include "server/config_validation/server.h"
 
+#include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
@@ -60,12 +61,14 @@ void ValidationInstance::initialize(Options& options,
   //
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   envoy::api::v2::Bootstrap bootstrap;
   if (!options.bootstrapPath().empty()) {
     MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  } else if (!options.configPath().empty()) {
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap); // TODO(htuch): only if -c.
+  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(
       new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),

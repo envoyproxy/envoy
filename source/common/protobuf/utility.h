@@ -70,6 +70,8 @@ public:
   /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
    * messages to/from google.protobuf.Struct.
+   * TODO(htuch): Avoid round-tripping via JSON strings by doing whatever
+   * Protobuf::util::MessageToJsonString does but generating a google.protobuf.Struct instead.
    * @param source message.
    * @param dest message.
    */

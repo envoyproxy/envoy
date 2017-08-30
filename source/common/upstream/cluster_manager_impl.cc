@@ -166,7 +166,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)) {
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
-    std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
+    const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
       outlier_event_logger_.reset(new Outlier::EventLoggerImpl(log_manager, event_log_file_path,
                                                                ProdSystemTimeSource::instance_,

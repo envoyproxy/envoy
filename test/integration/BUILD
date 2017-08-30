@@ -12,8 +12,8 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "bind_integration_test",
-    srcs = ["bind_integration_test.cc"],
+    name = "proto_integration_test",
+    srcs = ["proto_integration_test.cc"],
     deps = [
         ":integration_lib",
         "//source/common/http:header_map_lib",

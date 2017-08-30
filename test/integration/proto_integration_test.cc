@@ -13,17 +13,21 @@
 namespace Envoy {
 namespace {
 
-class BindIntegrationTest : public BaseIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class ProtoIntegrationTest : public BaseIntegrationTest,
+                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  BindIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  ProtoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
   void SetUp() override {
     // Fake upstream.
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
 
-    // Admin access log path and address.
+    // Below we build up the config completely dynamically.
+    // TODO(alyssawilk): Make some of this a static config as appropriate, i.e. the bits that won't
+    // change.
     envoy::api::v2::Bootstrap bootstrap;
+
+    // Admin access log path and address.
     auto* admin = bootstrap.mutable_admin();
     admin->set_access_log_path("/dev/null");
     auto* admin_socket_addr = admin->mutable_address()->mutable_socket_address();
@@ -66,6 +70,7 @@ public:
     host_socket_addr->set_port_value(fake_upstreams_.back()->localAddress()->ip()->port());
 
     // Cluster manager.
+    // TODO(alyssawilk): Refactor to separate the bind-specific from generic v2 proto config setup.
     if (GetParam() == Network::Address::IpVersion::v4) {
       address_string_ = TestUtility::getIpv4Loopback();
     }
@@ -88,7 +93,7 @@ public:
   std::string address_string_ = "::1";
 };
 
-TEST_P(BindIntegrationTest, TestBind) {
+TEST_P(ProtoIntegrationTest, TestBind) {
   executeActions(
       {[&]() -> void {
          codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
@@ -115,7 +120,7 @@ TEST_P(BindIntegrationTest, TestBind) {
        [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, BindIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, ProtoIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 } // namespace
 } // namespace Envoy
