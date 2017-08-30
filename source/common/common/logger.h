@@ -100,12 +100,15 @@ public:
   static void initialize(uint64_t log_level, Thread::BasicLockable& lock);
 
   /**
-   * @return const std::vector<Logger>& the installed loggers.
+   * @return const std::vector<Logger>& return a const reference to the installed loggers.
    */
-  static const std::vector<Logger>& loggers() { return all_loggers_; }
+  static const std::vector<Logger>& loggers() { return allLoggers(); }
 
 private:
-  static std::vector<Logger> all_loggers_;
+  /*
+   * @return std::vector<Logger>& return the installed loggers.
+   */
+  static std::vector<Logger>& allLoggers();
 };
 
 /**
