@@ -38,7 +38,7 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         const FaultConfigSharedPtr fault_config)
+                         const FaultConfigSharedPtr& fault_config)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
