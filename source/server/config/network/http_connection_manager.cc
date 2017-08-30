@@ -284,17 +284,6 @@ void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCall
   }
 }
 
-HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type) {
-  if (type == "decoder") {
-    return HttpFilterType::Decoder;
-  } else if (type == "encoder") {
-    return HttpFilterType::Encoder;
-  } else {
-    ASSERT(type == "both" || type.empty());
-    return HttpFilterType::Both;
-  }
-}
-
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }

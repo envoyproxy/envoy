@@ -221,9 +221,6 @@ public:
     return [](Network::FilterManager&) -> void {};
   }
   std::string name() override { return "stats_test"; }
-  Configuration::NetworkFilterType type() override {
-    return Configuration::NetworkFilterType::Read;
-  }
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
