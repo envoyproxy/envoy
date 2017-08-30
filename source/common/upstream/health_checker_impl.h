@@ -127,12 +127,12 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
-  struct HealthCheckerSinkImpl : public HealthCheckerSink {
-    HealthCheckerSinkImpl(const std::shared_ptr<HealthCheckerImplBase>& health_checker,
-                          const HostSharedPtr& host)
+  struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
+    HealthCheckHostMonitorImpl(const std::shared_ptr<HealthCheckerImplBase>& health_checker,
+                               const HostSharedPtr& host)
         : health_checker_(health_checker), host_(host) {}
 
-    // Upstream::HealthCheckerSink
+    // Upstream::HealthCheckHostMonitor
     void setUnhealthy() override;
 
     std::weak_ptr<HealthCheckerImplBase> health_checker_;

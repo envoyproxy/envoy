@@ -113,7 +113,7 @@ void HealthCheckerImplBase::addHosts(const std::vector<HostSharedPtr>& hosts) {
   for (const HostSharedPtr& host : hosts) {
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
-        HealthCheckerSinkPtr{new HealthCheckerSinkImpl(shared_from_this(), host)});
+        HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
     active_sessions_[host]->start();
   }
 }
@@ -146,7 +146,7 @@ void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, bool changed_state)
   }
 }
 
-void HealthCheckerImplBase::HealthCheckerSinkImpl::setUnhealthy() {
+void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy() {
   // This is called cross thread. The cluster/health checker might already be gone.
   std::shared_ptr<HealthCheckerImplBase> health_checker = health_checker_.lock();
   if (health_checker) {
@@ -156,9 +156,12 @@ void HealthCheckerImplBase::HealthCheckerSinkImpl::setUnhealthy() {
 
 void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
   // The threading here is complex. The cluster owns the only strong reference to the health
-  // checker. It might go away when we post to the main thread. We capture a weak reference and
-  // make sure it is still valid when we get to the other thread. Additionally, the host/session
-  // may also be gone by then so we check that also.
+  // checker. It might go away when we post to the main thread from a worker thread. To deal with
+  // this we use the following sequence of events:
+  // 1) We capture a weak reference to the health checker and post it from worker thread to main
+  //    thread.
+  // 2) On the main thread, we make sure it is still valid (as the cluster may have been destroyed).
+  // 3) Additionally, the host/session may also be gone by then so we check that also.
   std::weak_ptr<HealthCheckerImplBase> weak_this = shared_from_this();
   dispatcher_.post([weak_this, host]() -> void {
     std::shared_ptr<HealthCheckerImplBase> shared_this = weak_this.lock();

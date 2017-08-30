@@ -34,11 +34,11 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * Null implementation of HealthCheckerSink.
+ * Null implementation of HealthCheckHostMonitor.
  */
-class HealthCheckerSinkNullImpl : public HealthCheckerSink {
+class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
 public:
-  // Upstream::HealthCheckerSink
+  // Upstream::HealthCheckHostMonitor
   void setUnhealthy() override {}
 };
 
@@ -56,20 +56,21 @@ public:
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
   const ClusterInfo& cluster() const override { return *cluster_; }
-  HealthCheckerSink& healthChecker() const override {
+  HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
       return *health_checker_;
     } else {
-      static HealthCheckerSinkNullImpl* null_health_checker = new HealthCheckerSinkNullImpl();
+      static HealthCheckHostMonitorNullImpl* null_health_checker =
+          new HealthCheckHostMonitorNullImpl();
       return *null_health_checker;
     }
   }
-  Outlier::DetectorHostSink& outlierDetector() const override {
+  Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
     } else {
-      static Outlier::DetectorHostSinkNullImpl* null_outlier_detector =
-          new Outlier::DetectorHostSinkNullImpl();
+      static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
+          new Outlier::DetectorHostMonitorNullImpl();
       return *null_outlier_detector;
     }
   }
@@ -86,8 +87,8 @@ protected:
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
-  Outlier::DetectorHostSinkPtr outlier_detector_;
-  HealthCheckerSinkPtr health_checker_;
+  Outlier::DetectorHostMonitorPtr outlier_detector_;
+  HealthCheckHostMonitorPtr health_checker_;
 };
 
 /**
@@ -111,10 +112,10 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
-  void setHealthChecker(HealthCheckerSinkPtr&& health_checker) override {
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     health_checker_ = std::move(health_checker);
   }
-  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
   bool healthy() const override { return !health_flags_; }

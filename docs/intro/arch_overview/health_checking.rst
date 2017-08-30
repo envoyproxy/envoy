@@ -21,7 +21,10 @@ unhealthy, successes required before marking a host healthy, etc.):
   server can respond with anything other than PONG to cause an immediate active health check
   failure.
 
-Note that Envoy also supports passive health checking via :ref:`outlier detection
+Passive health checking
+-----------------------
+
+Envoy also supports passive health checking via :ref:`outlier detection
 <arch_overview_outlier_detection>`.
 
 .. _arch_overview_health_checking_filter:
@@ -47,7 +50,11 @@ operation:
   eventually consistent view of the health state of each upstream host without overwhelming the
   local service with a large number of health check requests.
 
-Health check filter :ref:`configuration <config_http_filters_health_check>`.
+Further reading:
+
+* Health check filter :ref:`configuration <config_http_filters_health_check>`.
+* :ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin endpoint.
+* :ref:`/healthcheck/ok <operations_admin_interface_healthcheck_ok>` admin endpoint.
 
 Active health checking fast failure
 -----------------------------------

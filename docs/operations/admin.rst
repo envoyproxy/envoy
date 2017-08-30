@@ -75,6 +75,8 @@ modify different aspects of the server.
   down or doing a full restart. Invoking this command will universally fail health check requests
   regardless of how the filter is configured (pass through, etc.).
 
+.. _operations_admin_interface_healthcheck_ok:
+
 .. http:get:: /healthcheck/ok
 
   Negate the effect of :http:get:`/healthcheck/fail`. This requires the use of the HTTP

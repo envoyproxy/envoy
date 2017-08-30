@@ -22,8 +22,8 @@ using testing::_;
 namespace Upstream {
 namespace Outlier {
 
-MockDetectorHostSink::MockDetectorHostSink() {}
-MockDetectorHostSink::~MockDetectorHostSink() {}
+MockDetectorHostMonitor::MockDetectorHostMonitor() {}
+MockDetectorHostMonitor::~MockDetectorHostMonitor() {}
 
 MockEventLogger::MockEventLogger() {}
 MockEventLogger::~MockEventLogger() {}
@@ -38,8 +38,8 @@ MockDetector::~MockDetector() {}
 
 } // namespace Outlier
 
-MockHealthCheckerSink::MockHealthCheckerSink() {}
-MockHealthCheckerSink::~MockHealthCheckerSink() {}
+MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() {}
+MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() {}
 
 MockHostDescription::MockHostDescription()
     : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
