@@ -18,7 +18,6 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext& context) override;
   std::string name() override { return "grpc_json_transcoder"; };
-  HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
 } // namespace Configuration

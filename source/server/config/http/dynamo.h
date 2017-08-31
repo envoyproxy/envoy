@@ -16,7 +16,6 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string& stat_prefix,
                                           FactoryContext& context) override;
   std::string name() override { return "http_dynamo_filter"; }
-  HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
 } // namespace Configuration

@@ -11,6 +11,18 @@ load(
 
 envoy_package()
 
+envoy_cc_test(
+    name = "proto_integration_test",
+    srcs = ["proto_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_sh_test(
     name = "hotrestart_test",
     srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),

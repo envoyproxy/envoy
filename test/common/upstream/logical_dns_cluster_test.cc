@@ -30,7 +30,7 @@ class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
-    MockClusterManager cm;
+    NiceMock<MockClusterManager> cm;
     cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
                                          ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
                                          false));
@@ -130,6 +130,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
   EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
+  cluster_->hosts()[0]->healthChecker().setUnhealthy();
   tls_.shutdownThread();
 }
 

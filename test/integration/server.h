@@ -27,17 +27,15 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path, const std::string& bootstrap_path,
-                  Network::Address::IpVersion ip_version)
-      : config_path_(config_path), bootstrap_path_(bootstrap_path),
-        local_address_ip_version_(ip_version), service_cluster_name_("cluster_name"),
-        service_node_name_("node_name"), service_zone_("zone_name") {}
+  TestOptionsImpl(const std::string& config_path, Network::Address::IpVersion ip_version)
+      : config_path_(config_path), local_address_ip_version_(ip_version),
+        service_cluster_name_("cluster_name"), service_node_name_("node_name"),
+        service_zone_("zone_name") {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
-  const std::string& bootstrapPath() override { return bootstrap_path_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
@@ -54,7 +52,6 @@ public:
 
 private:
   const std::string config_path_;
-  const std::string bootstrap_path_;
   const std::string admin_address_path_;
   const Network::Address::IpVersion local_address_ip_version_;
   const std::string service_cluster_name_;
@@ -190,7 +187,6 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public Server::ComponentFactory {
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
-                                         const std::string& bootstrap_path,
                                          const Network::Address::IpVersion version);
   ~IntegrationTestServer();
 
@@ -247,8 +243,7 @@ public:
   }
 
 protected:
-  IntegrationTestServer(const std::string& config_path, const std::string& bootstrap_path)
-      : config_path_(config_path), bootstrap_path_(bootstrap_path) {}
+  IntegrationTestServer(const std::string& config_path) : config_path_(config_path) {}
 
 private:
   /**
@@ -257,7 +252,6 @@ private:
   void threadRoutine(const Network::Address::IpVersion version);
 
   const std::string config_path_;
-  const std::string bootstrap_path_;
   Thread::ThreadPtr thread_;
   std::condition_variable listeners_cv_;
   std::mutex listeners_mutex_;

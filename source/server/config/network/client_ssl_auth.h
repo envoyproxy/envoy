@@ -17,7 +17,6 @@ public:
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
   std::string name() override { return "client_ssl_auth"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
 
 } // namespace Configuration

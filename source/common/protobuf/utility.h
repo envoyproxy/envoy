@@ -68,6 +68,16 @@ public:
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
   /**
+   * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
+   * messages to/from google.protobuf.Struct.
+   * TODO(htuch): Avoid round-tripping via JSON strings by doing whatever
+   * Protobuf::util::MessageToJsonString does but generating a google.protobuf.Struct instead.
+   * @param source message.
+   * @param dest message.
+   */
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
+
+  /**
    * Extract JSON as string from a google.protobuf.Message.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @return std::string of JSON object.

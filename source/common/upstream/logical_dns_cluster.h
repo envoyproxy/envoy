@@ -66,7 +66,10 @@ private:
     // Upstream:HostDescription
     bool canary() const override { return false; }
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
-    Outlier::DetectorHostSink& outlierDetector() const override {
+    HealthCheckHostMonitor& healthChecker() const override {
+      return logical_host_->healthChecker();
+    }
+    Outlier::DetectorHostMonitor& outlierDetector() const override {
       return logical_host_->outlierDetector();
     }
     const HostStats& stats() const override { return logical_host_->stats(); }

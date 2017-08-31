@@ -15,15 +15,15 @@ public:
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer("test/config/integration/server_xds.json",
-                        {
-                            .bootstrap_path_ = "test/config/integration/server_xds.bootstrap.yaml",
-                            .cds_path_ = "test/config/integration/server_xds.cds.yaml",
-                            .eds_path_ = "test/config/integration/server_xds.eds.yaml",
-                            .lds_path_ = "test/config/integration/server_xds.lds.yaml",
-                            .rds_path_ = "test/config/integration/server_xds.rds.yaml",
-                        },
-                        {"http"});
+    createApiTestServer(
+        {
+            .bootstrap_path_ = "test/config/integration/server_xds.bootstrap.yaml",
+            .cds_path_ = "test/config/integration/server_xds.cds.yaml",
+            .eds_path_ = "test/config/integration/server_xds.eds.yaml",
+            .lds_path_ = "test/config/integration/server_xds.lds.yaml",
+            .rds_path_ = "test/config/integration/server_xds.rds.yaml",
+        },
+        {"http"});
   }
 
   void TearDown() override {

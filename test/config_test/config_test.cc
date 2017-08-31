@@ -25,8 +25,7 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path)
-      : options_(file_path, std::string(), Network::Address::IpVersion::v6) {
+  ConfigTest(const std::string& file_path) : options_(file_path, Network::Address::IpVersion::v6) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -34,8 +33,9 @@ public:
         .WillByDefault(Return("access_token"));
 
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
-    envoy::api::v2::Bootstrap bootstrap;
-    Server::Configuration::InitialImpl initial_config(*config_json);
+    envoy::api::v2::Bootstrap bootstrap =
+        TestUtility::parseBootstrapFromJson(config_json->asJsonString());
+    Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
@@ -54,7 +54,7 @@ public:
         }));
 
     try {
-      main_config.initialize(*config_json, bootstrap, server_, *cluster_manager_factory_);
+      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }

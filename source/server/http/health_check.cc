@@ -119,6 +119,9 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
     }
 
     headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
+  } else if (context_.healthCheckFailed()) {
+    headers.insertEnvoyImmediateHealthCheckFail().value(
+        Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -149,4 +152,5 @@ void HealthCheckFilter::onComplete() {
 
   callbacks_->encodeHeaders(std::move(headers), true);
 }
+
 } // namespace Envoy
