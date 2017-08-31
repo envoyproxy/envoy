@@ -54,10 +54,7 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
   return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void BufferFilter::onDestroy() {
-  stream_reset_ = true;
-  resetInternalState();
-}
+void BufferFilter::onDestroy() { resetInternalState(); }
 
 void BufferFilter::onRequestTimeout() {
   // TODO(htuch): Switch this to Utility::sendLocalReply().

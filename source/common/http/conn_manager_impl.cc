@@ -33,14 +33,6 @@
 
 namespace Envoy {
 namespace Http {
-namespace {
-uint32_t morePermissiveLimit(uint32_t limit1, uint32_t limit2) {
-  if (limit1 == 0 || limit2 == 0) {
-    return 0;
-  }
-  return std::max(limit1, limit2);
-}
-} // namespace
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
@@ -934,12 +926,7 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t limit) {
-  const uint32_t new_limit = morePermissiveLimit(limit, buffer_limit_);
-  if (new_limit == buffer_limit_) {
-    return;
-  }
-
+void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
@@ -1122,7 +1109,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
   if (parent_.state_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
-    parent_.connection_manager_.stats_.named_.downstream_cx_rq_too_large_.inc();
+    parent_.connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
     Http::Utility::sendLocalReply(*this, parent_.state_.destroyed_, Http::Code::PayloadTooLarge,
                                   CodeUtility::toString(Http::Code::PayloadTooLarge));
   }
@@ -1164,7 +1151,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
                                             [this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); });
   if (parent_.buffer_limit_ > 0) {
-    buffer->setWatermarks(parent_.buffer_limit_ / 2, parent_.buffer_limit_);
+    buffer->setWatermarks(parent_.buffer_limit_);
   }
   return Buffer::WatermarkBufferPtr{buffer};
 }

@@ -1316,25 +1316,26 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
 
+  // Check initial limits.
   EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
   EXPECT_EQ(initial_buffer_limit_, encoder_filters_[0]->callbacks_->encoderBufferLimit());
 
-  // setDecoderBufferLimit does not lower the limit.
+  // Check lowering the limits.
   decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ - 1);
-  EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  EXPECT_EQ(initial_buffer_limit_ - 1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
-  // setDecoderBufferLimit raise the limit, and affects both limits
+  // Check raising the limits.
   decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ + 1);
   EXPECT_EQ(initial_buffer_limit_ + 1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
   EXPECT_EQ(initial_buffer_limit_ + 1, encoder_filters_[0]->callbacks_->encoderBufferLimit());
 
-  // Turning off buffer limits works.
+  // Verify turning off buffer limits works.
   decoder_filters_[0]->callbacks_->setDecoderBufferLimit(0);
   EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
-  // Once the limits are turned off they may not be turned on again.
+  // Once the limits are turned off can be turned on again.
   decoder_filters_[0]->callbacks_->setDecoderBufferLimit(1);
-  EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  EXPECT_EQ(1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {

@@ -122,8 +122,8 @@ configured bytes without calling the appropriate watermark callbacks or sending
 an error response.
 
 Filters may override the default limit with calls to `setDecoderBufferLimit()`
-and `setEncoderBufferLimit()`.  These calls should only increase the buffer
-limit, and will be ignored if they would reduce the limit.
+and `setEncoderBufferLimit()`.  These limits are applied as filters are creaeted
+so filters later in the chain can override the limits set by prior filters.
 
 Most filters do not buffer internally, but instead push back on data by
 returning a FilterDataStatus on `encodeData()`/`decodeData()` calls.

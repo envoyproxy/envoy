@@ -244,8 +244,7 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
-   * This routine may be called to increase the buffer limit for decoder filters.
-   * If the limit set would lower the buffer limit it will be ignored.
+   * This routine may be called to change the buffer limit for decoder filters.
    *
    * @param boolean supplies the desired buffer limit.
    */
@@ -373,8 +372,7 @@ public:
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
-   * This routine may be called to increase the buffer limit for encoder filters.
-   * If the limit set would lower the buffer limit it will be ignored.
+   * This routine may be called to change the buffer limit for encoder filters.
    *
    * @limit settings supplies the desired buffer limit.
    */
