@@ -131,18 +131,18 @@ public:
     ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_.reset(new Event::DispatcherImpl(Buffer::WatermarkInstanceFactoryPtr{factory}));
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
         .Times(AnyNumber())
         .WillOnce(Invoke([&](std::function<void()> below_low,
-                             std::function<void()> above_high) -> Buffer::WatermarkBuffer* {
+                             std::function<void()> above_high) -> Buffer::Instance* {
           client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high);
           return client_write_buffer_;
         }))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                  std::function<void()> above_high) -> Buffer::WatermarkBuffer* {
+                                  std::function<void()> above_high) -> Buffer::Instance* {
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
   }

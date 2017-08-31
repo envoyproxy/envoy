@@ -115,7 +115,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
         EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
             .Times(1)
             .WillOnce(Invoke([&](std::function<void()> below_low,
-                                 std::function<void()> above_high) -> Buffer::WatermarkBuffer* {
+                                 std::function<void()> above_high) -> Buffer::Instance* {
               client_write_buffer = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
               ON_CALL(*client_write_buffer, move(_))
                   .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));

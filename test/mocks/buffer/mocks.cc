@@ -14,7 +14,6 @@ MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase()
     : Buffer::WatermarkBuffer([&]() -> void {}, [&]() -> void {}) {
   ASSERT(0); // This constructor is not supported for WatermarkBuffer.
 }
-
 template <>
 MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::function<void()>)
     : Buffer::OwnedImpl() {

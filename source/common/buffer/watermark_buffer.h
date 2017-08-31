@@ -13,7 +13,7 @@ namespace Buffer {
 // buffer size transitions from under the low watermark to above the high watermark, the
 // above_high_watermark function is called one time. It will not be called again until the buffer
 // is drained below the low watermark, at which point the below_low_watermark function is called.
-class WatermarkBuffer : public OwnedImpl, public virtual WatermarkInstance {
+class WatermarkBuffer : public OwnedImpl {
 public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
@@ -33,12 +33,12 @@ public:
   int write(int fd) override;
   void postProcess() override { checkLowWatermark(); }
 
-  void setWatermarks(uint32_t watermark) override {
+  void setWatermarks(uint32_t watermark) {
     if (watermark != 0) {
       setWatermarks(watermark / 2, watermark);
     }
   }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark) override;
+  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
 
 private:
   void checkHighWatermark();
@@ -57,12 +57,12 @@ private:
   bool above_high_watermark_called_{false};
 };
 
-class WatermarkBufferFactory : public WatermarkInstanceFactory {
+class WatermarkBufferFactory : public Factory {
 public:
-  // Buffer::WatermarkInstanceFactory
-  WatermarkInstancePtr create(std::function<void()> below_low_watermark,
-                              std::function<void()> above_high_watermark) override {
-    return WatermarkInstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark)};
+  // Buffer::Factory
+  InstancePtr create(std::function<void()> below_low_watermark,
+                     std::function<void()> above_high_watermark) override {
+    return InstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark)};
   }
 };
 
