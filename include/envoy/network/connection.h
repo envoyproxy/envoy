@@ -77,6 +77,7 @@ public:
     Stats::Gauge& read_current_;
     Stats::Counter& write_total_;
     Stats::Gauge& write_current_;
+    // Counter* as this is an optional counter.  Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
   };
 
