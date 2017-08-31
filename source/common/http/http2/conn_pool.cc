@@ -215,9 +215,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.conn_connect_ms_ =
       parent_.host_->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(parent_.dispatcher_);
-  if (data.connection_->state() != Network::Connection::State::Open) {
-    parent_.host_->cluster().stats().bind_errors_.inc();
-  }
   real_host_description_ = data.host_description_;
   client_ = parent_.createCodecClient(data);
   client_->addConnectionCallbacks(*this);
@@ -232,10 +229,11 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
   conn_length_ = parent_.host_->cluster().stats().upstream_cx_length_ms_.allocateSpan();
 
-  client_->setBufferStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-                           parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_});
+  client_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
+                               parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+                               parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
+                               parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
+                               &parent_.host_->cluster().stats().bind_errors_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {

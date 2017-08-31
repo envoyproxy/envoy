@@ -162,7 +162,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
-  buffer_stats_.reset();
+  connection_stats_.reset();
 
   file_event_.reset();
   ::close(fd_);
@@ -364,6 +364,11 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   if (state_ & InternalState::BindError) {
     ENVOY_CONN_LOG(debug, "raising bind error", *this);
+    // Update stats here, rather than on bind failure, to give the caller a chance to
+    // setConnectionStats.
+    if (connection_stats_ && connection_stats_->bind_errors_) {
+      connection_stats_->bind_errors_->inc();
+    }
     closeSocket(ConnectionEvent::LocalClose);
     return;
   }
@@ -531,29 +536,29 @@ void ConnectionImpl::doConnect() {
   }
 }
 
-void ConnectionImpl::setBufferStats(const BufferStats& stats) {
-  ASSERT(!buffer_stats_);
-  buffer_stats_.reset(new BufferStats(stats));
+void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+  ASSERT(!connection_stats_);
+  connection_stats_.reset(new ConnectionStats(stats));
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
-                                           buffer_stats_->read_total_,
-                                           buffer_stats_->read_current_);
+                                           connection_stats_->read_total_,
+                                           connection_stats_->read_current_);
 }
 
 void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
-                                           buffer_stats_->write_total_,
-                                           buffer_stats_->write_current_);
+                                           connection_stats_->write_total_,
+                                           connection_stats_->write_current_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

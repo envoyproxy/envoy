@@ -193,22 +193,23 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-struct MockBufferStats {
-  Connection::BufferStats toBufferStats() {
-    return {rx_total_, rx_current_, tx_total_, tx_current_};
+struct MockConnectionStats {
+  Connection::ConnectionStats toBufferStats() {
+    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_};
   }
 
   StrictMock<Stats::MockCounter> rx_total_;
   StrictMock<Stats::MockGauge> rx_current_;
   StrictMock<Stats::MockCounter> tx_total_;
   StrictMock<Stats::MockGauge> tx_current_;
+  StrictMock<Stats::MockCounter> bind_errors_;
 };
 
-TEST_P(ConnectionImplTest, BufferStats) {
+TEST_P(ConnectionImplTest, ConnectionStats) {
   setUpBasicConnection();
 
-  MockBufferStats client_buffer_stats;
-  client_connection_->setBufferStats(client_buffer_stats.toBufferStats());
+  MockConnectionStats client_connection_stats;
+  client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
   client_connection_->connect();
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
@@ -223,23 +224,23 @@ TEST_P(ConnectionImplTest, BufferStats) {
   EXPECT_CALL(*write_filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
-  EXPECT_CALL(client_buffer_stats.tx_total_, add(4)).InSequence(s1);
+  EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
-  MockBufferStats server_buffer_stats;
+  MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->setBufferStats(server_buffer_stats.toBufferStats());
+        server_connection_->setConnectionStats(server_connection_stats.toBufferStats());
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
 
   Sequence s2;
-  EXPECT_CALL(server_buffer_stats.rx_total_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_buffer_stats.rx_current_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_buffer_stats.rx_current_, sub(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, sub(4)).InSequence(s2);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter_, onNewConnection());
@@ -521,8 +522,11 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
 
   client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
 
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  MockConnectionStats connection_stats;
+  client_connection_->setConnectionStats(connection_stats.toBufferStats());
   client_connection_->addConnectionCallbacks(client_callbacks_);
+  EXPECT_CALL(connection_stats.bind_errors_, inc());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 

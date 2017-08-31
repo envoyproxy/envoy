@@ -69,7 +69,7 @@ public:
   bool readEnabled() const override;
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
-  void setBufferStats(const BufferStats& stats) override;
+  void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }
   State state() const override;
@@ -147,7 +147,7 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
-  std::unique_ptr<BufferStats> buffer_stats_;
+  std::unique_ptr<ConnectionStats> connection_stats_;
   // Tracks the number of times reads have been disabled.  If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.

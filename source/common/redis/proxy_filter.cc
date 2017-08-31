@@ -44,10 +44,11 @@ ProxyFilter::~ProxyFilter() {
 void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->connection().addConnectionCallbacks(*this);
-  callbacks_->connection().setBufferStats({config_->stats().downstream_cx_rx_bytes_total_,
-                                           config_->stats().downstream_cx_rx_bytes_buffered_,
-                                           config_->stats().downstream_cx_tx_bytes_total_,
-                                           config_->stats().downstream_cx_tx_bytes_buffered_});
+  callbacks_->connection().setConnectionStats({config_->stats().downstream_cx_rx_bytes_total_,
+                                               config_->stats().downstream_cx_rx_bytes_buffered_,
+                                               config_->stats().downstream_cx_tx_bytes_total_,
+                                               config_->stats().downstream_cx_tx_bytes_buffered_,
+                                               nullptr});
 }
 
 void ProxyFilter::onRespValue(RespValuePtr&& value) {

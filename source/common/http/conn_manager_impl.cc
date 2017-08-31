@@ -76,10 +76,10 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
-  read_callbacks_->connection().setBufferStats({stats_.named_.downstream_cx_rx_bytes_total_,
-                                                stats_.named_.downstream_cx_rx_bytes_buffered_,
-                                                stats_.named_.downstream_cx_tx_bytes_total_,
-                                                stats_.named_.downstream_cx_tx_bytes_buffered_});
+  read_callbacks_->connection().setConnectionStats(
+      {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
+       stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
+       nullptr});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
