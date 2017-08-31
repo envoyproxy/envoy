@@ -11,7 +11,7 @@
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {

@@ -12,6 +12,8 @@
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Router {
 

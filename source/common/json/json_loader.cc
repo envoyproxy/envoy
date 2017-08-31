@@ -13,7 +13,7 @@
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"

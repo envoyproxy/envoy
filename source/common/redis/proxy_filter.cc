@@ -7,7 +7,7 @@
 #include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 // TODO(mattklein123): Graceful drain support.
 

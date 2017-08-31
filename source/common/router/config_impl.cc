@@ -23,7 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {

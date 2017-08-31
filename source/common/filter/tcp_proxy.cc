@@ -15,7 +15,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Filter {
