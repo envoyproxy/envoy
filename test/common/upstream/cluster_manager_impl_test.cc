@@ -3,6 +3,7 @@
 
 #include "envoy/upstream/upstream.h"
 
+#include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
@@ -64,23 +65,23 @@ public:
     return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
-  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&, const Optional<SdsConfig>&,
-                      ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&,
+                      const Optional<envoy::api::v2::ConfigSource>&, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr clusterManagerFromJson(const Json::Object& config,
-                                           const envoy::api::v2::Bootstrap&, Stats::Store& stats,
-                                           ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                           Runtime::RandomGenerator& random,
-                                           const LocalInfo::LocalInfo& local_info,
-                                           AccessLog::AccessLogManager& log_manager) override {
+  ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+                                            Stats::Store& stats, ThreadLocal::Instance& tls,
+                                            Runtime::Loader& runtime,
+                                            Runtime::RandomGenerator& random,
+                                            const LocalInfo::LocalInfo& local_info,
+                                            AccessLog::AccessLogManager& log_manager) override {
     return ClusterManagerPtr{
-        clusterManagerFromJson_(config, stats, tls, runtime, random, local_info, log_manager)};
+        clusterManagerFromProto_(bootstrap, stats, tls, runtime, random, local_info, log_manager)};
   }
 
-  MOCK_METHOD7(clusterManagerFromJson_,
-               ClusterManager*(const Json::Object& config, Stats::Store& stats,
+  MOCK_METHOD7(clusterManagerFromProto_,
+               ClusterManager*(const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats,
                                ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random,
                                const LocalInfo::LocalInfo& local_info,
@@ -105,20 +106,23 @@ public:
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  void createWithBootstrap(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap) {
+  void create(const envoy::api::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
-        config, bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.random_, factory_.local_info_, log_manager_));
-  }
-
-  void create(const Json::Object& config) {
-    createWithBootstrap(config, envoy::api::v2::Bootstrap());
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        factory_.local_info_, log_manager_));
   }
 
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
 };
+
+envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
+  envoy::api::v2::Bootstrap bootstrap;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);
+  return bootstrap;
+}
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   const std::string json = R"EOF(
@@ -130,15 +134,13 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   const std::string json = fmt::sprintf("{%s}", clustersJson({defaultSdsClusterJson("cluster_1")}));
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
@@ -154,8 +156,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -168,8 +169,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
@@ -183,8 +183,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), Json::Exception);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), Json::Exception);
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
@@ -198,8 +197,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
                     defaultStaticClusterJson("new_cluster")}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 
   EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
   EXPECT_EQ(3UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
@@ -211,8 +209,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
       "{%s}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, UnknownHcType) {
@@ -232,8 +229,7 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(create(*loader), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, MaxClusterName) {
@@ -246,8 +242,7 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), Json::Exception,
                             "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
                             "#/properties/name\n Schema violation: maxLength\n Offending "
                             "document key: #/name");
@@ -263,8 +258,7 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), Json::Exception,
                             "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
                             "#/properties/name\n Schema violation: pattern\n Offending document "
                             "key: #/name");
@@ -283,9 +277,8 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(
-      create(*loader), EnvoyException,
+      create(parseBootstrapFromJson(json)), EnvoyException,
       "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
 }
 
@@ -303,9 +296,8 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(
-      create(*loader), EnvoyException,
+      create(parseBootstrapFromJson(json)), EnvoyException,
       "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
 }
 
@@ -336,13 +328,12 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(
       factory_.dispatcher_,
       createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
       .WillOnce(Return(connection));
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
 }
 
@@ -382,8 +373,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr,
             cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default, nullptr));
@@ -410,8 +400,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _))
@@ -425,8 +414,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
@@ -440,33 +428,6 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
   EXPECT_EQ(3U, cluster.info().use_count());
-}
-
-// Validate that the v2 envoy::api::v2::Bootstrap overrides JSON config.
-TEST_F(ClusterManagerImplTest, CdsBootstrap) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
-    }]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
-                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
-                            "#/properties/name\n Schema violation: maxLength\n Offending "
-                            "document key: #/name");
-
-  envoy::api::v2::Bootstrap cds_config_bootstrap;
-  cds_config_bootstrap.mutable_dynamic_resources()->mutable_cds_config();
-  createWithBootstrap(*loader, cds_config_bootstrap);
-
-  envoy::api::v2::Bootstrap clusters_bootstrap;
-  clusters_bootstrap.mutable_static_resources()->mutable_clusters()->Add()->CopyFrom(
-      defaultStaticCluster("foo"));
-  createWithBootstrap(*loader, clusters_bootstrap);
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
@@ -490,19 +451,18 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
-  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(*cds_cluster, initialize());
-  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
-  EXPECT_CALL(*cds, setInitializedCb(_));
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
+  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cds_cluster, initialize());
+  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
+  EXPECT_CALL(*cds, setInitializedCb(_));
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -574,8 +534,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize());
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   foo->initialize_callback_();
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
@@ -617,8 +576,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 
   InSequence s;
   ReadyWatcher initialized;
@@ -686,8 +644,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -720,8 +677,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
 
@@ -730,7 +685,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -817,8 +772,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  create(*loader);
+  create(parseBootstrapFromJson(json));
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });

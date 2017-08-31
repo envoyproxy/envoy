@@ -1,5 +1,7 @@
 #include "server/config_validation/server.h"
 
+#include "common/common/version.h"
+#include "common/config/bootstrap_json.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -59,17 +61,25 @@ void ValidationInstance::initialize(Options& options,
   //
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  // Handle configuration that needs to take place prior to the main configuration load.
   envoy::api::v2::Bootstrap bootstrap;
-  if (!options.bootstrapPath().empty()) {
-    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  try {
+    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
   }
+  if (!bootstrap.has_admin()) {
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  }
+  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(
       new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
                                    options.serviceClusterName(), options.serviceNodeName()));
 
-  Configuration::InitialImpl initial_config(*config_json);
+  Configuration::InitialImpl initial_config(bootstrap);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
@@ -79,7 +89,7 @@ void ValidationInstance::initialize(Options& options,
 
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
+  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
 
   clusterManager().setInitializedCb(
       [this]() -> void { init_manager_.initialize([]() -> void {}); });

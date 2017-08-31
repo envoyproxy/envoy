@@ -15,6 +15,8 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
+#include "common/config/bootstrap_json.h"
+#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -129,6 +131,13 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
   closedir(dir);
   return file_names;
+}
+
+envoy::api::v2::Bootstrap TestUtility::parseBootstrapFromJson(const std::string& json_string) {
+  envoy::api::v2::Bootstrap bootstrap;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
+  return bootstrap;
 }
 
 void ConditionalInitializer::setReady() {

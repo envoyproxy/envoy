@@ -38,17 +38,5 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
-TEST(UtilityTest, SdsConfigToEdsConfig) {
-  Upstream::SdsConfig sds_config{"sds", std::chrono::milliseconds(30000)};
-  envoy::api::v2::ConfigSource config;
-  Utility::sdsConfigToEdsConfig(sds_config, config);
-  EXPECT_TRUE(config.has_api_config_source());
-  const auto& api_config_source = config.api_config_source();
-  EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST_LEGACY, api_config_source.api_type());
-  EXPECT_EQ(1, api_config_source.cluster_name().size());
-  EXPECT_EQ("sds", api_config_source.cluster_name()[0]);
-  EXPECT_EQ(30000, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
-}
-
 } // namespace Config
 } // namespace Envoy

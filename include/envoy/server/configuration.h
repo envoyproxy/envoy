@@ -69,9 +69,9 @@ public:
   virtual Optional<std::string> statsdTcpClusterName() PURE;
 
   /**
-   * @return Optional<std::string> the optional UDP statsd address to write to.
+   * @return Network::Address::InstanceConstSharedPtr the optional UDP statsd address to write to.
    */
-  virtual Optional<std::string> statsdUdpIpAddress() PURE;
+  virtual Network::Address::InstanceConstSharedPtr statsdUdpIpAddress() PURE;
 
   /**
    * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.

@@ -12,7 +12,7 @@ namespace Upstream {
  * arrays for each priority, but does not pollute the enum.
  */
 enum class ResourcePriority { Default, High };
-const size_t NumResourcePriorities = 2;
+const std::size_t NumResourcePriorities = 2;
 
 /**
  * An individual resource tracked by the resource manager.

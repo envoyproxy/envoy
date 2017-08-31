@@ -59,13 +59,11 @@ Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_
       Protobuf::util::TimeUtil::DurationToMilliseconds(api_config_source.refresh_delay()));
 }
 
-void Utility::sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
-                                   envoy::api::v2::ConfigSource& eds_config) {
-  auto* api_config_source = eds_config.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_name(sds_config.sds_cluster_name_);
-  api_config_source->mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(sds_config.refresh_delay_.count()));
+void Utility::translateEdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& eds_config) {
+  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
+                           json_config.getInteger("refresh_delay_ms", 30000),
+                           *eds_config.mutable_api_config_source());
 }
 
 void Utility::translateCdsConfig(const Json::Object& json_config,
