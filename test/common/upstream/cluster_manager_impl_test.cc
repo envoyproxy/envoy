@@ -359,13 +359,12 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(
       factory_.dispatcher_,
       createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
       .WillOnce(Return(connection));
-  create(*loader);
+  create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
 }
 
