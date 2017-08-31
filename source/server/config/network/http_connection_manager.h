@@ -35,7 +35,6 @@ public:
         new envoy::api::v2::filter::HttpConnectionManager());
   }
   std::string name() override { return "http_connection_manager"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
 
 /**
@@ -97,8 +96,6 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
-
-  HttpFilterType stringToType(const std::string& type);
 
   FactoryContext& context_;
   std::list<HttpFilterFactoryCb> filter_factories_;

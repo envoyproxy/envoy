@@ -39,7 +39,6 @@ TEST(HttpFilterConfigTest, BufferFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   BufferFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -71,7 +70,6 @@ TEST(HttpFilterConfigTest, RateLimitFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RateLimitFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -101,7 +99,6 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   DynamoFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -122,7 +119,6 @@ TEST(HttpFilterConfigTest, FaultFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -138,7 +134,6 @@ TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   GrpcHttp1BridgeFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -154,7 +149,6 @@ TEST(HttpFilterConfigTest, GrpcWebFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   GrpcWebFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -172,7 +166,6 @@ TEST(HttpFilterConfigTest, HealthCheckFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -204,7 +197,6 @@ TEST(HttpFilterConfigTest, RouterFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -240,7 +232,6 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   IpTaggingFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

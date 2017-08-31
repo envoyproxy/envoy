@@ -18,7 +18,6 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object& config, const std::string&,
                                           FactoryContext& context) override;
   std::string name() override { return "health_check"; }
-  HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
 } // namespace Configuration

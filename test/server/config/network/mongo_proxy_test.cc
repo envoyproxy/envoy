@@ -26,7 +26,6 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Both, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
@@ -212,7 +211,6 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Both, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));

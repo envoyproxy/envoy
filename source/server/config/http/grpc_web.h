@@ -11,7 +11,6 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext&) override;
   std::string name() override { return "grpc_web"; }
-  HttpFilterType type() override { return HttpFilterType::Both; }
 };
 
 } // namespace Configuration

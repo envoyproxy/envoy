@@ -37,7 +37,6 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -88,7 +87,6 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   TcpProxyConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -116,7 +114,6 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuth) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -136,7 +133,6 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

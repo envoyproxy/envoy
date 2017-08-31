@@ -17,7 +17,6 @@ public:
                                           const std::string& stats_prefix,
                                           FactoryContext& context) override;
   std::string name() override { return "fault"; }
-  HttpFilterType type() override { return HttpFilterType::Decoder; }
 };
 
 } // namespace Configuration
