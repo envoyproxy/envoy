@@ -74,8 +74,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
-      read_buffer_(new Buffer::OwnedImpl), write_buffer_(dispatcher.getBufferFactory().create(
-                                               [this]() -> void { this->onLowWatermark(); },
+      write_buffer_(
+          dispatcher.getBufferFactory().create([this]() -> void { this->onLowWatermark(); },
                                                [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
       using_original_dst_(using_original_dst) {
@@ -259,7 +259,7 @@ void ConnectionImpl::readDisable(bool disable) {
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain.  Instead fake an event to make sure the buffered data
     // gets processed regardless.
-    if (read_buffer_->length() > 0) {
+    if (read_buffer_.length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
@@ -392,7 +392,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     //
     // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
     // ioctl(). The extra syscall is not worth it.
-    int rc = read_buffer_->read(fd_, 16384);
+    int rc = read_buffer_.read(fd_, 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", *this, rc);
 
     // Remote close. Might need to raise data before raising close.
@@ -423,7 +423,7 @@ void ConnectionImpl::onReadReady() {
   ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();
-  uint64_t new_buffer_size = read_buffer_->length();
+  uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   onRead(new_buffer_size);
 
