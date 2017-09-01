@@ -299,12 +299,7 @@ public:
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
-<<<<<<< HEAD
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
-=======
-  MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
-  MOCK_METHOD0(statsdUdpIpAddress, Network::Address::InstanceConstSharedPtr());
->>>>>>> master
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());

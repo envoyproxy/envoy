@@ -25,7 +25,6 @@ name (which should be a string) is called *true*, it should be written in the co
     "flags_path": "...",
     "statsd_udp_ip_address": "...",
     "statsd_tcp_cluster_name": "...",
-    "stats_sinks": [],
     "stats_flush_interval_ms": "...",
     "watchdog_miss_timeout_ms": "...",
     "watchdog_megamiss_timeout_ms": "...",
@@ -62,21 +61,16 @@ flags_path
 
 .. _config_overview_statsd_udp_ip_address:
 
-statsd_udp_ip_address (Warning: DEPRECATED and will be removed in 1.5.0)
+statsd_udp_ip_address
   *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
   :ref:`statistics <arch_overview_statistics>` will be flushed to this address. IPv4 addresses should
   have format host:port (ex: 127.0.0.1:855). IPv6 addresses should have URL format [host]:port
   (ex: [::1]:855).
 
-statsd_tcp_cluster_name (Warning: DEPRECATED and will be removed in 1.5.0)
+statsd_tcp_cluster_name
   *(optional, string)* The name of a cluster manager cluster that is running a TCP statsd compliant
   listener. If specified, Envoy will connect to this cluster to flush :ref:`statistics
   <arch_overview_statistics>`.
-
-stats_sinks
-  *(optional, array)* An array of stats sink configuration objects.  Each object is required to
-  have a "name" string field (to look up the statically registered implementation of that sink) and
-  a "config" object field that contains the custom configuration for the sink.
 
 .. _config_overview_stats_flush_interval_ms:
 

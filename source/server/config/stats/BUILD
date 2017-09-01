@@ -9,19 +9,12 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "tcp_statsd_lib",
-    srcs = ["tcp_statsd.cc"],
-    hdrs = ["tcp_statsd.h"],
-    deps = [
-        "//source/common/stats:statsd_lib",
-        "//source/server:configuration_lib",
+    name = "statsd_lib",
+    srcs = ["statsd.cc"],
+    hdrs = ["statsd.h"],
+    external_deps = [
+        "envoy_bootstrap",
     ],
-)
-
-envoy_cc_library(
-    name = "udp_statsd_lib",
-    srcs = ["udp_statsd.cc"],
-    hdrs = ["udp_statsd.h"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stats:statsd_lib",

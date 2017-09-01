@@ -12,8 +12,8 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
-        "//source/server/config/stats:tcp_statsd_lib",
-        "//source/server/config/stats:udp_statsd_lib",
+        "//source/common/stats:statsd_lib",
+        "//source/server/config/stats:statsd_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

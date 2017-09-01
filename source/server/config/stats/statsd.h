@@ -11,13 +11,15 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the udp statsd sink. @see StatsSinkFactory.
+ * Config registration for the tcp statsd sink. @see StatsSinkFactory.
  */
-class UdpStatsdSinkFactory : Logger::Loggable<Logger::Id::config>, public StatsSinkFactory {
+class StatsdSinkFactory : Logger::Loggable<Logger::Id::config>, public StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Json::Object& json_config, Instance& server,
+  Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server,
                                  Upstream::ClusterManager& cluster_manager) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() override;
 };

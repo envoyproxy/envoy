@@ -252,41 +252,6 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
                             EnvoyException, "No HttpTracerFactory found for type: invalid");
 }
 
-TEST_F(ConfigurationImplTest, DeprecatedStatsConfiguration) {
-
-  std::string json = R"EOF(
-  {
-    "listeners": [],
-
-    "cluster_manager": {
-      "clusters": [
-        {
-          "name": "fake_cluster",
-          "type": "static",
-          "connect_timeout_ms": 1,
-          "per_connection_buffer_limit_bytes": 8192,
-          "lb_type": "round_robin",
-          "hosts": [
-            { "url" : "tcp://127.0.0.1:9999" }
-          ]
-        }
-      ]
-    },
-
-    "statsd_udp_ip_address" : "127.0.0.1:8125",
-    "statsd_tcp_cluster_name" : "fake_cluster"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
-
-  MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
-
-  EXPECT_EQ(2, config.statsSinks().size());
-}
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

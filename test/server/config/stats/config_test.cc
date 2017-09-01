@@ -2,11 +2,14 @@
 
 #include "envoy/registry/registry.h"
 
-#include "server/config/stats/tcp_statsd.h"
-#include "server/config/stats/udp_statsd.h"
+#include "common/protobuf/utility.h"
+#include "common/stats/statsd.h"
+
+#include "server/config/stats/statsd.h"
 
 #include "test/mocks/server/mocks.h"
 
+#include "api/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -20,95 +23,71 @@ namespace Server {
 namespace Configuration {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string json_string = R"EOF(
-  {
-    "cluster_name" : "fake_cluster"
-  }
-  )EOF";
-  const std::string name = "statsd_tcp";
+  const std::string name = "envoy.statsd";
+  Protobuf::Struct config;
+  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& field_map = *config.mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
-  Stats::SinkPtr sink = factory->createStatsSink(*json_config, server, server.clusterManager());
-  EXPECT_NE(sink, nullptr);
-}
 
-TEST(StatsConfigTest, InvalidTcpStatsd) {
-  const std::string json_string = R"EOF(
-  {}
-  )EOF";
-  const std::string name = "statsd_tcp";
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(config, *message);
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
-  StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
-  EXPECT_THROW(factory->createStatsSink(*json_config, server, server.clusterManager()),
-               EnvoyException);
-}
-
-TEST(StatsConfigTest, ValidUdpPortStatsd) {
-  const std::string json_string = R"EOF(
-  {
-    "local_port" : 8125
-  }
-  )EOF";
-  const std::string name = "statsd_udp";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
-  StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
-  ASSERT_NE(factory, nullptr);
-  Stats::SinkPtr sink = factory->createStatsSink(*json_config, server, server.clusterManager());
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server, server.clusterManager());
   EXPECT_NE(sink, nullptr);
+  EXPECT_NE(dynamic_cast<Stats::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
 
 TEST(StatsConfigTest, ValidUdpIpStatsd) {
-  const std::string json_string = R"EOF(
-  {
-    "ip_address" : "127.0.0.1:8125"
-  }
-  )EOF";
-  const std::string name = "statsd_udp";
+  const std::string name = "envoy.statsd";
+  Protobuf::Struct config;
+  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& field_map = *config.mutable_fields();
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
+  envoy::api::v2::Address address;
+  envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
+  socket_address.set_address("127.0.0.1");
+  socket_address.set_port_value(8125);
+
+  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& address_field_map =
+      *field_map["address"].mutable_struct_value()->mutable_fields();
+  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& socket_address_field_map =
+      *address_field_map["socket_address"].mutable_struct_value()->mutable_fields();
+  socket_address_field_map["protocol"].set_string_value("UDP");
+  socket_address_field_map["address"].set_string_value("127.0.0.1");
+  socket_address_field_map["port_value"].set_number_value(8125);
+
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
-  Stats::SinkPtr sink = factory->createStatsSink(*json_config, server, server.clusterManager());
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(config, *message);
+
+  // REMOVE THIS
+  auto& sink_proto = dynamic_cast<envoy::api::v2::StatsdSink&>(*message);
+  ASSERT_EQ(envoy::api::v2::SocketAddress::UDP, sink_proto.address().socket_address().protocol());
+  ASSERT_EQ("127.0.0.1", sink_proto.address().socket_address().address());
+  ASSERT_EQ(8125, sink_proto.address().socket_address().port_value());
+
+  NiceMock<MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server, server.clusterManager());
   EXPECT_NE(sink, nullptr);
+  EXPECT_NE(dynamic_cast<Stats::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
 }
 
-TEST(StatsConfigTest, BadUdpEmptyConfig) {
-  const std::string json_string = R"EOF(
-  {}
-  )EOF";
-  const std::string name = "statsd_udp";
+TEST(StatsConfigTest, EmptyConfig) {
+  const std::string name = "envoy.statsd";
+  Protobuf::Struct config;
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockInstance> server;
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
-  EXPECT_THROW(factory->createStatsSink(*json_config, server, server.clusterManager()),
-               EnvoyException);
-}
 
-TEST(StatsConfigTest, BadUdpIpAndPortConfig) {
-  const std::string json_string = R"EOF(
-  {
-    "ip_address" : "127.0.0.1:8125",
-    "local_port" : 8125
-  }
-  )EOF";
-  const std::string name = "statsd_udp";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(config, *message);
   NiceMock<MockInstance> server;
-  StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
-  ASSERT_NE(factory, nullptr);
-  EXPECT_THROW(factory->createStatsSink(*json_config, server, server.clusterManager()),
-               EnvoyException);
+  EXPECT_THROW(factory->createStatsSink(*message, server, server.clusterManager()), EnvoyException);
 }
 
 } // namespace Configuration

@@ -68,12 +68,19 @@ public:
    * Stats::Sink with the provided parameters, it should throw an EnvoyException in the case of
    * general error or a Json::Exception if the json configuration is erroneous. The returned
    * pointer should always be valid.
-   * @param json_config supplies the general json configuration for the Stats::Sink
+   * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    * @param cluster_manager supplies the cluster_manager instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Json::Object& json_config, Instance& server,
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server,
                                          Upstream::ClusterManager& cluster_manager) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * Returns the identifying name for a particular implementation of Stats::Sink produced by the
@@ -132,7 +139,7 @@ private:
    */
   void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
 
-  void initializeStatsSinks(const Json::Object& configuration, Instance& server);
+  void initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<LdsApi> lds_api_;
