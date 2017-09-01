@@ -21,6 +21,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
     : parent_(parent), encoder_(encoder) {

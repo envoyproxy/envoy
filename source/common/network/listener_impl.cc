@@ -14,7 +14,7 @@
 #include "common/ssl/connection_impl.h"
 
 #include "event2/listener.h"
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Network {

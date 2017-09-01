@@ -8,6 +8,7 @@
 #include "common/common/macros.h"
 #include "common/common/version.h"
 
+#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 

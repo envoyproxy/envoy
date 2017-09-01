@@ -11,6 +11,8 @@
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Server {
 

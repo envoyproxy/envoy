@@ -22,8 +22,8 @@
 
 #include "test/test_common/printers.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
 using testing::GTEST_FLAG(random_seed);
 

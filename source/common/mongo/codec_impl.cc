@@ -12,7 +12,7 @@
 #include "common/common/assert.h"
 #include "common/mongo/bson_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Mongo {
