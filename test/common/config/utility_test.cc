@@ -40,7 +40,7 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
 
 TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::api::v2::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, Utility::REST_LEGACY,
+  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().RestLegacy,
                                     api_config_source_rest_legacy);
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST_LEGACY, api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000, Protobuf::util::TimeUtil::DurationToMilliseconds(
@@ -48,7 +48,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_name(0));
 
   envoy::api::v2::ApiConfigSource api_config_source_rest;
-  Utility::translateApiConfigSource("test_rest_cluster", 20000, Utility::REST,
+  Utility::translateApiConfigSource("test_rest_cluster", 20000, ApiType::get().Rest,
                                     api_config_source_rest);
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST, api_config_source_rest.api_type());
   EXPECT_EQ(20000, Protobuf::util::TimeUtil::DurationToMilliseconds(
@@ -56,7 +56,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_name(0));
 
   envoy::api::v2::ApiConfigSource api_config_source_grpc;
-  Utility::translateApiConfigSource("test_grpc_cluster", 30000, Utility::GRPC,
+  Utility::translateApiConfigSource("test_grpc_cluster", 30000, ApiType::get().Grpc,
                                     api_config_source_grpc);
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
   EXPECT_EQ(30000, Protobuf::util::TimeUtil::DurationToMilliseconds(

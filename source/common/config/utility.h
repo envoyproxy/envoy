@@ -5,6 +5,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
@@ -12,6 +13,18 @@
 
 namespace Envoy {
 namespace Config {
+
+/**
+ * Constant Api Type Values, used by envoy::api::v2::ApiConfigSource.
+ */
+class ApiTypeValues {
+public:
+  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string Rest{"REST"};
+  const std::string Grpc{"GRPC"};
+};
+
+typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
  * General config API utilities.
@@ -119,10 +132,6 @@ public:
   static SubscriptionStats generateStats(Stats::Scope& scope) {
     return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
   }
-
-  static const std::string REST_LEGACY;
-  static const std::string REST;
-  static const std::string GRPC;
 };
 
 } // namespace Config
