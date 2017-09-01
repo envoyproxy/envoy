@@ -36,7 +36,7 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
       new Tracing::HttpTracerImpl(std::move(lightstep_driver), server.localInfo()));
 }
 
-std::string LightstepHttpTracerFactory::name() { return "lightstep"; }
+std::string LightstepHttpTracerFactory::name() { return "envoy.lightstep"; }
 
 /**
  * Static registration for the lightstep http tracer. @see RegisterFactory.

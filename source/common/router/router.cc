@@ -455,6 +455,10 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(
       Http::Utility::getResponseStatus(*headers));
 
+  if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
+    upstream_request_->upstream_host_->healthChecker().setUnhealthy();
+  }
+
   if (retry_state_ &&
       retry_state_->shouldRetry(headers.get(), Optional<Http::StreamResetReason>(),
                                 [this]() -> void { doRetry(); }) &&

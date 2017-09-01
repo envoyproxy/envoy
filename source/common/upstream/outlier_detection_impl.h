@@ -22,11 +22,11 @@ namespace Upstream {
 namespace Outlier {
 
 /**
- * Null host sink implementation.
+ * Null host monitor implementation.
  */
-class DetectorHostSinkNullImpl : public DetectorHostSink {
+class DetectorHostMonitorNullImpl : public DetectorHostMonitor {
 public:
-  // Upstream::Outlier::DetectorHostSink
+  // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
@@ -99,11 +99,11 @@ private:
 class DetectorImpl;
 
 /**
- * Implementation of DetectorHostSink for the generic detector.
+ * Implementation of DetectorHostMonitor for the generic detector.
  */
-class DetectorHostSinkImpl : public DetectorHostSink {
+class DetectorHostMonitorImpl : public DetectorHostMonitor {
 public:
-  DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
+  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
       : detector_(detector), host_(host), success_rate_(-1) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
@@ -116,7 +116,7 @@ public:
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
 
-  // Upstream::Outlier::DetectorHostSink
+  // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
@@ -211,9 +211,9 @@ private:
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger);
 
-  void addHostSink(HostSharedPtr host);
+  void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
-  void checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink, MonotonicTime now);
+  void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
   void ejectHost(HostSharedPtr host, EjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
@@ -230,7 +230,7 @@ private:
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
-  std::unordered_map<HostSharedPtr, DetectorHostSinkImpl*> host_sinks_;
+  std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
   double success_rate_average_;
   double success_rate_ejection_threshold_;

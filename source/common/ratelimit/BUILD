@@ -13,6 +13,7 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit_impl.cc"],
     hdrs = ["ratelimit_impl.h"],
+    external_deps = ["envoy_bootstrap"],
     deps = [
         ":ratelimit_proto",
         "//include/envoy/grpc:async_client_interface",
@@ -23,7 +24,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:json_loader_lib",
     ],
 )
 

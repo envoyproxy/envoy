@@ -40,9 +40,13 @@ protected:
   ServerInstanceImplTest() : version_(GetParam()) {}
 
   void initialize(const std::string& bootstrap_path) {
-    options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-        "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    options_.bootstrap_path_ = TestEnvironment::runfilesPath(bootstrap_path);
+    if (bootstrap_path.empty()) {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+    } else {
+      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+          bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
+    }
     server_.reset(new InstanceImpl(
         options_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
@@ -72,13 +76,13 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  initialize("test/server/empty_bootstrap.json");
+  initialize(std::string());
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
 }
 
 // Validate server localInfo() from bootstrap Node.
 TEST_P(ServerInstanceImplTest, BootstrapNode) {
-  initialize("test/server/node_bootstrap.json");
+  initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
   EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
@@ -91,7 +95,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.service_zone_name_ = "some_zone_name";
-  initialize("test/server/node_bootstrap.json");
+  initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("some_zone_name", server_->localInfo().zoneName());
   EXPECT_EQ("some_cluster_name", server_->localInfo().clusterName());
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());

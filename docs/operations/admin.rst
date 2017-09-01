@@ -66,12 +66,16 @@ modify different aspects of the server.
 
   Enable or disable the CPU profiler. Requires compiling with gperftools.
 
+.. _operations_admin_interface_healthcheck_fail:
+
 .. http:get:: /healthcheck/fail
 
   Fail inbound health checks. This requires the use of the HTTP :ref:`health check filter
   <config_http_filters_health_check>`. This is useful for draining a server prior to shutting it
   down or doing a full restart. Invoking this command will universally fail health check requests
   regardless of how the filter is configured (pass through, etc.).
+
+.. _operations_admin_interface_healthcheck_ok:
 
 .. http:get:: /healthcheck/ok
 

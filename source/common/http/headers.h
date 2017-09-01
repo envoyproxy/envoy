@@ -26,6 +26,7 @@ public:
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
+  const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
@@ -88,6 +89,10 @@ public:
     const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
     const std::string Json{"application/json"};
   } ContentTypeValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyImmediateHealthCheckFailValues;
 
   struct {
     const std::string True{"true"};

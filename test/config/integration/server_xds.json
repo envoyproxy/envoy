@@ -1,7 +1,0 @@
-{
-  "listeners": [],
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://{{ ip_loopback_address }}:0" },
-  "cluster_manager": {
-    "clusters": []
-  }
-}

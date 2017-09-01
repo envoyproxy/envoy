@@ -56,7 +56,8 @@ public:
   void setTag(const std::string& name, const std::string& value) override;
 
   void injectContext(Http::HeaderMap& request_headers) override;
-  Tracing::SpanPtr spawnChild(const std::string& name, SystemTime start_time) override;
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime start_time) override;
 
   /**
    * @return a reference to the Zipkin::Span object.
@@ -89,12 +90,12 @@ public:
    * It starts a new Zipkin span. Depending on the request headers, it can create a root span,
    * a child span, or a shared-context span.
    *
-   * The second parameter (operation_name) does not actually make sense for Zipkin.
+   * The third parameter (operation_name) does not actually make sense for Zipkin.
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string&,
-                             SystemTime start_time) override;
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::HeaderMap& request_headers,
+                             const std::string&, SystemTime start_time) override;
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }

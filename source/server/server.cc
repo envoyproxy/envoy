@@ -16,6 +16,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/config/bootstrap_json.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
@@ -46,8 +47,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
-      handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
@@ -65,9 +66,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
-              options.configPath() +
-                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
@@ -151,10 +150,16 @@ void InstanceImpl::initialize(Options& options,
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   envoy::api::v2::Bootstrap bootstrap;
-  if (!options.bootstrapPath().empty()) {
-    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  try {
+    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  }
+  if (!bootstrap.has_admin()) {
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
@@ -162,7 +167,7 @@ void InstanceImpl::initialize(Options& options,
       new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
                                    options.serviceClusterName(), options.serviceNodeName()));
 
-  Configuration::InitialImpl initial_config(*config_json);
+  Configuration::InitialImpl initial_config(bootstrap);
   ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
@@ -205,7 +210,7 @@ void InstanceImpl::initialize(Options& options,
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
+  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
 
   // Setup signals.
   sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
@@ -264,11 +269,10 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 }
 
 void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpIpAddress().valid()) {
-    ENVOY_LOG(info, "statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(
-        thread_local_,
-        Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
+  if (config_->statsdUdpIpAddress()) {
+    ENVOY_LOG(info, "statsd UDP ip address: {}", config_->statsdUdpIpAddress()->asString());
+    stat_sinks_.emplace_back(
+        new Stats::Statsd::UdpStatsdSink(thread_local_, config_->statsdUdpIpAddress()));
     stats_store_.addSink(*stat_sinks_.back());
   }
 
@@ -331,7 +335,7 @@ void InstanceImpl::run() {
   handler_.reset();
   thread_local_.shutdownThread();
   ENVOY_LOG(warn, "exiting");
-  log().flush();
+  ENVOY_FLUSH_LOG();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
