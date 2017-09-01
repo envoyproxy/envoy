@@ -65,12 +65,6 @@ TEST(StatsConfigTest, ValidUdpIpStatsd) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   MessageUtil::jsonConvert(config, *message);
 
-  // REMOVE THIS
-  auto& sink_proto = dynamic_cast<envoy::api::v2::StatsdSink&>(*message);
-  ASSERT_EQ(envoy::api::v2::SocketAddress::UDP, sink_proto.address().socket_address().protocol());
-  ASSERT_EQ("127.0.0.1", sink_proto.address().socket_address().address());
-  ASSERT_EQ(8125, sink_proto.address().socket_address().port_value());
-
   NiceMock<MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server, server.clusterManager());
   EXPECT_NE(sink, nullptr);
