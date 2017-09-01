@@ -25,7 +25,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
@@ -36,6 +35,7 @@ using testing::StrictMock;
 using testing::Test;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 TEST(ConnectionImplUtility, updateBufferStats) {
@@ -87,6 +87,9 @@ public:
         dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
+    const Network::ClientConnection& const_connection = *client_connection_;
+    EXPECT_EQ(nullptr, const_connection.ssl());
+    EXPECT_FALSE(client_connection_->usingOriginalDst());
   }
 
   void connect() {

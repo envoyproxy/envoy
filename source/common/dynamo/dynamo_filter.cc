@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/dynamo/dynamo_utility.h"
 #include "common/http/codes.h"
@@ -62,10 +63,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
 }
 
 void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
-  if (!response_headers_) {
-    return;
-  }
-
+  ASSERT(enabled_);
   uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
   chargeBasicStats(status);
 

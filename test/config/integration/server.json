@@ -423,7 +423,8 @@
       "type": "strict_dns",
       "lb_type": "ring_hash",
       "dns_lookup_family": "{{ dns_lookup_family }}",
-      "hosts": [{"url": "tcp://localhost:4"}]
+      "hosts": [{"url": "tcp://localhost:4"}],
+      "outlier_detection": {}
     }]
   }
 }
