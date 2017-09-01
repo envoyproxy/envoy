@@ -75,6 +75,7 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string json_string = R"EOF(
   {
     "codec_type": "http1",
+    "server_name": "foo",
     "stat_prefix": "router",
     "route_config":
     {
@@ -107,6 +108,7 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
+  EXPECT_EQ("foo", config.serverName());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
