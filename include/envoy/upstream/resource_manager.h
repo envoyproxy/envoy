@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <cstddef>
 
 #include "envoy/common/pure.h"
 
@@ -12,7 +12,7 @@ namespace Upstream {
  * arrays for each priority, but does not pollute the enum.
  */
 enum class ResourcePriority { Default, High };
-const std::size_t NumResourcePriorities = 2;
+const size_t NumResourcePriorities = 2;
 
 /**
  * An individual resource tracked by the resource manager.
