@@ -34,6 +34,7 @@ envoy_cc_test_library(
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//source/server:configuration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",

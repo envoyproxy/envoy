@@ -34,24 +34,44 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * Null implementation of HealthCheckHostMonitor.
+ */
+class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
+public:
+  // Upstream::HealthCheckHostMonitor
+  void setUnhealthy() override {}
+};
+
+/**
  * Implementation of Upstream::HostDescription.
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-                      Network::Address::InstanceConstSharedPtr address, bool canary,
+                      Network::Address::InstanceConstSharedPtr dest_address, bool canary,
                       const std::string& zone)
-      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary),
+      : cluster_(cluster), hostname_(hostname), address_(dest_address), canary_(canary),
         zone_(zone), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
   const ClusterInfo& cluster() const override { return *cluster_; }
-  Outlier::DetectorHostSink& outlierDetector() const override {
+  HealthCheckHostMonitor& healthChecker() const override {
+    if (health_checker_) {
+      return *health_checker_;
+    } else {
+      static HealthCheckHostMonitorNullImpl* null_health_checker =
+          new HealthCheckHostMonitorNullImpl();
+      return *null_health_checker;
+    }
+  }
+  Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
     } else {
-      return null_outlier_detector_;
+      static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
+          new Outlier::DetectorHostMonitorNullImpl();
+      return *null_outlier_detector;
     }
   }
   const HostStats& stats() const override { return stats_; }
@@ -67,10 +87,8 @@ protected:
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
-  Outlier::DetectorHostSinkPtr outlier_detector_;
-
-private:
-  static Outlier::DetectorHostSinkNullImpl null_outlier_detector_;
+  Outlier::DetectorHostMonitorPtr outlier_detector_;
+  HealthCheckHostMonitorPtr health_checker_;
 };
 
 /**
@@ -94,7 +112,10 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
-  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
+    health_checker_ = std::move(health_checker);
+  }
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
   bool healthy() const override { return !health_flags_; }
@@ -177,9 +198,10 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
  */
 class ClusterInfoImpl : public ClusterInfo {
 public:
-  ClusterInfoImpl(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  bool added_via_api);
+  ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+                  const Network::Address::InstanceConstSharedPtr source_address,
+                  Runtime::Loader& runtime, Stats::Store& stats,
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
 
@@ -199,6 +221,9 @@ public:
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
+  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
+    return source_address_;
+  };
 
 private:
   struct ResourceManagers {
@@ -227,6 +252,7 @@ private:
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
+  const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   const bool added_via_api_;
 };
@@ -253,22 +279,23 @@ public:
    * creation since the health checker assumes that the cluster has already been fully initialized
    * so there is a cyclic dependency. However we want the cluster to own the health checker.
    */
-  void setHealthChecker(HealthCheckerPtr&& health_checker);
+  void setHealthChecker(const HealthCheckerSharedPtr& health_checker);
 
   /**
    * Optionally set the outlier detector for the primary cluster. Done for the same reason as
    * documented in setHealthChecker().
    */
-  void setOutlierDetector(Outlier::DetectorSharedPtr outlier_detector);
+  void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
 
 protected:
-  ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  bool added_via_api);
+  ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+                  const Network::Address::InstanceConstSharedPtr source_address,
+                  Runtime::Loader& runtime, Stats::Store& stats,
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
@@ -282,7 +309,7 @@ protected:
   ClusterInfoConstSharedPtr
       info_; // This cluster info stores the stats scope so it must be initialized first
              // and destroyed last.
-  HealthCheckerPtr health_checker_;
+  HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
@@ -297,7 +324,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    bool added_via_api);
+                    ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -340,8 +367,8 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                       Network::DnsResolverSharedPtr dns_resolver, Event::Dispatcher& dispatcher,
-                       bool added_via_api);
+                       Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
+                       Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
   void initialize() override {}

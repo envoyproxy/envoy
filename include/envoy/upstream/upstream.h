@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
@@ -80,11 +81,19 @@ public:
   virtual bool healthy() const PURE;
 
   /**
-   * Set the host's outlier detector. Outlier detectors are assumed to be thread safe, however
-   * a new outlier detector must be installed before the host is used across threads. Thus,
+   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
+   * a new monitor must be installed before the host is used across threads. Thus,
    * this routine should only be called on the main thread before the host is used across threads.
    */
-  virtual void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) PURE;
+  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
+
+  /**
+   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
+   * safe, however a new outlier detector monitor must be installed before the host is used across
+   * threads. Thus, this routine should only be called on the main thread before the host is used
+   * across threads.
+   */
+  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-100.
@@ -318,6 +327,13 @@ public:
    *         stats that will be freed when the cluster is removed.
    */
   virtual Stats::Scope& statsScope() const PURE;
+
+  /**
+   * Returns an optional source address for upstream connections to bind to.
+   *
+   * @return a source address to bind to or nullptr if no bind need occur.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

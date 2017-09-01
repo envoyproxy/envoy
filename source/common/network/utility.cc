@@ -149,16 +149,20 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
 Address::InstanceConstSharedPtr Utility::fromProtoAddress(const envoy::api::v2::Address& address) {
   switch (address.address_case()) {
   case envoy::api::v2::Address::kSocketAddress:
-    // TODO(htuch): Support custom resolvers #1477.
-    ASSERT(address.socket_address().resolver_name().empty());
-    ASSERT(address.socket_address().named_port().empty());
-    return parseInternetAddress(address.socket_address().address(),
-                                address.socket_address().port_value());
+    return Utility::fromProtoSocketAddress(address.socket_address());
   case envoy::api::v2::Address::kPipe:
     return Address::InstanceConstSharedPtr{new Address::PipeInstance(address.pipe().path())};
   default:
-    NOT_REACHED;
+    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
   }
+}
+
+Address::InstanceConstSharedPtr
+Utility::fromProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
+  // TODO(htuch): Support custom resolvers #1477.
+  ASSERT(socket_address.resolver_name().empty());
+  ASSERT(socket_address.named_port().empty());
+  return parseInternetAddress(socket_address.address(), socket_address.port_value());
 }
 
 void Utility::throwWithMalformedIp(const std::string& ip_address) {
@@ -232,7 +236,8 @@ bool Utility::isInternalAddress(const char* address) {
   int rc6 = inet_pton(AF_INET6, address, &addr6);
   if (rc6 == 1) {
     // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
-    // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the future.
+    // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the
+    // future.
     uint8_t* address6_bytes = reinterpret_cast<uint8_t*>(&addr6.s6_addr);
     if (address6_bytes[0] == 0xfd ||
         memcmp(address6_bytes, &in6addr_loopback, sizeof(in6addr_loopback)) == 0) {

@@ -180,9 +180,7 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  uint64_t connectionId() override { return 0; }
   const Network::Connection* connection() override { return nullptr; }
-  Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }

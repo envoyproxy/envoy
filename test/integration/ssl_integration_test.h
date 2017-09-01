@@ -34,7 +34,7 @@ public:
 
 private:
   MockRuntimeIntegrationTestServer(const std::string& config_path)
-      : IntegrationTestServer(config_path, std::string()) {}
+      : IntegrationTestServer(config_path) {}
 };
 
 class SslIntegrationTest : public BaseIntegrationTest,

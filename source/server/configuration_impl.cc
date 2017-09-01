@@ -16,7 +16,7 @@
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
-#include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -36,51 +36,62 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
-                          Instance& server,
+void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
-  cluster_manager_ = cluster_manager_factory.clusterManagerFromJson(
-      *json.getObject("cluster_manager"), bootstrap, server.stats(), server.threadLocal(),
-      server.runtime(), server.random(), server.localInfo(), server.accessLogManager());
+  cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
+      bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
+      server.localInfo(), server.accessLogManager());
 
-  std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
+  const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
-  for (size_t i = 0; i < listeners.size(); i++) {
+  for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(info, "listener #{}:", i);
-    envoy::api::v2::Listener listener;
-    Config::LdsJson::translateListener(*listeners[i], listener);
-    server.listenerManager().addOrUpdateListener(listener);
+    server.listenerManager().addOrUpdateListener(listeners[i]);
   }
 
-  if (json.hasObject("lds")) {
-    envoy::api::v2::ConfigSource lds_config;
-    Config::Utility::translateLdsConfig(*json.getObject("lds"), lds_config);
-    lds_api_.reset(new LdsApi(lds_config, *cluster_manager_, server.dispatcher(), server.random(),
-                              server.initManager(), server.localInfo(), server.stats(),
-                              server.listenerManager()));
+  if (bootstrap.dynamic_resources().has_lds_config()) {
+    lds_api_.reset(new LdsApi(bootstrap.dynamic_resources().lds_config(), *cluster_manager_,
+                              server.dispatcher(), server.random(), server.initManager(),
+                              server.localInfo(), server.stats(), server.listenerManager()));
+  }
+
+  for (const auto& stats_sink : bootstrap.stats_sinks()) {
+    // TODO(mrice32): Add support for pluggable stats sinks.
+    ASSERT(stats_sink.name() == "envoy.statsd");
+    envoy::api::v2::StatsdSink statsd_sink;
+    MessageUtil::jsonConvert(stats_sink.config(), statsd_sink);
+
+    switch (statsd_sink.statsd_specifier_case()) {
+    case envoy::api::v2::StatsdSink::kAddress: {
+      statsd_udp_ip_address_ = Network::Utility::fromProtoAddress(statsd_sink.address());
+      break;
+    }
+    case envoy::api::v2::StatsdSink::kTcpClusterName:
+      statsd_tcp_cluster_name_.value(statsd_sink.tcp_cluster_name());
+      break;
+    default:
+      NOT_REACHED;
+    }
   }
 
   stats_flush_interval_ =
-      std::chrono::milliseconds(json.getInteger("stats_flush_interval_ms", 5000));
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
 
+  const auto& watchdog = bootstrap.watchdog();
   watchdog_miss_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_miss_timeout_ms", 200));
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, miss_timeout, 200));
   watchdog_megamiss_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_megamiss_timeout_ms", 1000));
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
   watchdog_kill_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_kill_timeout_ms", 0));
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0));
   watchdog_multikill_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 0));
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
-  initializeTracers(json, server);
+  initializeTracers(bootstrap.tracing(), server);
 
-  if (json.hasObject("rate_limit_service")) {
-    Json::ObjectSharedPtr rate_limit_service_config = json.getObject("rate_limit_service");
-    std::string type = rate_limit_service_config->getString("type");
-    ASSERT(type == "grpc_service");
-    UNREFERENCED_PARAMETER(type);
-    ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
-        *rate_limit_service_config->getObject("config"), *cluster_manager_));
+  if (bootstrap.has_rate_limit_service()) {
+    ratelimit_client_factory_.reset(
+        new RateLimit::GrpcFactoryImpl(bootstrap.rate_limit_service(), *cluster_manager_));
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }
@@ -88,16 +99,10 @@ void MainImpl::initialize(const Json::Object& json, const envoy::api::v2::Bootst
   initializeStatsSinks(json, server);
 }
 
-void MainImpl::initializeTracers(const Json::Object& configuration, Instance& server) {
+void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
-  if (!configuration.hasObject("tracing")) {
-    http_tracer_.reset(new Tracing::HttpNullTracer());
-    return;
-  }
-
-  Json::ObjectSharedPtr tracing_configuration = configuration.getObject("tracing");
-  if (!tracing_configuration->hasObject("http")) {
+  if (!configuration.has_http()) {
     http_tracer_.reset(new Tracing::HttpNullTracer());
     return;
   }
@@ -108,13 +113,12 @@ void MainImpl::initializeTracers(const Json::Object& configuration, Instance& se
   }
 
   // Initialize tracing driver.
-  Json::ObjectSharedPtr http_tracer_config = tracing_configuration->getObject("http");
-  Json::ObjectSharedPtr driver = http_tracer_config->getObject("driver");
-
-  std::string type = driver->getString("type");
+  std::string type = configuration.http().name();
   ENVOY_LOG(info, "  loading tracing driver: {}", type);
 
-  Json::ObjectSharedPtr driver_config = driver->getObject("config");
+  // TODO(htuch): Make this dynamically pluggable one day.
+  Json::ObjectSharedPtr driver_config =
+      MessageUtil::getJsonObjectFromMessage(configuration.http().config());
 
   // Now see if there is a factory that will accept the config.
   HttpTracerFactory* factory = Registry::FactoryRegistry<HttpTracerFactory>::getFactory(type);
@@ -195,23 +199,22 @@ void MainImpl::initializeStatsSinks(const Json::Object& configuration, Instance&
   }
 }
 
-InitialImpl::InitialImpl(const Json::Object& json) {
-  json.validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
-  Json::ObjectSharedPtr admin = json.getObject("admin");
-  admin_.access_log_path_ = admin->getString("access_log_path");
-  admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");
-  admin_.address_ = Network::Utility::resolveUrl(admin->getString("address"));
+InitialImpl::InitialImpl(const envoy::api::v2::Bootstrap& bootstrap) {
+  const auto& admin = bootstrap.admin();
+  admin_.access_log_path_ = admin.access_log_path();
+  admin_.profile_path_ =
+      admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
+  admin_.address_ = Network::Utility::fromProtoAddress(admin.address());
 
-  if (json.hasObject("flags_path")) {
-    flags_path_.value(json.getString("flags_path"));
+  if (!bootstrap.flags_path().empty()) {
+    flags_path_.value(bootstrap.flags_path());
   }
 
-  if (json.hasObject("runtime")) {
+  if (bootstrap.has_runtime()) {
     runtime_.reset(new RuntimeImpl());
-    runtime_->symlink_root_ = json.getObject("runtime")->getString("symlink_root");
-    runtime_->subdirectory_ = json.getObject("runtime")->getString("subdirectory");
-    runtime_->override_subdirectory_ =
-        json.getObject("runtime")->getString("override_subdirectory", "");
+    runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
+    runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
+    runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();
   }
 }
 

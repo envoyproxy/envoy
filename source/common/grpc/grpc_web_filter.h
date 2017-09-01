@@ -21,7 +21,7 @@ public:
   virtual ~GrpcWebFilter(){};
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override { stream_destroyed_ = true; };
 
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
@@ -62,6 +62,7 @@ private:
   std::string grpc_service_;
   std::string grpc_method_;
   bool do_stat_tracking_{};
+  bool stream_destroyed_{};
 };
 
 } // namespace Grpc

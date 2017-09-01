@@ -34,8 +34,8 @@ public:
   NiceMock<MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
   Router::RouteConfigProviderManagerImpl route_config_provider_manager_{
-      context_.runtime(), context_.dispatcher(), context_.random(), context_.localInfo(),
-      context_.threadLocal()};
+      context_.runtime(),   context_.dispatcher(),  context_.random(),
+      context_.localInfo(), context_.threadLocal(), context_.admin()};
 };
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {

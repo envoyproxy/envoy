@@ -141,8 +141,6 @@ void TcpProxy::readDisableUpstream(bool disable) {
 void TcpProxy::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
   // The WsHandlerImpl class uses TCP Proxy code with a null config.
-  // TODO (alyssawilk) make sure that HTTP conn man tracks the same
-  // flow control stuff, so that we get these stats for WebSockets/HTTP.
   if (!config_) {
     return;
   }

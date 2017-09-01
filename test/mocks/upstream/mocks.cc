@@ -22,8 +22,8 @@ using testing::_;
 namespace Upstream {
 namespace Outlier {
 
-MockDetectorHostSink::MockDetectorHostSink() {}
-MockDetectorHostSink::~MockDetectorHostSink() {}
+MockDetectorHostMonitor::MockDetectorHostMonitor() {}
+MockDetectorHostMonitor::~MockDetectorHostMonitor() {}
 
 MockEventLogger::MockEventLogger() {}
 MockEventLogger::~MockEventLogger() {}
@@ -38,6 +38,9 @@ MockDetector::~MockDetector() {}
 
 } // namespace Outlier
 
+MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() {}
+MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() {}
+
 MockHostDescription::MockHostDescription()
     : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
   ON_CALL(*this, hostname()).WillByDefault(ReturnRef(hostname_));
@@ -45,6 +48,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
 }
 
 MockHostDescription::~MockHostDescription() {}
@@ -68,10 +72,12 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
+  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}
@@ -111,6 +117,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
+  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
 
   // Matches are LIFO so "" will match first.
   ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));

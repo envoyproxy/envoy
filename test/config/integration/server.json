@@ -149,6 +149,17 @@
               ]
             },
             {
+              "name": "redirect",
+              "domains": [ "www.namewithport.com:1234" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
               "name": "integration",
               "domains": [ "*" ],
               "routes": [
@@ -305,24 +316,6 @@
         ]
       }
     }]
-  },
-  {
-    "address": "tcp://{{ ip_loopback_address }}:0",
-    "filters": [
-      { "type": "read", "name":
-        "tcp_proxy",
-        "config": {
-          "stat_prefix": "test_tcp",
-          "route_config": {
-            "routes": [
-              {
-                "cluster": "cluster_1"
-              }
-            ]
-          }
-        }
-      }
-    ]
   },
   {
     "address": "tcp://{{ ip_loopback_address }}:0",

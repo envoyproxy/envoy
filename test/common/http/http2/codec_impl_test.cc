@@ -399,6 +399,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
   MockStreamDecoder request_decoder2;
+  // When the server stream is created it should check the status of the
+  // underlying connection.  Pretend it is overrun.
+  EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_callbacks_, newStream(_))
       .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
         response_encoder2 = &encoder;
@@ -411,13 +415,23 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // been noticed that the connection was backed up.  Any new subscriber to
   // stream callbacks should get a callback when they addCallbacks.
   MockStreamCallbacks callbacks2;
-  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark()).Times(1);
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   request_encoder_->getStream().addCallbacks(callbacks2);
+
+  // Add a third callback to make testing removal mid-watermark call below more interesting.
+  MockStreamCallbacks callbacks3;
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  request_encoder_->getStream().addCallbacks(callbacks3);
 
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
+  // and ensure it is not called.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
+    request_encoder_->getStream().removeCallbacks(callbacks2);
+  }));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_.getStream(1)->readDisable(false);
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
@@ -504,8 +518,8 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   // ends.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
-  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
     client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
     client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();

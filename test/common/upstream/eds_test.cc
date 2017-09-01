@@ -29,9 +29,11 @@ protected:
   }
 
   void resetCluster(const std::string& json_config) {
-    SdsConfig sds_config{"eds", std::chrono::milliseconds(30000)};
+    envoy::api::v2::ConfigSource eds_config;
+    eds_config.mutable_api_config_source()->add_cluster_name("eds");
+    eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
     local_info_.zone_name_ = "us-east-1a";
-    eds_cluster_ = parseSdsClusterFromJson(json_config, sds_config);
+    eds_cluster_ = parseSdsClusterFromJson(json_config, eds_config);
     cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());

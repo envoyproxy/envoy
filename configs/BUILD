@@ -12,7 +12,10 @@ load("//bazel:envoy_build_system.bzl", "envoy_py_test_binary")
 envoy_py_test_binary(
     name = "configgen",
     srcs = ["configgen.py"],
-    data = glob(["*.json"]),
+    data = glob([
+        "*.json",
+        "*.yaml",
+    ]),
     external_deps = ["jinja2"],
 )
 

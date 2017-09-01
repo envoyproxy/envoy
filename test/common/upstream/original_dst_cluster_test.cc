@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -50,8 +51,9 @@ public:
   OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
 
   void setup(const std::string& json) {
+    MockClusterManager cm;
     cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                          ssl_context_manager_, dispatcher_, false));
+                                          ssl_context_manager_, cm, dispatcher_, false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
@@ -379,7 +381,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   ASSERT_NE(host, nullptr);
   EXPECT_EQ(local_address, *host->address());
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(&local_address)))
+  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(&local_address), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   host->createConnection(dispatcher_);
 }

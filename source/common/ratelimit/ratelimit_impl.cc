@@ -78,15 +78,16 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitRes
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status) {
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
   UNREFERENCED_PARAMETER(status);
   callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)
-    : cluster_name_(config.getString("cluster_name")), cm_(cm) {
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
+                                 Upstream::ClusterManager& cm)
+    : cluster_name_(config.cluster_name()), cm_(cm) {
   if (!cm_.get(cluster_name_)) {
     throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
   }

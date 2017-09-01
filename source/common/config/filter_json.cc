@@ -125,8 +125,10 @@ void FilterJson::translateHttpConnectionManager(
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const auto status = Protobuf::util::JsonStringToMessage(
-        json_filter->getObject("config")->asJsonString(), filter->mutable_config());
+    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
+                                    json_filter->getObject("config")->asJsonString() + "}";
+
+    const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
     UNREFERENCED_PARAMETER(status);
@@ -157,7 +159,6 @@ void FilterJson::translateHttpConnectionManager(
 
   if (json_http_connection_manager.hasObject("http2_settings")) {
     ProtocolJson::translateHttp2ProtocolOptions(
-        json_http_connection_manager.getString("http_codec_options", ""),
         *json_http_connection_manager.getObject("http2_settings"),
         *http_connection_manager.mutable_http2_protocol_options());
   }

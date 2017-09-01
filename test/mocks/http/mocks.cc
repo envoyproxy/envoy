@@ -173,6 +173,8 @@ MockInstance::~MockInstance() {}
 MockRequestInfo::MockRequestInfo() {
   ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_));
   ON_CALL(*this, startTime()).WillByDefault(Return(start_time_));
+  ON_CALL(*this, requestReceivedDuration()).WillByDefault(Return(request_received_duration_));
+  ON_CALL(*this, responseReceivedDuration()).WillByDefault(Return(response_received_duration_));
 }
 
 MockRequestInfo::~MockRequestInfo() {}

@@ -77,22 +77,26 @@ public:
     http_callbacks_->onData(reply_buffer, false);
   }
 
-  void expectGrpcStatus(Status::GrpcStatus grpc_status) {
+  void expectGrpcStatus(Status::GrpcStatus grpc_status,
+                        const std::string& grpc_message = std::string()) {
     if (grpc_status != Status::GrpcStatus::Ok) {
       EXPECT_CALL(*http_stream_, reset());
     }
-    EXPECT_CALL(*this, onRemoteClose(grpc_status))
-        .WillOnce(Invoke([this](Status::GrpcStatus grpc_status) {
+    EXPECT_CALL(*this, onRemoteClose(grpc_status, grpc_message))
+        .WillOnce(Invoke([this](Status::GrpcStatus grpc_status, const std::string&) {
           if (grpc_status != Status::GrpcStatus::Ok) {
             clearStream();
           }
         }));
   }
 
-  void sendServerTrailers(Status::GrpcStatus grpc_status, TestMetadata metadata,
-                          bool trailers_only = false) {
+  void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
+                          TestMetadata metadata, bool trailers_only = false) {
     auto* reply_trailers =
         new Http::TestHeaderMapImpl{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
+    if (!grpc_message.empty()) {
+      reply_trailers->addCopy("grpc-message", grpc_message);
+    }
     if (trailers_only) {
       reply_trailers->addCopy(":status", "200");
     }
@@ -103,7 +107,7 @@ public:
     if (grpc_status == Status::GrpcStatus::Ok) {
       EXPECT_CALL(*this, onReceiveTrailingMetadata_(HeaderMapEqualRef(reply_trailers)));
     }
-    expectGrpcStatus(grpc_status);
+    expectGrpcStatus(grpc_status, grpc_message);
     if (trailers_only) {
       http_callbacks_->onHeaders(std::move(reply_trailers_ptr), true);
     } else {
@@ -265,7 +269,7 @@ TEST_F(GrpcAsyncClientImplTest, BasicStream) {
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata);
   stream->closeStream();
 }
 
@@ -285,8 +289,8 @@ TEST_F(GrpcAsyncClientImplTest, MultiStream) {
   stream_1->sendRequest();
   stream_0->sendServerInitialMetadata(empty_metadata);
   stream_0->sendReply();
-  stream_1->sendServerTrailers(Status::GrpcStatus::Unavailable, empty_metadata);
-  stream_0->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
+  stream_1->sendServerTrailers(Status::GrpcStatus::Unavailable, "", empty_metadata);
+  stream_0->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata);
   stream_0->closeStream();
 }
 
@@ -304,7 +308,7 @@ TEST_F(GrpcAsyncClientImplTest, MultiRequest) {
 TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
-  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
 }
@@ -314,7 +318,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
 TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
-  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable));
+  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, ""));
   helloworld::HelloRequest request_msg;
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           Optional<std::chrono::milliseconds>());
@@ -342,7 +346,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
         UNREFERENCED_PARAMETER(end_stream);
         http_callbacks->onReset();
       }));
-  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal, ""));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
 }
@@ -368,7 +372,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
         UNREFERENCED_PARAMETER(end_stream);
         http_callbacks->onReset();
       }));
-  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Internal));
+  EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Internal, ""));
   helloworld::HelloRequest request_msg;
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           Optional<std::chrono::milliseconds>());
@@ -394,8 +398,9 @@ TEST_F(GrpcAsyncClientImplTest, GrpcStatusFallback) {
   auto stream = createStream(empty_metadata);
   Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{
       {":status", "404"},
-      {"grpc-status", std::to_string(enumToInt(Status::GrpcStatus::PermissionDenied))}}};
-  stream->expectGrpcStatus(Status::GrpcStatus::PermissionDenied);
+      {"grpc-status", std::to_string(enumToInt(Status::GrpcStatus::PermissionDenied))},
+      {"grpc-message", "error message"}}};
+  stream->expectGrpcStatus(Status::GrpcStatus::PermissionDenied, "error message");
   stream->http_callbacks_->onHeaders(std::move(reply_headers), true);
 }
 
@@ -403,7 +408,7 @@ TEST_F(GrpcAsyncClientImplTest, GrpcStatusFallback) {
 TEST_F(GrpcAsyncClientImplTest, HttpReset) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  EXPECT_CALL(*stream, onRemoteClose(Status::GrpcStatus::Internal));
+  EXPECT_CALL(*stream, onRemoteClose(Status::GrpcStatus::Internal, ""));
   stream->http_callbacks_->onReset();
   stream->clearStream();
 }
@@ -513,7 +518,7 @@ TEST_F(GrpcAsyncClientImplTest, ServerTrailingMetadata) {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, trailing_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", trailing_metadata);
   expectResetOn(stream.get());
 }
 
@@ -521,7 +526,7 @@ TEST_F(GrpcAsyncClientImplTest, ServerTrailingMetadata) {
 TEST_F(GrpcAsyncClientImplTest, StreamTrailersOnly) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata, true);
   stream->closeStream();
 }
 
@@ -532,7 +537,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
   auto request = createRequest(empty_metadata);
   Http::HeaderMapPtr reply_headers{
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
-  EXPECT_CALL(*request, onFailure(Status::Internal));
+  EXPECT_CALL(*request, onFailure(Status::Internal, ""));
   EXPECT_CALL(*request->http_stream_, reset());
   request->http_callbacks_->onTrailers(std::move(reply_headers));
 }
@@ -543,7 +548,8 @@ TEST_F(GrpcAsyncClientImplTest, ResourceExhaustedError) {
   auto stream = createStream(empty_metadata);
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted, empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted, "error message",
+                             empty_metadata);
 }
 
 // Validate that we can continue to receive after a local close.
@@ -554,7 +560,7 @@ TEST_F(GrpcAsyncClientImplTest, ReceiveAfterLocalClose) {
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
   EXPECT_CALL(*stream->http_stream_, reset());
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata);
 }
 
 // Validate that we can continue to send after a remote close.
@@ -563,7 +569,7 @@ TEST_F(GrpcAsyncClientImplTest, SendAfterRemoteClose) {
   auto stream = createStream(empty_metadata);
   stream->sendServerInitialMetadata(empty_metadata);
   stream->sendReply();
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata);
   stream->sendRequest();
   stream->closeStream();
 }
@@ -583,7 +589,7 @@ TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseLocal) {
 TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseRemote) {
   TestMetadata empty_metadata;
   auto stream = createStream(empty_metadata);
-  stream->sendServerTrailers(Status::GrpcStatus::Ok, empty_metadata, true);
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata, true);
   EXPECT_CALL(*stream->http_stream_, reset());
   stream->grpc_stream_->resetStream();
   stream->clearStream();

@@ -75,18 +75,6 @@ SpanContext::SpanContext(const Span& span) {
   id_ = span.id();
   parent_id_ = span.isSetParentId() ? span.parentId() : 0;
 
-  for (const Annotation& annotation : span.annotations()) {
-    if (annotation.value() == ZipkinCoreConstants::get().CLIENT_RECV) {
-      annotation_values_.cr_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
-      annotation_values_.cs_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
-      annotation_values_.sr_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_SEND) {
-      annotation_values_.ss_ = true;
-    }
-  }
-
   is_initialized_ = true;
 }
 
@@ -99,19 +87,6 @@ const std::string SpanContext::serializeToString() {
   result = traceIdAsHexString() + fieldSeparator() + idAsHexString() + fieldSeparator() +
            parentIdAsHexString();
 
-  if (annotation_values_.cr_) {
-    result += fieldSeparator() + ZipkinCoreConstants::get().CLIENT_RECV;
-  }
-  if (annotation_values_.cs_) {
-    result += fieldSeparator() + ZipkinCoreConstants::get().CLIENT_SEND;
-  }
-  if (annotation_values_.sr_) {
-    result += fieldSeparator() + ZipkinCoreConstants::get().SERVER_RECV;
-  }
-  if (annotation_values_.ss_) {
-    result += fieldSeparator() + ZipkinCoreConstants::get().SERVER_SEND;
-  }
-
   return result;
 }
 
@@ -119,31 +94,12 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
   std::smatch match;
 
   trace_id_ = parent_id_ = id_ = 0;
-  annotation_values_.cs_ = annotation_values_.cr_ = annotation_values_.ss_ =
-      annotation_values_.sr_ = false;
 
   if (std::regex_search(span_context_str, match, spanContextRegex())) {
     // This is a valid string encoding of the context
     trace_id_ = std::stoull(match.str(1), nullptr, 16);
     id_ = std::stoull(match.str(2), nullptr, 16);
     parent_id_ = std::stoull(match.str(3), nullptr, 16);
-
-    std::string matched_annotations = match.str(4);
-    if (matched_annotations.size() > 0) {
-      std::vector<std::string> annotation_value_strings =
-          StringUtil::split(matched_annotations, fieldSeparator());
-      for (const std::string& annotation_value : annotation_value_strings) {
-        if (annotation_value == ZipkinCoreConstants::get().CLIENT_RECV) {
-          annotation_values_.cr_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::get().CLIENT_SEND) {
-          annotation_values_.cs_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::get().SERVER_RECV) {
-          annotation_values_.sr_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::get().SERVER_SEND) {
-          annotation_values_.ss_ = true;
-        }
-      }
-    }
 
     is_initialized_ = true;
   } else {

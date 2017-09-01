@@ -47,29 +47,26 @@ protected:
                        const std::vector<std::string>& grpc_response_messages,
                        const Status& grpc_status, Http::HeaderMap&& response_headers,
                        const std::string& response_body) {
-    IntegrationCodecClientPtr codec_client;
-    FakeHttpConnectionPtr fake_upstream_connection;
-    IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-    FakeStreamPtr request_stream;
+    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
 
-    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+    codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
 
     if (!request_body.empty()) {
-      Http::StreamEncoder& encoder = codec_client->startRequest(request_headers, *response);
+      request_encoder_ = &codec_client_->startRequest(request_headers, *response_);
       Buffer::OwnedImpl body(request_body);
-      codec_client->sendData(encoder, body, true);
+      codec_client_->sendData(*request_encoder_, body, true);
     } else {
-      codec_client->makeHeaderOnlyRequest(request_headers, *response);
+      codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
     }
 
-    fake_upstream_connection = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    request_stream = fake_upstream_connection->waitForNewStream();
+    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    upstream_request_ = fake_upstream_connection_->waitForNewStream();
     if (!grpc_request_messages.empty()) {
-      request_stream->waitForEndStream(*dispatcher_);
+      upstream_request_->waitForEndStream(*dispatcher_);
 
       Grpc::Decoder grpc_decoder;
       std::vector<Grpc::Frame> frames;
-      EXPECT_TRUE(grpc_decoder.decode(request_stream->body(), frames));
+      EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames));
       EXPECT_EQ(grpc_request_messages.size(), frames.size());
 
       for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
@@ -90,41 +87,41 @@ protected:
       if (grpc_response_messages.empty()) {
         response_headers.insertGrpcStatus().value(grpc_status.error_code());
         response_headers.insertGrpcMessage().value(grpc_status.error_message());
-        request_stream->encodeHeaders(response_headers, true);
+        upstream_request_->encodeHeaders(response_headers, true);
       } else {
-        request_stream->encodeHeaders(response_headers, false);
+        upstream_request_->encodeHeaders(response_headers, false);
         for (const auto& response_message_str : grpc_response_messages) {
           ResponseType response_message;
           EXPECT_TRUE(TextFormat::ParseFromString(response_message_str, &response_message));
           auto buffer = Grpc::Common::serializeBody(response_message);
-          request_stream->encodeData(*buffer, false);
+          upstream_request_->encodeData(*buffer, false);
         }
         Http::TestHeaderMapImpl response_trailers;
         response_trailers.insertGrpcStatus().value(grpc_status.error_code());
         response_trailers.insertGrpcMessage().value(grpc_status.error_message());
-        request_stream->encodeTrailers(response_trailers);
+        upstream_request_->encodeTrailers(response_trailers);
       }
-      EXPECT_TRUE(request_stream->complete());
+      EXPECT_TRUE(upstream_request_->complete());
     } else {
-      request_stream->waitForReset();
+      upstream_request_->waitForReset();
     }
 
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
+    response_->waitForEndStream();
+    EXPECT_TRUE(response_->complete());
     response_headers.iterate(
         [](const Http::HeaderEntry& entry, void* context) -> void {
           IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
           Http::LowerCaseString lower_key{entry.key().c_str()};
           EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
         },
-        response.get());
+        response_.get());
     if (!response_body.empty()) {
-      EXPECT_EQ(response_body, response->body());
+      EXPECT_EQ(response_body, response_->body());
     }
 
-    codec_client->close();
-    fake_upstream_connection->close();
-    fake_upstream_connection->waitForDisconnect();
+    codec_client_->close();
+    fake_upstream_connection_->close();
+    fake_upstream_connection_->waitForDisconnect();
   }
 };
 

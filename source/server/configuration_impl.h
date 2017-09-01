@@ -29,20 +29,6 @@ namespace Server {
 namespace Configuration {
 
 /**
- * DEPRECATED - Implemented by each network filter and registered via
- * registerNetworkFilterConfigFactory() or the convenience class RegisterNetworkFilterConfigFactory.
- */
-class NetworkFilterConfigFactory {
-public:
-  virtual ~NetworkFilterConfigFactory() {}
-
-  virtual NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type,
-                                                        const std::string& name,
-                                                        const Json::Object& config,
-                                                        Instance& server) PURE;
-};
-
-/**
  * Implemented by each HttpTracer and registered via Registry::registerFactory() or
  * the convenience class RegisterFactory.
  */
@@ -115,32 +101,15 @@ public:
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * DEPRECATED - Register an NetworkFilterConfigFactory implementation as an option to create
-   * instances of NetworkFilterFactoryCb.
-   * @param factory the NetworkFilterConfigFactory implementation
-   */
-  static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
-    filterConfigFactories_().push_back(&factory);
-  }
-
-  /**
-   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
-   */
-  static const std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
-    return filterConfigFactories_();
-  }
-
-  /**
    * Initialize the configuration. This happens here vs. the constructor because the initialization
    * will call through the server into the config to get the cluster manager so the config object
    * must be created already.
-   * @param json supplies the configuration JSON.
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const Json::Object& json, const envoy::api::v2::Bootstrap& bootstrap,
-                  Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory);
+  void initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
+                  Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
@@ -161,18 +130,9 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const Json::Object& tracing_configuration, Instance& server);
+  void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
 
   void initializeStatsSinks(const Json::Object& configuration, Instance& server);
-
-  /**
-   * DEPRECATED - Returns a list of the currently registered NetworkConfigFactories.
-   */
-  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories_() {
-    static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
-        new std::list<NetworkFilterConfigFactory*>;
-    return *filter_config_factories;
-  }
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<LdsApi> lds_api_;
@@ -187,27 +147,11 @@ private:
 };
 
 /**
- * DEPRECATED - @see NetworkFilterConfigFactory.  An instantiation of this class registers a
- * NetworkFilterConfigFactory implementation (T) so it can be used to create instances of
- * NetworkFilterFactoryCb.
- */
-template <class T> class RegisterNetworkFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterNetworkFilterConfigFactory() {
-    static T* instance = new T;
-    MainImpl::registerNetworkFilterConfigFactory(*instance);
-  }
-};
-
-/**
  * Initial configuration that reads from JSON.
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const Json::Object& json);
+  InitialImpl(const envoy::api::v2::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }

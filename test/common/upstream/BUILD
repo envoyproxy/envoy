@@ -30,6 +30,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -138,6 +139,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -155,6 +157,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )

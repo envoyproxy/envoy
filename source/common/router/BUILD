@@ -60,10 +60,12 @@ envoy_cc_library(
         ":config_lib",
         ":rds_subscription_lib",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/http:codes_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
@@ -71,6 +73,7 @@ envoy_cc_library(
         "//source/common/config:rds_json_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

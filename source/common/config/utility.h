@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -69,12 +70,12 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
-   * @param sds_config source v1 SdsConfig.
+   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::ConfigSource.
+   * @param json_config source v1 SDS JSON config.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
    */
-  static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
-                                   envoy::api::v2::ConfigSource& eds_config);
+  static void translateEdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& eds_config);
 
   /**
    * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.

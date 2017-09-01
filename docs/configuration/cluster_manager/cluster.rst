@@ -18,7 +18,6 @@ Cluster
     "circuit_breakers": "{...}",
     "ssl_context": "{...}",
     "features": "...",
-    "http_codec_options": "...",
     "http2_settings": "{...}",
     "cleanup_interval_ms": "...",
     "dns_refresh_rate_ms": "...",
@@ -135,15 +134,6 @@ features
     HTTP connection pool connections. Currently, Envoy only supports prior knowledge for upstream
     connections. Even if TLS is used with ALPN, *http2* must be specified. As an aside this allows
     HTTP/2 connections to happen over plain text.
-
-.. _config_cluster_manager_cluster_http_codec_options:
-
-http_codec_options
-  *(optional, string)* Additional options that are passed directly to the codec when initiating
-  HTTP connection pool connections. These are the same options supported in the HTTP connection
-  manager :ref:`http_codec_options <config_http_conn_man_http_codec_options>` option. When building
-  an HTTP/2 mesh, if it's desired to disable HTTP/2 header compression the *no_compression*
-  option should be specified both here as well as in the HTTP connection manager.
 
 .. _config_cluster_manager_cluster_http2_settings:
 
