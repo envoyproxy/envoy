@@ -11,24 +11,26 @@
 namespace Envoy {
 namespace Config {
 
-namespace {
+const std::string Utility::REST_LEGACY = "REST_LEGACY";
+const std::string Utility::REST = "REST";
+const std::string Utility::GRPC = "GRPC";
 
-void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                              const std::string& api_type,
-                              envoy::api::v2::ApiConfigSource& api_config_source) {
-  if (api_type == "REST_LEGACY") {
+void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                                       const std::string& api_type,
+                                       envoy::api::v2::ApiConfigSource& api_config_source) {
+  // TODO(junr03): document the option to chose an api type once we have created
+  // stronger constraints around v2.
+  if (api_type == REST_LEGACY) {
     api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
-  } else if (api_type == "REST") {
+  } else if (api_type == REST) {
     api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::REST);
-  } else if (api_type == "GRPC") {
+  } else if (api_type == GRPC) {
     api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   }
   api_config_source.add_cluster_name(cluster);
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
-
-} // namespace
 
 void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
                            Upstream::ClusterManager& cm) {
@@ -70,7 +72,7 @@ void Utility::translateEdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::ConfigSource& eds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", "REST_LEGACY"),
+                           json_config.getString("api_type", REST_LEGACY),
                            *eds_config.mutable_api_config_source());
 }
 
@@ -78,7 +80,7 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::ConfigSource& cds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", "REST_LEGACY"),
+                           json_config.getString("api_type", REST_LEGACY),
                            *cds_config.mutable_api_config_source());
 }
 
@@ -86,7 +88,7 @@ void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::f
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", "REST_LEGACY"),
+                           json_rds.getString("api_type", REST_LEGACY),
                            *rds.mutable_config_source()->mutable_api_config_source());
   JSON_UTIL_SET_STRING(json_rds, rds, route_config_name);
 }
@@ -94,10 +96,9 @@ void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::f
 void Utility::translateLdsConfig(const Json::Object& json_lds,
                                  envoy::api::v2::ConfigSource& lds_config) {
   json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
-  translateApiConfigSource(json_lds.getString("cluster"),
-                           json_lds.getInteger("refresh_delay_ms", 30000),
-                           json_lds.getString("api_type", "REST_LEGACY"),
-                           *lds_config.mutable_api_config_source());
+  translateApiConfigSource(
+      json_lds.getString("cluster"), json_lds.getInteger("refresh_delay_ms", 30000),
+      json_lds.getString("api_type", REST_LEGACY), *lds_config.mutable_api_config_source());
 }
 
 } // namespace Config
