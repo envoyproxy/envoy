@@ -46,3 +46,14 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "request_info_impl_test",
+    srcs = ["request_info_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:protocol_interface",
+        "//include/envoy/upstream:host_description_interface",
+        "//source/common/http/access_log:request_info_lib",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
