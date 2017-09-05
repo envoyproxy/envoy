@@ -36,7 +36,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
@@ -50,6 +49,7 @@ using testing::Sequence;
 using testing::Test;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfig {

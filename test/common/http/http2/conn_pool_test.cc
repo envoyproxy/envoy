@@ -17,7 +17,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -27,6 +26,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
