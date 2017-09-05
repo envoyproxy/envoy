@@ -28,7 +28,7 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(std::string version_info, const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:

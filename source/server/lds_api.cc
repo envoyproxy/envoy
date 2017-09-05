@@ -32,8 +32,10 @@ void LdsApi::initialize(std::function<void()> callback) {
   subscription_->start({}, *this);
 }
 
-void LdsApi::onConfigUpdate(const ResourceVector& resources) {
+void LdsApi::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   // We need to keep track of which listeners we might need to remove.
+  // TODO(dhochman): use version_info
+  UNREFERENCED_PARAMETER(version_info);
   std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);

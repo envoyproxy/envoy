@@ -36,8 +36,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
 }
 
-void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
+void CdsApiImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   // We need to keep track of which clusters we might need to remove.
+  // TODO(dhochman): store version info
+  UNREFERENCED_PARAMETER(version_info);
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();

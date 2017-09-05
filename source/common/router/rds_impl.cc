@@ -92,7 +92,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources) {
+void RdsRouteConfigProviderImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
   }
@@ -102,6 +102,8 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
+  // TODO(dhochman): push logic up a level as version info
+  UNREFERENCED_PARAMETER(version_info);
   const uint64_t new_hash = MessageUtil::hash(route_config);
   if (new_hash != last_config_hash_ || !initialized_) {
     ConfigConstSharedPtr new_config(new ConfigImpl(route_config, runtime_, cm_, false));

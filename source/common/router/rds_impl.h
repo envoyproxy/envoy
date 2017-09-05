@@ -101,7 +101,7 @@ public:
   const std::string& clusterName() const override { return cluster_name_; }
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(std::string version_info, const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:

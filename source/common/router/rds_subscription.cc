@@ -46,7 +46,10 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> resources;
   Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
   resources[0].set_name(route_config_name_);
-  callbacks_->onConfigUpdate(resources);
+  // TODO(dhochman): hash it
+  // const uint64_t new_hash = MessageUtil::hash(route_config);
+  std::string hash = "foo";
+  callbacks_->onConfigUpdate(hash, resources);
   stats_.update_success_.inc();
 }
 

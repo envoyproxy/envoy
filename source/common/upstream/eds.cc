@@ -39,7 +39,9 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 
 void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
+  // TODO(dhochman): use version_info
+  UNREFERENCED_PARAMETER(version_info);
   std::vector<HostSharedPtr> new_hosts;
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
