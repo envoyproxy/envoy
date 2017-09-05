@@ -57,7 +57,7 @@ TEST_F(EdsTest, OnWrongNameConfigUpdate) {
   cluster_load_assignment->set_cluster_name("wrong name");
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
-  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  EXPECT_THROW(cluster_->onConfigUpdate("version", resources), EnvoyException);
   cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
 }
@@ -68,7 +68,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   // Too few.
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
-  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  EXPECT_THROW(cluster_->onConfigUpdate("version", resources), EnvoyException);
   cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
   // Too many.
@@ -78,7 +78,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   cluster_load_assignment->set_cluster_name("fare");
   cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
-  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  EXPECT_THROW(cluster_->onConfigUpdate("version", resources), EnvoyException);
   cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
 }
@@ -90,7 +90,7 @@ TEST_F(EdsTest, OnSuccessConfigUpdate) {
   cluster_load_assignment->set_cluster_name("fare");
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_NO_THROW(cluster_->onConfigUpdate("version", resources));
   EXPECT_TRUE(initialized);
 }
 
@@ -109,7 +109,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   cluster_load_assignment->set_cluster_name("name");
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_NO_THROW(cluster_->onConfigUpdate("version", resources));
   EXPECT_TRUE(initialized);
 }
 

@@ -64,5 +64,10 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_name(0));
 }
 
+TEST(UtilityTest, ComputeHashedVersion) {
+  EXPECT_EQ("hash_966733478336241915", Utility::computeHashedVersion("{}"));
+  EXPECT_EQ("hash_9631199822919835226", Utility::computeHashedVersion("foo"));
+}
+
 } // namespace Config
 } // namespace Envoy

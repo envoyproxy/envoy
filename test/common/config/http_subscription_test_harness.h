@@ -107,7 +107,7 @@ public:
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body().reset(new Buffer::OwnedImpl(response_json));
     EXPECT_CALL(callbacks_,
-                onConfigUpdate(RepeatedProtoEq(
+                onConfigUpdate(version, RepeatedProtoEq(
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
                         response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
