@@ -139,6 +139,8 @@ private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
 
+  int npnListCallback(const uint8_t** out, unsigned int* outlen);
+
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
 };
