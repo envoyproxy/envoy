@@ -42,7 +42,7 @@ enabled
   *(optional, boolean)* Defaults to false.
 
 allow_origin
-  *(required, string)* The content for the access-control-allow-origin header.
+  *(optional, string)* The content for the access-control-allow-origin header.
 
 allow_methods
   *(optional, string)* The content for the access-control-allow-methods header.

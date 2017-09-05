@@ -589,7 +589,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
           "allow_credentials" : {"type" : "boolean"},
           "enabled" : {"type" : "boolean"}
         },
-        "required" : ["allow_origin"],
+        "required" : [],
         "additionalProperties" : false
       }
     },
@@ -720,7 +720,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
           "allow_credentials" : {"type" : "boolean"},
           "enabled" : {"type" : "boolean"}
         },
-        "required" : ["allow_origin"],
+        "required" : [],
         "additionalProperties" : false
       }
     },

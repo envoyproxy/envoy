@@ -2086,7 +2086,8 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
           "prefix": "/api",
           "cluster": "ats",
           "cors" : {
-              "enabled": "true"
+              "enabled": "true",
+              "allow_credentials": "true"
           }
         }
       ]
