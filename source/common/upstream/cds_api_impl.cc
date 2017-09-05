@@ -38,20 +38,18 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
 
 void CdsApiImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   // We need to keep track of which clusters we might need to remove.
-  // TODO(dhochman): store version info
-  UNREFERENCED_PARAMETER(version_info);
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
     if (cm_.addOrUpdatePrimaryCluster(cluster)) {
-      ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster_name);
+      ENVOY_LOG(info, "cds: add/update cluster '{}' based on version '{}'", cluster_name, version_info);
     }
   }
 
   for (auto cluster : clusters_to_remove) {
     if (cm_.removePrimaryCluster(cluster.first)) {
-      ENVOY_LOG(info, "cds: remove cluster '{}'", cluster.first);
+      ENVOY_LOG(info, "cds: remove cluster '{}' based on version '{}'", cluster.first, version_info);
     }
   }
 

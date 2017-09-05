@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
+#include "common/protobuf/utility.h"
 
 #include "api/filter/http_connection_manager.pb.h"
 

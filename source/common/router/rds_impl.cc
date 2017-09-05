@@ -102,16 +102,13 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(std::string version_info, const 
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
-  // TODO(dhochman): push logic up a level as version info
-  UNREFERENCED_PARAMETER(version_info);
-  const uint64_t new_hash = MessageUtil::hash(route_config);
-  if (new_hash != last_config_hash_ || !initialized_) {
+  if (version_info != last_version_info_ || !initialized_) {
     ConfigConstSharedPtr new_config(new ConfigImpl(route_config, runtime_, cm_, false));
     initialized_ = true;
-    last_config_hash_ = new_hash;
+    last_version_info_ = version_info;
     stats_.config_reload_.inc();
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              new_hash);
+    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} version_info={}", route_config_name_,
+              version_info);
     tls_->runOnAllThreads(
         [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
     route_config_proto_ = route_config;

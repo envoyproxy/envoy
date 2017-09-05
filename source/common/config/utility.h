@@ -48,6 +48,13 @@ public:
   }
 
   /**
+   * Legacy configuration uses JSON and does not have an explicit version. Hash the body and append a user-friendly prefix
+   */
+  static std::string computeHashedVersion(std::string input) {
+    return "hash_" + std::to_string(std::hash<std::string>{}(input));
+  }
+
+  /**
    * Extract refresh_delay as a std::chrono::milliseconds from envoy::api::v2::ApiConfigSource.
    */
   static std::chrono::milliseconds

@@ -128,7 +128,7 @@ private:
   std::string cluster_name_;
   const std::string route_config_name_;
   bool initialized_{};
-  uint64_t last_config_hash_{};
+  std::string last_version_info_{};
   Stats::ScopePtr scope_;
   RdsStats stats_;
   std::function<void()> initialize_callback_;

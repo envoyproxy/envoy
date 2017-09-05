@@ -34,8 +34,6 @@ void LdsApi::initialize(std::function<void()> callback) {
 
 void LdsApi::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   // We need to keep track of which listeners we might need to remove.
-  // TODO(dhochman): use version_info
-  UNREFERENCED_PARAMETER(version_info);
   std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
@@ -45,15 +43,15 @@ void LdsApi::onConfigUpdate(std::string version_info, const ResourceVector& reso
     const std::string listener_name = listener.name();
     listeners_to_remove.erase(listener_name);
     if (listener_manager_.addOrUpdateListener(listener)) {
-      ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
+      ENVOY_LOG(info, "lds: add/update listener '{}' based on version '{}'", listener_name, version_info);
     } else {
-      ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
+      ENVOY_LOG(debug, "lds: add/update listener '{}' skipped based on version '{}'", listener_name, version_info);
     }
   }
 
   for (const auto& listener : listeners_to_remove) {
     if (listener_manager_.removeListener(listener.first)) {
-      ENVOY_LOG(info, "lds: remove listener '{}'", listener.first);
+      ENVOY_LOG(info, "lds: remove listener '{}' based on version '{}'", listener.first, version_info);
     }
   }
 
