@@ -31,6 +31,11 @@ TEST(UtilityTest, GetTypedResources) {
   EXPECT_EQ("1", typed_resources[1].cluster_name());
 }
 
+TEST(UtilityTest, ComputeHashedVersion) {
+  EXPECT_EQ("hash_966733478336241915", Utility::computeHashedVersion("{}"));
+  EXPECT_EQ("hash_9631199822919835226", Utility::computeHashedVersion("foo"));
+}
+
 TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   envoy::api::v2::ApiConfigSource api_config_source;
   api_config_source.mutable_refresh_delay()->CopyFrom(
