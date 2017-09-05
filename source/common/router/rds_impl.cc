@@ -92,7 +92,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
+void RdsRouteConfigProviderImpl::onConfigUpdate(const std::string& version_info, const ResourceVector& resources) {
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected RDS resource length from version '{}': {}", version_info, resources.size()));
   }

@@ -50,7 +50,7 @@ public:
   /**
    * Legacy configuration uses JSON and does not have an explicit version. Hash the body and append a user-friendly prefix
    */
-  static std::string computeHashedVersion(std::string input) {
+  static std::string computeHashedVersion(const std::string& input) {
     return "hash_" + std::to_string(std::hash<std::string>{}(input));
   }
 
