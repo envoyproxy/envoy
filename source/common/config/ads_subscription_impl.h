@@ -6,8 +6,9 @@
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
-#include "api/ads.pb.h"
+#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -44,21 +45,20 @@ public:
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     std::transform(resources.cbegin(), resources.cend(),
                    Protobuf::RepeatedPtrFieldBackInserter(&typed_resources),
-                   [](const ProtobufWkt::Any& resource) {
-                     ResourceType typed_resource;
-                     resource.UnpackTo(&typed_resource);
-                     return typed_resource;
-                   });
+                   MessageUtil::anyConvert<ResourceType>);
     callbacks_->onConfigUpdate(typed_resources);
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
-    ENVOY_LOG(debug, "ADS config for {} accepted", type_url_);
+    ENVOY_LOG(debug, "ADS config for {} accepted with {} resources", type_url_, resources.size());
+    for (const auto resource : typed_resources) {
+      ENVOY_LOG(debug, "- {}", resource.DebugString());
+    }
   }
 
   void onConfigUpdateFailed(const EnvoyException* e) override {
     stats_.update_rejected_.inc();
     stats_.update_attempt_.inc();
-    ENVOY_LOG(warn, "ADS config for {} rejected: {}", type_url_, e->what());
+    ENVOY_LOG(warn, "ADS config for {} rejected: {}", type_url_, e == nullptr ? "" : e->what());
     callbacks_->onConfigUpdateFailed(e);
   }
 

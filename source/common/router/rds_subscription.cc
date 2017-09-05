@@ -16,9 +16,10 @@ RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
-    : RestApiFetcher(
-          cm, rds.config_source().api_config_source().cluster_name()[0], dispatcher, random,
-          Config::Utility::apiConfigSourceRefreshDelay(rds.config_source().api_config_source())),
+    : RestApiFetcher(cm, rds.config_source().api_config_source().cluster_name()[0], dispatcher,
+                     random,
+                     Envoy::Config::Utility::apiConfigSourceRefreshDelay(
+                         rds.config_source().api_config_source())),
       local_info_(local_info), stats_(stats) {
   const auto& api_config_source = rds.config_source().api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);

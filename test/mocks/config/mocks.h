@@ -37,6 +37,7 @@ public:
   MockAdsApi();
   virtual ~MockAdsApi();
 
+  MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
                AdsWatch*(const std::string& type_url, const std::vector<std::string>& resources,
                          AdsCallbacks& callbacks));

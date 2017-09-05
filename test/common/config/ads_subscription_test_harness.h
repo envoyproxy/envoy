@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/config/ads_subscription_impl.h"
+#include "common/config/resources.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -39,7 +40,7 @@ public:
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(ads_api_, subscribe_("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+    EXPECT_CALL(ads_api_, subscribe_(Config::TypeUrl::get().ClusterLoadAssignment,
                                      ElementsAreArray(cluster_names), _))
         .WillOnce(Return(resetAdsWatch()));
     subscription_->start(cluster_names, callbacks_);
@@ -72,7 +73,7 @@ public:
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
     EXPECT_CALL(*ads_watch_, cancel());
-    EXPECT_CALL(ads_api_, subscribe_("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+    EXPECT_CALL(ads_api_, subscribe_(Config::TypeUrl::get().ClusterLoadAssignment,
                                      ElementsAreArray(cluster_names), _))
         .WillOnce(Return(resetAdsWatch()));
     subscription_->updateResources(cluster_names);

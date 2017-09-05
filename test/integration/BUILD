@@ -12,6 +12,25 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "ads_integration_test",
+    srcs = ["ads_integration_test.cc"],
+    data = ["//test/config/integration:server_ads.yaml"],
+    external_deps = [
+        "envoy_cds",
+        "envoy_discovery",
+        "envoy_eds",
+        "envoy_lds",
+        "envoy_rds",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "proto_integration_test",
     srcs = ["proto_integration_test.cc"],
     deps = [
@@ -130,6 +149,7 @@ envoy_cc_test_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:status",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
@@ -139,9 +159,12 @@ envoy_cc_test_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:api_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

@@ -98,10 +98,10 @@ void FakeStream::waitForHeadersComplete() {
 
 void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length) {
   std::unique_lock<std::mutex> lock(lock_);
-  while (bodyLength() != body_length) {
+  while (bodyLength() < body_length) {
     decoder_event_.wait_until(lock,
                               std::chrono::system_clock::now() + std::chrono::milliseconds(5));
-    if (bodyLength() != body_length) {
+    if (bodyLength() < body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -125,6 +125,15 @@ void FakeStream::waitForReset() {
   while (!saw_reset_) {
     decoder_event_.wait(lock);
   }
+}
+
+void FakeStream::startGrpcStream() {
+  encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+}
+
+void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
+  encodeTrailers(
+      Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
 FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper,

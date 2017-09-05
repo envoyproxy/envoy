@@ -109,7 +109,7 @@ public:
   void create(const envoy::api::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_));
   }
 
   NiceMock<TestClusterManagerFactory> factory_;

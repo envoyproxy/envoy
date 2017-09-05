@@ -100,5 +100,23 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
                            *lds_config.mutable_api_config_source());
 }
 
+std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.Listener")) {
+    return anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.RouteConfiguration")) {
+    return anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.Cluster")) {
+    return anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.ClusterLoadAssignment")) {
+    return anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  ASSERT(false);
+  // TODO(htuch): this is a protocol error.
+  return "unknown_name";
+}
+
 } // namespace Config
 } // namespace Envoy

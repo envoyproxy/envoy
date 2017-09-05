@@ -68,6 +68,18 @@ public:
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
   /**
+   * Convert from google.protobuf.Any to a typed message.
+   * @param message source google.protobuf.Any message.
+   * @return MessageType the typed message inside the Any.
+   */
+  template <class MessageType>
+  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+    MessageType typed_message;
+    message.UnpackTo(&typed_message);
+    return typed_message;
+  };
+
+  /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
    * messages to/from google.protobuf.Struct.
    * TODO(htuch): Avoid round-tripping via JSON strings by doing whatever
