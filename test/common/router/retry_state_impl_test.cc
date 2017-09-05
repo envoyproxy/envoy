@@ -67,11 +67,12 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_TRUE(state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
-  EXPECT_FALSE(state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {
@@ -230,7 +231,7 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  EXPECT_FALSE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_overflow_.value());
 }
 
@@ -243,21 +244,21 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
   EXPECT_CALL(*retry_timer_, enableTimer(_));
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
   EXPECT_CALL(*retry_timer_, enableTimer(_));
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
-  EXPECT_FALSE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_success_.value());
@@ -273,24 +274,24 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_CALL(random_, random()).WillOnce(Return(49));
   retry_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(24)));
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(149));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(74)));
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(349));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(174)));
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_FALSE(state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
@@ -304,7 +305,7 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
-  EXPECT_TRUE(state_->shouldRetry(nullptr, connect_failure_, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, connect_failure_, callback_));
 }
 
 } // namespace Router

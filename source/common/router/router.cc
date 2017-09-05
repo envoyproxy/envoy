@@ -463,14 +463,19 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     upstream_request_->upstream_host_->healthChecker().setUnhealthy();
   }
 
-  if (retry_state_ &&
-      retry_state_->shouldRetry(headers.get(), Optional<Http::StreamResetReason>(),
-                                [this]() -> void { doRetry(); }) &&
-      setupRetry(end_stream)) {
-    Http::CodeUtility::chargeBasicResponseStat(
-        cluster_->statsScope(), "retry.",
-        static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
-    return;
+  if (retry_state_) {
+    RetryStatus retry_status = retry_state_->shouldRetry(
+        headers.get(), Optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
+    if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
+      Http::CodeUtility::chargeBasicResponseStat(
+          cluster_->statsScope(), "retry.",
+          static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
+      return;
+    } else if (retry_status == RetryStatus::NoOverflow) {
+      callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
+    }
+
+    retry_state_.reset();
   } else {
     // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
     // false.
