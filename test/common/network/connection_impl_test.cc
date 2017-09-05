@@ -531,7 +531,6 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   client_connection_->addConnectionCallbacks(client_callbacks_);
   EXPECT_CALL(connection_stats.bind_errors_, inc());
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
-
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
