@@ -524,19 +524,44 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
       dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
 
+  int expected_callbacks = 2;
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+
+        expected_callbacks--;
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));
+
   client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
   client_connection_->addConnectionCallbacks(client_callbacks_);
   EXPECT_CALL(connection_stats.bind_errors_, inc());
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        expected_callbacks--;
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));;
 
   // Make sure write event gets activated or else the callbacks may never happen.
+  client_connection_->connect();
   Buffer::OwnedImpl buffer("data");
   client_connection_->write(buffer);
 
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {
