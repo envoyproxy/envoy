@@ -21,6 +21,7 @@ public:
    *         each request flow.
    */
   virtual Router::ConfigConstSharedPtr config() PURE;
+
 };
 
 /**
@@ -45,6 +46,11 @@ public:
    * requests to.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return const std::string& version info from last accepted RDS config.
+   */
+  virtual const std::string& versionInfo() const PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;

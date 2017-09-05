@@ -99,10 +99,12 @@ public:
   }
   const std::string& routeConfigName() const override { return route_config_name_; }
   const std::string& clusterName() const override { return cluster_name_; }
+  const std::string& versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
+
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
