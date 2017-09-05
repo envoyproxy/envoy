@@ -11,11 +11,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,

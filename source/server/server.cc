@@ -24,7 +24,6 @@
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
-#include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -132,7 +131,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
+  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
@@ -228,7 +227,9 @@ void InstanceImpl::initialize(Options& options,
     ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
-  initializeStatSinks();
+  for (Stats::SinkPtr& sink : main_config->statsSinks()) {
+    stats_store_.addSink(*sink);
+  }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
@@ -265,23 +266,6 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random())};
   } else {
     return Runtime::LoaderPtr{new Runtime::NullLoaderImpl(server.random())};
-  }
-}
-
-void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpIpAddress()) {
-    ENVOY_LOG(info, "statsd UDP ip address: {}", config_->statsdUdpIpAddress()->asString());
-    stat_sinks_.emplace_back(
-        new Stats::Statsd::UdpStatsdSink(thread_local_, config_->statsdUdpIpAddress()));
-    stats_store_.addSink(*stat_sinks_.back());
-  }
-
-  if (config_->statsdTcpClusterName().valid()) {
-    ENVOY_LOG(info, "statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
-    stat_sinks_.emplace_back(
-        new Stats::Statsd::TcpStatsdSink(*local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager(), stats_store_));
-    stats_store_.addSink(*stat_sinks_.back());
   }
 }
 

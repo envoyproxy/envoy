@@ -14,11 +14,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -250,6 +250,82 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException, "No HttpTracerFactory found for type: invalid");
+}
+
+TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
+  sink.set_name("envoy.statsd");
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(1, config.statsSinks().size());
+}
+
+TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  envoy::api::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
+  sink.set_name("envoy.invalid");
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException, "No Stats::Sink found for name: envoy.invalid");
+}
+
+TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "sink object does not have 'name' attribute to look up the implementation");
 }
 
 } // namespace Configuration
