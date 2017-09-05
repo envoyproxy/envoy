@@ -34,7 +34,9 @@ SdsSubscription::SdsSubscription(ClusterStats& stats,
 }
 
 void SdsSubscription::parseResponse(const Http::Message& response) {
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response.bodyAsString());
+  const std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response_body);
+
   json->validateSchema(Json::Schema::SDS_SCHEMA);
 
   // Since in the v2 EDS API we place all the endpoints for a given zone in the same proto, we first
@@ -70,7 +72,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     locality_lb_endpoints->mutable_lb_endpoints()->Swap(&it.second);
   }
 
-  callbacks_->onConfigUpdate(resources);
+  callbacks_->onConfigUpdate(Config::Utility::computeHashedVersion(response_body), resources);
   stats_.update_success_.inc();
 }
 

@@ -57,7 +57,7 @@ private:
       MessageUtil::loadFromFile(path_, message);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
-      callbacks_->onConfigUpdate(typed_resources);
+      callbacks_->onConfigUpdate(message.version_info(), typed_resources);
       stats_.update_success_.inc();
       ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
                 message.DebugString());

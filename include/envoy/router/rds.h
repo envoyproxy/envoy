@@ -45,6 +45,11 @@ public:
    * requests to.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return const std::string& version info from RDS that current route table was generated from.
+   */
+  virtual const std::string& versionInfo() const PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;

@@ -93,7 +93,7 @@ public:
   void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
     const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
     try {
-      callbacks_->onConfigUpdate(typed_resources);
+      callbacks_->onConfigUpdate(message->version_info(), typed_resources);
       request_.set_version_info(message->version_info());
       stats_.update_success_.inc();
       ENVOY_LOG(debug, "gRPC config update accepted: {}", message->DebugString());

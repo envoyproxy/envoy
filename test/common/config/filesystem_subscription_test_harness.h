@@ -69,10 +69,12 @@ public:
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb))))
+    EXPECT_CALL(
+        callbacks_,
+        onConfigUpdate(
+            version, RepeatedProtoEq(
+                         Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
+                             response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));

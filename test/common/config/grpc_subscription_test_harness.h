@@ -78,7 +78,7 @@ public:
       load_assignment->set_cluster_name(cluster);
       response->add_resources()->PackFrom(*load_assignment);
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
+    EXPECT_CALL(callbacks_, onConfigUpdate(version, RepeatedProtoEq(typed_resources)))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage(cluster_names, version);

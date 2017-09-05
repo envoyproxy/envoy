@@ -92,24 +92,26 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources) {
+void RdsRouteConfigProviderImpl::onConfigUpdate(const std::string& version_info,
+                                                const ResourceVector& resources) {
   if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
+    throw EnvoyException(fmt::format("Unexpected RDS resource length from version '{}': {}",
+                                     version_info, resources.size()));
   }
   const auto& route_config = resources[0];
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(route_config.name() == route_config_name_)) {
-    throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
-                                     route_config_name_, route_config.name()));
+    throw EnvoyException(
+        fmt::format("Unexpected RDS configuration from version '{}' (expecting '{}'): '{}'",
+                    version_info, route_config_name_, route_config.name()));
   }
-  const uint64_t new_hash = MessageUtil::hash(route_config);
-  if (new_hash != last_config_hash_ || !initialized_) {
+  if (version_info != last_version_info_ || !initialized_) {
     ConfigConstSharedPtr new_config(new ConfigImpl(route_config, runtime_, cm_, false));
     initialized_ = true;
-    last_config_hash_ = new_hash;
+    last_version_info_ = version_info;
     stats_.config_reload_.inc();
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              new_hash);
+    ENVOY_LOG(debug, "rds: loading new configuration: config_name='{}' version='{}'",
+              route_config_name_, version_info);
     tls_->runOnAllThreads(
         [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
     route_config_proto_ = route_config;
@@ -199,6 +201,7 @@ void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& 
                                                   Buffer::Instance& response) {
   // TODO(junr03): change this to proto with JSON transcoding when #1522 is done.
   response.add("{\n");
+  response.add(fmt::format("    \"version_info\": \"{}\",\n", provider.versionInfo()));
   response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
   response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
   response.add("    \"route_table_dump\": ");

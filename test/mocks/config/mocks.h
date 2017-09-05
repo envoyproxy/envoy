@@ -10,9 +10,10 @@ namespace Config {
 template <class ResourceType>
 class MockSubscriptionCallbacks : public SubscriptionCallbacks<ResourceType> {
 public:
-  MOCK_METHOD1_T(
+  MOCK_METHOD2_T(
       onConfigUpdate,
-      void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources));
+      void(const std::string& version_info,
+           const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources));
   MOCK_METHOD1_T(onConfigUpdateFailed, void(const EnvoyException* e));
 };
 

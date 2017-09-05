@@ -99,9 +99,10 @@ public:
   }
   const std::string& routeConfigName() const override { return route_config_name_; }
   const std::string& clusterName() const override { return cluster_name_; }
+  const std::string& versionInfo() const override { return last_version_info_; }
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(const std::string& version_info, const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:
@@ -128,7 +129,7 @@ private:
   std::string cluster_name_;
   const std::string route_config_name_;
   bool initialized_{};
-  uint64_t last_config_hash_{};
+  std::string last_version_info_{"uninitialized"};
   Stats::ScopePtr scope_;
   RdsStats stats_;
   std::function<void()> initialize_callback_;

@@ -106,10 +106,12 @@ public:
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body().reset(new Buffer::OwnedImpl(response_json));
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                        response_pb))))
+    EXPECT_CALL(
+        callbacks_,
+        onConfigUpdate(
+            version, RepeatedProtoEq(
+                         Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
+                             response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));

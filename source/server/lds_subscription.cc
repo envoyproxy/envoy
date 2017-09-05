@@ -41,7 +41,8 @@ void LdsSubscription::createRequest(Http::Message& request) {
 
 void LdsSubscription::parseResponse(const Http::Message& response) {
   ENVOY_LOG(debug, "lds: parsing response");
-  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  const std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   response_json->validateSchema(Json::Schema::LDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> json_listeners = response_json->getObjectArray("listeners");
 
@@ -50,7 +51,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
     Config::LdsJson::translateListener(*json_listener, *resources.Add());
   }
 
-  callbacks_->onConfigUpdate(resources);
+  callbacks_->onConfigUpdate(Config::Utility::computeHashedVersion(response_body), resources);
   stats_.update_success_.inc();
 }
 

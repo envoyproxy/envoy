@@ -39,16 +39,19 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 
 void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(const std::string& version_info,
+                                    const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
   if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
+    throw EnvoyException(fmt::format("Unexpected EDS resource length from version '{}': {}",
+                                     version_info, resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
-    throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
-                                     cluster_load_assignment.cluster_name()));
+    throw EnvoyException(
+        fmt::format("Unexpected EDS cluster from version '{}' (expecting '{}'): '{}'", version_info,
+                    cluster_name_, cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
@@ -69,7 +72,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(), hosts().size());
+    ENVOY_LOG(debug, "EDS hosts changed for cluster: '{}' ({}) based on version '{}'",
+              info_->name(), hosts().size(), version_info);
     HostListsSharedPtr per_zone(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
