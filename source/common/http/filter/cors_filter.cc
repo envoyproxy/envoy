@@ -32,7 +32,7 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   is_cors_request_ = true;
 
-  const Http::HeaderEntry* method = headers.Method();
+  auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
     return FilterHeadersStatus::Continue;
   }
