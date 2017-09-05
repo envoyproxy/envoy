@@ -63,7 +63,7 @@ private:
   std::string grpc_method_;
   bool do_stat_tracking_{};
   bool stream_destroyed_{};
-  bool is_grpc_web_req_{};
+  bool is_grpc_web_request_{};
 };
 
 } // namespace Grpc
