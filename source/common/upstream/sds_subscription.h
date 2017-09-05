@@ -25,7 +25,10 @@ public:
   SdsSubscription(ClusterStats& stats, const envoy::api::v2::ConfigSource& eds_config,
                   ClusterManager& cm, Event::Dispatcher& dispatcher,
                   Runtime::RandomGenerator& random);
-
+  
+  // Config::Subscription
+  const std::string& versionInfo() override { return version_info_; }
+  
 private:
   // Config::Subscription
   void
@@ -53,6 +56,7 @@ private:
   void onFetchFailure(const EnvoyException* e) override;
 
   std::string cluster_name_;
+  std::string version_info_;
   Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>* callbacks_;
   ClusterStats& stats_;
 };

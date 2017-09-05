@@ -47,6 +47,8 @@ public:
     UNREFERENCED_PARAMETER(resources);
   }
 
+  const std::string& versionInfo() override { return version_info_; }
+
 private:
   void refresh() {
     ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
@@ -58,6 +60,7 @@ private:
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources);
+      version_info_ = message.version_info();
       stats_.update_success_.inc();
       ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
                 message.DebugString());
@@ -75,6 +78,7 @@ private:
   }
 
   const std::string path_;
+  std::string version_info_{};
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   SubscriptionStats stats_;

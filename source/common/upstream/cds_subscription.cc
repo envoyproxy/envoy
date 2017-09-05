@@ -41,7 +41,8 @@ void CdsSubscription::createRequest(Http::Message& request) {
 
 void CdsSubscription::parseResponse(const Http::Message& response) {
   ENVOY_LOG(debug, "cds: parsing response");
-  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> clusters = response_json->getObjectArray("clusters");
 
@@ -51,6 +52,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
   }
 
   callbacks_->onConfigUpdate(resources);
+  version_info_ = Config::Utility::computeHashedVersion(response_body);
   stats_.update_success_.inc();
 }
 

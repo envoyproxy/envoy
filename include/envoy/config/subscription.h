@@ -59,6 +59,11 @@ public:
    * @param resources vector of resource names to fetch.
    */
   virtual void updateResources(const std::vector<std::string>& resources) PURE;
+
+  /**
+   * Return the version info string from the last accepted onConfigUpdate.
+   */
+  virtual const std::string& versionInfo() PURE;
 };
 
 /**

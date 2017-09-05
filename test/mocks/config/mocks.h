@@ -21,6 +21,8 @@ public:
   MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
                              SubscriptionCallbacks<ResourceType>& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
+
+  MOCK_METHOD0_T(versionInfo, const std::string&());
 };
 
 } // namespace Config
