@@ -42,7 +42,7 @@ void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this)
 void EdsClusterImpl::onConfigUpdate(std::string version_info, const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
   if (resources.size() != 1) {
-    throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
+    throw EnvoyException(fmt::format("Unexpected EDS resource length from version '{}': {}", version_info, resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
   // TODO(PiotrSikora): Remove this hack once fixed internally.
