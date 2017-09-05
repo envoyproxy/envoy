@@ -42,7 +42,7 @@ enabled
   *(optional, boolean)* Defaults to false.
 
 allow_origin
-  *(optional, string)* The content for the access-control-allow-origin header.
+  *(optional, string)* The origins that will be allowed to do CORS request.
 
 allow_methods
   *(optional, string)* The content for the access-control-allow-methods header.
