@@ -281,10 +281,12 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
-  codec_client_->setBufferStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-                                 parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-                                 parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-                                 parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_});
+  codec_client_->setConnectionStats(
+      {parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
+       parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+       parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
+       parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
+       &parent_.host_->cluster().stats().bind_errors_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {

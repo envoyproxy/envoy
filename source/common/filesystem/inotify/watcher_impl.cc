@@ -11,7 +11,7 @@
 #include "common/common/utility.h"
 #include "common/filesystem/watcher_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Filesystem {

@@ -6,6 +6,7 @@ TARGET_RECIPES = {
     "backward": "backward",
     "event": "libevent",
     "event_pthreads": "libevent",
+    "fmtlib": "fmtlib",
     # TODO(htuch): This shouldn't be a build recipe, it's a tooling dependency
     # that is external to Bazel.
     "gcovr": "gcovr",

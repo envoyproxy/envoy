@@ -8,7 +8,7 @@
           "name": "http_connection_manager",
           "config": {
             "tracing": {
-              "operation_name": "ingress"
+              "operation_name": "egress"
             }, 
             "codec_type": "auto",
             "stat_prefix": "ingress_http",

@@ -23,4 +23,5 @@ The following features have been DEPRECATED and will be removed in the specified
   RPC stubs. `Grpc::AsyncClientImpl` supports streaming, in addition to the previous unary, RPCs.
 * The direction of network and HTTP filters in the configuration will be ignored from 1.4.0 and
   later removed from the configuration in the v2 APIs. Filter direction is now implied at the C++ type
-  level.
+  level. The `type()` methods on the `NamedNetworkFilterConfigFactory` and
+  `NamedHttpFilterConfigFactory` intefaces have been removed to reflect this.

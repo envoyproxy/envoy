@@ -6,7 +6,6 @@
 
 #include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/http_connection_manager.h"
-#include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
 #include "server/config/network/tcp_proxy.h"
@@ -17,10 +16,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -38,44 +37,10 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
-}
-
-TEST(NetworkFilterConfigTest, MongoProxy) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "access_log" : "path/to/access/log"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  MongoProxyFilterConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Both, factory.type());
-  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
-  cb(connection);
-}
-
-TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "access_log" : "path/to/access/log",
-    "test" : "a"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  MongoProxyFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
@@ -122,7 +87,6 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   TcpProxyConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -150,7 +114,6 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuth) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -170,7 +133,6 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
-  EXPECT_EQ(NetworkFilterType::Read, factory.type());
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

@@ -12,7 +12,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace RateLimit {
@@ -85,8 +85,9 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)
-    : cluster_name_(config.getString("cluster_name")), cm_(cm) {
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
+                                 Upstream::ClusterManager& cm)
+    : cluster_name_(config.cluster_name()), cm_(cm) {
   if (!cm_.get(cluster_name_)) {
     throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
   }

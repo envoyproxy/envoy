@@ -34,6 +34,15 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * Null implementation of HealthCheckHostMonitor.
+ */
+class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
+public:
+  // Upstream::HealthCheckHostMonitor
+  void setUnhealthy() override {}
+};
+
+/**
  * Implementation of Upstream::HostDescription.
  */
 class HostDescriptionImpl : virtual public HostDescription {
@@ -47,11 +56,22 @@ public:
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
   const ClusterInfo& cluster() const override { return *cluster_; }
-  Outlier::DetectorHostSink& outlierDetector() const override {
+  HealthCheckHostMonitor& healthChecker() const override {
+    if (health_checker_) {
+      return *health_checker_;
+    } else {
+      static HealthCheckHostMonitorNullImpl* null_health_checker =
+          new HealthCheckHostMonitorNullImpl();
+      return *null_health_checker;
+    }
+  }
+  Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
     } else {
-      return null_outlier_detector_;
+      static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
+          new Outlier::DetectorHostMonitorNullImpl();
+      return *null_outlier_detector;
     }
   }
   const HostStats& stats() const override { return stats_; }
@@ -67,10 +87,8 @@ protected:
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
-  Outlier::DetectorHostSinkPtr outlier_detector_;
-
-private:
-  static Outlier::DetectorHostSinkNullImpl null_outlier_detector_;
+  Outlier::DetectorHostMonitorPtr outlier_detector_;
+  HealthCheckHostMonitorPtr health_checker_;
 };
 
 /**
@@ -94,7 +112,10 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
-  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
+    health_checker_ = std::move(health_checker);
+  }
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
   bool healthy() const override { return !health_flags_; }
@@ -258,13 +279,13 @@ public:
    * creation since the health checker assumes that the cluster has already been fully initialized
    * so there is a cyclic dependency. However we want the cluster to own the health checker.
    */
-  void setHealthChecker(HealthCheckerPtr&& health_checker);
+  void setHealthChecker(const HealthCheckerSharedPtr& health_checker);
 
   /**
    * Optionally set the outlier detector for the primary cluster. Done for the same reason as
    * documented in setHealthChecker().
    */
-  void setOutlierDetector(Outlier::DetectorSharedPtr outlier_detector);
+  void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
@@ -288,7 +309,7 @@ protected:
   ClusterInfoConstSharedPtr
       info_; // This cluster info stores the stats scope so it must be initialized first
              // and destroyed last.
-  HealthCheckerPtr health_checker_;
+  HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:

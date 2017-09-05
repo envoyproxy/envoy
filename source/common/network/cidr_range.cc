@@ -16,7 +16,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Network {

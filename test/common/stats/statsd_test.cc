@@ -42,7 +42,7 @@ public:
 
     EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
         .WillOnce(Return(conn_info));
-    EXPECT_CALL(*connection_, setBufferStats(_));
+    EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, connect());
   }
 

@@ -11,6 +11,8 @@
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -41,7 +43,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
           throw EnvoyException(
               fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
         }
-        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        MessageUtil::jsonConvert(proto_config, *message);
         callback = factory->createFilterFactoryFromProto(*message, context);
       }
       ret.push_back(callback);

@@ -115,7 +115,8 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
-  const ConfigImpl& global_route_config_;
+  const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
+                                          // raw ref to the top level config is currently safe.
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
@@ -312,7 +313,8 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-  const VirtualHostImpl& vhost_;
+  const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
+                                 // to virtual host is currently safe.
   const bool auto_host_rewrite_;
   const bool use_websocket_;
   const std::string cluster_name_;

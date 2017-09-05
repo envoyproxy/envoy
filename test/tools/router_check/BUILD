@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_binary(
     name = "router_check_tool",
     testonly = 1,
+    srcs = ["router_check.cc"],
     deps = [":router_check_main_lib"],
 )
 
@@ -20,7 +21,6 @@ envoy_cc_test_library(
     srcs = [
         "router.cc",
         "router.h",
-        "router_check.cc",
     ],
     deps = [
         "//source/common/config:rds_json_lib",

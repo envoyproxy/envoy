@@ -22,7 +22,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {
@@ -242,7 +242,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           throw EnvoyException(
               fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
         }
-        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
+        MessageUtil::jsonConvert(proto_config, *message);
         callback = factory->createFilterFactoryFromProto(*message, stats_prefix_, context);
       }
       filter_factories_.push_back(callback);
@@ -281,17 +281,6 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
   for (const HttpFilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
-  }
-}
-
-HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type) {
-  if (type == "decoder") {
-    return HttpFilterType::Decoder;
-  } else if (type == "encoder") {
-    return HttpFilterType::Encoder;
-  } else {
-    ASSERT(type == "both" || type.empty());
-    return HttpFilterType::Both;
   }
 }
 

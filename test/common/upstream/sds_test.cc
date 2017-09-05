@@ -51,8 +51,10 @@ protected:
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";
-    const SdsConfig sds_config{"sds", std::chrono::milliseconds(30000)};
-    sds_cluster_ = parseSdsClusterFromJson(raw_config, sds_config);
+    envoy::api::v2::ConfigSource eds_config;
+    eds_config.mutable_api_config_source()->add_cluster_name("sds");
+    eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+    sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);
     cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -218,10 +220,10 @@ TEST_F(SdsTest, NoHealthChecker) {
 
 TEST_F(SdsTest, HealthChecker) {
   InSequence s;
-  MockHealthChecker* health_checker = new MockHealthChecker();
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster_->setHealthChecker(HealthCheckerPtr{health_checker});
+  cluster_->setHealthChecker(health_checker);
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   setupRequest();

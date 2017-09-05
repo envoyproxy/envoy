@@ -19,18 +19,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
-    MockClusterManager cm;
+    NiceMock<MockClusterManager> cm;
     cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
                                          ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
                                          false));
@@ -130,6 +130,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
   EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
+  cluster_->hosts()[0]->healthChecker().setUnhealthy();
   tls_.shutdownThread();
 }
 
@@ -199,6 +200,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("", data.host_description_->zone());
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
+  data.host_description_->healthChecker().setUnhealthy();
 
   expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();

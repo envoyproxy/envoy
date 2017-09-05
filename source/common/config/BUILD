@@ -21,6 +21,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "bootstrap_json_lib",
+    srcs = ["bootstrap_json.cc"],
+    hdrs = ["bootstrap_json.h"],
+    external_deps = ["envoy_bootstrap"],
+    deps = [
+        ":address_json_lib",
+        ":cds_json_lib",
+        ":json_utility_lib",
+        ":lds_json_lib",
+        ":utility_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "base_json_lib",
     srcs = ["base_json.cc"],
     hdrs = ["base_json.h"],
@@ -219,6 +237,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:singleton",
         "//source/common/json:config_schemas_lib",
     ],
 )

@@ -26,7 +26,7 @@ ZipkinHttpTracerFactory::createHttpTracer(const Json::Object& json_config, Serve
       new Tracing::HttpTracerImpl(std::move(zipkin_driver), server.localInfo()));
 }
 
-std::string ZipkinHttpTracerFactory::name() { return "zipkin"; }
+std::string ZipkinHttpTracerFactory::name() { return "envoy.zipkin"; }
 
 /**
  * Static registration for the lightstep http tracer. @see RegisterFactory.

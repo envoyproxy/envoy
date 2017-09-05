@@ -6,7 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace RateLimit {

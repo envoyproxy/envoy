@@ -61,7 +61,7 @@ public:
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
-  MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
+  MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());
@@ -96,7 +96,7 @@ public:
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
-  MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
+  MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());

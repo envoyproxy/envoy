@@ -12,7 +12,7 @@
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -175,7 +175,8 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
     span_name.append(request_headers.Host()->value().c_str());
   }
 
-  SpanPtr active_span = driver_->startSpan(request_headers, span_name, request_info.startTime());
+  SpanPtr active_span =
+      driver_->startSpan(config, request_headers, span_name, request_info.startTime());
   if (active_span) {
     active_span->setTag("node_id", local_info_.nodeName());
     active_span->setTag("zone", local_info_.zoneName());
