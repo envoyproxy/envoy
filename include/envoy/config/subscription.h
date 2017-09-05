@@ -25,7 +25,8 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const std::string& version_info, const ResourceVector& resources) PURE;
+  virtual void onConfigUpdate(const std::string& version_info,
+                              const ResourceVector& resources) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate

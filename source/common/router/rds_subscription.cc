@@ -47,7 +47,7 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> resources;
   Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
   resources[0].set_name(route_config_name_);
-  
+
   callbacks_->onConfigUpdate(Config::Utility::computeHashedVersion(response_body), resources);
   stats_.update_success_.inc();
 }

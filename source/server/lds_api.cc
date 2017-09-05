@@ -43,15 +43,18 @@ void LdsApi::onConfigUpdate(const std::string& version_info, const ResourceVecto
     const std::string listener_name = listener.name();
     listeners_to_remove.erase(listener_name);
     if (listener_manager_.addOrUpdateListener(listener)) {
-      ENVOY_LOG(info, "lds: add/update listener '{}' based on version '{}'", listener_name, version_info);
+      ENVOY_LOG(info, "lds: add/update listener '{}' based on version '{}'", listener_name,
+                version_info);
     } else {
-      ENVOY_LOG(debug, "lds: add/update listener '{}' skipped based on version '{}'", listener_name, version_info);
+      ENVOY_LOG(debug, "lds: add/update listener '{}' skipped based on version '{}'", listener_name,
+                version_info);
     }
   }
 
   for (const auto& listener : listeners_to_remove) {
     if (listener_manager_.removeListener(listener.first)) {
-      ENVOY_LOG(info, "lds: remove listener '{}' based on version '{}'", listener.first, version_info);
+      ENVOY_LOG(info, "lds: remove listener '{}' based on version '{}'", listener.first,
+                version_info);
     }
   }
 

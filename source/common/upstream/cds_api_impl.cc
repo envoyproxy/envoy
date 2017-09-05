@@ -43,13 +43,15 @@ void CdsApiImpl::onConfigUpdate(const std::string& version_info, const ResourceV
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
     if (cm_.addOrUpdatePrimaryCluster(cluster)) {
-      ENVOY_LOG(info, "cds: add/update cluster '{}' based on version '{}'", cluster_name, version_info);
+      ENVOY_LOG(info, "cds: add/update cluster '{}' based on version '{}'", cluster_name,
+                version_info);
     }
   }
 
   for (auto cluster : clusters_to_remove) {
     if (cm_.removePrimaryCluster(cluster.first)) {
-      ENVOY_LOG(info, "cds: remove cluster '{}' based on version '{}'", cluster.first, version_info);
+      ENVOY_LOG(info, "cds: remove cluster '{}' based on version '{}'", cluster.first,
+                version_info);
     }
   }
 

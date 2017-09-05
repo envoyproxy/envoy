@@ -48,9 +48,8 @@ public:
 
   /**
    * @return const std::string& version info from RDS that current route table was generated from.
-   * requests to.
    */
-   virtual const std::string& versionInfo() const PURE;
+  virtual const std::string& versionInfo() const PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
