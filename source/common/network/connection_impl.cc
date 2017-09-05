@@ -34,21 +34,6 @@ Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& add
 }
 } // namespace
 
-int ConnectionImplUtility::createSocket(Address::InstanceConstSharedPtr address,
-                                        const Address::InstanceConstSharedPtr source_address) {
-  const int fd = address->socket(Address::SocketType::Stream);
-  if (fd >= 0 && source_address != nullptr) {
-    int rc = source_address->bind(fd);
-    // TODO(alyssawilk) make this a non-fatal connect failure.
-    if (rc < 0) {
-      ENVOY_LOG_MISC(critical, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
-                     strerror(errno));
-    }
-    RELEASE_ASSERT(rc >= 0);
-  }
-  return fd;
-}
-
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
                                               Stats::Gauge& stat_current) {
@@ -72,6 +57,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
+                               Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       read_buffer_(dispatcher.getBufferFactory().create()),
@@ -94,6 +80,19 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   file_event_ = dispatcher_.createFileEvent(
       fd_, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+  if (bind_to_address != nullptr) {
+    int rc = bind_to_address->bind(fd);
+    if (rc < 0) {
+      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", bind_to_address->asString(),
+                     strerror(errno));
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      state_ |= InternalState::BindError;
+      // Indicate this bind close should "flush", i.e. wait for a dispatcher callback cycle.
+      close(ConnectionCloseType::FlushWrite);
+    }
+  }
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -125,7 +124,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_.length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
+  if ((data_to_write == 0 && !(state_ & InternalState::BindError)) ||
+      type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
@@ -162,7 +162,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
-  buffer_stats_.reset();
+  connection_stats_.reset();
 
   file_event_.reset();
   ::close(fd_);
@@ -362,6 +362,17 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
+  if (state_ & InternalState::BindError) {
+    ENVOY_CONN_LOG(debug, "raising bind error", *this);
+    // Update stats here, rather than on bind failure, to give the caller a chance to
+    // setConnectionStats.
+    if (connection_stats_ && connection_stats_->bind_errors_) {
+      connection_stats_->bind_errors_->inc();
+    }
+    closeSocket(ConnectionEvent::LocalClose);
+    return;
+  }
+
   if (events & Event::FileReadyType::Closed) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
@@ -525,36 +536,36 @@ void ConnectionImpl::doConnect() {
   }
 }
 
-void ConnectionImpl::setBufferStats(const BufferStats& stats) {
-  ASSERT(!buffer_stats_);
-  buffer_stats_.reset(new BufferStats(stats));
+void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+  ASSERT(!connection_stats_);
+  connection_stats_.reset(new ConnectionStats(stats));
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
-                                           buffer_stats_->read_total_,
-                                           buffer_stats_->read_current_);
+                                           connection_stats_->read_total_,
+                                           connection_stats_->read_current_);
 }
 
 void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
-                                           buffer_stats_->write_total_,
-                                           buffer_stats_->write_current_);
+                                           connection_stats_->write_total_,
+                                           connection_stats_->write_current_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
     const Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, ConnectionImplUtility::createSocket(address, source_address),
-                     address, getNullLocalAddress(*address), false, false) {}
+    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
+                     getNullLocalAddress(*address), source_address, false, false) {}
 
 } // namespace Network
 } // namespace Envoy
