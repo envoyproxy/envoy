@@ -393,10 +393,14 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   }
 
   // We don't retry on a global timeout or if we already started the response.
-  if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_ &&
-      retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); }) &&
-      setupRetry(true)) {
-    return;
+  if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_) {
+    RetryStatus retry_status =
+        retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
+    if (retry_status == RetryStatus::NoOverflow) {
+      callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
+    } else if (retry_status == RetryStatus::Yes && setupRetry(true)) {
+      return;
+    }
   }
 
   // This will destroy any created retry timers.

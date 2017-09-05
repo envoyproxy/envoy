@@ -127,9 +127,9 @@ void RetryStateImpl::resetRetry() {
   }
 }
 
-bool RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
-                                 const Optional<Http::StreamResetReason>& reset_reason,
-                                 DoRetryCallback callback) {
+RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
+                                        const Optional<Http::StreamResetReason>& reset_reason,
+                                        DoRetryCallback callback) {
   ASSERT((response_headers != nullptr) ^ reset_reason.valid());
 
   if (callback_ && !wouldRetry(response_headers, reset_reason)) {
@@ -139,21 +139,21 @@ bool RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   resetRetry();
 
   if (retries_remaining_ == 0) {
-    return false;
+    return RetryStatus::No;
   }
 
   if (!runtime_.snapshot().featureEnabled("upstream.use_retry", 100)) {
-    return false;
+    return RetryStatus::No;
   }
 
   retries_remaining_--;
   if (!wouldRetry(response_headers, reset_reason)) {
-    return false;
+    return RetryStatus::No;
   }
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
-    return false;
+    return RetryStatus::NoOverflow;
   }
 
   ASSERT(!callback_);
@@ -161,7 +161,7 @@ bool RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   cluster_.resourceManager(priority_).retries().inc();
   cluster_.stats().upstream_rq_retry_.inc();
   enableBackoffTimer();
-  return true;
+  return RetryStatus::Yes;
 }
 
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
