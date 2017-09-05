@@ -190,5 +190,14 @@ void Common::validateResponse(Http::Message& http_response) {
   }
 }
 
+const std::string& Common::typeUrlPrefix() {
+  static const std::string* type_url = new std::string("type.googleapis.com");
+  return *type_url;
+}
+
+std::string Common::typeUrl(const std::string& qualified_name) {
+  return typeUrlPrefix() + "/" + qualified_name;
+}
+
 } // namespace Grpc
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/ads.h"
 #include "envoy/config/subscription.h"
 
 #include "gmock/gmock.h"
@@ -21,6 +22,18 @@ public:
   MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
                              SubscriptionCallbacks<ResourceType>& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
+};
+
+class MockAdsWatch : public AdsWatch {
+public:
+  MOCK_METHOD0(cancel, void());
+};
+
+class MockAdsApi : public AdsApi {
+public:
+  MOCK_METHOD3(subscribe,
+               AdsWatch*(const std::string& type_url, const std::vector<std::string>& resources,
+                         AdsCallbacks& calllbacks));
 };
 
 } // namespace Config
