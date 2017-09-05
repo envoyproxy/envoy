@@ -105,7 +105,6 @@ public:
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
-
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
     ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}

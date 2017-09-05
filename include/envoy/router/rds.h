@@ -21,7 +21,6 @@ public:
    *         each request flow.
    */
   virtual Router::ConfigConstSharedPtr config() PURE;
-
 };
 
 /**

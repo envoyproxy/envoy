@@ -25,10 +25,10 @@ public:
   SdsSubscription(ClusterStats& stats, const envoy::api::v2::ConfigSource& eds_config,
                   ClusterManager& cm, Event::Dispatcher& dispatcher,
                   Runtime::RandomGenerator& random);
-  
+
   // Config::Subscription
   const std::string& versionInfo() override { return version_info_; }
-  
+
 private:
   // Config::Subscription
   void
