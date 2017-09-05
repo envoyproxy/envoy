@@ -13,8 +13,7 @@ namespace Server {
 namespace Configuration {
 
 Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
-                                                  Server::Instance& server,
-                                                  Upstream::ClusterManager& cluster_manager) {
+                                                  Server::Instance& server) {
 
   const auto& statsd_sink = dynamic_cast<const envoy::api::v2::StatsdSink&>(config);
   switch (statsd_sink.statsd_specifier_case()) {
@@ -28,9 +27,9 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
   }
   case envoy::api::v2::StatsdSink::kTcpClusterName:
     ENVOY_LOG(info, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
-    return Stats::SinkPtr(
-        new Stats::Statsd::TcpStatsdSink(server.localInfo(), statsd_sink.tcp_cluster_name(),
-                                         server.threadLocal(), cluster_manager, server.stats()));
+    return Stats::SinkPtr(new Stats::Statsd::TcpStatsdSink(
+        server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
+        server.clusterManager(), server.stats()));
     break;
   default:
     throw EnvoyException(

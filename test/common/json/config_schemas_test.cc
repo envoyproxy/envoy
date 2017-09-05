@@ -11,9 +11,9 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::_;
 
+namespace Envoy {
 namespace Json {
 
 std::vector<std::string> generateTestInputs() {

@@ -16,8 +16,7 @@ namespace Configuration {
 class StatsdSinkFactory : Logger::Loggable<Logger::Id::config>, public StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server,
-                                 Upstream::ClusterManager& cluster_manager) override;
+  Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

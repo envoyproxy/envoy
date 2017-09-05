@@ -65,15 +65,12 @@ public:
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
-   * Stats::Sink with the provided parameters, it should throw an EnvoyException in the case of
-   * general error or a Json::Exception if the json configuration is erroneous. The returned
+   * Stats::Sink with the provided parameters, it should throw an EnvoyException. The returned
    * pointer should always be valid.
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
-   * @param cluster_manager supplies the cluster_manager instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server,
-                                         Upstream::ClusterManager& cluster_manager) PURE;
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

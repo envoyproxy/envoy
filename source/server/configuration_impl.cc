@@ -119,17 +119,14 @@ void MainImpl::initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, 
           "sink object does not have 'name' attribute to look up the implementation");
     }
 
-    if (!sink_object.has_config()) {
-      throw EnvoyException(
-          "sink object does not contain the 'config' object to configure the implementation");
-    }
-
     ProtobufTypes::String name = sink_object.name();
     StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
     if (factory != nullptr) {
       ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-      MessageUtil::jsonConvert(sink_object.config(), *message);
-      stats_sinks_.emplace_back(factory->createStatsSink(*message, server, *cluster_manager_));
+      if (sink_object.has_config()) {
+        MessageUtil::jsonConvert(sink_object.config(), *message);
+      }
+      stats_sinks_.emplace_back(factory->createStatsSink(*message, server));
     } else {
       throw EnvoyException(fmt::format("No Stats::Sink found for name: {}", name));
     }

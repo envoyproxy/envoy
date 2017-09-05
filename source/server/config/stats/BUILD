@@ -16,6 +16,7 @@ envoy_cc_library(
         "envoy_bootstrap",
     ],
     deps = [
+        "//include/envoy/registry",
         "//source/common/network:address_lib",
         "//source/common/stats:statsd_lib",
         "//source/server:configuration_lib",

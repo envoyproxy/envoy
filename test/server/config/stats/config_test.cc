@@ -13,19 +13,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = "envoy.statsd";
   Protobuf::Struct config;
-  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& field_map = *config.mutable_fields();
+  auto& field_map = *config.mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
@@ -35,7 +35,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   MessageUtil::jsonConvert(config, *message);
 
   NiceMock<MockInstance> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server, server.clusterManager());
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Stats::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
@@ -43,17 +43,10 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 TEST(StatsConfigTest, ValidUdpIpStatsd) {
   const std::string name = "envoy.statsd";
   Protobuf::Struct config;
-  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& field_map = *config.mutable_fields();
+  auto& field_map = *config.mutable_fields();
 
-  envoy::api::v2::Address address;
-  envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
-  socket_address.set_address("127.0.0.1");
-  socket_address.set_port_value(8125);
-
-  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& address_field_map =
-      *field_map["address"].mutable_struct_value()->mutable_fields();
-  ProtobufWkt::Map<ProtobufTypes::String, ProtobufWkt::Value>& socket_address_field_map =
+  auto& address_field_map = *field_map["address"].mutable_struct_value()->mutable_fields();
+  auto& socket_address_field_map =
       *address_field_map["socket_address"].mutable_struct_value()->mutable_fields();
   socket_address_field_map["protocol"].set_string_value("UDP");
   socket_address_field_map["address"].set_string_value("127.0.0.1");
@@ -66,7 +59,7 @@ TEST(StatsConfigTest, ValidUdpIpStatsd) {
   MessageUtil::jsonConvert(config, *message);
 
   NiceMock<MockInstance> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server, server.clusterManager());
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Stats::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
 }
@@ -81,7 +74,7 @@ TEST(StatsConfigTest, EmptyConfig) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   MessageUtil::jsonConvert(config, *message);
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory->createStatsSink(*message, server, server.clusterManager()), EnvoyException);
+  EXPECT_THROW(factory->createStatsSink(*message, server), EnvoyException);
 }
 
 } // namespace Configuration

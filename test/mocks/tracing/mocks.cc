@@ -3,10 +3,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Return;
 using testing::ReturnRef;
 
+namespace Envoy {
 namespace Tracing {
 
 MockSpan::MockSpan() {}

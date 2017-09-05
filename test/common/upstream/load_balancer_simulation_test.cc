@@ -14,10 +14,10 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 
+namespace Envoy {
 namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,

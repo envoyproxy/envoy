@@ -11,7 +11,12 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    external_deps = [
+        "envoy_bootstrap",
+    ],
     deps = [
+        "//include/envoy/registry",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:statsd_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks/server:server_mocks",
