@@ -40,4 +40,17 @@ TEST(UtilityTest, LoadTextProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
+TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
+
+  envoy::api::v2::Bootstrap proto_from_file;
+  EXPECT_THROW_WITH_MESSAGE(
+      MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+      "Unable to parse file \"" + filename +
+          "\" as a text protobuf (type envoy.api.v2.Bootstrap)");
+  MessageUtil::loadFromFile(filename, proto_from_file);
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
 } // namespace Envoy
