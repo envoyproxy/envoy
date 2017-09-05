@@ -8,6 +8,7 @@
 #include "server/config/stats/statsd.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "api/bootstrap.pb.h"
 #include "gmock/gmock.h"
@@ -24,15 +25,15 @@ namespace Configuration {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = "envoy.statsd";
-  Protobuf::Struct config;
-  auto& field_map = *config.mutable_fields();
-  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  envoy::api::v2::StatsdSink sink_config;
+  sink_config.set_tcp_cluster_name("fake_cluster");
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(config, *message);
+  MessageUtil::jsonConvert(sink_config, *message);
 
   NiceMock<MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -42,21 +43,19 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 
 TEST(StatsConfigTest, ValidUdpIpStatsd) {
   const std::string name = "envoy.statsd";
-  Protobuf::Struct config;
-  auto& field_map = *config.mutable_fields();
 
-  auto& address_field_map = *field_map["address"].mutable_struct_value()->mutable_fields();
-  auto& socket_address_field_map =
-      *address_field_map["socket_address"].mutable_struct_value()->mutable_fields();
-  socket_address_field_map["protocol"].set_string_value("UDP");
-  socket_address_field_map["address"].set_string_value("127.0.0.1");
-  socket_address_field_map["port_value"].set_number_value(8125);
+  envoy::api::v2::StatsdSink sink_config;
+  envoy::api::v2::Address& address = *sink_config.mutable_address();
+  envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
+  socket_address.set_address("127.0.0.1");
+  socket_address.set_port_value(8125);
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(config, *message);
+  MessageUtil::jsonConvert(sink_config, *message);
 
   NiceMock<MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -66,15 +65,17 @@ TEST(StatsConfigTest, ValidUdpIpStatsd) {
 
 TEST(StatsConfigTest, EmptyConfig) {
   const std::string name = "envoy.statsd";
-  Protobuf::Struct config;
+  envoy::api::v2::StatsdSink sink_config;
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(config, *message);
+  MessageUtil::jsonConvert(sink_config, *message);
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory->createStatsSink(*message, server), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      factory->createStatsSink(*message, server), EnvoyException,
+      "No tcp_cluster_name or address provided for envoy.statsd Stats::Sink config");
 }
 
 } // namespace Configuration
