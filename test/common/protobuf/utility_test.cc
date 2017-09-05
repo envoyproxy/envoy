@@ -45,10 +45,9 @@ TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::api::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(
-      MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
-      "Unable to parse file \"" + filename +
-          "\" as a text protobuf (type envoy.api.v2.Bootstrap)");
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+                            "Unable to parse file \"" + filename +
+                                "\" as a text protobuf (type envoy.api.v2.Bootstrap)");
 }
 
 } // namespace Envoy
