@@ -202,6 +202,7 @@ TEST_F(RdsImplTest, Basic) {
 
   // Test Admin /routes handler. There should be no route table to dump.
   const std::string& routes_expected_output_no_routes = R"EOF({
+    "version_info": "uninitialized",
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
     "route_table_dump": {}
@@ -229,6 +230,7 @@ TEST_F(RdsImplTest, Basic) {
 
   // Test Admin /routes handler. Now we should have an empty route table, with exception of name.
   const std::string routes_expected_output_only_name = R"EOF({
+    "version_info": "hash_5155986269879860237",
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
     "route_table_dump": {"name":"foo_route_config"}
@@ -300,6 +302,7 @@ TEST_F(RdsImplTest, Basic) {
   // Test Admin /routes handler. The route table should now have the information given in
   // response2_json.
   const std::string routes_expected_output_full_table = R"EOF({
+    "version_info": "hash_10773541860894967652",
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
     "route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}

@@ -197,8 +197,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
 void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& provider,
                                                   Buffer::Instance& response) {
   // TODO(junr03): change this to proto with JSON transcoding when #1522 is done.
-  // TODO(danielhochman): add version_info to output
   response.add("{\n");
+  response.add(fmt::format("    \"version_info\": \"{}\",\n", provider.versionInfo()));
   response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
   response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
   response.add("    \"route_table_dump\": ");
