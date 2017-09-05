@@ -76,10 +76,10 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
-  read_callbacks_->connection().setBufferStats({stats_.named_.downstream_cx_rx_bytes_total_,
-                                                stats_.named_.downstream_cx_rx_bytes_buffered_,
-                                                stats_.named_.downstream_cx_tx_bytes_total_,
-                                                stats_.named_.downstream_cx_tx_bytes_buffered_});
+  read_callbacks_->connection().setConnectionStats(
+      {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
+       stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
+       nullptr});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -138,9 +138,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   checkForDeferredClose();
 
   // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2 &&
-      !read_callbacks_->connection().readEnabled()) {
-    read_callbacks_->connection().readDisable(false);
+  // Also be sure to unwind any read-disable done by the prior downstream
+  // connection.
+  if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2) {
+    while (!read_callbacks_->connection().readEnabled()) {
+      read_callbacks_->connection().readDisable(false);
+    }
   }
 
   if (idle_timer_ && streams_.empty()) {

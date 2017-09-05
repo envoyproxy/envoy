@@ -5,6 +5,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
@@ -12,6 +13,18 @@
 
 namespace Envoy {
 namespace Config {
+
+/**
+ * Constant Api Type Values, used by envoy::api::v2::ApiConfigSource.
+ */
+class ApiTypeValues {
+public:
+  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string Rest{"REST"};
+  const std::string Grpc{"GRPC"};
+};
+
+typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
  * General config API utilities.
@@ -39,6 +52,17 @@ public:
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
+
+  /**
+   * Populate an envoy::api::v2::ApiConfigSource.
+   * @param cluster supplies the cluster name for the ApiConfigSource.
+   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
+   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
+   * @param api_config_source a reference to the envoy::api::v2::ApiConfigSource object to populate.
+   */
+  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                                       const std::string& api_type,
+                                       envoy::api::v2::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.

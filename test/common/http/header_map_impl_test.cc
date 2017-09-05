@@ -319,6 +319,14 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   EXPECT_EQ(1UL, headers.size());
 }
 
+TEST(HeaderMapImplTest, AddReferenceKey) {
+  HeaderMapImpl headers;
+  LowerCaseString foo("hello");
+  headers.addReferenceKey(foo, "world");
+  EXPECT_NE("world", headers.get(foo)->value().c_str());
+  EXPECT_STREQ("world", headers.get(foo)->value().c_str());
+}
+
 TEST(HeaderMapImplTest, AddCopy) {
   HeaderMapImpl headers;
 

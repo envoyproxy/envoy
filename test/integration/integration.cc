@@ -380,8 +380,10 @@ void BaseIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl&
 
 void BaseIntegrationTest::cleanupUpstreamAndDownstream() {
   codec_client_->close();
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+  if (fake_upstream_connection_) {
+    fake_upstream_connection_->close();
+    fake_upstream_connection_->waitForDisconnect();
+  }
 }
 
 void BaseIntegrationTest::waitForNextUpstreamRequest() {

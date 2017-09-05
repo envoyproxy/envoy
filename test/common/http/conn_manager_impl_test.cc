@@ -36,7 +36,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
@@ -50,6 +49,7 @@ using testing::Sequence;
 using testing::Test;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfig {
@@ -1226,6 +1226,29 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
+
+  // Backup upstream once again.
+  EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(stream_, readDisable(true));
+  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
+  decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_EQ(2U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
+
+  // Send a full response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  // When the stream ends, the manager should check to see if the connection is
+  // read disabled, and keep calling readDisable(false) until readEnabled()
+  // returns true.
+  EXPECT_CALL(filter_callbacks_.connection_, readEnabled())
+      .Times(2)
+      .WillOnce(Return(false))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+  expectOnDestroy();
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {

@@ -229,10 +229,11 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
   conn_length_ = parent_.host_->cluster().stats().upstream_cx_length_ms_.allocateSpan();
 
-  client_->setBufferStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-                           parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_});
+  client_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
+                               parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+                               parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
+                               parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
+                               &parent_.host_->cluster().stats().bind_errors_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
