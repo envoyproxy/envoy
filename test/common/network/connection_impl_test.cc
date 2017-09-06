@@ -21,10 +21,10 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
@@ -35,6 +35,7 @@ using testing::StrictMock;
 using testing::Test;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 TEST(ConnectionImplUtility, updateBufferStats) {
@@ -68,7 +69,8 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
   EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
                               Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                              Network::Test::getCanonicalLoopbackAddress(GetParam()), false, false),
+                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                              Network::Address::InstanceConstSharedPtr(), false, false),
                ".*assert failure: fd_ != -1.*");
 }
 
@@ -82,12 +84,17 @@ public:
         dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                     Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-    client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
+    client_connection_ =
+        dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
+    const Network::ClientConnection& const_connection = *client_connection_;
+    EXPECT_EQ(nullptr, const_connection.ssl());
+    EXPECT_FALSE(client_connection_->usingOriginalDst());
   }
 
   void connect() {
+    int expected_callbacks = 2;
     client_connection_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -95,9 +102,19 @@ public:
           server_connection_ = std::move(conn);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
+
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
         }));
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
+        }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -147,6 +164,7 @@ protected:
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockBuffer* client_write_buffer_ = nullptr;
+  Address::InstanceConstSharedPtr source_address_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
@@ -179,22 +197,23 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-struct MockBufferStats {
-  Connection::BufferStats toBufferStats() {
-    return {rx_total_, rx_current_, tx_total_, tx_current_};
+struct MockConnectionStats {
+  Connection::ConnectionStats toBufferStats() {
+    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_};
   }
 
   StrictMock<Stats::MockCounter> rx_total_;
   StrictMock<Stats::MockGauge> rx_current_;
   StrictMock<Stats::MockCounter> tx_total_;
   StrictMock<Stats::MockGauge> tx_current_;
+  StrictMock<Stats::MockCounter> bind_errors_;
 };
 
-TEST_P(ConnectionImplTest, BufferStats) {
+TEST_P(ConnectionImplTest, ConnectionStats) {
   setUpBasicConnection();
 
-  MockBufferStats client_buffer_stats;
-  client_connection_->setBufferStats(client_buffer_stats.toBufferStats());
+  MockConnectionStats client_connection_stats;
+  client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
   client_connection_->connect();
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
@@ -209,23 +228,23 @@ TEST_P(ConnectionImplTest, BufferStats) {
   EXPECT_CALL(*write_filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
-  EXPECT_CALL(client_buffer_stats.tx_total_, add(4)).InSequence(s1);
+  EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
-  MockBufferStats server_buffer_stats;
+  MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);
         server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->setBufferStats(server_buffer_stats.toBufferStats());
+        server_connection_->setConnectionStats(server_connection_stats.toBufferStats());
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
       }));
 
   Sequence s2;
-  EXPECT_CALL(server_buffer_stats.rx_total_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_buffer_stats.rx_current_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_buffer_stats.rx_current_, sub(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, sub(4)).InSequence(s2);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter_, onNewConnection());
@@ -472,6 +491,49 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   disconnect(true);
 }
 
+TEST_P(ConnectionImplTest, BindTest) {
+  std::string address_string = TestUtility::getIpv4Loopback();
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+  setUpBasicConnection();
+  connect();
+  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
+
+  disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, BindFailureTest) {
+  // Swap the constraints from BindTest to create an address family mismatch.
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    const std::string address_string = TestUtility::getIpv4Loopback();
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    const std::string address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+  dispatcher_.reset(new Event::DispatcherImpl);
+  listener_ =
+      dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
+                                  Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
+
+  MockConnectionStats connection_stats;
+  client_connection_->setConnectionStats(connection_stats.toBufferStats());
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  EXPECT_CALL(connection_stats.bind_errors_, inc());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
@@ -484,7 +546,8 @@ public:
                                      .use_original_dst_ = false,
                                      .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
-    client_connection_ = dispatcher_->createClientConnection(socket_.localAddress());
+    client_connection_ = dispatcher_->createClientConnection(
+        socket_.localAddress(), Network::Address::InstanceConstSharedPtr());
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -549,7 +612,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
     // IPv6 reserved multicast address.
     address = Utility::resolveUrl("tcp://[ff00::]:1");
   }
-  ClientConnectionPtr connection = dispatcher.createClientConnection(address);
+  ClientConnectionPtr connection =
+      dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr());
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -560,8 +624,10 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   Event::DispatcherImpl dispatcher;
   // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
   // path from other errors. Test this also.
-  ClientConnectionPtr connection = dispatcher.createClientConnection(Utility::resolveUrl(
-      fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))));
+  ClientConnectionPtr connection = dispatcher.createClientConnection(
+      Utility::resolveUrl(
+          fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
+      Network::Address::InstanceConstSharedPtr());
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);

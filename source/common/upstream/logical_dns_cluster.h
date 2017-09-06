@@ -31,7 +31,7 @@ public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
-                    Event::Dispatcher& dispatcher, bool added_via_api);
+                    ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
   ~LogicalDnsCluster();
 
@@ -66,7 +66,10 @@ private:
     // Upstream:HostDescription
     bool canary() const override { return false; }
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
-    Outlier::DetectorHostSink& outlierDetector() const override {
+    HealthCheckHostMonitor& healthChecker() const override {
+      return logical_host_->healthChecker();
+    }
+    Outlier::DetectorHostMonitor& outlierDetector() const override {
       return logical_host_->outlierDetector();
     }
     const HostStats& stats() const override { return logical_host_->stats(); }

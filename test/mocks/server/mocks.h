@@ -40,14 +40,12 @@ namespace Server {
 class MockOptions : public Options {
 public:
   MockOptions() : MockOptions(std::string()) {}
-  MockOptions(const std::string& config_path) : MockOptions(config_path, std::string()) {}
-  MockOptions(const std::string& config_path, const std::string& boostrap_path);
+  MockOptions(const std::string& config_path);
   ~MockOptions();
 
   MOCK_METHOD0(baseId, uint64_t());
   MOCK_METHOD0(concurrency, uint32_t());
   MOCK_METHOD0(configPath, const std::string&());
-  MOCK_METHOD0(bootstrapPath, const std::string&());
   MOCK_METHOD0(adminAddressPath, const std::string&());
   MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
@@ -61,7 +59,6 @@ public:
   MOCK_METHOD0(serviceZone, const std::string&());
 
   std::string config_path_;
-  std::string bootstrap_path_;
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -302,9 +299,7 @@ public:
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
-  MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
-  MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
-  MOCK_METHOD0(statsdUdpIpAddress, Optional<std::string>());
+  MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());
@@ -338,9 +333,9 @@ public:
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
-  MOCK_METHOD0(server, Instance&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
+  MOCK_METHOD0(admin, Server::Admin&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -352,9 +347,9 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   Stats::IsolatedStoreImpl scope_;
-  testing::NiceMock<MockInstance> server_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
+  testing::NiceMock<MockAdmin> admin_;
 };
 
 } // namespace Configuration

@@ -3,8 +3,10 @@
 #include <string>
 
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -30,24 +32,22 @@ TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::
 TEST_P(IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP1); }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  IntegrationCodecClientPtr codec_client;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions(
       {[&]() -> void {
-         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
        },
        [&]() -> void {
-         codec_client->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                     {":path", "/healthcheck"},
-                                                                     {":authority", "host"},
-                                                                     {"connection", "close"}},
-                                             *response);
+         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                      {":path", "/healthcheck"},
+                                                                      {":authority", "host"},
+                                                                      {"connection", "close"}},
+                                              *response_);
        },
-       [&]() -> void { response->waitForEndStream(); },
-       [&]() -> void { codec_client->waitForDisconnect(); }});
+       [&]() -> void { response_->waitForEndStream(); },
+       [&]() -> void { codec_client_->waitForDisconnect(); }});
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -130,6 +130,10 @@ TEST_P(IntegrationTest, NoHost) { testNoHost(); }
 TEST_P(IntegrationTest, BadPath) { testBadPath(); }
 
 TEST_P(IntegrationTest, AbsolutePath) { testAbsolutePath(); }
+
+TEST_P(IntegrationTest, AbsolutePathWithPort) { testAbsolutePathWithPort(); }
+
+TEST_P(IntegrationTest, AbsolutePathWithoutPort) { testAbsolutePathWithoutPort(); }
 
 TEST_P(IntegrationTest, Connect) { testConnect(); }
 
@@ -216,34 +220,4 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
 }
 
-TEST_P(IntegrationTest, TcpProxyUpstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-       [&]() -> void { tcp_client->write("hello"); },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-       [&]() -> void { tcp_client->waitForDisconnect(); }});
-
-  EXPECT_EQ("world", tcp_client->data());
-}
-
-TEST_P(IntegrationTest, TcpProxyDownstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-       [&]() -> void { tcp_client->write("hello"); },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
-       [&]() -> void { tcp_client->waitForData("world"); },
-       [&]() -> void { tcp_client->write("hello"); }, [&]() -> void { tcp_client->close(); },
-       [&]() -> void { fake_upstream_connection->waitForData(10); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
-}
 } // namespace Envoy

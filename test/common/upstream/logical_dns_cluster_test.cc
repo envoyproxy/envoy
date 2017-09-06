@@ -13,24 +13,26 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    NiceMock<MockClusterManager> cm;
     cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                         ssl_context_manager_, dns_resolver_, tls_, dispatcher_,
+                                         ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
                                          false));
     cluster_->addMemberUpdateCb(
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
@@ -128,6 +130,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
   EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
+  cluster_->hosts()[0]->healthChecker().setUnhealthy();
   tls_.shutdownThread();
 }
 
@@ -173,7 +176,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   HostSharedPtr logical_host = cluster_->hosts()[0];
 
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))))
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
   logical_host->outlierDetector().putHttpResponseCode(200);
@@ -187,7 +190,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))))
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   Host::CreateConnectionData data = logical_host->createConnection(dispatcher_);
   EXPECT_FALSE(data.host_description_->canary());
@@ -197,6 +200,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("", data.host_description_->zone());
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
+  data.host_description_->healthChecker().setUnhealthy();
 
   expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
@@ -207,7 +211,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))))
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
 
@@ -220,7 +224,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))))
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
 

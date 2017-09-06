@@ -10,14 +10,14 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 
+namespace Envoy {
 namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,

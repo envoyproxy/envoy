@@ -21,7 +21,10 @@ unhealthy, successes required before marking a host healthy, etc.):
   server can respond with anything other than PONG to cause an immediate active health check
   failure.
 
-Note that Envoy also supports passive health checking via :ref:`outlier detection
+Passive health checking
+-----------------------
+
+Envoy also supports passive health checking via :ref:`outlier detection
 <arch_overview_outlier_detection>`.
 
 .. _arch_overview_health_checking_filter:
@@ -47,7 +50,28 @@ operation:
   eventually consistent view of the health state of each upstream host without overwhelming the
   local service with a large number of health check requests.
 
-Health check filter :ref:`configuration <config_http_filters_health_check>`.
+Further reading:
+
+* Health check filter :ref:`configuration <config_http_filters_health_check>`.
+* :ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin endpoint.
+* :ref:`/healthcheck/ok <operations_admin_interface_healthcheck_ok>` admin endpoint.
+
+Active health checking fast failure
+-----------------------------------
+
+When using active health checking along with passive health checking (:ref:`outlier detection
+<arch_overview_outlier_detection>`), it is common to use a long health checking interval to avoid a
+large amount of active health checking traffic. In this case, it is still useful to be able to
+quickly drain an upstream host when using the :ref:`/healthcheck/fail
+<operations_admin_interface_healthcheck_fail>` admin endpoint. To support this, the :ref:`router
+filter <config_http_filters_router>` will respond to the :ref:`x-envoy-immediate-health-check-fail
+<config_http_filters_router_x-envoy-immediate-health-check-fail>` header. If this header is set by
+an upstream host, Envoy will immediately mark the host as being failed for active health check. Note
+that this only occurs if the host's cluster has active health checking :ref:`configured
+<config_cluster_manager_cluster_hc>`. The :ref:`health checking filter
+<config_http_filters_health_check>` will automatically set this header if Envoy has been marked as
+failed via the :ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin
+endpoint.
 
 .. _arch_overview_health_checking_identity:
 

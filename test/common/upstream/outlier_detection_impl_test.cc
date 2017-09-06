@@ -20,13 +20,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
@@ -516,8 +516,8 @@ TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   loadRq(cluster_.hosts_[0], 5, 503);
 }
 
-TEST(DetectorHostSinkNullImplTest, All) {
-  DetectorHostSinkNullImpl null_sink;
+TEST(DetectorHostMonitorNullImplTest, All) {
+  DetectorHostMonitorNullImpl null_sink;
 
   EXPECT_EQ(0UL, null_sink.numEjections());
   EXPECT_FALSE(null_sink.lastEjectionTime().valid());

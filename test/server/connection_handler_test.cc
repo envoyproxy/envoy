@@ -22,7 +22,7 @@ namespace Server {
 
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
-  ConnectionHandlerTest() : handler_(new ConnectionHandlerImpl(log(), dispatcher_)) {}
+  ConnectionHandlerTest() : handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)) {}
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Event::MockDispatcher> dispatcher_;

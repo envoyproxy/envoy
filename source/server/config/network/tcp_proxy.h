@@ -17,7 +17,6 @@ public:
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
   std::string name() override { return "tcp_proxy"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
 };
 
 } // namespace Configuration

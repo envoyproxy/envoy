@@ -7,7 +7,7 @@
 
 #include "server/watchdog_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

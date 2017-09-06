@@ -10,7 +10,7 @@
 #include "common/http/message_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -36,7 +36,7 @@ void LightStepSpan::injectContext(Http::HeaderMap& request_headers) {
       Base64::encode(current_span_context.c_str(), current_span_context.length()));
 }
 
-SpanPtr LightStepSpan::spawnChild(const std::string& name, SystemTime start_time) {
+SpanPtr LightStepSpan::spawnChild(const Config&, const std::string& name, SystemTime start_time) {
   lightstep::Span ls_span = tracer_.StartSpan(
       name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time)});
   return SpanPtr{new LightStepSpan(ls_span, tracer_)};
@@ -135,7 +135,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   });
 }
 
-SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
+SpanPtr LightStepDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time) {
   lightstep::Tracer& tracer = *tls_->getTyped<TlsLightStepTracer>().tracer_;
   LightStepSpanPtr active_span;

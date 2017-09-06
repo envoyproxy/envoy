@@ -37,6 +37,11 @@ fi
 TEST_INDEX=0
 for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
 do
+  # Test validation.
+  # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
+  "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
+      --service-node node --base-id 1
+
   # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
   # sanity test.
   echo "Starting epoch 0"

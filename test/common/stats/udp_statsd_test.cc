@@ -12,9 +12,9 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::NiceMock;
 
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 

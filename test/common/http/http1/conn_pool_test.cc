@@ -20,7 +20,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -30,6 +29,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -91,7 +91,7 @@ public:
                                                        },
                                                        nullptr);
 
-    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_))
+    EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));

@@ -41,6 +41,7 @@ brew install cmake
 brew install libtool
 brew install go
 brew install bazel
+brew install automake
 ```
 
 Envoy compiles and passes tests with the version of clang installed by XCode 8.3.3:

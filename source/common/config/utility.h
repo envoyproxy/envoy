@@ -1,9 +1,11 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
@@ -11,6 +13,18 @@
 
 namespace Envoy {
 namespace Config {
+
+/**
+ * Constant Api Type Values, used by envoy::api::v2::ApiConfigSource.
+ */
+class ApiTypeValues {
+public:
+  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string Rest{"REST"};
+  const std::string Grpc{"GRPC"};
+};
+
+typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
  * General config API utilities.
@@ -38,6 +52,17 @@ public:
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
+
+  /**
+   * Populate an envoy::api::v2::ApiConfigSource.
+   * @param cluster supplies the cluster name for the ApiConfigSource.
+   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
+   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
+   * @param api_config_source a reference to the envoy::api::v2::ApiConfigSource object to populate.
+   */
+  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                                       const std::string& api_type,
+                                       envoy::api::v2::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -69,12 +94,12 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
-   * @param sds_config source v1 SdsConfig.
+   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::ConfigSource.
+   * @param json_config source v1 SDS JSON config.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
    */
-  static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
-                                   envoy::api::v2::ConfigSource& eds_config);
+  static void translateEdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& eds_config);
 
   /**
    * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.

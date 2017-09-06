@@ -18,13 +18,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class ConnectionManagerUtilityTest : public testing::Test {

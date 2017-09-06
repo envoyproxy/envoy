@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/network:listen_socket_interface",
     ],
 )
 
@@ -100,9 +101,11 @@ envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
     deps = [
+        ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:init_interface",
+        "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
@@ -111,6 +114,9 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/protobuf",
     ],
 )
 

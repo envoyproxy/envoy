@@ -40,9 +40,10 @@ public:
    * @param dispatcher supplies the dispatcher.
    * @return a health checker.
    */
-  static HealthCheckerPtr create(const envoy::api::v2::HealthCheck& hc_config,
-                                 Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+  static HealthCheckerSharedPtr create(const envoy::api::v2::HealthCheck& hc_config,
+                                       Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                       Runtime::RandomGenerator& random,
+                                       Event::Dispatcher& dispatcher);
 };
 
 /**
@@ -53,6 +54,7 @@ public:
   COUNTER(attempt)                                                                                 \
   COUNTER(success)                                                                                 \
   COUNTER(failure)                                                                                 \
+  COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
   COUNTER(verify_cluster)                                                                          \
   GAUGE  (healthy)
@@ -68,7 +70,9 @@ struct HealthCheckerStats {
 /**
  * Base implementation for both the HTTP and TCP health checker.
  */
-class HealthCheckerImplBase : public HealthChecker, protected Logger::Loggable<Logger::Id::hc> {
+class HealthCheckerImplBase : public HealthChecker,
+                              protected Logger::Loggable<Logger::Id::hc>,
+                              public std::enable_shared_from_this<HealthCheckerImplBase> {
 public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
@@ -77,14 +81,17 @@ public:
 protected:
   class ActiveHealthCheckSession {
   public:
+    enum class FailureType { Active, Passive, Network };
+
     virtual ~ActiveHealthCheckSession();
+    void setUnhealthy(FailureType type);
     void start() { onIntervalBase(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess();
-    void handleFailure(bool network_failure);
+    void handleFailure(FailureType type);
 
     HostSharedPtr host_;
 
@@ -120,6 +127,18 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
+  struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
+    HealthCheckHostMonitorImpl(const std::shared_ptr<HealthCheckerImplBase>& health_checker,
+                               const HostSharedPtr& host)
+        : health_checker_(health_checker), host_(host) {}
+
+    // Upstream::HealthCheckHostMonitor
+    void setUnhealthy() override;
+
+    std::weak_ptr<HealthCheckerImplBase> health_checker_;
+    std::weak_ptr<Host> host_;
+  };
+
   void addHosts(const std::vector<HostSharedPtr>& hosts);
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
@@ -129,6 +148,7 @@ private:
                              const std::vector<HostSharedPtr>& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, bool changed_state);
+  void setUnhealthyCrossThread(const HostSharedPtr& host);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 

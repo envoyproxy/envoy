@@ -8,7 +8,7 @@
 #include "common/common/assert.h"
 #include "common/redis/supported_commands.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Redis {

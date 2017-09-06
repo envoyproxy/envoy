@@ -21,8 +21,6 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server_ratelimit.json", {"http"});
-
-    upstream_response_.reset(new IntegrationStreamDecoder(*dispatcher_));
   }
 
   void TearDown() override {
@@ -36,7 +34,7 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    codec_client_->makeRequestWithBody(headers, request_size_, *upstream_response_);
+    codec_client_->makeRequestWithBody(headers, request_size_, *response_);
   }
 
   void waitForRatelimitRequest() {
@@ -73,21 +71,21 @@ public:
 
     upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
-    upstream_response_->waitForEndStream();
+    response_->waitForEndStream();
 
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
-    EXPECT_TRUE(upstream_response_->complete());
-    EXPECT_STREQ("200", upstream_response_->headers().Status()->value().c_str());
-    EXPECT_EQ(response_size_, upstream_response_->body().size());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+    EXPECT_EQ(response_size_, response_->body().size());
   }
 
   void waitForFailedUpstreamResponse(uint32_t response_code) {
-    upstream_response_->waitForEndStream();
-    EXPECT_TRUE(upstream_response_->complete());
+    response_->waitForEndStream();
+    EXPECT_TRUE(response_->complete());
     EXPECT_STREQ(std::to_string(response_code).c_str(),
-                 upstream_response_->headers().Status()->value().c_str());
+                 response_->headers().Status()->value().c_str());
   }
 
   void sendRateLimitResponse(pb::lyft::ratelimit::RateLimitResponse_Code code) {
@@ -111,11 +109,7 @@ public:
     }
   }
 
-  IntegrationCodecClientPtr codec_client_;
-  FakeHttpConnectionPtr fake_upstream_connection_;
   FakeHttpConnectionPtr fake_ratelimit_connection_;
-  IntegrationStreamDecoderPtr upstream_response_;
-  FakeStreamPtr upstream_request_;
   FakeStreamPtr ratelimit_request_;
 
   const uint64_t request_size_ = 1024;
@@ -165,14 +159,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
 TEST_P(RatelimitIntegrationTest, Timeout) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  // Keep polling stats until the HTTP ratelimit wait times out.
-  const uint32_t sleep_ms = 100;
-  for (int32_t timeout_wait_ms = 50000; timeout_wait_ms > 0; timeout_wait_ms -= sleep_ms) {
-    if (test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value() > 0) {
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-  }
+  test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();

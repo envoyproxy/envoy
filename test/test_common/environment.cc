@@ -1,6 +1,7 @@
 #include "test/test_common/environment.h"
 
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <fstream>
 #include <iostream>
@@ -209,4 +210,16 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
+
+std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
+                                                      const std::string& contents) {
+  const std::string out_path = TestEnvironment::temporaryPath(filename);
+  unlink(out_path.c_str());
+  {
+    std::ofstream out_file(out_path);
+    out_file << contents;
+  }
+  return out_path;
+}
+
 } // namespace Envoy

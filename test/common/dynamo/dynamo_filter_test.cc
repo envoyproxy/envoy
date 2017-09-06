@@ -14,12 +14,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
+namespace Envoy {
 namespace Dynamo {
 
 class DynamoFilterTest : public testing::Test {

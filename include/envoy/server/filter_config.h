@@ -10,17 +10,18 @@
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/assert.h"
+#include "common/common/macros.h"
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Server {
-
-class Instance; // TODO(mattklein123): Remove post 1.4.0. Forward declare to avoid circular
-                // includes.
-
 namespace Configuration {
 
 /**
@@ -96,12 +97,6 @@ public:
   virtual Envoy::Runtime::Loader& runtime() PURE;
 
   /**
-   * DEPRECATED: Do not call this function. It will be removed post 1.4.0 and is needed for other
-   * deprecated functionality.
-   */
-  virtual Instance& server() PURE;
-
-  /**
    * @return Stats::Scope& the filter's stats scope.
    */
   virtual Stats::Scope& scope() PURE;
@@ -116,9 +111,12 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-};
 
-enum class NetworkFilterType { Read, Write, Both };
+  /**
+   * @return Server::Admin& the server's global admin HTTP endpoint.
+   */
+  virtual Server::Admin& admin() PURE;
+};
 
 /**
  * This function is used to wrap the creation of a network filter chain for new connections as
@@ -151,18 +149,30 @@ public:
                                                      FactoryContext& context) PURE;
 
   /**
+   * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
+   * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
+   */
+  virtual NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                              FactoryContext& context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    NOT_IMPLEMENTED;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+   *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+
+  /**
    * @return std::string the identifying name for a particular implementation of a network filter
    * produced by the factory.
    */
   virtual std::string name() PURE;
-
-  /**
-   * @return NetworkFilterType the type of filter.
-   */
-  virtual NetworkFilterType type() PURE;
 };
-
-enum class HttpFilterType { Decoder, Encoder, Both };
 
 /**
  * This function is used to wrap the creation of an HTTP filter chain for new streams as they
@@ -198,15 +208,32 @@ public:
                                                   FactoryContext& context) PURE;
 
   /**
+   * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
+   * may be optionally implemented today, but will in the future become compulsory once v1 is
+   * deprecated.
+   */
+  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                           const std::string& stat_prefix,
+                                                           FactoryContext& context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(stat_prefix);
+    UNREFERENCED_PARAMETER(context);
+    NOT_IMPLEMENTED;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+   *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+
+  /**
    * @return std::string the identifying name for a particular implementation of an http filter
    * produced by the factory.
    */
   virtual std::string name() PURE;
-
-  /**
-   * @return HttpFilterType the type of filter.
-   */
-  virtual HttpFilterType type() PURE;
 };
 
 } // namespace Configuration

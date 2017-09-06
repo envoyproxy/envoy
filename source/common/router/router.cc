@@ -334,6 +334,7 @@ void Filter::maybeDoShadowing() {
 void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
   downstream_request_complete_time_ = std::chrono::steady_clock::now();
+  callbacks_->requestInfo().requestReceivedDuration(downstream_request_complete_time_);
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
@@ -454,6 +455,10 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(
       Http::Utility::getResponseStatus(*headers));
 
+  if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
+    upstream_request_->upstream_host_->healthChecker().setUnhealthy();
+  }
+
   if (retry_state_ &&
       retry_state_->shouldRetry(headers.get(), Optional<Http::StreamResetReason>(),
                                 [this]() -> void { doRetry(); }) &&
@@ -471,9 +476,11 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // Only send upstream service time if we received the complete request and this is not a
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    MonotonicTime response_received_time = std::chrono::steady_clock::now();
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - downstream_request_complete_time_);
+        response_received_time - downstream_request_complete_time_);
     headers->insertEnvoyUpstreamServiceTime().value(ms.count());
+    callbacks_->requestInfo().responseReceivedDuration(response_received_time);
   }
 
   upstream_request_->upstream_canary_ =
