@@ -95,6 +95,36 @@ void FilterJson::translateAccessLog(const Json::Object& json_access_log,
   }
 }
 
+void FilterJson::translateDecorator(
+    const Json::Object& json_decorator,
+    envoy::api::v2::filter::HttpConnectionManager::Tracing::Decorator& decorator) {
+  auto* match = decorator.mutable_match();
+
+  if (json_decorator.hasObject("prefix")) {
+    match->set_prefix(json_decorator.getString("prefix"));
+  }
+  if (json_decorator.hasObject("path")) {
+    if (json_decorator.hasObject("prefix")) {
+      throw EnvoyException("decorators must specify either prefix or path");
+    }
+    match->set_path(json_decorator.getString("path"));
+  }
+
+  JSON_UTIL_SET_BOOL(json_decorator, *match, case_sensitive);
+
+  if (json_decorator.hasObject("method")) {
+    envoy::api::v2::filter::HttpConnectionManager::Tracing::DecoratorMatch::HttpMethod
+        http_method{};
+    envoy::api::v2::filter::HttpConnectionManager::Tracing::DecoratorMatch::HttpMethod_Parse(
+        StringUtil::toUpper(json_decorator.getString("method")), &http_method);
+    match->set_method(http_method);
+  }
+
+  if (json_decorator.hasObject("operation")) {
+    decorator.set_operation(json_decorator.getString("operation"));
+  }
+}
+
 void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_http_connection_manager,
     envoy::api::v2::filter::HttpConnectionManager& http_connection_manager) {
@@ -148,6 +178,11 @@ void FilterJson::translateHttpConnectionManager(
     for (const std::string& header :
          json_tracing->getStringArray("request_headers_for_tags", true)) {
       tracing->add_request_headers_for_tags(header);
+    }
+
+    for (const auto json_decorator : json_tracing->getObjectArray("decorators", true)) {
+      auto* decorator = tracing->mutable_decorators()->Add();
+      translateDecorator(*json_decorator, *decorator);
     }
   }
 

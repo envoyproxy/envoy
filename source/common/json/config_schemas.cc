@@ -229,9 +229,37 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "array",
             "uniqueItems": true,
             "items" : {"type" : "string"}
+          },
+          "decorators" : {
+            "type" : "array",
+            "minItems" : 1,
+            "properties" : {"$ref" : "#/definitions/decorators"}
           }
         },
         "required" : ["operation_name"],
+        "additionalProperties" : false
+      },
+      "decorators" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "prefix" : {
+            "type" : "string"
+          },
+          "case_sensitive" : {
+            "type" : "boolean"
+          },
+          "method" : {
+            "type" : "string",
+            "enum": ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
+          },
+          "operation" : {
+            "type" : "string"
+          }
+        },
+        "required" : ["operation"],
         "additionalProperties" : false
       },
       "filters" : {

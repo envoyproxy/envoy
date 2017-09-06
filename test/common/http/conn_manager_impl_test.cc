@@ -74,7 +74,7 @@ public:
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))} {
     tracing_config_.reset(new TracingConnectionManagerConfig(
-        {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
+        {Tracing::OperationName::Ingress, {LowerCaseString(":method")}, {}}));
 
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
@@ -1625,6 +1625,86 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 
   ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
   EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
+}
+
+class PrefixDecoratorImplTest : public testing::Test {
+public:
+};
+
+TEST_F(PrefixDecoratorImplTest, MatchedPrefixNoMethod) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_prefix("/trace");
+
+  PrefixDecoratorImpl decorator = PrefixDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/trace/1"}}));
+  EXPECT_EQ(false, decorator.match(
+                       Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/service/1"}}));
+}
+
+TEST_F(PrefixDecoratorImplTest, MatchedPrefixWithMethod) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_prefix("/trace");
+  match->set_method(envoy::api::v2::filter::HttpConnectionManager_Tracing_DecoratorMatch::GET);
+
+  PrefixDecoratorImpl decorator = PrefixDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/trace/1"}}));
+  EXPECT_EQ(false,
+            decorator.match(Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/trace/1"}}));
+}
+
+TEST_F(PrefixDecoratorImplTest, MatchedPrefixCaseInsensitive) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_prefix("/TRACE");
+  match->mutable_case_sensitive()->set_value(false);
+
+  PrefixDecoratorImpl decorator = PrefixDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/trace/1"}}));
+}
+
+class PathDecoratorImplTest : public testing::Test {
+public:
+};
+
+TEST_F(PathDecoratorImplTest, MatchedPathNoMethod) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_path("/trace/1");
+
+  PathDecoratorImpl decorator = PathDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/trace/1"}}));
+  EXPECT_EQ(false,
+            decorator.match(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/trace/2"}}));
+}
+
+TEST_F(PathDecoratorImplTest, MatchedPathWithMethod) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_path("/trace/1");
+  match->set_method(envoy::api::v2::filter::HttpConnectionManager_Tracing_DecoratorMatch::GET);
+
+  PathDecoratorImpl decorator = PathDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/trace/1"}}));
+  EXPECT_EQ(false,
+            decorator.match(Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/trace/1"}}));
+}
+
+TEST_F(PathDecoratorImplTest, MatchedPathCaseInsensitive) {
+  envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator decorator_config;
+  auto* match = decorator_config.mutable_match();
+  match->set_path("/TRACE/1");
+  match->mutable_case_sensitive()->set_value(false);
+
+  PathDecoratorImpl decorator = PathDecoratorImpl(decorator_config);
+  EXPECT_EQ(true,
+            decorator.match(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/trace/1"}}));
 }
 
 } // namespace Http

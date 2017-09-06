@@ -19,6 +19,8 @@ void ZipkinSpan::finishSpan(Tracing::SpanFinalizer& finalizer) {
   span_.finish();
 }
 
+void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
+
 void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
   span_.setTag(name, value);
 }
@@ -79,7 +81,7 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
-                                   const std::string&, SystemTime start_time) {
+                                   const std::string& span_name, SystemTime start_time) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
 
@@ -103,11 +105,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     // annotation. In this case, we are dealing with an ingress operation. This envoy instance,
     // being at the receiving end, will add the SR annotation to the shared span context.
 
-    new_zipkin_span =
-        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
+    new_zipkin_span = tracer.startSpan(config, span_name, start_time, context);
   } else {
     // Create a root Zipkin span. No context was found in the headers.
-    new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+    new_zipkin_span = tracer.startSpan(config, span_name, start_time);
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));

@@ -31,6 +31,8 @@
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "api/filter/http_connection_manager.pb.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -117,6 +119,54 @@ struct ConnectionManagerTracingStats {
 };
 
 /**
+ * Base implementation for all decorator entries.
+ */
+class DecoratorImplBase : public Tracing::Decorator {
+public:
+  DecoratorImplBase(
+      const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator);
+
+  bool match(const Http::HeaderMap& headers) const;
+
+  void apply(const Tracing::SpanPtr& span) const;
+
+protected:
+  const bool case_sensitive_;
+
+private:
+  const envoy::api::v2::filter::HttpConnectionManager::Tracing::DecoratorMatch::HttpMethod method_;
+  const std::string operation_;
+};
+
+/**
+ * Route entry implementation for prefix path match routing.
+ */
+class PrefixDecoratorImpl : public DecoratorImplBase {
+public:
+  PrefixDecoratorImpl(
+      const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator);
+
+  bool match(const Http::HeaderMap& headers) const;
+
+private:
+  const std::string prefix_;
+};
+
+/**
+ * Route entry implementation for exact path match routing.
+ */
+class PathDecoratorImpl : public DecoratorImplBase {
+public:
+  PathDecoratorImpl(
+      const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator);
+
+  bool match(const Http::HeaderMap& headers) const;
+
+private:
+  const std::string path_;
+};
+
+/**
  * Configuration for tracing which is set on the connection manager level.
  * Http Tracing can be enabled/disabled on a per connection manager basis.
  * Here we specify some specific for connection manager settings.
@@ -124,6 +174,7 @@ struct ConnectionManagerTracingStats {
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
   std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  std::vector<Tracing::DecoratorConstSharedPtr> decorators_;
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
@@ -492,9 +543,10 @@ private:
       encodeHeaders(nullptr, headers, true);
     }
 
-    // Tracing::TracingConfig
+    // Tracing::Config
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    virtual const std::vector<Tracing::DecoratorConstSharedPtr>& decorators() const override;
 
     // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.

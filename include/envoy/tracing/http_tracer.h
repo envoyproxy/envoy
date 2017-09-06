@@ -13,6 +13,28 @@ namespace Tracing {
 
 enum class OperationName { Ingress, Egress };
 
+class Span;
+
+typedef std::unique_ptr<Span> SpanPtr;
+
+class Decorator {
+public:
+  virtual ~Decorator() {}
+
+  /**
+   * @return bool Whether the supplied headers match the decorator's criteria.
+   */
+  virtual bool match(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * This method decorates the supplied span.
+   * @param const Tracing::SpanPtr& the span.
+   */
+  virtual void apply(const Tracing::SpanPtr& span) const PURE;
+};
+
+typedef std::shared_ptr<const Decorator> DecoratorConstSharedPtr;
+
 /*
  * Tracing configuration, it carries additional data needed to populate the span.
  */
@@ -29,11 +51,12 @@ public:
    * @return list of headers to populate tags on the active span.
    */
   virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
+
+  /**
+   * @return list of decorators.
+   */
+  virtual const std::vector<DecoratorConstSharedPtr>& decorators() const PURE;
 };
-
-class Span;
-
-typedef std::unique_ptr<Span> SpanPtr;
 
 /*
  * Interface to perform context-specific tasks when completing a Span.
@@ -55,6 +78,12 @@ public:
 class Span {
 public:
   virtual ~Span() {}
+
+  /**
+   * Set the operation name.
+   * @param operation the operation name
+   */
+  virtual void setOperation(const std::string& operation) PURE;
 
   /**
    * Attach metadata to a Span, to be handled in an implementation-dependent fashion.

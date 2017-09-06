@@ -26,6 +26,17 @@ public:
                                  envoy::api::v2::filter::AccessLog& access_log);
 
   /**
+   * Translate a v1 JSON tracing decorator object to v2
+   * envoy::api::v2::filter::HttpConnectionManager::Tracing::Decorator.
+   * @param json_decorator source v1 JSON decorator object.
+   * @param decorator destination v2
+   * envoy::api::v2::filter::HttpConnectionManager::Tracing::Decorator.
+   */
+  static void
+  translateDecorator(const Json::Object& json_decorator,
+                     envoy::api::v2::filter::HttpConnectionManager::Tracing::Decorator& decorator);
+
+  /**
    * Translate a v1 JSON HTTP connection manager object to v2
    * envoy::api::v2::filter::HttpConnectionManager.
    * @param json_http_connection_manager source v1 JSON HTTP connection manager object.

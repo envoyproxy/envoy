@@ -167,6 +167,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     Tracing::OperationName tracing_operation_name;
     std::vector<Http::LowerCaseString> request_headers_for_tags;
+    std::vector<Tracing::DecoratorConstSharedPtr> decorators(tracing_config.decorators().size());
 
     switch (tracing_config.operation_name()) {
     case envoy::api::v2::filter::HttpConnectionManager::Tracing::INGRESS:
@@ -183,8 +184,24 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
+    for (int i = 0; i < tracing_config.decorators().size(); i++) {
+      const auto& decorator = tracing_config.decorators()[i];
+      switch (decorator.match().path_specifier_case()) {
+      case envoy::api::v2::filter::HttpConnectionManager::Tracing::DecoratorMatch::
+          PathSpecifierCase::kPrefix:
+        decorators[i] = std::make_shared<Http::PrefixDecoratorImpl>(decorator);
+        break;
+      case envoy::api::v2::filter::HttpConnectionManager::Tracing::DecoratorMatch::
+          PathSpecifierCase::kPath:
+        decorators[i] = std::make_shared<Http::PathDecoratorImpl>(decorator);
+        break;
+      default:
+        NOT_REACHED;
+      }
+    }
+
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags}));
+        {tracing_operation_name, request_headers_for_tags, decorators}));
   }
 
   if (config.has_idle_timeout()) {

@@ -8,7 +8,19 @@
           "name": "http_connection_manager",
           "config": {
             "tracing": {
-              "operation_name": "ingress"
+              "operation_name": "ingress",
+              "decorators": [
+                {
+                  "prefix": "/trace",
+                  "method": "GET",
+                  "operation": "checkAvailability"
+                },
+                {
+                  "prefix": "/service",
+                  "method": "GET",
+                  "operation": "placeOrder"
+                }
+              ]
             }, 
             "codec_type": "auto",
             "stat_prefix": "ingress_http",
@@ -45,7 +57,14 @@
           "name": "http_connection_manager",
           "config": {
             "tracing": {
-              "operation_name": "egress"
+              "operation_name": "egress",
+              "decorators": [
+                {
+                  "prefix": "/trace",
+                  "method": "GET",
+                  "operation": "checkStock"
+                }
+              ]
             }, 
             "codec_type": "auto",
             "stat_prefix": "egress_http",
