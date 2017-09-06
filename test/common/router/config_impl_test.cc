@@ -20,6 +20,7 @@
 
 namespace Envoy {
 using testing::ContainerEq;
+using testing::ElementsAreArray;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -2043,8 +2044,7 @@ TEST(RoutePropertyTest, TestCorsConfig) {
           "prefix": "/api",
           "cluster": "ats",
           "cors" : {
-              "enabled": true,
-              "allow_origin": "test-origin",
+              "allow_origin": ["test-origin"],
               "allow_methods": "test-methods",
               "allow_headers": "test-headers",
               "expose_headers": "test-expose-headers",
@@ -2062,16 +2062,16 @@ TEST(RoutePropertyTest, TestCorsConfig) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  const CorsPolicy& cors_policy =
+  const Router::CorsPolicySharedPtr cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
-  EXPECT_EQ(cors_policy.enabled(), true);
-  EXPECT_EQ(cors_policy.allowOrigin(), "test-origin");
-  EXPECT_EQ(cors_policy.allowMethods(), "test-methods");
-  EXPECT_EQ(cors_policy.allowHeaders(), "test-headers");
-  EXPECT_EQ(cors_policy.exposeHeaders(), "test-expose-headers");
-  EXPECT_EQ(cors_policy.maxAge(), "test-max-age");
-  EXPECT_EQ(cors_policy.allowCredentials(), true);
+  EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigin(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
 TEST(RoutePropertyTest, TestBadCorsConfig) {
