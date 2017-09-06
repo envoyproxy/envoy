@@ -2,7 +2,7 @@
 
 set -e
 
-COMMIT=68f84f5c40644e029ed066999448696b01caba7a  # chromium-60.0.3112.78
+COMMIT=14308731e5446a73ac2258688a9688b524483cb6  # chromium-61.0.3163.81
 
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl
