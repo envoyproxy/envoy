@@ -12,7 +12,7 @@ Envoy has the following requirements:
 * `Bazel <https://github.com/bazelbuild/bazel>`_ (last tested with 0.5.3)
 * `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 0.14.0)
 * `http-parser <https://github.com/nodejs/http-parser>`_ (last tested with 2.7.1)
-* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.23.1)
+* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.25.0)
 * `libevent <http://libevent.org/>`_ (last tested with 2.1.8)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
 * `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.6.1)
