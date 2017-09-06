@@ -48,7 +48,6 @@ private:
 };
 
 TEST(RequestInfoImplTest, TimingTest) {
-
   RequestInfoTimingWrapper wrapper;
 
   wrapper.checkTimingBounds(
@@ -82,18 +81,18 @@ TEST(RequestInfoImplTest, BytesTest) {
 }
 
 TEST(RequestInfoImplTest, ResponseFlagTest) {
-  std::vector<ResponseFlag> responseFlags = {FailedLocalHealthCheck,
-                                             NoHealthyUpstream,
-                                             UpstreamRequestTimeout,
-                                             LocalReset,
-                                             UpstreamRemoteReset,
-                                             UpstreamConnectionFailure,
-                                             UpstreamConnectionTermination,
-                                             UpstreamOverflow,
-                                             NoRouteFound,
-                                             DelayInjected,
-                                             FaultInjected,
-                                             RateLimited};
+  const std::vector<ResponseFlag> responseFlags = {FailedLocalHealthCheck,
+                                                   NoHealthyUpstream,
+                                                   UpstreamRequestTimeout,
+                                                   LocalReset,
+                                                   UpstreamRemoteReset,
+                                                   UpstreamConnectionFailure,
+                                                   UpstreamConnectionTermination,
+                                                   UpstreamOverflow,
+                                                   NoRouteFound,
+                                                   DelayInjected,
+                                                   FaultInjected,
+                                                   RateLimited};
 
   RequestInfoImpl request_info(Protocol::Http2);
   for (ResponseFlag flag : responseFlags) {
