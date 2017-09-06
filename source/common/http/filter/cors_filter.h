@@ -65,7 +65,6 @@ private:
   const Envoy::Router::CorsPolicy* virtualHostCorsPolicy_{};
   bool is_cors_request_{};
   Http::HeaderEntry* origin_{};
-  std::string origin__{};
 };
 
 } // namespace Http
