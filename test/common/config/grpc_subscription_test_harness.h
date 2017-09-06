@@ -88,6 +88,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }
     subscription_->onReceiveMessage(std::move(response));
+    EXPECT_EQ(version_, subscription_->versionInfo());
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
