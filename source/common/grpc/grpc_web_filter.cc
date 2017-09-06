@@ -41,10 +41,9 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
-    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_,
-                                  Http::Code::UnsupportedMediaType, EMPTY_STRING);
-    return Http::FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::Continue;
   }
+  is_grpc_web_request_ = true;
 
   setupStatTracking(headers);
 
@@ -73,6 +72,10 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
 }
 
 Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
   if (!is_text_request_) {
     // No additional transcoding required if gRPC client is sending binary request.
     return Http::FilterDataStatus::Continue;
@@ -105,6 +108,10 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (do_stat_tracking_) {
     chargeStat(headers);
   }
@@ -119,6 +126,10 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
 }
 
 Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
   if (!is_text_response_) {
     // No additional transcoding required if gRPC-Web client asked for binary response.
     return Http::FilterDataStatus::Continue;
@@ -149,6 +160,10 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   if (do_stat_tracking_) {
     chargeStat(trailers);
   }
