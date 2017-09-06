@@ -50,19 +50,20 @@ public:
 private:
   friend class CorsFilterTest;
 
-  const std::string& allowOrigin();
+  const std::list<std::string>& allowOrigin();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();
   const std::string& maxAge();
   bool allowCredentials();
   bool enabled();
+  bool isOriginAllowed(Http::HeaderString& origin);
 
   CorsFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  Envoy::Router::CorsPolicySharedPtr routeCorsPolicy_{};
-  Envoy::Router::CorsPolicySharedPtr virtualHostCorsPolicy_{};
+  Envoy::Router::CorsPolicySharedPtr route_cors_policy_{};
+  Envoy::Router::CorsPolicySharedPtr virtual_host_cors_policy_{};
   bool is_cors_request_{};
   Http::HeaderEntry* origin_{};
 };

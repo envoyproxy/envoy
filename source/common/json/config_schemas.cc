@@ -581,7 +581,11 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
       "cors" : {
         "type" : "object",
         "properties" : {
-          "allow_origin": {"type" : "string"},
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
           "allow_methods" : {"type" : "string"},
           "allow_headers" : {"type" : "string"},
           "expose_headers" : {"type" : "string"},
@@ -712,7 +716,11 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "cors" : {
         "type" : "object",
         "properties" : {
-          "allow_origin": {"type" : "string"},
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
           "allow_methods" : {"type" : "string"},
           "allow_headers" : {"type" : "string"},
           "expose_headers" : {"type" : "string"},

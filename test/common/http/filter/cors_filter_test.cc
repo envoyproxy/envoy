@@ -31,7 +31,7 @@ public:
   CorsFilterTest() : config_{new CorsFilterConfig{}}, filter_(config_) {
     cors_policy_.reset(new Router::TestCorsPolicy());
     cors_policy_->enabled_ = true;
-    cors_policy_->allow_origin_ = "*";
+    cors_policy_->allow_origin_.push_back("*");
     cors_policy_->allow_methods_ = "GET";
     cors_policy_->allow_headers_ = "content-type";
     cors_policy_->expose_headers_ = "content-type";
@@ -186,7 +186,8 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOrigin) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "OPTIONS"}, {"origin", "test-host"}, {"access-control-request-method", "GET"}};
 
-  cors_policy_->allow_origin_ = "localhost";
+  cors_policy_->allow_origin_.clear();
+  cors_policy_->allow_origin_.push_back("localhost");
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -204,7 +205,8 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsTrue) {
       {":method", "OPTIONS"}, {"origin", "localhost"}, {"access-control-request-method", "GET"}};
 
   cors_policy_->allow_credentials_ = true;
-  cors_policy_->allow_origin_ = "localhost";
+  cors_policy_->allow_origin_.clear();
+  cors_policy_->allow_origin_.push_back("localhost");
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"},
@@ -316,7 +318,8 @@ TEST_F(CorsFilterTest, EncodeWithAllowCredentialsFalse) {
 TEST_F(CorsFilterTest, EncodeWithNonMatchingOrigin) {
   Http::TestHeaderMapImpl request_headers{{"origin", "test-host"}};
 
-  cors_policy_->allow_origin_ = "localhost";
+  cors_policy_->allow_origin_.clear();
+  cors_policy_->allow_origin_.push_back("localhost");
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));

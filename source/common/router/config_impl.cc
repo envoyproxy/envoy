@@ -45,7 +45,9 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
-  allow_origin_ = config.allow_origin();
+  for (const auto& origin : config.allow_origin()) {
+    allow_origin_.push_back(origin);
+  }
   allow_methods_ = config.allow_methods();
   allow_headers_ = config.allow_headers();
   expose_headers_ = config.expose_headers();

@@ -87,13 +87,15 @@ protected:
 private:
   struct NullCorsPolicy : public Router::CorsPolicy {
     // Router::CorsPolicy
-    const std::string& allowOrigin() const override { return EMPTY_STRING; };
+    const std::list<std::string>& allowOrigin() const override { return allow_origin_; };
     const std::string& allowMethods() const override { return EMPTY_STRING; };
     const std::string& allowHeaders() const override { return EMPTY_STRING; };
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };
     const std::string& maxAge() const override { return EMPTY_STRING; };
     bool allowCredentials() const override { return false; };
     bool enabled() const override { return false; };
+
+    static const std::list<std::string> allow_origin_;
   };
 
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {

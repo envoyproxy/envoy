@@ -71,7 +71,7 @@ public:
   CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config);
 
   // Router::CorsPolicy
-  const std::string& allowOrigin() const override { return allow_origin_; };
+  const std::list<std::string>& allowOrigin() const override { return allow_origin_; };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -80,7 +80,7 @@ public:
   bool enabled() const override { return enabled_; };
 
 private:
-  std::string allow_origin_;
+  std::list<std::string> allow_origin_;
   std::string allow_methods_;
   std::string allow_headers_;
   std::string expose_headers_;

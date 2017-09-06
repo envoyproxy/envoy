@@ -26,7 +26,7 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  if (allowOrigin().find(origin_->value().c_str()) == std::string::npos && allowOrigin() != "*") {
+  if (!isOriginAllowed(origin_->value())) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -91,54 +91,63 @@ void CorsFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbac
 };
 
 void CorsFilter::initialize() {
-  routeCorsPolicy_ = decoder_callbacks_->route()->routeEntry()->corsPolicy();
-  virtualHostCorsPolicy_ = decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
+  route_cors_policy_ = decoder_callbacks_->route()->routeEntry()->corsPolicy();
+  virtual_host_cors_policy_ = decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
 }
 
-const std::string& CorsFilter::allowOrigin() {
-  if (routeCorsPolicy_->allowOrigin() != "") {
-    return routeCorsPolicy_->allowOrigin();
+bool CorsFilter::isOriginAllowed(Http::HeaderString& origin) {
+  for (const auto& o : allowOrigin()) {
+    if (o == "*" || origin == o.c_str()) {
+      return true;
+    }
   }
-  return virtualHostCorsPolicy_->allowOrigin();
+  return false;
+}
+
+const std::list<std::string>& CorsFilter::allowOrigin() {
+  if (!route_cors_policy_->allowOrigin().empty()) {
+    return route_cors_policy_->allowOrigin();
+  }
+  return virtual_host_cors_policy_->allowOrigin();
 }
 
 const std::string& CorsFilter::allowMethods() {
-  if (routeCorsPolicy_->allowMethods() != "") {
-    return routeCorsPolicy_->allowMethods();
+  if (route_cors_policy_->allowMethods() != "") {
+    return route_cors_policy_->allowMethods();
   }
-  return virtualHostCorsPolicy_->allowMethods();
+  return virtual_host_cors_policy_->allowMethods();
 }
 
 const std::string& CorsFilter::allowHeaders() {
-  if (routeCorsPolicy_->allowHeaders() != "") {
-    return routeCorsPolicy_->allowHeaders();
+  if (route_cors_policy_->allowHeaders() != "") {
+    return route_cors_policy_->allowHeaders();
   }
-  return virtualHostCorsPolicy_->allowHeaders();
+  return virtual_host_cors_policy_->allowHeaders();
 }
 
 const std::string& CorsFilter::exposeHeaders() {
-  if (routeCorsPolicy_->exposeHeaders() != "") {
-    return routeCorsPolicy_->exposeHeaders();
+  if (route_cors_policy_->exposeHeaders() != "") {
+    return route_cors_policy_->exposeHeaders();
   }
-  return virtualHostCorsPolicy_->exposeHeaders();
+  return virtual_host_cors_policy_->exposeHeaders();
 }
 
 const std::string& CorsFilter::maxAge() {
-  if (routeCorsPolicy_->maxAge() != "") {
-    return routeCorsPolicy_->maxAge();
+  if (route_cors_policy_->maxAge() != "") {
+    return route_cors_policy_->maxAge();
   }
-  return virtualHostCorsPolicy_->maxAge();
+  return virtual_host_cors_policy_->maxAge();
 }
 
 bool CorsFilter::allowCredentials() {
-  if (routeCorsPolicy_->allowCredentials() == true) {
-    return routeCorsPolicy_->allowCredentials();
+  if (route_cors_policy_->allowCredentials() == true) {
+    return route_cors_policy_->allowCredentials();
   }
-  return virtualHostCorsPolicy_->allowCredentials();
+  return virtual_host_cors_policy_->allowCredentials();
 }
 
 bool CorsFilter::enabled() {
-  return routeCorsPolicy_->enabled() || virtualHostCorsPolicy_->enabled();
+  return route_cors_policy_->enabled() || virtual_host_cors_policy_->enabled();
 }
 
 } // namespace Http
