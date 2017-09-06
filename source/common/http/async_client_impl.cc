@@ -11,7 +11,8 @@
 namespace Envoy {
 namespace Http {
 
-const AsyncStreamImpl::NullCorsPolicy AsyncStreamImpl::RouteEntryImpl::cors_policy_;
+const std::shared_ptr<Envoy::Http::AsyncStreamImpl::NullCorsPolicy>
+    AsyncStreamImpl::RouteEntryImpl::cors_policy_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
@@ -19,7 +20,8 @@ const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_po
 const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
-const AsyncStreamImpl::NullCorsPolicy AsyncStreamImpl::NullVirtualHost::cors_policy_;
+const std::shared_ptr<AsyncStreamImpl::NullCorsPolicy>
+    AsyncStreamImpl::NullVirtualHost::cors_policy_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,

@@ -39,10 +39,10 @@ public:
     cors_policy_->max_age_ = "0";
 
     ON_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy())
-        .WillByDefault(ReturnRef(*cors_policy_));
+        .WillByDefault(Return(cors_policy_));
 
     ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
-        .WillByDefault(ReturnRef(*cors_policy_));
+        .WillByDefault(Return(cors_policy_));
 
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);

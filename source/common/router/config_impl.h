@@ -109,7 +109,7 @@ public:
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
 
   // Router::VirtualHost
-  const CorsPolicy& corsPolicy() const override { return cors_policy_; }
+  const CorsPolicySharedPtr corsPolicy() const override { return cors_policy_; }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
@@ -143,7 +143,7 @@ private:
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ConfigImpl& global_route_config_;
-  const CorsPolicyImpl cors_policy_;
+  CorsPolicySharedPtr cors_policy_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
@@ -222,7 +222,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const CorsPolicy& corsPolicy() const override { return cors_policy_; }
+  const CorsPolicySharedPtr corsPolicy() const override { return cors_policy_; }
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
@@ -275,7 +275,7 @@ private:
       return parent_->finalizeRequestHeaders(headers);
     }
 
-    const CorsPolicy& corsPolicy() const override { return parent_->corsPolicy(); }
+    const CorsPolicySharedPtr corsPolicy() const override { return parent_->corsPolicy(); }
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
@@ -342,7 +342,7 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-  const CorsPolicyImpl cors_policy_;
+  CorsPolicySharedPtr cors_policy_;
   const VirtualHostImpl& vhost_;
   const bool auto_host_rewrite_;
   const bool use_websocket_;

@@ -74,6 +74,8 @@ public:
   virtual bool enabled() const PURE;
 };
 
+typedef std::shared_ptr<const CorsPolicy> CorsPolicySharedPtr;
+
 /**
  * Route level retry policy.
  */
@@ -184,7 +186,10 @@ class VirtualHost {
 public:
   virtual ~VirtualHost() {}
 
-  virtual const CorsPolicy& corsPolicy() const PURE;
+  /**
+   * @return CorsPolicySharedPtr the CORS policy for this virtual host.
+   */
+  virtual const CorsPolicySharedPtr corsPolicy() const PURE;
 
   /**
    * @return const std::string& the name of the virtual host.
@@ -226,7 +231,10 @@ public:
    */
   virtual const std::string& clusterName() const PURE;
 
-  virtual const CorsPolicy& corsPolicy() const PURE;
+  /**
+   * @return CorsPolicySharedPtr the CORS policy for this route.
+   */
+  virtual const CorsPolicySharedPtr corsPolicy() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For

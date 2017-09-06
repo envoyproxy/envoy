@@ -61,8 +61,8 @@ private:
   CorsFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  const Envoy::Router::CorsPolicy* routeCorsPolicy_{};
-  const Envoy::Router::CorsPolicy* virtualHostCorsPolicy_{};
+  Envoy::Router::CorsPolicySharedPtr routeCorsPolicy_{};
+  Envoy::Router::CorsPolicySharedPtr virtualHostCorsPolicy_{};
   bool is_cors_request_{};
   Http::HeaderEntry* origin_{};
 };
