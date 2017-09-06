@@ -146,9 +146,7 @@ bool CorsFilter::allowCredentials() {
   return virtual_host_cors_policy_->allowCredentials();
 }
 
-bool CorsFilter::enabled() {
-  return route_cors_policy_->enabled() || virtual_host_cors_policy_->enabled();
-}
+bool CorsFilter::enabled() { return route_cors_policy_->enabled(); }
 
 } // namespace Http
 } // namespace Envoy

@@ -53,7 +53,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
   expose_headers_ = config.expose_headers();
   max_age_ = config.max_age();
   allow_credentials_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_credentials, false);
-  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, false);
+  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {

@@ -590,8 +590,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
           "allow_headers" : {"type" : "string"},
           "expose_headers" : {"type" : "string"},
           "max_age" : {"type" : "string"},
-          "allow_credentials" : {"type" : "boolean"},
-          "enabled" : {"type" : "boolean"}
+          "allow_credentials" : {"type" : "boolean"}
         },
         "required" : [],
         "additionalProperties" : false
