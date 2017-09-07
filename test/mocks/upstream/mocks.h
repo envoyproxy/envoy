@@ -21,9 +21,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 
+namespace Envoy {
 namespace Upstream {
 
 class MockCluster : public Cluster {

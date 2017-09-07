@@ -20,6 +20,7 @@ void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
 }
 
 void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
+  ASSERT(connection_.state() == Connection::State::Open);
   ActiveReadFilterPtr new_filter(new ActiveReadFilter{*this, filter});
   filter->initializeReadFilterCallbacks(*new_filter);
   new_filter->moveIntoListBack(std::move(new_filter), upstream_filters_);
