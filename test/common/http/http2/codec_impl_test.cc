@@ -502,6 +502,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
 }
 
+// Test the HTTP2 pending_recv_data_ buffer going over and under watermark limits.
 TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   initialize();
   MockStreamCallbacks callbacks;
