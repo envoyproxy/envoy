@@ -24,8 +24,8 @@ public:
     UNREFERENCED_PARAMETER(cluster_manager);
   }
 
-  AdsWatch* subscribe(const std::string& type_url, const std::vector<std::string>& resources,
-                      AdsCallbacks& callbacks) override {
+  AdsWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+                        AdsCallbacks& callbacks) override {
     UNREFERENCED_PARAMETER(type_url);
     UNREFERENCED_PARAMETER(resources);
     UNREFERENCED_PARAMETER(callbacks);

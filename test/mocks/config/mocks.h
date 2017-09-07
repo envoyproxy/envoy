@@ -38,8 +38,8 @@ public:
   virtual ~MockAdsApi();
 
   MOCK_METHOD3(subscribe,
-               AdsWatch*(const std::string& type_url, const std::vector<std::string>& resources,
-                         AdsCallbacks& calllbacks));
+               AdsWatchPtr(const std::string& type_url, const std::vector<std::string>& resources,
+                           AdsCallbacks& calllbacks));
 };
 
 } // namespace Config

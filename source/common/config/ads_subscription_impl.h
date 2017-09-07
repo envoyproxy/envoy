@@ -24,8 +24,6 @@ public:
       : ads_api_(ads_api), stats_(stats),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())) {}
 
-  ~AdsSubscriptionImpl() { cancelWatch(); }
-
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
@@ -38,7 +36,6 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    cancelWatch();
     watch_ = ads_api_.subscribe(type_url_, resources, *this);
   }
 
@@ -66,18 +63,11 @@ public:
   }
 
 private:
-  void cancelWatch() {
-    if (watch_ != nullptr) {
-      watch_->cancel();
-      watch_ = nullptr;
-    }
-  }
-
   AdsApi& ads_api_;
   SubscriptionStats stats_;
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
-  AdsWatch* watch_{};
+  AdsWatchPtr watch_{};
 };
 
 } // namespace Config

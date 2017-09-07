@@ -30,17 +30,14 @@ public:
 };
 
 /**
- * Handle on an ADS subscription that enables the subscription to be canceled.
+ * Handle on an ADS subscription.  The subscription is canceled on destruction.
  */
 class AdsWatch {
 public:
   virtual ~AdsWatch() {}
-
-  /**
-   * Cancel an ADS watch that was created via AdsApi::subscribe. This will free the AdsWatch object.
-   */
-  virtual void cancel() PURE;
 };
+
+typedef std::unique_ptr<AdsWatch> AdsWatchPtr;
 
 /**
  * Aggregated Discovery Service interface.
@@ -56,13 +53,12 @@ public:
    * @param resources vector of resource names to fetch.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until AdsWatch::cancel() is invoked.
-   * @return AdsWatch& a handle to cancel the subscription with. E.g. when a cluster goes away, its
-   *                   EDS updates should be cancelled. Ownership of the AdsWatch belongs to the
-   *                   AdsApi object.
+   * @return AdsWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes away,
+   * its EDS updates should be cancelled. Ownership of the AdsWatch belongs to the AdsApi object.
    */
-  virtual AdsWatch* subscribe(const std::string& type_url,
-                              const std::vector<std::string>& resources,
-                              AdsCallbacks& calllbacks) PURE;
+  virtual AdsWatchPtr subscribe(const std::string& type_url,
+                                const std::vector<std::string>& resources,
+                                AdsCallbacks& calllbacks) PURE;
 };
 
 } // namespace Config
