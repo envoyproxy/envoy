@@ -475,8 +475,6 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
       callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     }
 
-    retry_state_.reset();
-  } else {
     // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
     // false.
     retry_state_.reset();
