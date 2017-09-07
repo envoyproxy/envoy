@@ -25,7 +25,12 @@ public:
     subscription_.reset(new AdsEdsSubscriptionImpl(ads_api_, stats_));
   }
 
-  ~AdsSubscriptionTestHarness() { EXPECT_CALL(ads_watch_, cancel()); }
+  ~AdsSubscriptionTestHarness() { EXPECT_CALL(*ads_watch_, cancel()); }
+
+  AdsWatch* resetAdsWatch() {
+    ads_watch_ = new Config::MockAdsWatch();
+    return ads_watch_;
+  }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
@@ -34,9 +39,9 @@ public:
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(ads_api_, subscribe("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
-                                    ElementsAreArray(cluster_names), _))
-        .WillOnce(Return(&ads_watch_));
+    EXPECT_CALL(ads_api_, subscribe_("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+                                     ElementsAreArray(cluster_names), _))
+        .WillOnce(Return(resetAdsWatch()));
     subscription_->start(cluster_names, callbacks_);
   }
 
@@ -66,15 +71,15 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(ads_watch_, cancel());
-    EXPECT_CALL(ads_api_, subscribe("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
-                                    ElementsAreArray(cluster_names), _))
-        .WillOnce(Return(&ads_watch_));
+    EXPECT_CALL(*ads_watch_, cancel());
+    EXPECT_CALL(ads_api_, subscribe_("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+                                     ElementsAreArray(cluster_names), _))
+        .WillOnce(Return(resetAdsWatch()));
     subscription_->updateResources(cluster_names);
   }
 
   Config::MockAdsApi ads_api_;
-  Config::MockAdsWatch ads_watch_;
+  Config::MockAdsWatch* ads_watch_;
   std::unique_ptr<AdsEdsSubscriptionImpl> subscription_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
 };
