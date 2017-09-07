@@ -21,7 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
@@ -30,6 +29,7 @@ using testing::ReturnRef;
 using testing::ReturnRefOfCopy;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class AsyncClientImplTest : public testing::Test {

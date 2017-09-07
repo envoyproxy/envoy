@@ -15,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -25,6 +24,7 @@ using testing::Return;
 using testing::WithArg;
 using testing::_;
 
+namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 

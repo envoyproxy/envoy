@@ -15,9 +15,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class CodeUtilityTest : public testing::Test {

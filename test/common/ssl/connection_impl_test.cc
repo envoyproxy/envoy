@@ -27,11 +27,11 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::StrictMock;
 using testing::_;
 
+namespace Envoy {
 namespace Ssl {
 
 namespace {

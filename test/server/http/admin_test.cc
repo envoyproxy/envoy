@@ -14,10 +14,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Server {
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {

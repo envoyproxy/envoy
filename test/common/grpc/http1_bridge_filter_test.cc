@@ -10,13 +10,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
+namespace Envoy {
 namespace Grpc {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {

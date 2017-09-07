@@ -56,6 +56,37 @@ public:
 };
 
 /**
+ * Implemented for each Stats::Sink and registered via Registry::registerFactory() or
+ * the convenience class RegisterFactory.
+ */
+class StatsSinkFactory {
+public:
+  virtual ~StatsSinkFactory() {}
+
+  /**
+   * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
+   * Stats::Sink with the provided parameters, it should throw an EnvoyException. The returned
+   * pointer should always be valid.
+   * @param config supplies the custom proto configuration for the Stats::Sink
+   * @param server supplies the server instance
+   */
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * Returns the identifying name for a particular implementation of Stats::Sink produced by the
+   * factory.
+   */
+  virtual std::string name() PURE;
+};
+
+/**
  * Utilities for creating a filter chain for a network connection.
  */
 class FilterChainUtility {
@@ -88,10 +119,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
-  Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
-  Network::Address::InstanceConstSharedPtr statsdUdpIpAddress() override {
-    return statsd_udp_ip_address_;
-  }
+  std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
   std::chrono::milliseconds wdMegaMissTimeout() const override {
@@ -108,11 +136,12 @@ private:
    */
   void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
 
+  void initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server);
+
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
-  Optional<std::string> statsd_tcp_cluster_name_;
-  Network::Address::InstanceConstSharedPtr statsd_udp_ip_address_;
+  std::list<Stats::SinkPtr> stats_sinks_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
   std::chrono::milliseconds watchdog_miss_timeout_;

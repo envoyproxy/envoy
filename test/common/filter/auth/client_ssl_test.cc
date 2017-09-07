@@ -19,7 +19,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -28,6 +27,7 @@ using testing::ReturnRef;
 using testing::WithArg;
 using testing::_;
 
+namespace Envoy {
 namespace Filter {
 namespace Auth {
 namespace ClientSsl {

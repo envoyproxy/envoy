@@ -3,11 +3,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Return;
 using testing::ReturnArg;
 using testing::_;
 
+namespace Envoy {
 namespace Runtime {
 
 MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefault(Return(uuid_)); }

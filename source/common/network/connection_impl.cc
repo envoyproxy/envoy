@@ -88,8 +88,9 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
       state_ |= InternalState::BindError;
-      // Indicate this bind close should "flush", i.e. wait for a dispatcher callback cycle.
-      close(ConnectionCloseType::FlushWrite);
+
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
     }
   }
 }
@@ -123,8 +124,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if ((data_to_write == 0 && !(state_ & InternalState::BindError)) ||
-      type == ConnectionCloseType::NoFlush) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.

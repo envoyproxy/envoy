@@ -95,28 +95,28 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
 }
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
+  Buffer::OwnedImpl data;
   Http::TestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType, "unsupported");
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        uint64_t code;
-        StringUtil::atoul(headers.Status()->value().c_str(), code);
-        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
-      }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers));
 }
 
 TEST_F(GrpcWebFilterTest, NoContentType) {
+  Buffer::OwnedImpl data;
   Http::TestHeaderMapImpl request_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        uint64_t code;
-        StringUtil::atoul(headers.Status()->value().c_str(), code);
-        EXPECT_EQ(static_cast<uint64_t>(Http::Code::UnsupportedMediaType), code);
-      }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers));
 }
 
 TEST_F(GrpcWebFilterTest, InvalidBase64) {
