@@ -39,7 +39,8 @@ Both the route and the virtual host need to set enabled to true.
   }
 
 enabled
-  *(optional, boolean)* Defaults to false.
+  *(optional, boolean)* Defaults to false. Setting *enabled* to false on a route disables CORS
+  for this route only. The setting has no effect on a virtual host.
 
 allow_origin
   *(optional, string)* The origins that will be allowed to do CORS request.
