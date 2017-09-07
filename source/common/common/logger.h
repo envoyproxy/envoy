@@ -102,10 +102,13 @@ public:
   /**
    * @return const std::vector<Logger>& the installed loggers.
    */
-  static const std::vector<Logger>& loggers() { return all_loggers_; }
+  static const std::vector<Logger>& loggers() { return allLoggers(); }
 
 private:
-  static std::vector<Logger> all_loggers_;
+  /*
+   * @return std::vector<Logger>& return the installed loggers.
+   */
+  static std::vector<Logger>& allLoggers();
 };
 
 /**
@@ -114,9 +117,10 @@ private:
 template <Id id> class Loggable {
 protected:
   /**
+   * Do not use this directly, use macros defined below.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& log() {
+  static spdlog::logger& __log_do_not_use_read_comment() {
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
@@ -153,9 +157,19 @@ protected:
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
 
 /**
+ * Convenience macro to get logger.
+ */
+#define ENVOY_LOGGER() __log_do_not_use_read_comment()
+
+/**
+ * Convenience macro to flush logger.
+ */
+#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
+
+/**
  * Convenience macro to log to the class' logger.
  */
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(log(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
@@ -171,7 +185,7 @@ protected:
   ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(log(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
@@ -182,55 +196,6 @@ protected:
                       (STREAM).streamId(), ##__VA_ARGS__)
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  ENVOY_STREAM_LOG_TO_LOGGER(log(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
-
-/**
- * DEPRECATED: Logging macros.
- */
-#ifdef NVLOG
-#define log_trace(...)
-#define log_debug(...)
-#else
-#define log_trace(...) log().trace(__VA_ARGS__)
-#define log_debug(...) log().debug(__VA_ARGS__)
-#endif
-
-/**
- * DEPRECATED: Convenience macros for logging with connection ID.
- */
-#define conn_log(LOG, LEVEL, FORMAT, CONNECTION, ...)                                              \
-  LOG.LEVEL("[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
-
-#ifdef NVLOG
-#define conn_log_trace(...)
-#define conn_log_debug(...)
-#else
-#define conn_log_trace(FORMAT, CONNECTION, ...)                                                    \
-  conn_log(log(), trace, FORMAT, CONNECTION, ##__VA_ARGS__)
-#define conn_log_debug(FORMAT, CONNECTION, ...)                                                    \
-  conn_log(log(), debug, FORMAT, CONNECTION, ##__VA_ARGS__)
-#endif
-
-#define conn_log_info(FORMAT, CONNECTION, ...)                                                     \
-  conn_log(log(), info, FORMAT, CONNECTION, ##__VA_ARGS__)
-
-/**
- * DEPRECATED: Convenience macros for logging with a stream ID and a connection ID.
- */
-#define stream_log(LOG, LEVEL, FORMAT, STREAM, ...)                                                \
-  LOG.LEVEL("[C{}][S{}] " FORMAT, (STREAM).connection() ? (STREAM).connection()->id() : 0,         \
-            (STREAM).streamId(), ##__VA_ARGS__)
-
-#ifdef NVLOG
-#define stream_log_trace(...)
-#define stream_log_debug(...)
-#else
-#define stream_log_trace(FORMAT, STREAM, ...)                                                      \
-  stream_log(log(), trace, FORMAT, STREAM, ##__VA_ARGS__)
-#define stream_log_debug(FORMAT, STREAM, ...)                                                      \
-  stream_log(log(), debug, FORMAT, STREAM, ##__VA_ARGS__)
-#endif
-
-#define stream_log_info(FORMAT, STREAM, ...) stream_log(log(), info, FORMAT, STREAM, ##__VA_ARGS__)
+  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
 } // namespace Envoy

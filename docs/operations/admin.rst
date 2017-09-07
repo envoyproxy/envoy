@@ -66,12 +66,16 @@ modify different aspects of the server.
 
   Enable or disable the CPU profiler. Requires compiling with gperftools.
 
+.. _operations_admin_interface_healthcheck_fail:
+
 .. http:get:: /healthcheck/fail
 
   Fail inbound health checks. This requires the use of the HTTP :ref:`health check filter
   <config_http_filters_health_check>`. This is useful for draining a server prior to shutting it
   down or doing a full restart. Invoking this command will universally fail health check requests
   regardless of how the filter is configured (pass through, etc.).
+
+.. _operations_admin_interface_healthcheck_ok:
 
 .. http:get:: /healthcheck/ok
 
@@ -96,6 +100,14 @@ modify different aspects of the server.
   Reset all counters to zero. This is useful along with :http:get:`/stats` during debugging. Note
   that this does not drop any data sent to statsd. It just effects local output of the
   :http:get:`/stats` command.
+
+.. _operations_admin_interface_routes:
+
+.. http:get:: /routes?route_config_name=<name>
+
+  This endpoint is only available if envoy has HTTP routes configured via RDS.
+  The endpoint dumps all the configured HTTP route tables, or only ones that
+  match the ``route_config_name`` query, if a query is specified.
 
 .. http:get:: /server_info
 

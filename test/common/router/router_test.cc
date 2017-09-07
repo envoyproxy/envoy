@@ -20,7 +20,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
@@ -29,6 +28,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Router {
 
 class TestFilter : public Filter {
@@ -622,6 +622,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(false));
+  EXPECT_CALL(cm_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
   Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
@@ -754,7 +755,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(false));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
-  Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->health_checker_, setUnhealthy());
+  Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{
+      {":status", "200"}, {"x-envoy-immediate-health-check-fail", "true"}});
   response_decoder->decodeHeaders(std::move(response_headers2), true);
 
   EXPECT_EQ(1U,

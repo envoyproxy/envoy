@@ -81,7 +81,7 @@ void CdsJson::translateOutlierDetection(
 }
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
-                               const Optional<Upstream::SdsConfig>& sds_config,
+                               const Optional<envoy::api::v2::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
   cluster.set_name(json_cluster.getString("name"));
@@ -120,9 +120,8 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   } else {
     ASSERT(string_type == "sds");
     cluster.set_type(envoy::api::v2::Cluster::EDS);
-    auto* eds_cluster_config = cluster.mutable_eds_cluster_config();
-    Utility::sdsConfigToEdsConfig(sds_config.value(), *eds_cluster_config->mutable_eds_config());
-    eds_cluster_config->set_service_name(json_cluster.getString("service_name", ""));
+    cluster.mutable_eds_cluster_config()->mutable_eds_config()->CopyFrom(eds_config.value());
+    JSON_UTIL_SET_STRING(json_cluster, *cluster.mutable_eds_cluster_config(), service_name);
   }
 
   JSON_UTIL_SET_DURATION(json_cluster, cluster, cleanup_interval);
@@ -160,9 +159,8 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   }
 
   if (json_cluster.getString("features", "") == "http2" ||
-      json_cluster.hasObject("http_codec_options") || json_cluster.hasObject("http2_settings")) {
-    ProtocolJson::translateHttp2ProtocolOptions(json_cluster.getString("http_codec_options", ""),
-                                                *json_cluster.getObject("http2_settings", true),
+      json_cluster.hasObject("http2_settings")) {
+    ProtocolJson::translateHttp2ProtocolOptions(*json_cluster.getObject("http2_settings", true),
                                                 *cluster.mutable_http2_protocol_options());
   }
 

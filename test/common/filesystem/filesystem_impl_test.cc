@@ -1,5 +1,4 @@
 #include <chrono>
-#include <fstream>
 #include <string>
 
 #include "common/common/thread.h"
@@ -14,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -23,6 +21,8 @@ using testing::SaveArg;
 using testing::Sequence;
 using testing::Throw;
 using testing::_;
+
+namespace Envoy {
 
 TEST(FileSystemImpl, BadFile) {
   Event::MockDispatcher dispatcher;
@@ -46,13 +46,8 @@ TEST(FileSystemImpl, directoryExists) {
 }
 
 TEST(FileSystemImpl, fileReadToEndSuccess) {
-  const std::string file_path = TestEnvironment::temporaryPath("test_envoy");
-  unlink(file_path.c_str());
-  std::ofstream file(file_path);
-
   const std::string data = "test string\ntest";
-  file << data;
-  file.close();
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
   EXPECT_EQ(data, Filesystem::fileReadToEnd(file_path));
 }

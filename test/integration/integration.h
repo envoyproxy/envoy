@@ -155,6 +155,8 @@ struct ApiFilesystemConfig {
   std::string bootstrap_path_;
   std::string cds_path_;
   std::string eds_path_;
+  std::string lds_path_;
+  std::string rds_path_;
 };
 
 /**
@@ -186,8 +188,9 @@ public:
   void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
-  void createApiTestServer(const std::string& json_path,
-                           const ApiFilesystemConfig& api_filesystem_config,
+  void createGeneratedApiTestServer(const std::string& bootstrap_path,
+                                    const std::vector<std::string>& port_names);
+  void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
@@ -195,6 +198,24 @@ public:
   Event::DispatcherPtr dispatcher_;
 
 protected:
+  // Sends |request_headers| and |request_body_size| bytes of body upstream.
+  // Configured upstream to send |response_headers| and |response_body_size|
+  // bytes of body downstream.
+  //
+  // Waits for the complete downstream response before returning.
+  // Requires |codec_client_| to be initialized.
+  void sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
+                                     uint32_t request_body_size,
+                                     Http::TestHeaderMapImpl& response_headers,
+                                     uint32_t response_body_size);
+
+  // Wait for the end of stream on the next upstream stream on fake_upstreams_
+  // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
+  void waitForNextUpstreamRequest();
+
+  // Close |codec_client_| and |fake_upstream_connection_| cleanly.
+  void cleanupUpstreamAndDownstream();
+
   void testRouterRedirect(Http::CodecClient::Type type);
   void testRouterNotFound(Http::CodecClient::Type type);
   void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
@@ -224,6 +245,8 @@ protected:
   void testUpstreamProtocolError();
   void testBadPath();
   void testAbsolutePath();
+  void testAbsolutePathWithPort();
+  void testAbsolutePathWithoutPort();
   void testConnect();
   void testAllowAbsoluteSameRelative();
   // Test that a request returns the same content with both allow_absolute_urls enabled and
@@ -239,6 +262,19 @@ protected:
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
+
+  // The client making requests to Envoy.
+  IntegrationCodecClientPtr codec_client_;
+  // A placeholder for the first upstream connection.
+  FakeHttpConnectionPtr fake_upstream_connection_;
+  // A placeholder for the first response received by the client.
+  IntegrationStreamDecoderPtr response_{new IntegrationStreamDecoder(*dispatcher_)};
+  // A placeholder for the first request received at upstream.
+  FakeStreamPtr upstream_request_;
+  // A pointer to the request encoder, if used.
+  Http::StreamEncoder* request_encoder_{nullptr};
+  // The response headers sent by sendRequestAndWaitForResponse() by default.
+  Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;

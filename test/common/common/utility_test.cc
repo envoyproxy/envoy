@@ -8,8 +8,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::ContainerEq;
+
+namespace Envoy {
 
 TEST(StringUtil, atoul) {
   uint64_t out;

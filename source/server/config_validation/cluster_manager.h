@@ -22,16 +22,18 @@ public:
                                   Event::Dispatcher& primary_dispatcher,
                                   const LocalInfo::LocalInfo& local_info);
 
-  ClusterManagerPtr
-  clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
-                         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager) override;
+  ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+                                            Stats::Store& stats, ThreadLocal::Instance& tls,
+                                            Runtime::Loader& runtime,
+                                            Runtime::RandomGenerator& random,
+                                            const LocalInfo::LocalInfo& local_info,
+                                            AccessLog::AccessLogManager& log_manager) override;
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
   CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                      const Optional<SdsConfig>& sds_config, ClusterManager& cm) override;
+                      const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                      ClusterManager& cm) override;
 };
 
 /**
@@ -39,7 +41,7 @@ public:
  */
 class ValidationClusterManager : public ClusterManagerImpl {
 public:
-  ValidationClusterManager(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
+  ValidationClusterManager(const envoy::api::v2::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,

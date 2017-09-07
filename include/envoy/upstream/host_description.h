@@ -5,6 +5,7 @@
 
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
 
 namespace Envoy {
@@ -50,9 +51,14 @@ public:
   virtual const ClusterInfo& cluster() const PURE;
 
   /**
-   * @return the host's outlier detection sink.
+   * @return the host's outlier detection monitor.
    */
-  virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
+  virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
+
+  /**
+   * @return the host's health checker monitor.
+   */
+  virtual HealthCheckHostMonitor& healthChecker() const PURE;
 
   /**
    * @return the hostname associated with the host if any.

@@ -60,6 +60,8 @@ public:
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
+  ~IpTaggingFilterTest() { filter_->onDestroy(); }
+
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;
   NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;

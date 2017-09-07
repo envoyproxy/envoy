@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
@@ -20,6 +19,8 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
+
+namespace Envoy {
 
 class HealthCheckFilterTest : public testing::Test {
 public:
@@ -73,10 +74,14 @@ TEST_F(HealthCheckFilterNoPassThroughTest, OkOrFailed) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
+
+  Http::TestHeaderMapImpl service_response{{":status", "200"}};
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_response, true));
+  EXPECT_STREQ("true", service_response.EnvoyImmediateHealthCheckFail()->value().c_str());
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
@@ -88,6 +93,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
       .WillRepeatedly(Invoke([&](Http::HeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_STREQ("cluster_name", headers.EnvoyUpstreamHealthCheckedCluster()->value().c_str());
+        EXPECT_EQ(nullptr, headers.EnvoyImmediateHealthCheckFail());
       }));
 
   EXPECT_CALL(callbacks_.request_info_,

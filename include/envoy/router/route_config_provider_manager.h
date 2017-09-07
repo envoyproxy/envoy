@@ -53,10 +53,11 @@ public:
   virtual ~ServerRouteConfigProviderManager() {}
 
   /**
-   * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
-   * RouteConfigProviders currently loaded.
+   * @return std::vector<Router::RdsRouteConfigProviderSharedPtr> a list of all the
+   * RdsRouteConfigProviders currently loaded. This means that the manager does not provide
+   * pointers to StaticRouteConfigProviders.
    */
-  virtual std::vector<RouteConfigProviderSharedPtr> routeConfigProviders() PURE;
+  virtual std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() PURE;
 };
 
 } // namespace Router

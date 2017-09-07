@@ -8,6 +8,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -21,7 +22,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {
@@ -33,8 +34,11 @@ const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+namespace {
+
+NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
+    const envoy::api::v2::filter::HttpConnectionManager& http_connection_manager,
+    FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -47,12 +51,9 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(
                 context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal());
+                context.threadLocal(), context.admin());
           });
 
-  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
-  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
-                                                     http_connection_manager);
   std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
       http_connection_manager, context, *date_provider, *route_config_provider_manager));
 
@@ -65,6 +66,22 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
         *http_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
   };
+}
+
+} // namespace
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    const Json::Object& json_http_connection_manager, FactoryContext& context) {
+  envoy::api::v2::filter::HttpConnectionManager http_connection_manager;
+  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
+                                                     http_connection_manager);
+  return createHttpConnectionManagerFilterFactory(http_connection_manager, context);
+}
+
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, FactoryContext& context) {
+  return createHttpConnectionManagerFilterFactory(
+      dynamic_cast<const envoy::api::v2::filter::HttpConnectionManager&>(config), context);
 }
 
 /**
@@ -203,49 +220,35 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    const std::string& string_type = filters[i].deprecated_v1().type();
     const std::string& string_name = filters[i].name();
     const auto& proto_config = filters[i].config();
 
     ENVOY_LOG(info, "    filter #{}", i);
     ENVOY_LOG(info, "      name: {}", string_name);
 
-    Protobuf::util::JsonOptions json_options;
-    ProtobufTypes::String json_config;
-    const auto status =
-        Protobuf::util::MessageToJsonString(proto_config, &json_config, json_options);
-    // This should always succeed unless something crash-worthy such as out-of-memory.
-    RELEASE_ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
-    const Json::ObjectSharedPtr filter_config = Json::Factory::loadFromString(json_config);
-
-    const HttpFilterType type = stringToType(string_type);
+    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
 
     // Now see if there is a factory that will accept the config.
     NamedHttpFilterConfigFactory* factory =
         Registry::FactoryRegistry<NamedHttpFilterConfigFactory>::getFactory(string_name);
     if (factory != nullptr) {
-      HttpFilterFactoryCb callback =
-          factory->createFilterFactory(*filter_config, stats_prefix_, context_);
+      HttpFilterFactoryCb callback;
+      if (filter_config->getBoolean("deprecated_v1", false)) {
+        callback = factory->createFilterFactory(*filter_config->getObject("value", true),
+                                                stats_prefix_, context);
+      } else {
+        auto message = factory->createEmptyConfigProto();
+        if (!message) {
+          throw EnvoyException(
+              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
+        }
+        MessageUtil::jsonConvert(proto_config, *message);
+        callback = factory->createFilterFactoryFromProto(*message, stats_prefix_, context);
+      }
       filter_factories_.push_back(callback);
     } else {
-      // DEPRECATED
-      // This name wasn't found in the named map, so search in the deprecated list registry.
-      bool found_filter = false;
-      for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
-        HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
-            type, string_name, *filter_config, stats_prefix_, context_.server());
-        if (callback) {
-          filter_factories_.push_back(callback);
-          found_filter = true;
-          break;
-        }
-      }
-
-      if (!found_filter) {
-        throw EnvoyException(
-            fmt::format("unable to create http filter factory for '{}'", string_name));
-      }
+      throw EnvoyException(
+          fmt::format("unable to create http filter factory for '{}'", string_name));
     }
   }
 }
@@ -278,17 +281,6 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
   for (const HttpFilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
-  }
-}
-
-HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type) {
-  if (type == "decoder") {
-    return HttpFilterType::Decoder;
-  } else if (type == "encoder") {
-    return HttpFilterType::Encoder;
-  } else {
-    ASSERT(type == "both");
-    return HttpFilterType::Both;
   }
 }
 

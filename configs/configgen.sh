@@ -12,4 +12,4 @@ mkdir -p "$OUT_DIR"
 cp $* "$OUT_DIR"
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -cvf example_configs.tar *.json)
+(cd "$OUT_DIR"; tar -cvf example_configs.tar *.json *.yaml)

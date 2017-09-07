@@ -18,7 +18,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Pointee;
@@ -28,6 +27,7 @@ using testing::SaveArg;
 using testing::Throw;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class CodecClientTest : public testing::Test {

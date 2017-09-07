@@ -17,7 +17,6 @@ public:
                                           const std::string& stat_prefix,
                                           FactoryContext& context) override;
   std::string name() override { return "router"; }
-  HttpFilterType type() override { return HttpFilterType::Decoder; }
 };
 
 } // namespace Configuration

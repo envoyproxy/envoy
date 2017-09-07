@@ -11,6 +11,18 @@ load(
 
 envoy_package()
 
+envoy_cc_test(
+    name = "proto_integration_test",
+    srcs = ["proto_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_sh_test(
     name = "hotrestart_test",
     srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
@@ -183,6 +195,7 @@ envoy_cc_test_library(
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
+        "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -206,6 +219,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/server/config/stats:statsd_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -235,7 +249,6 @@ envoy_cc_test(
         ":integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/stats:stats_lib",
     ],
 )
 

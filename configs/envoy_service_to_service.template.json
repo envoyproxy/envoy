@@ -10,7 +10,6 @@
     "name": "http_connection_manager",
     "config": {
       "codec_type": "auto",
-      "http_codec_options": "no_compression",
       "tracing": {
         "operation_name": "ingress"
       },

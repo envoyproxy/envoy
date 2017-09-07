@@ -23,7 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {
@@ -285,10 +285,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       }
 
       // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
-      //       the route table sticks around. In v1 of RDS we will likely snap the route table
-      //       in the connection manager to account for this, but we may eventually want to have
-      //       a chain of references that goes back to the route table root. That is complicated
-      //       though.
+      //       the route table sticks around. See snapped_route_config_ in
+      //       ConnectionManagerImpl::ActiveStream.
       return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
     }
   }

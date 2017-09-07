@@ -18,7 +18,6 @@ public:
                                              FactoryContext& context) override;
 
   std::string name() override { return "mongo_proxy"; }
-  NetworkFilterType type() override { return NetworkFilterType::Both; }
 };
 
 } // namespace Configuration

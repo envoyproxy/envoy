@@ -29,13 +29,13 @@ public:
    */
   static std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                           Server::Instance& server, Configuration::FactoryContext& context);
+                           Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
-    return createFilterFactoryList_(filters, server_, context);
+    return createFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
@@ -58,6 +58,7 @@ typedef std::unique_ptr<ListenerImpl> ListenerImplPtr;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_create_failure)                                                                 \
   GAUGE  (total_listeners_warming)                                                                 \
   GAUGE  (total_listeners_active)                                                                  \
@@ -218,10 +219,10 @@ public:
     return parent_.server_.rateLimitClient(timeout);
   }
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
-  Instance& server() override { return parent_.server_; }
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
+  Admin& admin() override { return parent_.server_.admin(); }
 
   // Network::DrainDecision
   bool drainClose() const override;

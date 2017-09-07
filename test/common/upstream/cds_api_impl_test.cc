@@ -42,7 +42,7 @@ public:
     envoy::api::v2::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     cds_ =
-        CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_);
+        CdsApiImpl::create(cds_config, eds_config_, cm_, dispatcher_, random_, local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -90,7 +90,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
-  Optional<Upstream::SdsConfig> sds_config_;
+  Optional<envoy::api::v2::ConfigSource> eds_config_;
 };
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
@@ -108,7 +108,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   envoy::api::v2::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(
-      CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_),
+      CdsApiImpl::create(cds_config, eds_config_, cm_, dispatcher_, random_, local_info_, store_),
       EnvoyException);
 }
 

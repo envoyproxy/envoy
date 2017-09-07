@@ -14,7 +14,7 @@
 #include "common/ssl/connection_impl.h"
 
 #include "event2/listener.h"
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Network {
@@ -113,8 +113,9 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
 void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
                                  Address::InstanceConstSharedPtr local_address,
                                  bool using_original_dst) {
-  ConnectionPtr new_connection(
-      new ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst, true));
+  ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address,
+                                                  Network::Address::InstanceConstSharedPtr(),
+                                                  using_original_dst, true));
   new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
@@ -122,9 +123,9 @@ void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_
 void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
                                     Address::InstanceConstSharedPtr local_address,
                                     bool using_original_dst) {
-  ConnectionPtr new_connection(
-      new Ssl::ConnectionImpl(dispatcher_, fd, remote_address, local_address, using_original_dst,
-                              true, ssl_ctx_, Ssl::ConnectionImpl::InitialState::Server));
+  ConnectionPtr new_connection(new Ssl::ConnectionImpl(
+      dispatcher_, fd, remote_address, local_address, Network::Address::InstanceConstSharedPtr(),
+      using_original_dst, true, ssl_ctx_, Ssl::ConnectionImpl::InitialState::Server));
   new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }

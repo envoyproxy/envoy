@@ -18,7 +18,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::ContainerEq;
 using testing::ElementsAreArray;
 using testing::NiceMock;
@@ -27,6 +26,7 @@ using testing::ReturnRef;
 using testing::StrNe;
 using testing::_;
 
+namespace Envoy {
 namespace Router {
 namespace {
 

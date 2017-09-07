@@ -10,15 +10,16 @@ namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::ConfigSource& cds_config,
-                             const Optional<SdsConfig>& sds_config, ClusterManager& cm,
-                             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                             const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                             ClusterManager& cm, Event::Dispatcher& dispatcher,
+                             Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
   return CdsApiPtr{
-      new CdsApiImpl(cds_config, sds_config, cm, dispatcher, random, local_info, scope)};
+      new CdsApiImpl(cds_config, eds_config, cm, dispatcher, random, local_info, scope)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
-                       const Optional<SdsConfig>& sds_config, ClusterManager& cm,
+                       const Optional<envoy::api::v2::ConfigSource>& eds_config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
@@ -26,10 +27,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info.node(), dispatcher, cm, random, *scope_,
-          [this, &cds_config, &sds_config, &cm, &dispatcher, &random,
+          [this, &cds_config, &eds_config, &cm, &dispatcher, &random,
            &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
             return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
-                                       sds_config, cm, dispatcher, random, local_info);
+                                       eds_config, cm, dispatcher, random, local_info);
           },
           "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters");

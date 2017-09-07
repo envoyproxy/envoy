@@ -3,10 +3,17 @@
 Overview
 ========
 
-The Envoy configuration format is written in JSON and is validated against a JSON schema. The
+The Envoy configuration format is written in JSON and is validated against a JSON schema.  The
 schema can be found in :repo:`source/common/json/config_schemas.cc`. The main configuration for the
 server is contained within the listeners and cluster manager sections. The other top level elements
 specify miscellaneous configuration.
+
+YAML support is also provided as a syntactic convenience for hand-written configurations. Envoy will
+internally convert YAML to JSON if a file path ends with .yaml. In the rest of the configuration
+documentation, we refer exclusively to JSON. Envoy expects unambiguous YAML scalars, so if a cluster
+name (which should be a string) is called *true*, it should be written in the configuration YAML as
+*"true"*. The same applies to integer and floating point values (e.g. *1* vs. *1.0* vs. *"1.0"*).
+
 
 .. code-block:: json
 
@@ -16,7 +23,6 @@ specify miscellaneous configuration.
     "admin": "{...}",
     "cluster_manager": "{...}",
     "flags_path": "...",
-    "statsd_local_udp_port": "...",
     "statsd_udp_ip_address": "...",
     "statsd_tcp_cluster_name": "...",
     "stats_flush_interval_ms": "...",
@@ -53,9 +59,7 @@ flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.
 
-statsd_local_udp_port (Warning: DEPRECATED and will be removed in 1.4.0)
-  *(optional, integer)* The UDP port of a locally running statsd compliant listener. If specified,
-  :ref:`statistics <arch_overview_statistics>` will be flushed to this port.
+.. _config_overview_statsd_udp_ip_address:
 
 statsd_udp_ip_address
   *(optional, string)* The UDP address of a running statsd compliant listener. If specified,
