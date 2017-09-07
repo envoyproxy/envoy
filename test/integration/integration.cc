@@ -27,8 +27,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
 using testing::AnyNumber;
 using testing::Invoke;
@@ -387,8 +387,10 @@ void BaseIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl&
 
 void BaseIntegrationTest::cleanupUpstreamAndDownstream() {
   codec_client_->close();
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+  if (fake_upstream_connection_) {
+    fake_upstream_connection_->close();
+    fake_upstream_connection_->waitForDisconnect();
+  }
 }
 
 void BaseIntegrationTest::waitForNextUpstreamRequest() {

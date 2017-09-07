@@ -18,13 +18,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Filter {
 
 TEST(TcpProxyConfigTest, NoRouteConfig) {
@@ -394,6 +394,9 @@ public:
     EXPECT_EQ(return_connection ? Network::FilterStatus::Continue
                                 : Network::FilterStatus::StopIteration,
               filter_->onNewConnection());
+
+    EXPECT_EQ(Optional<uint64_t>(), filter_->hashKey());
+    EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
   }
 
   TcpProxyConfigSharedPtr config_;

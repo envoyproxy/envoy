@@ -18,6 +18,8 @@
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Http {
 

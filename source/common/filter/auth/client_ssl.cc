@@ -14,7 +14,7 @@
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Filter {

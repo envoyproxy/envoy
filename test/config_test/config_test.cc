@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/protobuf/utility.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -10,9 +11,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
 using testing::Invoke;
 using testing::NiceMock;
@@ -32,9 +33,14 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
-    envoy::api::v2::Bootstrap bootstrap =
-        TestUtility::parseBootstrapFromJson(config_json->asJsonString());
+    envoy::api::v2::Bootstrap bootstrap;
+    try {
+      MessageUtil::loadFromFile(file_path, bootstrap);
+    } catch (const EnvoyException& e) {
+      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+      Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
+      bootstrap = TestUtility::parseBootstrapFromJson(config_json->asJsonString());
+    }
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 

@@ -63,15 +63,9 @@ public:
   virtual RateLimit::ClientFactory& rateLimitClientFactory() PURE;
 
   /**
-   * @return Optional<std::string> the optional local/remote TCP statsd cluster to write to.
-   *         This cluster must be defined via the cluster manager configuration.
+   * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
    */
-  virtual Optional<std::string> statsdTcpClusterName() PURE;
-
-  /**
-   * @return Network::Address::InstanceConstSharedPtr the optional UDP statsd address to write to.
-   */
-  virtual Network::Address::InstanceConstSharedPtr statsdUdpIpAddress() PURE;
+  virtual std::list<Stats::SinkPtr>& statsSinks() PURE;
 
   /**
    * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.

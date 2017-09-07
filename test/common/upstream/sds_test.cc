@@ -24,7 +24,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -34,6 +33,7 @@ using testing::SaveArg;
 using testing::WithArg;
 using testing::_;
 
+namespace Envoy {
 namespace Upstream {
 
 class SdsTest : public testing::Test {

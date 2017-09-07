@@ -20,7 +20,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -28,6 +27,7 @@ using testing::Return;
 using testing::WithArgs;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 class NetworkFilterManagerTest : public testing::Test, public BufferSource {

@@ -21,7 +21,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "api/lds.pb.h"
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {
@@ -55,25 +55,6 @@ void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& 
                               server.localInfo(), server.stats(), server.listenerManager()));
   }
 
-  for (const auto& stats_sink : bootstrap.stats_sinks()) {
-    // TODO(mrice32): Add support for pluggable stats sinks.
-    ASSERT(stats_sink.name() == "envoy.statsd");
-    envoy::api::v2::StatsdSink statsd_sink;
-    MessageUtil::jsonConvert(stats_sink.config(), statsd_sink);
-
-    switch (statsd_sink.statsd_specifier_case()) {
-    case envoy::api::v2::StatsdSink::kAddress: {
-      statsd_udp_ip_address_ = Network::Utility::fromProtoAddress(statsd_sink.address());
-      break;
-    }
-    case envoy::api::v2::StatsdSink::kTcpClusterName:
-      statsd_tcp_cluster_name_.value(statsd_sink.tcp_cluster_name());
-      break;
-    default:
-      NOT_REACHED;
-    }
-  }
-
   stats_flush_interval_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
 
@@ -95,6 +76,8 @@ void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& 
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }
+
+  initializeStatsSinks(bootstrap, server);
 }
 
 void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server) {
@@ -124,6 +107,29 @@ void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, I
     http_tracer_ = factory->createHttpTracer(*driver_config, server, *cluster_manager_);
   } else {
     throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
+  }
+}
+
+void MainImpl::initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server) {
+  ENVOY_LOG(info, "loading stats sink configuration");
+
+  for (const envoy::api::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
+    if (sink_object.name().empty()) {
+      throw EnvoyException(
+          "sink object does not have 'name' attribute to look up the implementation");
+    }
+
+    ProtobufTypes::String name = sink_object.name();
+    StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
+    if (factory != nullptr) {
+      ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+      if (sink_object.has_config()) {
+        MessageUtil::jsonConvert(sink_object.config(), *message);
+      }
+      stats_sinks_.emplace_back(factory->createStatsSink(*message, server));
+    } else {
+      throw EnvoyException(fmt::format("No Stats::Sink found for name: {}", name));
+    }
   }
 }
 

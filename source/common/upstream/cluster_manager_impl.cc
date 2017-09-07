@@ -27,7 +27,7 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

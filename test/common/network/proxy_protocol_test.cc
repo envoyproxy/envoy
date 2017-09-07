@@ -19,11 +19,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion> {

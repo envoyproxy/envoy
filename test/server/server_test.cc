@@ -51,6 +51,8 @@ protected:
         options_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_, thread_local_));
+
+    EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
 
   void TearDown() override {

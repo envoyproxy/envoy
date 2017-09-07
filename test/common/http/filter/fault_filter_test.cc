@@ -21,7 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
@@ -30,6 +29,7 @@ using testing::ReturnRef;
 using testing::WithArgs;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class FaultFilterTest : public testing::Test {

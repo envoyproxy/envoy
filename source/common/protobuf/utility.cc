@@ -5,7 +5,7 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 
@@ -23,13 +23,22 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
   const std::string contents = Filesystem::fileReadToEnd(path);
-  // If the filename ends with .pb, do a best-effort attempt to parse it as a proto.
+  // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (StringUtil::endsWith(path, ".pb")) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
       return;
     }
-    throw EnvoyException("Unable to parse proto " + path);
+    throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
+                         message.GetTypeName() + ")");
+  }
+  // If the filename ends with .pb_text, attempt to parse it as a text proto.
+  if (StringUtil::endsWith(path, ".pb_text")) {
+    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+      return;
+    }
+    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                         message.GetTypeName() + ")");
   }
   if (StringUtil::endsWith(path, ".yaml")) {
     const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();

@@ -11,13 +11,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::ByRef;
 using testing::Eq;
 using testing::Invoke;
 using testing::Return;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 static void errorCallbackTest(Address::IpVersion version) {

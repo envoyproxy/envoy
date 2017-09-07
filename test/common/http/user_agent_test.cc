@@ -14,7 +14,7 @@ TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
   Stats::MockTimespan span;
 
-  EXPECT_CALL(stat_store.counter_, inc()).Times(4);
+  EXPECT_CALL(stat_store.counter_, inc()).Times(5);
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_rq_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_destroy_remote_active_rq"));
@@ -39,6 +39,7 @@ TEST(UserAgentTest, All) {
     ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
                              stat_store);
     ua.completeConnectionLength(span);
+    ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, true);
   }
 
   {
@@ -47,6 +48,7 @@ TEST(UserAgentTest, All) {
     ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
                              stat_store);
     ua.completeConnectionLength(span);
+    ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, false);
   }
 
   {
