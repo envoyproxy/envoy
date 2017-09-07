@@ -136,7 +136,7 @@ public:
     ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))

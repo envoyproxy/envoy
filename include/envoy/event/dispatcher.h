@@ -159,10 +159,10 @@ public:
   virtual void run(RunType type) PURE;
 
   /**
-   * Returns a factory which connections may use for buffer creation.
-   * @return the buffer factory for this dispatcher.
+   * Returns a factory which connections may use for watermark buffer creation.
+   * @return the watermark buffer factory for this dispatcher.
    */
-  virtual Buffer::Factory& getBufferFactory() PURE;
+  virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
 };
 
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;

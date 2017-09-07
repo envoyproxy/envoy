@@ -83,7 +83,7 @@ public:
   }
 };
 
-class MockBufferFactory : public Buffer::Factory {
+class MockBufferFactory : public Buffer::WatermarkFactory {
 public:
   Buffer::InstancePtr create(std::function<void()> below_low,
                              std::function<void()> above_high) override {

@@ -57,9 +57,9 @@ private:
   bool above_high_watermark_called_{false};
 };
 
-class WatermarkBufferFactory : public Factory {
+class WatermarkBufferFactory : public WatermarkFactory {
 public:
-  // Buffer::Factory
+  // Buffer::WatermarkFactory
   InstancePtr create(std::function<void()> below_low_watermark,
                      std::function<void()> above_high_watermark) override {
     return InstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark)};

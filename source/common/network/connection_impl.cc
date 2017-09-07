@@ -61,8 +61,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       write_buffer_(
-          dispatcher.getBufferFactory().create([this]() -> void { this->onLowWatermark(); },
-                                               [this]() -> void { this->onHighWatermark(); })),
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
       using_original_dst_(using_original_dst) {
 

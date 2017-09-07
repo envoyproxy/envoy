@@ -196,7 +196,6 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _))
-      .Times(1)
       .WillOnce(Invoke([&](std::function<void()> below_low,
                            std::function<void()> above_high) -> Buffer::Instance* {
         client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high);
@@ -235,8 +234,8 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
-  EXPECT_CALL(*client_write_buffer_, move(_)).Times(1);
-  EXPECT_CALL(*client_write_buffer_, write(_)).Times(1);
+  EXPECT_CALL(*client_write_buffer_, move(_));
+  EXPECT_CALL(*client_write_buffer_, write(_));
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
@@ -256,7 +255,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(new Event::DispatcherImpl(Buffer::FactoryPtr{mock_buffer_factory_})),
+      dispatcher_(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
