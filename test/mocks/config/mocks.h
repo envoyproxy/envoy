@@ -26,11 +26,17 @@ public:
 
 class MockAdsWatch : public AdsWatch {
 public:
+  MockAdsWatch();
+  virtual ~MockAdsWatch();
+
   MOCK_METHOD0(cancel, void());
 };
 
 class MockAdsApi : public AdsApi {
 public:
+  MockAdsApi();
+  virtual ~MockAdsApi();
+
   MOCK_METHOD3(subscribe,
                AdsWatch*(const std::string& type_url, const std::vector<std::string>& resources,
                          AdsCallbacks& calllbacks));
