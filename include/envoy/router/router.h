@@ -91,8 +91,8 @@ public:
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
-   * in the future. Otherwise a retry should not take place and the callback will never be called.
-   *         Calling code should proceed with error handling.
+   *         in the future. Otherwise a retry should not take place and the callback will never be
+   *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                                   const Optional<Http::StreamResetReason>& reset_reason,
