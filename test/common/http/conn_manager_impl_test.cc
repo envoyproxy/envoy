@@ -57,6 +57,10 @@ public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
+    const std::string& versionInfo() const override {
+      static const std::string* version = new std::string("");
+      return *version;
+    }
 
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };

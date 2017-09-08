@@ -109,5 +109,7 @@ public:
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
 };
 
+// TODO(danielhochman): test with RDS and ensure version_info is same as what API returned
+
 } // namespace Config
 } // namespace Envoy

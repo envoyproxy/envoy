@@ -61,7 +61,7 @@ public:
   virtual void updateResources(const std::vector<std::string>& resources) PURE;
 
   /**
-   * @return const std::string& version info from last accepted onConfigUpdate.
+   * @return version info from last accepted onConfigUpdate.
    */
   virtual const std::string& versionInfo() const PURE;
 };

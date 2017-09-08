@@ -49,6 +49,10 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
+  const std::string& versionInfo() const override {
+    static const std::string* version = new std::string("static");
+    return *version;
+  }
 
 private:
   ConfigConstSharedPtr config_;
@@ -119,6 +123,7 @@ private:
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                              const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
                              RouteConfigProviderManagerImpl& route_config_provider_manager);
+
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
 

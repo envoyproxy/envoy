@@ -76,6 +76,7 @@ public:
                                            runtime_, cm_, store_, "foo.", init_manager_,
                                            *route_config_provider_manager_);
     expectRequest();
+    EXPECT_EQ("", rds_->versionInfo());
     init_manager_.initialize();
   }
 
@@ -208,7 +209,7 @@ TEST_F(RdsImplTest, Basic) {
     "route_table_dump": {}
 }
 )EOF";
-
+  EXPECT_EQ("", rds_->versionInfo());
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_no_routes, TestUtility::bufferToString(data));
   data.drain(data.length());
@@ -238,6 +239,7 @@ TEST_F(RdsImplTest, Basic) {
 }
 )EOF";
 
+  EXPECT_EQ("hash_5155986269879860237", rds_->versionInfo());
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
@@ -296,6 +298,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(cm_, get("bar")).Times(0);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
+  EXPECT_EQ("hash_10773541860894967652", rds_->versionInfo());
   EXPECT_EQ("foo", rds_->config()
                        ->route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}}, 0)
                        ->routeEntry()
