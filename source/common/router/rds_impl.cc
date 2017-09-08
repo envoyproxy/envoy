@@ -204,7 +204,7 @@ void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& 
   response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
   response.add("    \"route_table_dump\": ");
   response.add(fmt::format("{}\n", provider.configAsJson()));
-  response.add("}");
+  response.add("}\n");
 }
 
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,

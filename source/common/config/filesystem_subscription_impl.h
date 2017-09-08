@@ -47,7 +47,7 @@ public:
     UNREFERENCED_PARAMETER(resources);
   }
 
-  const std::string& versionInfo() override { return version_info_; }
+  const std::string& versionInfo() const override { return version_info_; }
 
 private:
   void refresh() {
@@ -78,7 +78,7 @@ private:
   }
 
   const std::string path_;
-  std::string version_info_{};
+  std::string version_info_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   SubscriptionStats stats_;

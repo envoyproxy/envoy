@@ -60,7 +60,7 @@ public:
     request_.mutable_resource_names()->Swap(&resources_vector);
   }
 
-  const std::string& versionInfo() override { return request_.version_info(); }
+  const std::string& versionInfo() const override { return request_.version_info(); }
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override {
