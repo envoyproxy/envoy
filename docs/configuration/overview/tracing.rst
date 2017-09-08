@@ -23,7 +23,7 @@ driver
   *(optional, object)* Provides the driver that handles trace and span creation.
 
 Currently `LightStep <http://lightstep.com/>`_  and `Zipkin
-<http://zipkin.io>` drivers are supported.
+<http://zipkin.io>`_ drivers are supported.
 
 LightStep driver
 ----------------
