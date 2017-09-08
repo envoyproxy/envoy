@@ -291,6 +291,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/stats:stats_lib",
     ],
 )

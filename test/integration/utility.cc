@@ -62,7 +62,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
       cluster, "",
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
-      false, "")};
+      Upstream::HostMetadata(), "")};
   Http::CodecClientProd client(
       type,
       dispatcher->createClientConnection(

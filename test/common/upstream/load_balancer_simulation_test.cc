@@ -24,7 +24,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
   return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, zone)};
+      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), HostMetadata(), weight, zone)};
 }
 
 /**

@@ -378,7 +378,8 @@ public:
       conn_info.connection_ = upstream_connection_;
       conn_info.host_description_.reset(
           new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "",
-                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                                 Upstream::HostMetadata(), 1, ""));
       EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
           .WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))

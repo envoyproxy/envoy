@@ -291,7 +291,7 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
       cluster, "",
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_))),
-      false, "")};
+      Upstream::HostMetadata(), "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }

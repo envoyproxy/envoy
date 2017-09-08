@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -33,6 +34,10 @@ struct HostStats {
 
 class ClusterInfo;
 
+typedef std::map<std::string, std::string> HostMetadata;
+
+static const HostMetadata EMPTY_HOST_METADATA = HostMetadata();
+
 /**
  * A description of an upstream host.
  */
@@ -44,6 +49,11 @@ public:
    * @return whether the host is a canary.
    */
   virtual bool canary() const PURE;
+
+  /**
+   * @return the metadata associated with this host
+   */
+  virtual const HostMetadata& metadata() const PURE;
 
   /**
    * @return the cluster the host is a member of.

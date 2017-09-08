@@ -43,7 +43,8 @@ public:
       : ConnPoolImpl(
             dispatcher,
             Upstream::HostSharedPtr{new Upstream::HostImpl(
-                cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), false, 1, "")},
+                cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
+                Upstream::HostMetadata(), 1, "")},
             Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 
