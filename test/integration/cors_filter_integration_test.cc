@@ -28,9 +28,8 @@ public:
 
 protected:
   void testPreflight(Http::TestHeaderMapImpl&& request_headers,
-                     Http::TestHeaderMapImpl&& response_headers) {
+                     Http::TestHeaderMapImpl&& expected_response_headers) {
     executeActions({
-        // [&]() -> void { response_.reset(new IntegrationStreamDecoder(*dispatcher_)); },
         [&]() -> void {
           codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
         },
@@ -40,43 +39,30 @@ protected:
     });
 
     EXPECT_TRUE(response_->complete());
-    response_headers.iterate(
-        [](const Http::HeaderEntry& entry, void* context) -> void {
-          IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-          Http::LowerCaseString lower_key{entry.key().c_str()};
-          std::string header_value = "";
-          if (response->headers().get(lower_key) != nullptr) {
-            header_value = response->headers().get(lower_key)->value().c_str();
-          }
-          EXPECT_STREQ(entry.value().c_str(), header_value.c_str());
-        },
-        response_.get());
+    compareHeaders(response_->headers(), expected_response_headers);
   }
 
   void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
-                         Http::TestHeaderMapImpl&& response_headers) {
+                         Http::TestHeaderMapImpl&& expected_response_headers) {
     executeActions({
-        // [&]() -> void { response_.reset(new IntegrationStreamDecoder(*dispatcher_)); },
         [&]() -> void {
           codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
         },
-        [&]() -> void { sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0); },
+        [&]() -> void {
+          sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
+        },
         [&]() -> void { response_->waitForEndStream(); },
         [&]() -> void { cleanupUpstreamAndDownstream(); },
     });
 
     EXPECT_TRUE(response_->complete());
-    response_headers.iterate(
-        [](const Http::HeaderEntry& entry, void* context) -> void {
-          IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-          Http::LowerCaseString lower_key{entry.key().c_str()};
-          std::string header_value = "";
-          if (response->headers().get(lower_key) != nullptr) {
-            header_value = response->headers().get(lower_key)->value().c_str();
-          }
-          EXPECT_STREQ(entry.value().c_str(), header_value.c_str());
-        },
-        response_.get());
+    compareHeaders(response_->headers(), expected_response_headers);
+  }
+
+  void compareHeaders(Http::TestHeaderMapImpl&& response_headers,
+                      Http::TestHeaderMapImpl& expected_response_headers) {
+    response_headers.remove(Envoy::Http::LowerCaseString{"date"});
+    EXPECT_EQ(expected_response_headers, response_headers);
   }
 };
 
@@ -94,12 +80,12 @@ TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {":status", "200"},
           {"access-control-allow-origin", "test-origin"},
           {"access-control-allow-methods", "GET,POST"},
           {"access-control-allow-headers", "content-type,x-grpc-web"},
-          {"access-control-expose-headers", ""},
-          {"access-control-max-age", ""},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
       });
 }
 
@@ -114,12 +100,14 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigSuccess) {
           {"origin", "test-origin-1"},
       },
       Http::TestHeaderMapImpl{
-          {":status", "200"},
           {"access-control-allow-origin", "test-origin-1"},
           {"access-control-allow-methods", "POST"},
           {"access-control-allow-headers", "content-type"},
           {"access-control-expose-headers", "content-type"},
           {"access-control-max-age", "100"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
       });
 }
 
@@ -133,7 +121,12 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{{":status", "200"}, {"access-control-allow-origin", ""}});
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {"x-envoy-upstream-service-time", "0"},
+          {":status", "200"},
+      });
 }
 
 TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
@@ -146,7 +139,12 @@ TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
           {"access-control-request-method", "GET"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{{":status", "200"}, {"access-control-allow-origin", ""}});
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {"x-envoy-upstream-service-time", "0"},
+          {":status", "200"},
+      });
 }
 
 TEST_P(CorsFilterIntegrationTest, TestEncodeHeaders) {
@@ -158,7 +156,13 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeaders) {
           {":authority", "test-host"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{{":status", "200"}, {"access-control-allow-origin", "test-origin"}});
+      Http::TestHeaderMapImpl{
+          {"access-control-allow-origin", "test-origin"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {"x-envoy-upstream-service-time", "0"},
+          {":status", "200"},
+      });
 }
 
 TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
@@ -170,8 +174,13 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
           {":authority", "test-host"},
           {"origin", "test-origin"},
       },
-      Http::TestHeaderMapImpl{{":status", "200"},
-                              {"access-control-allow-origin", "test-origin"},
-                              {"access-control-allow-credentials", "true"}});
+      Http::TestHeaderMapImpl{
+          {"access-control-allow-origin", "test-origin"},
+          {"access-control-allow-credentials", "true"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {"x-envoy-upstream-service-time", "0"},
+          {":status", "200"},
+      });
 }
 } // namespace Envoy
