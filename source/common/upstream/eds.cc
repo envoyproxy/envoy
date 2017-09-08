@@ -18,7 +18,7 @@ namespace {
 HostMetadata parseEndpointMetadata(const envoy::api::v2::LbEndpoint& endpoint) {
   HostMetadata ret;
   if (endpoint.has_metadata()) {
-    const auto filter_metadata =
+    const auto& filter_metadata =
         endpoint.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_metadata == endpoint.metadata().filter_metadata().end()) {
       return ret;

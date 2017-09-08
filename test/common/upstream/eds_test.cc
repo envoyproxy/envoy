@@ -83,7 +83,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
   EXPECT_TRUE(initialized);
 }
 
-// Validate that onConfigupdate() with the expected cluster accepts config.
+// Validate that onConfigUpdate() with the expected cluster accepts config.
 TEST_F(EdsTest, OnSuccessConfigUpdate) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -94,7 +94,7 @@ TEST_F(EdsTest, OnSuccessConfigUpdate) {
   EXPECT_TRUE(initialized);
 }
 
-// Validate that onConfigupdate() with no service name accepts config.
+// Validate that onConfigUpdate() with no service name accepts config.
 TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   resetCluster(R"EOF(
     {
@@ -111,6 +111,75 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   cluster_->setInitializedCb([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
+}
+
+// Validate that onConfigUpdate() parses the endpoint metadata.
+TEST_F(EdsTest, ParsesEndpointMetadata) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment->add_endpoints();
+
+  auto string_value = ProtobufWkt::Value();
+  string_value.set_string_value("string_value");
+
+  auto bool_value = ProtobufWkt::Value();
+  bool_value.set_bool_value(true);
+
+  auto not_canary_value = ProtobufWkt::Value();
+  not_canary_value.set_bool_value(false);
+
+  auto ignored_value = ProtobufWkt::Value();
+  ignored_value.set_number_value(1.1);
+
+  auto metadata_struct = ProtobufWkt::Struct();
+  (*metadata_struct.mutable_fields())["string_key"] = string_value;
+  (*metadata_struct.mutable_fields())["bool_key"] = bool_value;
+  (*metadata_struct.mutable_fields())[Config::MetadataEnvoyLbKeys::get().CANARY] = not_canary_value;
+  (*metadata_struct.mutable_fields())["ignored_key"] = ignored_value;
+
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  auto* endpoint_metadata = endpoint->mutable_metadata();
+  (*endpoint_metadata->mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB] =
+      metadata_struct;
+
+  auto canary_value = ProtobufWkt::Value();
+  canary_value.set_bool_value(true);
+
+  auto canary_metadata_struct = ProtobufWkt::Struct();
+  (*canary_metadata_struct.mutable_fields())[Config::MetadataEnvoyLbKeys::get().CANARY] =
+      canary_value;
+
+  auto* canary = endpoints->add_lb_endpoints();
+  canary->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("2.3.4.5");
+  auto* canary_metadata = canary->mutable_metadata();
+  (*canary_metadata->mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB] =
+      canary_metadata_struct;
+
+  auto* other = endpoints->add_lb_endpoints();
+  other->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("3.4.5.6");
+  auto* other_metadata = other->mutable_metadata();
+  (*other_metadata->mutable_filter_metadata())["unknown"] = ProtobufWkt::Struct();
+
+  bool initialized = false;
+  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_TRUE(initialized);
+
+  auto& hosts = cluster_->hosts();
+  EXPECT_EQ(hosts.size(), 3);
+  EXPECT_EQ(hosts[0]->metadata().at("string_key"), std::string("string_value"));
+  EXPECT_EQ(hosts[0]->metadata().at("bool_key"), std::string("true"));
+  EXPECT_TRUE(hosts[0]->metadata().find("canary") == hosts[0]->metadata().end());
+  EXPECT_TRUE(hosts[0]->metadata().find("ignored_key") == hosts[0]->metadata().end());
+  EXPECT_FALSE(hosts[0]->canary());
+
+  EXPECT_EQ(hosts[1]->metadata().at("canary"), std::string("true"));
+  EXPECT_TRUE(hosts[1]->canary());
+
+  EXPECT_TRUE(hosts[2]->metadata().empty());
+  EXPECT_FALSE(hosts[2]->canary());
 }
 
 } // namespace Upstream
