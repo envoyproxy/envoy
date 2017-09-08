@@ -120,47 +120,36 @@ TEST_F(EdsTest, ParsesEndpointMetadata) {
   cluster_load_assignment->set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment->add_endpoints();
 
-  auto string_value = ProtobufWkt::Value();
-  string_value.set_string_value("string_value");
-
-  auto bool_value = ProtobufWkt::Value();
-  bool_value.set_bool_value(true);
-
-  auto not_canary_value = ProtobufWkt::Value();
-  not_canary_value.set_bool_value(false);
-
-  auto ignored_value = ProtobufWkt::Value();
-  ignored_value.set_number_value(1.1);
-
-  auto metadata_struct = ProtobufWkt::Struct();
-  (*metadata_struct.mutable_fields())["string_key"] = string_value;
-  (*metadata_struct.mutable_fields())["bool_key"] = bool_value;
-  (*metadata_struct.mutable_fields())[Config::MetadataEnvoyLbKeys::get().CANARY] = not_canary_value;
-  (*metadata_struct.mutable_fields())["ignored_key"] = ignored_value;
-
   auto* endpoint = endpoints->add_lb_endpoints();
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
-  auto* endpoint_metadata = endpoint->mutable_metadata();
-  (*endpoint_metadata->mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB] =
-      metadata_struct;
+  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "string_key")
+      .set_string_value("string_value");
+  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "bool_key")
+      .set_bool_value(true);
+  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(false);
+  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "ignored_key")
+      .set_number_value(1.1);
 
   auto canary_value = ProtobufWkt::Value();
   canary_value.set_bool_value(true);
 
-  auto canary_metadata_struct = ProtobufWkt::Struct();
-  (*canary_metadata_struct.mutable_fields())[Config::MetadataEnvoyLbKeys::get().CANARY] =
-      canary_value;
-
   auto* canary = endpoints->add_lb_endpoints();
   canary->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("2.3.4.5");
-  auto* canary_metadata = canary->mutable_metadata();
-  (*canary_metadata->mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB] =
-      canary_metadata_struct;
+  Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
 
   auto* other = endpoints->add_lb_endpoints();
   other->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("3.4.5.6");
-  auto* other_metadata = other->mutable_metadata();
-  (*other_metadata->mutable_filter_metadata())["unknown"] = ProtobufWkt::Struct();
+  Config::Metadata::mutableMetadataValue(*other->mutable_metadata(), "unknown", "dummy")
+      .set_string_value("dummy");
 
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
