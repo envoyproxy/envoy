@@ -11,6 +11,7 @@
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
@@ -275,11 +276,13 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
-
+  // The IpVersion (IPv4, IPv6) to use.
+  Network::Address::IpVersion version_;
+  // The config for envoy start-up.
+  ConfigHelper config_helper_{version_};
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
-  Network::Address::IpVersion version_;
 };
 } // namespace Envoy
