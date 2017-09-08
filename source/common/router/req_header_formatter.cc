@@ -5,7 +5,6 @@
 
 #include "common/config/rds_json.h"
 
-
 namespace Envoy {
 namespace Router {
 

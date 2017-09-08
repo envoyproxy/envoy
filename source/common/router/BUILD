@@ -180,8 +180,8 @@ envoy_cc_library(
     srcs = ["req_header_formatter.cc"],
     hdrs = ["req_header_formatter.h"],
     deps = [
-        "//source/common/config:rds_json_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:rds_json_lib",
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],
