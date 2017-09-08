@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "ads_interface",
+    hdrs = ["ads.h"],
+    deps = [
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [

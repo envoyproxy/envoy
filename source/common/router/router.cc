@@ -666,8 +666,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
       buffered_request_body_.reset(
-          new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                      [this]() -> void { this->enableDataFromDownstream(); },
+          new Buffer::WatermarkBuffer([this]() -> void { this->enableDataFromDownstream(); },
                                       [this]() -> void { this->disableDataFromDownstream(); }));
       if (parent_.buffer_limit_ > 0) {
         buffered_request_body_->setWatermarks(parent_.buffer_limit_);

@@ -1071,8 +1071,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
   auto buffer = Buffer::WatermarkBufferPtr{
-      new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                  [this]() -> void { this->requestDataDrained(); },
+      new Buffer::WatermarkBuffer([this]() -> void { this->requestDataDrained(); },
                                   [this]() -> void { this->requestDataTooLarge(); })};
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
@@ -1150,8 +1149,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                            [this]() -> void { this->responseDataDrained(); },
+  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); });
   if (parent_.buffer_limit_ > 0) {
     buffer->setWatermarks(parent_.buffer_limit_);
