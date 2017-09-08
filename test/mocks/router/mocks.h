@@ -56,9 +56,9 @@ public:
   void expectRetry();
 
   MOCK_METHOD0(enabled, bool());
-  MOCK_METHOD3(shouldRetry, bool(const Http::HeaderMap* response_headers,
-                                 const Optional<Http::StreamResetReason>& reset_reason,
-                                 DoRetryCallback callback));
+  MOCK_METHOD3(shouldRetry, RetryStatus(const Http::HeaderMap* response_headers,
+                                        const Optional<Http::StreamResetReason>& reset_reason,
+                                        DoRetryCallback callback));
 
   DoRetryCallback callback_;
 };
