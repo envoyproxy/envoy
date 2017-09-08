@@ -65,7 +65,10 @@ private:
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
-    const HostMetadata& metadata() const override { return EMPTY_HOST_METADATA; }
+    const HostMetadata& metadata() const override {
+      static HostMetadata* empty = new HostMetadata();
+      return *empty;
+    }
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     HealthCheckHostMonitor& healthChecker() const override {
       return logical_host_->healthChecker();

@@ -36,8 +36,6 @@ class ClusterInfo;
 
 typedef std::map<std::string, std::string> HostMetadata;
 
-static const HostMetadata EMPTY_HOST_METADATA = HostMetadata();
-
 /**
  * A description of an upstream host.
  */
