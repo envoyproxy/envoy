@@ -336,8 +336,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const auto& host : cluster.hosts()) {
     new_hosts->emplace_back(HostSharedPtr{
-      new HostImpl(info_, "", Network::Utility::fromProtoAddress(host),
-                   HostMetadata(), 1, "")});
+        new HostImpl(info_, "", Network::Utility::fromProtoAddress(host), HostMetadata(), 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,

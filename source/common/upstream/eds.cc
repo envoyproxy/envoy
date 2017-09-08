@@ -15,8 +15,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-HostMetadata parseEndpointMetadata(const envoy::api::v2::LbEndpoint& endpoint)
-{
+HostMetadata parseEndpointMetadata(const envoy::api::v2::LbEndpoint& endpoint) {
   HostMetadata ret;
   if (endpoint.has_metadata()) {
     const auto filter_metadata =
@@ -28,7 +27,8 @@ HostMetadata parseEndpointMetadata(const envoy::api::v2::LbEndpoint& endpoint)
     for (auto it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         ret[it.first] = it.second.string_value();
-      } else if (it.second.kind_case() == ProtobufWkt::Value::kBoolValue && it.second.bool_value()) {
+      } else if (it.second.kind_case() == ProtobufWkt::Value::kBoolValue &&
+                 it.second.bool_value()) {
         ret[it.first] = "true";
       }
     }

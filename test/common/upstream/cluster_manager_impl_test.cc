@@ -599,9 +599,9 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
-  cluster2->hosts_ = {HostSharedPtr{new HostImpl(
-      cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      Upstream::HostMetadata(), 1, "")}};
+  cluster2->hosts_ = {HostSharedPtr{new HostImpl(cluster2->info_, "",
+                                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                                                 Upstream::HostMetadata(), 1, "")}};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());

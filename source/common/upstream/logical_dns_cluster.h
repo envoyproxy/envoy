@@ -50,8 +50,7 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, HostMetadata(), 1, ""),
-          parent_(parent) {}
+        : HostImpl(cluster, hostname, address, HostMetadata(), 1, ""), parent_(parent) {}
 
     // Upstream::Host
     CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;

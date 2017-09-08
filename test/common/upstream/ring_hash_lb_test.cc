@@ -20,8 +20,8 @@ namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url) {
-  return std::make_shared<HostImpl>(cluster, "", Network::Utility::resolveUrl(url),
-                                    HostMetadata(), 1, "");
+  return std::make_shared<HostImpl>(cluster, "", Network::Utility::resolveUrl(url), HostMetadata(),
+                                    1, "");
 }
 
 class TestLoadBalancerContext : public LoadBalancerContext {
