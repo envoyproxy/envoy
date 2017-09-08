@@ -64,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:ads_api_lib",
         "//source/common/config:cds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_lib",
@@ -209,6 +210,7 @@ envoy_cc_library(
     deps = [
         ":sds_subscription_lib",
         ":upstream_includes",
+        "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
         "//source/common/config:metadata_lib",

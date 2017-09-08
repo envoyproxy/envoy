@@ -163,7 +163,10 @@ public:
 
   FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
   Network::Connection& connection() { return connection_; }
-  FakeStreamPtr waitForNewStream();
+  // By default waitForNewStream assumes the next event is a new stream and
+  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // wait for a new stream, set ignore_spurious_events = true.
+  FakeStreamPtr waitForNewStream(bool ignore_spurious_events = false);
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;

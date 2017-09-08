@@ -21,6 +21,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ads_api_lib",
+    hdrs = ["ads_api_impl.h"],
+    external_deps = ["envoy_ads"],
+    deps = [
+        "//include/envoy/config:ads_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "ads_subscription_lib",
+    hdrs = ["ads_subscription_impl.h"],
+    external_deps = ["envoy_ads"],
+    deps = [
+        "//include/envoy/config:ads_interface",
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "bootstrap_json_lib",
     srcs = ["bootstrap_json.cc"],
     hdrs = ["bootstrap_json.h"],
@@ -201,6 +225,7 @@ envoy_cc_library(
     hdrs = ["subscription_factory.h"],
     external_deps = ["envoy_base"],
     deps = [
+        ":ads_subscription_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
