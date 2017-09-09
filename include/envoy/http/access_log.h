@@ -5,15 +5,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/access_log/access_log.h"
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
-
-#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
