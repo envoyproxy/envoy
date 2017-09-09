@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -43,11 +44,11 @@ public:
     listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(GetParam()));
     listener_socket_addr->set_port_value(0);
     auto* hcm_filter = listener->mutable_filter_chains()->Add()->mutable_filters()->Add();
-    hcm_filter->set_name("http_connection_manager");
+    hcm_filter->set_name(Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER);
     envoy::api::v2::filter::HttpConnectionManager hcm_config;
     hcm_config.set_codec_type(envoy::api::v2::filter::HttpConnectionManager::HTTP1);
     auto* router_filter = hcm_config.mutable_http_filters()->Add();
-    router_filter->set_name("router");
+    router_filter->set_name(Config::HttpFilterNames::get().ROUTER);
     (*router_filter->mutable_config()->mutable_fields())["deprecated_v1"].set_bool_value(true);
     // Route configuration.
     auto* route_config = hcm_config.mutable_route_config();

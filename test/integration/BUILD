@@ -230,6 +230,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http:codec_client_lib",
     ],
 )

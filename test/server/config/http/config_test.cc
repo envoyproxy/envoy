@@ -19,7 +19,6 @@
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
 
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -291,8 +290,8 @@ TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
 }
 
 TEST(AccessLogConfigTest, FileAccessLogTest) {
-  auto factory = Registry::FactoryRegistry<Http::AccessLog::AccessLogInstanceFactory>::getFactory(
-      "envoy.file_access_log");
+  auto factory = Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(
+      Config::AccessLogNames::get().FILE);
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -304,10 +303,10 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
   MessageUtil::jsonConvert(file_access_log, *message);
 
   Http::AccessLog::FilterPtr filter;
-  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   Http::AccessLog::InstanceSharedPtr instance =
-      factory->createAccessLogInstance(*message, std::move(filter), log_manager);
+      factory->createAccessLogInstance(*message, std::move(filter), context);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<Http::AccessLog::FileAccessLog*>(instance.get()));
 }

@@ -5,17 +5,16 @@
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
-#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/protobuf/utility.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -147,32 +146,18 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
 }
 
 InstanceSharedPtr AccessLogFactory::fromProto(const envoy::api::v2::filter::AccessLog& config,
-                                              Runtime::Loader& runtime,
-                                              Envoy::AccessLog::AccessLogManager& log_manager) {
+                                              Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
-    filter = FilterFactory::fromProto(config.filter(), runtime);
+    filter = FilterFactory::fromProto(config.filter(), context.runtime());
   }
 
-  if (config.name().empty()) {
-    throw EnvoyException("Name field not found in proto for AccessLog configuration");
-  }
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
+          config.name());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(config, factory);
 
-  AccessLogInstanceFactory* factory =
-      Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(config.name());
-
-  if (factory == nullptr) {
-    throw EnvoyException(
-        fmt::format("Didn't find a registered AccessLog::Instance implementation for name: '{}'",
-                    config.name()));
-  }
-
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  if (config.has_config()) {
-    MessageUtil::jsonConvert(config.config(), *message);
-  }
-
-  return factory->createAccessLogInstance(*message, std::move(filter), log_manager);
+  return factory.createAccessLogInstance(*message, std::move(filter), context);
 }
 
 FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& filter,

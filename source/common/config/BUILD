@@ -33,6 +33,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf:utility_lib",
     ],
@@ -95,6 +96,7 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -234,10 +236,19 @@ envoy_cc_library(
         ":json_utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/registry",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:singleton",
         "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "well_known_names",
+    hdrs = ["well_known_names.h"],
+    deps = ["//source/common/common:singleton"],
 )

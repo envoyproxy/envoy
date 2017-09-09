@@ -6,6 +6,7 @@
 #include "common/config/protocol_json.h"
 #include "common/config/rds_json.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -98,7 +99,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_access_log,
 
   // Statically registered access logs are a v2-only feature, so use the standard internal file
   // access log for json config conversion.
-  access_log.set_name("envoy.file_access_log");
+  access_log.set_name(Config::AccessLogNames::get().FILE);
 
   if (json_access_log.hasObject("filter")) {
     translateAccessLogFilter(*json_access_log.getObject("filter"), *access_log.mutable_filter());

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/http/access_log.h"
+#include "envoy/server/access_log_config.h"
 
 namespace Envoy {
 namespace Server {
@@ -11,11 +11,11 @@ namespace Configuration {
 /**
  * Config registration for the file access log. @see AccessLogInstanceFactory.
  */
-class FileAccessLogFactory : public Http::AccessLog::AccessLogInstanceFactory {
+class FileAccessLogFactory : public AccessLogInstanceFactory {
 public:
-  Http::AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, Http::AccessLog::FilterPtr&& filter,
-                          AccessLog::AccessLogManager& log_manager) override;
+  Http::AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
+                                                             Http::AccessLog::FilterPtr&& filter,
+                                                             FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

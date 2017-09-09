@@ -2,6 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/statsd.h"
 
@@ -24,7 +25,7 @@ namespace Server {
 namespace Configuration {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string name = "envoy.statsd";
+  const std::string name = Config::StatsSinkNames::get().STATSD;
 
   envoy::api::v2::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
@@ -42,7 +43,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 }
 
 TEST(StatsConfigTest, ValidUdpIpStatsd) {
-  const std::string name = "envoy.statsd";
+  const std::string name = Config::StatsSinkNames::get().STATSD;
 
   envoy::api::v2::StatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
@@ -64,7 +65,7 @@ TEST(StatsConfigTest, ValidUdpIpStatsd) {
 }
 
 TEST(StatsConfigTest, EmptyConfig) {
-  const std::string name = "envoy.statsd";
+  const std::string name = Config::StatsSinkNames::get().STATSD;
   envoy::api::v2::StatsdSink sink_config;
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
