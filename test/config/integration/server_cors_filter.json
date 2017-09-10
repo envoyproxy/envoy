@@ -8,28 +8,6 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
-        "access_log": [
-        {
-          "path": "/dev/null",
-          "filter" : {
-            "type": "logical_or",
-            "filters": [
-              {
-                "type": "status_code",
-                "op": ">=",
-                "value": 500
-              },
-              {
-                "type": "duration",
-                "op": ">=",
-                "value": 1000000
-              }
-            ]
-          }
-        },
-        {
-          "path": "/dev/null"
-        }],
         "stat_prefix": "router",
         "route_config":
         {
