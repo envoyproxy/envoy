@@ -52,19 +52,19 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
         Http::Headers::get().CORSValues.True);
   }
 
-  if (allowMethods() != "") {
+  if (!allowMethods().empty()) {
     response_headers->insertAccessControlAllowMethods().value(allowMethods());
   }
 
-  if (allowHeaders() != "") {
+  if (!allowHeaders().empty()) {
     response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
   }
 
-  if (exposeHeaders() != "") {
+  if (!exposeHeaders().empty()) {
     response_headers->insertAccessControlExposeHeaders().value(exposeHeaders());
   }
 
-  if (maxAge() != "") {
+  if (!maxAge().empty()) {
     response_headers->insertAccessControlMaxAge().value(maxAge());
   }
 
@@ -112,28 +112,28 @@ const std::list<std::string>& CorsFilter::allowOrigin() {
 }
 
 const std::string& CorsFilter::allowMethods() {
-  if (route_cors_policy_->allowMethods() != "") {
+  if (!route_cors_policy_->allowMethods().empty()) {
     return route_cors_policy_->allowMethods();
   }
   return virtual_host_cors_policy_->allowMethods();
 }
 
 const std::string& CorsFilter::allowHeaders() {
-  if (route_cors_policy_->allowHeaders() != "") {
+  if (!route_cors_policy_->allowHeaders().empty()) {
     return route_cors_policy_->allowHeaders();
   }
   return virtual_host_cors_policy_->allowHeaders();
 }
 
 const std::string& CorsFilter::exposeHeaders() {
-  if (route_cors_policy_->exposeHeaders() != "") {
+  if (!route_cors_policy_->exposeHeaders().empty()) {
     return route_cors_policy_->exposeHeaders();
   }
   return virtual_host_cors_policy_->exposeHeaders();
 }
 
 const std::string& CorsFilter::maxAge() {
-  if (route_cors_policy_->maxAge() != "") {
+  if (!route_cors_policy_->maxAge().empty()) {
     return route_cors_policy_->maxAge();
   }
   return virtual_host_cors_policy_->maxAge();
