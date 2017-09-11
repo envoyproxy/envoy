@@ -117,7 +117,6 @@ envoy_cc_test_library(
     hdrs = [
         "http_integration.h",
     ],
-    data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":integration_lib",
     ],
