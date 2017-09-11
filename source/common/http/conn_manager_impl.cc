@@ -1151,9 +1151,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); });
-  if (parent_.buffer_limit_ > 0) {
-    buffer->setWatermarks(parent_.buffer_limit_);
-  }
+  buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
 

@@ -522,7 +522,7 @@ private:
       uint32_t filter_call_state_{0};
       bool encoder_filters_streaming_{true};
       bool decoder_filters_streaming_{true};
-      bool destroyed_{false};
+      bool destroyed_ {false};
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
