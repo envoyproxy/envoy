@@ -79,7 +79,7 @@ void ConfigHelper::setUpstreamPorts(const std::vector<uint32_t>& ports) {
     auto* cluster = static_resources->mutable_clusters(i);
     for (int j = 0; j < cluster->hosts_size(); ++j) {
       auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-      ASSERT(ports.size() >= port_idx);
+      RELEASE_ASSERT(ports.size() >= port_idx);
       host_socket_addr->set_port_value(ports[port_idx++]);
     }
   }
