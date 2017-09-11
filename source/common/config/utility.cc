@@ -6,6 +6,7 @@
 #include "common/config/json_utility.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "fmt/format.h"
 

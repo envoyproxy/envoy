@@ -281,5 +281,7 @@ envoy_cc_library(
         "//source/common/common:singleton",
         "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
