@@ -52,6 +52,7 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
+    // Buffer until the complete request has been processed.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }

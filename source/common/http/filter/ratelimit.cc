@@ -84,8 +84,11 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
 FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   ASSERT(state_ != State::Responded);
-  return state_ == State::Calling ? FilterDataStatus::StopIterationAndBuffer
-                                  : FilterDataStatus::Continue;
+  if (state_ != State::Calling) {
+    return FilterDataStatus::Continue;
+  }
+  // If the request is too large, stop reading new data until the buffer drains.
+  return FilterDataStatus::StopIterationAndWatermark;
 }
 
 FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {

@@ -66,6 +66,12 @@ TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
                                        4 * 1024 * 1024, false);
 }
 
+TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
+                                       Http::CodecClient::Type::HTTP1, 1024 * 1024, 1024 * 1024,
+                                       false);
+}
+
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, true);
@@ -112,6 +118,63 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
+
+TEST_P(IntegrationTest, RetryHittingBufferLimit) {
+  testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP1);
+}
+
+TEST_P(IntegrationTest, HittingDecoderFilterLimit) {
+  testHittingDecoderFilterLimit(Http::CodecClient::Type::HTTP1);
+}
+
+// Test hitting the bridge filter with too many response bytes to buffer.  Given
+// the headers are not proxied, the connection manager will send a 500.
+TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
+  IntegrationCodecClientPtr codec_client;
+  FakeHttpConnectionPtr fake_upstream_connection;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr request;
+  executeActions({[&]() -> void {
+                    codec_client = makeHttpConnection(lookupPort("bridge_with_buffer_limits"),
+                                                      Http::CodecClient::Type::HTTP1);
+                  },
+                  [&]() -> void {
+                    Http::StreamEncoder* request_encoder;
+                    request_encoder = &codec_client->startRequest(
+                        Http::TestHeaderMapImpl{{":method", "POST"},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"},
+                                                {"content-type", "application/grpc"},
+                                                {"x-envoy-retry-grpc-on", "cancelled"}},
+                        *response);
+                    codec_client->sendData(*request_encoder, 1024, true);
+                  },
+                  [&]() -> void {
+                    fake_upstream_connection =
+                        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+                  },
+                  [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
+                  [&]() -> void { request->waitForEndStream(*dispatcher_); },
+                  [&]() -> void {
+                    request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+                    // Make sure the headers are received before the body is sent.
+                    request->encodeData(1024 * 65, false);
+                  },
+                  [&]() -> void {
+                    response->waitForEndStream();
+                    EXPECT_TRUE(response->complete());
+                    EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+                  },
+                  // Cleanup both downstream and upstream
+                  [&]() -> void { codec_client->close(); },
+                  [&]() -> void { fake_upstream_connection->close(); },
+                  [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+}
+
+TEST_P(IntegrationTest, HittingEncoderFilterLimit) {
+  testHittingEncoderFilterLimit(Http::CodecClient::Type::HTTP1);
+}
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
 

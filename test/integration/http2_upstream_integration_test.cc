@@ -95,6 +95,10 @@ TEST_P(Http2UpstreamIntegrationTest, TwoRequests) {
 
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP2); }
 
+TEST_P(Http2UpstreamIntegrationTest, RetryHittingBufferLimit) {
+  testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP2);
+}
+
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {

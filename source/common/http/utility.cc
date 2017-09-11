@@ -169,6 +169,20 @@ Http1Settings Utility::parseHttp1Settings(const envoy::api::v2::Http1ProtocolOpt
 
 void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, const std::string& body_text) {
+  sendLocalReply(
+      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+        callbacks.encodeHeaders(std::move(headers), end_stream);
+      },
+      [&](Buffer::Instance& data, bool end_stream) -> void {
+        callbacks.encodeData(data, end_stream);
+      },
+      is_reset, response_code, body_text);
+}
+
+void Utility::sendLocalReply(
+    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
+    Code response_code, const std::string& body_text) {
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
@@ -176,12 +190,12 @@ void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
 
-  callbacks.encodeHeaders(std::move(response_headers), body_text.empty());
+  encode_headers(std::move(response_headers), body_text.empty());
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
     // TODO(htuch): We shouldn't encodeData() if the stream is reset in the encodeHeaders() above,
     // see https://github.com/lyft/envoy/issues/1283.
-    callbacks.encodeData(buffer, true);
+    encode_data(buffer, true);
   }
 }
 

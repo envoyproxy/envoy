@@ -9,8 +9,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -36,15 +38,9 @@ FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
   if (end_stream) {
     resetInternalState();
     return FilterDataStatus::Continue;
-  } else if (callbacks_->decodingBuffer() &&
-             callbacks_->decodingBuffer()->length() > config_->max_request_bytes_) {
-    // TODO(htuch): Switch this to Utility::sendLocalReply().
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::PayloadTooLarge))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
-    config_->stats_.rq_too_large_.inc();
   }
 
+  // Buffer until the complete request has been processed or the ConnectionManagerImpl sends a 413.
   return FilterDataStatus::StopIterationAndBuffer;
 }
 
@@ -72,6 +68,7 @@ void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
 }
 
 } // namespace Http
