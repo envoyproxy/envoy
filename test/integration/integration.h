@@ -10,6 +10,7 @@
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
@@ -140,11 +141,15 @@ public:
   void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
 
 protected:
+  // The IpVersion (IPv4, IPv6) to use.
+  Network::Address::IpVersion version_;
+  // The config for envoy start-up.
+  ConfigHelper config_helper_{version_};
+
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
-  Network::Address::IpVersion version_;
 };
 
 } // namespace Envoy

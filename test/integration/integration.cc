@@ -168,7 +168,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
-      default_log_level_(TestEnvironment::getOptions().logLevel()), version_(version) {
+      version_(version), default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
