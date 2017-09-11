@@ -26,7 +26,7 @@ public:
    * @param config the custom configuration for this access log type.
    * @param filter filter to determine whether a particular request should be logged. If no filter
    * was specified in the configuration, argument will be nullptr.
-   * @param log_manager interface through which filesystem access logs are created.
+   * @param context general filter context through which persistent resources can be accessed.
    */
   virtual Http::AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, Http::AccessLog::FilterPtr&& filter,
