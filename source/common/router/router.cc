@@ -675,9 +675,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
       buffered_request_body_.reset(
           new Buffer::WatermarkBuffer([this]() -> void { this->enableDataFromDownstream(); },
                                       [this]() -> void { this->disableDataFromDownstream(); }));
-      if (parent_.buffer_limit_ > 0) {
-        buffered_request_body_->setWatermarks(parent_.buffer_limit_);
-      }
+      buffered_request_body_->setWatermarks(parent_.buffer_limit_);
     }
 
     buffered_request_body_->move(data);
