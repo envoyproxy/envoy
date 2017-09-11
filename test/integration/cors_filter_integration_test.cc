@@ -56,12 +56,14 @@ protected:
     });
 
     EXPECT_TRUE(response_->complete());
+
     compareHeaders(response_->headers(), expected_response_headers);
   }
 
   void compareHeaders(Http::TestHeaderMapImpl&& response_headers,
                       Http::TestHeaderMapImpl& expected_response_headers) {
     response_headers.remove(Envoy::Http::LowerCaseString{"date"});
+    response_headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
     EXPECT_EQ(expected_response_headers, response_headers);
   }
 };
@@ -122,10 +124,7 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {"x-envoy-upstream-service-time", "0"},
-          {":status", "200"},
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
       });
 }
 
@@ -140,10 +139,7 @@ TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {"x-envoy-upstream-service-time", "0"},
-          {":status", "200"},
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
       });
 }
 
@@ -160,7 +156,6 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeaders) {
           {"access-control-allow-origin", "test-origin"},
           {"server", "envoy"},
           {"content-length", "0"},
-          {"x-envoy-upstream-service-time", "0"},
           {":status", "200"},
       });
 }
@@ -179,7 +174,6 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
           {"access-control-allow-credentials", "true"},
           {"server", "envoy"},
           {"content-length", "0"},
-          {"x-envoy-upstream-service-time", "0"},
           {":status", "200"},
       });
 }
