@@ -17,10 +17,6 @@ public:
   // and admin connections.
   ConfigHelper(const Network::Address::IpVersion version);
 
-  // Add a new listener with the specified name, IpVersion and port.
-  void addListener(const std::string& name, const Network::Address::IpVersion version,
-                   uint32_t port = 0);
-
   // Set the upstream ports.  The size of this vector must match the number of socket addresses
   // across all configured clusters.
   void setUpstreamPorts(const std::vector<uint32_t>& ports);
