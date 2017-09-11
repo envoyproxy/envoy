@@ -113,8 +113,8 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   EXPECT_TRUE(initialized);
 }
 
-// Validate that onConfigUpdate() parses the endpoint metadata.
-TEST_F(EdsTest, ParsesEndpointMetadata) {
+// Validate that onConfigUpdate() updates the endpoint metadata.
+TEST_F(EdsTest, EndpointMetadata) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
@@ -125,19 +125,9 @@ TEST_F(EdsTest, ParsesEndpointMetadata) {
   Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
                                          Config::MetadataFilters::get().ENVOY_LB, "string_key")
       .set_string_value("string_value");
-  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
-                                         Config::MetadataFilters::get().ENVOY_LB, "bool_key")
-      .set_bool_value(true);
-  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
-                                         Config::MetadataFilters::get().ENVOY_LB,
-                                         Config::MetadataEnvoyLbKeys::get().CANARY)
-      .set_bool_value(false);
-  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
-                                         Config::MetadataFilters::get().ENVOY_LB, "ignored_key")
+  Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(), "custom_namespace",
+                                         "num_key")
       .set_number_value(1.1);
-
-  auto canary_value = ProtobufWkt::Value();
-  canary_value.set_bool_value(true);
 
   auto* canary = endpoints->add_lb_endpoints();
   canary->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("2.3.4.5");
@@ -146,29 +136,33 @@ TEST_F(EdsTest, ParsesEndpointMetadata) {
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
 
-  auto* other = endpoints->add_lb_endpoints();
-  other->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("3.4.5.6");
-  Config::Metadata::mutableMetadataValue(*other->mutable_metadata(), "unknown", "dummy")
-      .set_string_value("dummy");
-
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   auto& hosts = cluster_->hosts();
-  EXPECT_EQ(hosts.size(), 3);
-  EXPECT_EQ(hosts[0]->metadata().at("string_key"), std::string("string_value"));
-  EXPECT_EQ(hosts[0]->metadata().at("bool_key"), std::string("true"));
-  EXPECT_TRUE(hosts[0]->metadata().find("canary") == hosts[0]->metadata().end());
-  EXPECT_TRUE(hosts[0]->metadata().find("ignored_key") == hosts[0]->metadata().end());
+  EXPECT_EQ(hosts.size(), 2);
+  EXPECT_EQ(hosts[0]->metadata().filter_metadata_size(), 2);
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata(),
+                                            Config::MetadataFilters::get().ENVOY_LB, "string_key")
+                .string_value(),
+            std::string("string_value"));
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata(), "custom_namespace", "num_key")
+                .number_value(),
+            1.1);
+  EXPECT_FALSE(Config::Metadata::metadataValue(hosts[0]->metadata(),
+                                               Config::MetadataFilters::get().ENVOY_LB,
+                                               Config::MetadataEnvoyLbKeys::get().CANARY)
+                   .bool_value());
   EXPECT_FALSE(hosts[0]->canary());
 
-  EXPECT_EQ(hosts[1]->metadata().at("canary"), std::string("true"));
+  EXPECT_EQ(hosts[1]->metadata().filter_metadata_size(), 1);
+  EXPECT_TRUE(Config::Metadata::metadataValue(hosts[1]->metadata(),
+                                              Config::MetadataFilters::get().ENVOY_LB,
+                                              Config::MetadataEnvoyLbKeys::get().CANARY)
+                  .bool_value());
   EXPECT_TRUE(hosts[1]->canary());
-
-  EXPECT_TRUE(hosts[2]->metadata().empty());
-  EXPECT_FALSE(hosts[2]->canary());
 }
 
 } // namespace Upstream

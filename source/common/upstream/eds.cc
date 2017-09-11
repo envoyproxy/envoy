@@ -13,30 +13,6 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace {
-
-HostMetadata parseEndpointMetadata(const envoy::api::v2::LbEndpoint& endpoint) {
-  HostMetadata ret;
-  if (endpoint.has_metadata()) {
-    const auto& filter_metadata =
-        endpoint.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
-    if (filter_metadata == endpoint.metadata().filter_metadata().end()) {
-      return ret;
-    }
-
-    for (auto it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
-        ret[it.first] = it.second.string_value();
-      } else if (it.second.kind_case() == ProtobufWkt::Value::kBoolValue &&
-                 it.second.bool_value()) {
-        ret[it.first] = "true";
-      }
-    }
-  }
-  return ret;
-}
-
-} // namespace
 
 EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
@@ -80,7 +56,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       new_hosts.emplace_back(new HostImpl(
           info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()),
-          parseEndpointMetadata(lb_endpoint), lb_endpoint.load_balancing_weight().value(), zone));
+          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

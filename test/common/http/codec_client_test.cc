@@ -57,8 +57,8 @@ public:
   Network::ReadFilterSharedPtr filter_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{new Upstream::HostDescriptionImpl(
-      cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), Upstream::HostMetadata(),
-      "")};
+      cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+      envoy::api::v2::Metadata::default_instance(), "")};
 };
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {

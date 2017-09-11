@@ -667,9 +667,10 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
   Upstream::MockHost::MockCreateConnectionData conn_info;
 
   conn_info.connection_ = upstream_connection_;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"), Upstream::HostMetadata(), 1, ""));
+  conn_info.host_description_.reset(
+      new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
+                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                             envoy::api::v2::Metadata::default_instance(), 1, ""));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())

@@ -291,7 +291,7 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
       cluster, "",
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_))),
-      Upstream::HostMetadata(), "")};
+      envoy::api::v2::Metadata::default_instance(), "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }

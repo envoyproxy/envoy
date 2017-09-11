@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
 
@@ -8,6 +7,8 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -34,8 +35,6 @@ struct HostStats {
 
 class ClusterInfo;
 
-typedef std::map<std::string, std::string> HostMetadata;
-
 /**
  * A description of an upstream host.
  */
@@ -51,7 +50,7 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const HostMetadata& metadata() const PURE;
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 
   /**
    * @return the cluster the host is a member of.
