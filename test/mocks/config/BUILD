@@ -10,8 +10,10 @@ envoy_package()
 
 envoy_cc_mock(
     name = "config_mocks",
+    srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
     ],
 )

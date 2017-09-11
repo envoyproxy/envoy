@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/ads.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
@@ -115,6 +116,16 @@ public:
    * bind need occur.
    */
   virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+
+  /**
+   * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
+   * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
+   * the management of clusters but instead is required early in ClusterManager/server
+   * initialization and in various sites that need ClusterManager for xDS API interfacing.
+   *
+   * @return AdsApi& ADS API provider referencee.
+   */
+  virtual Config::AdsApi& adsProvider() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

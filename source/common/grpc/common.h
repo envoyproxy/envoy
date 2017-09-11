@@ -112,6 +112,18 @@ public:
    */
   static void validateResponse(Http::Message& http_response);
 
+  /**
+   * @return const std::string& type URL prefix.
+   */
+  static const std::string& typeUrlPrefix();
+
+  /**
+   * Prefix type URL to a qualified name.
+   * @param qualified_name packagename.messagename.
+   * @return qualified_name prefixed with typeUrlPrefix + "/".
+   */
+  static std::string typeUrl(const std::string& qualified_name);
+
   static const std::string GRPC_CONTENT_TYPE;
 
 private:

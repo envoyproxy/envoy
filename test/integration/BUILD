@@ -179,6 +179,7 @@ envoy_cc_test_library(
         "//source/server/config/network:tcp_proxy_lib",
         "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
+        "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",

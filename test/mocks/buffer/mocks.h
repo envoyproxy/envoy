@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -9,24 +10,22 @@
 
 namespace Envoy {
 
-class MockBuffer : public Buffer::OwnedImpl {
+// A template class to allow code reuse between MockBuffer and MockWatermarkBuffer
+template <class BaseClass> class MockBufferBase : public BaseClass {
 public:
-  MockBuffer() {
-    ON_CALL(*this, write(testing::_))
-        .WillByDefault(testing::Invoke(this, &MockBuffer::trackWrites));
-    ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::baseMove));
-  }
+  MockBufferBase();
+  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
 
   MOCK_METHOD1(write, int(int fd));
-  MOCK_METHOD1(move, void(Instance& rhs));
-  MOCK_METHOD2(move, void(Instance& rhs, uint64_t length));
+  MOCK_METHOD1(move, void(Buffer::Instance& rhs));
+  MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
   MOCK_METHOD1(drain, void(uint64_t size));
 
-  void baseMove(Instance& rhs) { Buffer::OwnedImpl::move(rhs); }
-  void baseDrain(uint64_t size) { Buffer::OwnedImpl::drain(size); }
+  void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
+  void baseDrain(uint64_t size) { BaseClass::drain(size); }
 
   int trackWrites(int fd) {
-    int bytes_written = Buffer::OwnedImpl::write(fd);
+    int bytes_written = BaseClass::write(fd);
     if (bytes_written > 0) {
       bytes_written_ += bytes_written;
     }
@@ -35,7 +34,7 @@ public:
 
   void trackDrains(uint64_t size) {
     bytes_drained_ += size;
-    Buffer::OwnedImpl::drain(size);
+    BaseClass::drain(size);
   }
 
   // A convenience function to invoke on write() which fails the write with EAGAIN.
@@ -52,11 +51,47 @@ private:
   uint64_t bytes_drained_{0};
 };
 
-class MockBufferFactory : public Buffer::Factory {
-public:
-  Buffer::InstancePtr create() override { return Buffer::InstancePtr{create_()}; }
+template <>
+MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(std::function<void()> below_low,
+                                                        std::function<void()> above_high);
+template <> MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase();
 
-  MOCK_METHOD0(create_, Buffer::Instance*());
+template <>
+MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()> below_low,
+                                                  std::function<void()> above_high);
+template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase();
+
+class MockBuffer : public MockBufferBase<Buffer::OwnedImpl> {
+public:
+  MockBuffer() {
+    ON_CALL(*this, write(testing::_))
+        .WillByDefault(testing::Invoke(this, &MockBuffer::trackWrites));
+    ON_CALL(*this, move(testing::_)).WillByDefault(testing::Invoke(this, &MockBuffer::baseMove));
+  }
+};
+
+class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
+public:
+  typedef MockBufferBase<Buffer::WatermarkBuffer> BaseClass;
+
+  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high)
+      : BaseClass(below_low, above_high) {
+    ON_CALL(*this, write(testing::_))
+        .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::trackWrites));
+    ON_CALL(*this, move(testing::_))
+        .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::baseMove));
+  }
+};
+
+class MockBufferFactory : public Buffer::WatermarkFactory {
+public:
+  Buffer::InstancePtr create(std::function<void()> below_low,
+                             std::function<void()> above_high) override {
+    return Buffer::InstancePtr{create_(below_low, above_high)};
+  }
+
+  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
+                                          std::function<void()> above_high));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

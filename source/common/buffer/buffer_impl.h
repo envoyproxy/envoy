@@ -10,12 +10,6 @@
 namespace Envoy {
 namespace Buffer {
 
-class OwnedImplFactory : public Factory {
-public:
-  // Buffer::Factory
-  InstancePtr create() override;
-};
-
 class LibEventInstance : public Instance {
 public:
   // Allows access into the underlying buffer for move() optimizations.

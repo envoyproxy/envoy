@@ -23,7 +23,7 @@ namespace Event {
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
   DispatcherImpl();
-  DispatcherImpl(Buffer::FactoryPtr&& factory);
+  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory);
   ~DispatcherImpl();
 
   /**
@@ -59,7 +59,7 @@ public:
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
-  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
+  Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
 
 private:
   void runPostCallbacks();
@@ -73,7 +73,7 @@ private:
 #endif
 
   Thread::ThreadId run_tid_{};
-  Buffer::FactoryPtr buffer_factory_;
+  Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

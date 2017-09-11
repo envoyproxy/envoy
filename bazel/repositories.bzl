@@ -116,6 +116,7 @@ def envoy_api_deps(skip_targets):
     )
     api_bind_targets = [
         "address",
+        "ads",
         "base",
         "bootstrap",
         "cds",
