@@ -520,6 +520,9 @@ private:
       State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
 
       uint32_t filter_call_state_{0};
+      // The following 3 members are booleans rather than part of the space-saving bitfield as they
+      // are passed as arguments to functions expecting bools.  Extend State using the bitfield
+      // where possible.
       bool encoder_filters_streaming_{true};
       bool decoder_filters_streaming_{true};
       bool destroyed_{false};
