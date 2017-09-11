@@ -342,7 +342,9 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t port, uint3
        [&]() -> void {
          fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
          for (uint32_t i = 0; i < num_requests; ++i) {
-           upstream_requests.push_back(fake_upstream_connection_->waitForNewStream());
+           // As data and streams are interwoven, make sure waitForNewStream()
+           // ignores incoming data and waits for actual stream establishment.
+           upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(true));
          }
        },
        [&]() -> void {

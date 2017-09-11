@@ -20,7 +20,8 @@ MockRedirectEntry::~MockRedirectEntry() {}
 MockRetryState::MockRetryState() {}
 
 void MockRetryState::expectRetry() {
-  EXPECT_CALL(*this, shouldRetry(_, _, _)).WillOnce(DoAll(SaveArg<2>(&callback_), Return(true)));
+  EXPECT_CALL(*this, shouldRetry(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&callback_), Return(RetryStatus::Yes)));
 }
 
 MockRetryState::~MockRetryState() {}
