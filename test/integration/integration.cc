@@ -5,7 +5,6 @@
 #include <functional>
 #include <list>
 #include <memory>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -21,17 +20,15 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/integration/utility.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::_;
 
 namespace Envoy {

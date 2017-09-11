@@ -1,7 +1,5 @@
 #include "test/integration/http_integration.h"
 
-#include <chrono>
-#include <cstdint>
 #include <functional>
 #include <list>
 #include <memory>
@@ -15,7 +13,6 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -24,8 +21,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gtest/gtest.h"

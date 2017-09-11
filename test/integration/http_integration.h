@@ -11,8 +11,6 @@
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 
 /**

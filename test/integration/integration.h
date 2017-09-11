@@ -1,14 +1,11 @@
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <list>
 #include <string>
 #include <vector>
 
 #include "common/http/codec_client.h"
-#include "common/network/filter_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
