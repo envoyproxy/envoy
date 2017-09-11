@@ -30,21 +30,22 @@ public:
   const std::string TCP_PROXY = "envoy.tcp_proxy";
 
   NetworkFilterNameValues() {
-    const std::vector<std::string> prefixed_v2_names = {CLIENT_SSL_AUTH, ECHO, HTTP_CONNECTION_MANAGER, 
-      MONGO_PROXY, RATE_LIMIT, REDIS_PROXY, TCP_PROXY};
+    const std::vector<std::string> prefixed_v2_names = {
+        CLIENT_SSL_AUTH, ECHO,     HTTP_CONNECTION_MANAGER, MONGO_PROXY, RATE_LIMIT,
+        REDIS_PROXY,     TCP_PROXY};
 
     static constexpr std::size_t envoy_prefix_length = 6;
-    for (const auto &v2_name : prefixed_v2_names) {
+    for (const auto& v2_name : prefixed_v2_names) {
       v1_to_v2_names_[v2_name.substr(envoy_prefix_length)] = v2_name;
     }
   }
 
-  const std::string getV2Name(const std::string &v1_name) const {
+  const std::string getV2Name(const std::string& v1_name) const {
     auto it = v1_to_v2_names_.find(v1_name);
     return it == (v1_to_v2_names_.end()) ? v1_name : it->second;
   }
 
-  private:
+private:
   std::unordered_map<std::string, std::string> v1_to_v2_names_;
 };
 
@@ -75,16 +76,17 @@ public:
   const std::string ROUTER = "envoy.router";
 
   HttpFilterNameValues() {
-    const std::vector<std::string> prefixed_v2_names = {BUFFER, DYNAMO, FAULT, 
-      GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER, GRPC_WEB, IP_TAGGING, RATE_LIMIT, ROUTER};
+    const std::vector<std::string> prefixed_v2_names = {
+        BUFFER,     DYNAMO,     FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER, GRPC_WEB,
+        IP_TAGGING, RATE_LIMIT, ROUTER};
 
     static constexpr std::size_t envoy_prefix_length = 6;
-    for (const auto &v2_name : prefixed_v2_names) {
+    for (const auto& v2_name : prefixed_v2_names) {
       v1_to_v2_names_[v2_name.substr(envoy_prefix_length)] = v2_name;
     }
   }
 
-  const std::string getV2Name(const std::string &v1_name) const {
+  const std::string getV2Name(const std::string& v1_name) const {
     auto it = v1_to_v2_names_.find(v1_name);
     return (it == v1_to_v2_names_.end()) ? v1_name : it->second;
   }
@@ -129,7 +131,6 @@ public:
 };
 
 typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
-
 
 /**
  * Well-known metadata filter namespaces.

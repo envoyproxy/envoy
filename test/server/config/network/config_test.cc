@@ -309,7 +309,9 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),
-      EnvoyException, fmt::format("Double registration for name: '{}'", Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
+      EnvoyException,
+      fmt::format("Double registration for name: '{}'",
+                  Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
 }
 
 } // namespace Configuration

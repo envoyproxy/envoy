@@ -264,7 +264,8 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
-      EnvoyException, fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
+      EnvoyException,
+      fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
 }
 
 TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
