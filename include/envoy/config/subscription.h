@@ -75,6 +75,8 @@ public:
   COUNTER(update_success)               \
   COUNTER(update_failure)               \
   COUNTER(update_rejected)
+// clang-format on
+
 /**
  * Struct definition for per subscription stats. @see stats_macros.h
  */
