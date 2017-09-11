@@ -1,4 +1,4 @@
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 

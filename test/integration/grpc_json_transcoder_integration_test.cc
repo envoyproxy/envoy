@@ -3,7 +3,7 @@
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
 

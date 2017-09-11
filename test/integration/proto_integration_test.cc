@@ -3,7 +3,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"

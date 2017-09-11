@@ -3,7 +3,7 @@
 #include "common/grpc/common.h"
 #include "common/ratelimit/ratelimit.pb.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 

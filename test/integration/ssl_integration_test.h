@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
 
