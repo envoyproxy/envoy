@@ -44,7 +44,7 @@ envoy_sh_test(
 envoy_cc_test(
     name = "cors_filter_integration_test",
     srcs = [
-        "cors_filter_integration_test.cc"
+        "cors_filter_integration_test.cc",
     ],
     data = [
         "//test/config/integration:server_cors_filter.json",
