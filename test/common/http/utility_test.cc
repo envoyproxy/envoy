@@ -7,15 +7,15 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/http/mocks.h"
 
 #include "fmt/format.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InvokeWithoutArgs;
+using testing::_;
 
 namespace Envoy {
 namespace Http {
