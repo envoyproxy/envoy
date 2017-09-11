@@ -19,10 +19,10 @@ public:
 
   // Set the upstream ports.  The size of this vector must match the number of socket addresses
   // across all configured clusters.
-  void setUpstreamPorts(std::vector<uint32_t> ports);
+  void setUpstreamPorts(const std::vector<uint32_t>& ports);
 
   // Set source_address in the bootstrap bind config.
-  void setSourceAddress(std::string address_string);
+  void setSourceAddress(const std::string& address_string);
 
   // Return the bootstrap configuration for dyamic edits.
   envoy::api::v2::Bootstrap& bootstrap() { return bootstrap_; }
