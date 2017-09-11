@@ -192,10 +192,16 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   ASSERT(disconnected_);
 }
 
-FakeStreamPtr FakeHttpConnection::waitForNewStream() {
+FakeStreamPtr FakeHttpConnection::waitForNewStream(bool ignore_spurious_events) {
   std::unique_lock<std::mutex> lock(lock_);
-  if (new_streams_.empty()) {
+  while (new_streams_.empty()) {
     connection_event_.wait(lock);
+    // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
+    // If the caller explicitly notes other events should be ignored, it will instead actually
+    // wait for the next new stream, ignoring other events such as onData()
+    if (!ignore_spurious_events) {
+      break;
+    }
   }
 
   ASSERT(!new_streams_.empty());
