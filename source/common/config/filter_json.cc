@@ -134,6 +134,9 @@ void FilterJson::translateHttpConnectionManager(
   for (const auto& json_filter : json_http_connection_manager.getObjectArray("filters", true)) {
     auto* filter = http_connection_manager.mutable_http_filters()->Add();
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
+
+    // Translate v1 name to v2 name.
+    filter->set_name(Config::HttpFilterNames::get().getV2Name(json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +

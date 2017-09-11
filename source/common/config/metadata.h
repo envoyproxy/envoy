@@ -37,29 +37,5 @@ public:
                                                   const std::string& key);
 };
 
-/**
- * Well-known metadata filter namespaces.
- */
-class MetadataFilterValues {
-public:
-  // Filter namespace for built-in load balancer.
-  const std::string ENVOY_LB = "envoy.lb";
-  // Filter namespace for built-in router opaque data.
-  const std::string ENVOY_ROUTER = "envoy.router";
-};
-
-typedef ConstSingleton<MetadataFilterValues> MetadataFilters;
-
-/**
- * Keys for MetadataFilterConstants::ENVOY_LB metadata.
- */
-class MetadataEnvoyLbKeyValues {
-public:
-  // Key in envoy.lb filter namespace for endpoint canary bool value.
-  const std::string CANARY = "canary";
-};
-
-typedef ConstSingleton<MetadataEnvoyLbKeyValues> MetadataEnvoyLbKeys;
-
 } // namespace Config
 } // namespace Envoy

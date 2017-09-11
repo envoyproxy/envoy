@@ -2,6 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/well_known_names.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -263,7 +264,7 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
-      EnvoyException, "Double registration for name: 'router'");
+      EnvoyException, fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
 }
 
 TEST(HttpTracerConfigTest, ZipkinHttpTracer) {

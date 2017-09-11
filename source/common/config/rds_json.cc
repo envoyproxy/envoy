@@ -5,6 +5,7 @@
 #include "common/config/base_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 
 namespace Envoy {

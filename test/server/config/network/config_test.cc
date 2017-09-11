@@ -2,6 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/well_known_names.h"
 #include "common/dynamo/dynamo_filter.h"
 
 #include "server/config/network/client_ssl_auth.h"
@@ -308,7 +309,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),
-      EnvoyException, "Double registration for name: 'client_ssl_auth'");
+      EnvoyException, fmt::format("Double registration for name: '{}'", Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
 }
 
 } // namespace Configuration

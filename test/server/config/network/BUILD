@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     deps = [
         "//source/common/dynamo:dynamo_filter_lib",
+        "//source/common/config:well_known_names",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:ratelimit_lib",

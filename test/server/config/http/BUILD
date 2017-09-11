@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/http/access_log:access_log_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
