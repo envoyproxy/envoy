@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace {
 
-class ProtoIntegrationTest : public BaseIntegrationTest,
+class ProtoIntegrationTest : public HttpIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ProtoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  ProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 
@@ -102,9 +102,7 @@ TEST_P(ProtoIntegrationTest, TestBind) {
   initialize();
 
   executeActions(
-      {[&]() -> void {
-         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-       },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        // Request 1.
        [&]() -> void {
          codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -136,10 +134,7 @@ TEST_P(ProtoIntegrationTest, TestFailedBind) {
                     // Make sure they don't cause assertion failures when we ignore them.
                     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
                   },
-                  [&]() -> void {
-                    codec_client_ =
-                        makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-                  },
+                  [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     // With no ability to successfully bind on an upstream connection Envoy should
                     // send a 500.

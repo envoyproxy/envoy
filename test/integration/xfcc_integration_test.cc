@@ -138,9 +138,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientCo
   }
 
   executeActions(
-      {[&]() -> void {
-         codec_client_ = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
-       },
+      {[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
        [&]() -> void { codec_client_->makeHeaderOnlyRequest(header_map, *response_); },
        [&]() -> void {
          fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);

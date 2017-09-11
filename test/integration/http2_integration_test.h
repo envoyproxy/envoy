@@ -5,10 +5,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2IntegrationTest : public BaseIntegrationTest,
+class Http2IntegrationTest : public HttpIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  Http2IntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  Http2IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

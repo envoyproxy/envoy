@@ -6,10 +6,10 @@
 
 namespace Envoy {
 
-class IntegrationAdminTest : public BaseIntegrationTest,
+class IntegrationAdminTest : public HttpIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  IntegrationAdminTest() : BaseIntegrationTest(GetParam()) {}
+  IntegrationAdminTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

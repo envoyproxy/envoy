@@ -7,10 +7,10 @@ namespace {
 
 // This is a minimal litmus test for the v2 xDS APIs. TODO(htuch): Convert all integration tests to
 // be parameterized with v2 configs.
-class XdsIntegrationTest : public BaseIntegrationTest,
+class XdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  XdsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
@@ -36,8 +36,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, XdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP2, 1024, 512, false);
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, false);
 }
 
 } // namespace

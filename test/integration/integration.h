@@ -173,19 +173,14 @@ public:
       action();
     }
   }
-
-  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
-
-  IntegrationCodecClientPtr makeHttpConnection(uint32_t port, Http::CodecClient::Type type);
-  IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn,
-                                               Http::CodecClient::Type type);
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
-  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
@@ -196,6 +191,25 @@ public:
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
+  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+
+protected:
+  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
+  spdlog::level::level_enum default_log_level_;
+  IntegrationTestServerPtr test_server_;
+  TestEnvironment::PortMap port_map_;
+  Network::Address::IpVersion version_;
+};
+
+/**
+ * Test fixture for HTTP and HTTP/2 integration tests.
+ */
+class HttpIntegrationTest : public BaseIntegrationTest {
+public:
+  HttpIntegrationTest(Http::CodecClient::Type client_protocol, Network::Address::IpVersion version);
+
+  IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
+  IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
 protected:
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
@@ -216,32 +230,28 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
-  void testRouterRedirect(Http::CodecClient::Type type);
-  void testRouterNotFound(Http::CodecClient::Type type);
-  void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
+  void testRouterRedirect();
+  void testRouterNotFound();
+  void testRouterNotFoundWithBody(uint32_t port);
   void testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
-                                            Http::CodecClient::Type type, uint64_t request_size,
-                                            uint64_t response_size, bool big_header);
+                                            uint64_t request_size, uint64_t response_size,
+                                            bool big_header);
   void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
-                                              Http::CodecClient::Type type, bool close_upstream);
-  void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
-                                                         Http::CodecClient::Type type);
-  void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
-                                                          Http::CodecClient::Type type);
-  void testRouterDownstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
-                                                           Http::CodecClient::Type type);
-  void testRouterDownstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn,
-                                                            Http::CodecClient::Type type);
-  void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
-                                                       Http::CodecClient::Type type);
-  void testTwoRequests(Http::CodecClient::Type type);
+                                              bool close_upstream);
+  void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
+  void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn);
+  void testRouterDownstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
+  void testRouterDownstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn);
+  void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
+  void testTwoRequests();
+  void testOverlyLongHeaders();
+  // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
   void testInvalidCharacterInFirstline();
   void testLowVersion();
   void testHttp10Request();
   void testNoHost();
-  void testOverlyLongHeaders(Http::CodecClient::Type type);
   void testUpstreamProtocolError();
   void testBadPath();
   void testAbsolutePath();
@@ -252,11 +262,11 @@ protected:
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled
   void testEquivalent(const std::string& request);
-  void testValidZeroLengthContent(Http::CodecClient::Type type);
-  void testInvalidContentLength(Http::CodecClient::Type type);
-  void testMultipleContentLengths(Http::CodecClient::Type type);
-  void testDrainClose(Http::CodecClient::Type type);
-  void testRetry(Http::CodecClient::Type type);
+  void testValidZeroLengthContent();
+  void testInvalidContentLength();
+  void testMultipleContentLengths();
+  void testDrainClose();
+  void testRetry();
   void testGrpcRetry();
 
   // HTTP/2 client tests.
@@ -275,11 +285,7 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
-
-  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
-  spdlog::level::level_enum default_log_level_;
-  IntegrationTestServerPtr test_server_;
-  TestEnvironment::PortMap port_map_;
-  Network::Address::IpVersion version_;
+  // The codec type for the client-to-envoy connection
+  Http::CodecClient::Type client_protocol_;
 };
 } // namespace Envoy

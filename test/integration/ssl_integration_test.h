@@ -37,10 +37,10 @@ private:
       : IntegrationTestServer(config_path) {}
 };
 
-class SslIntegrationTest : public BaseIntegrationTest,
+class SslIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  SslIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  SslIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

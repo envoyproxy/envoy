@@ -278,22 +278,20 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
       Network::Address::InstanceConstSharedPtr());
 }
 
-IntegrationCodecClientPtr BaseIntegrationTest::makeHttpConnection(uint32_t port,
-                                                                  Http::CodecClient::Type type) {
-  return makeHttpConnection(makeClientConnection(port), type);
+IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
+  return makeHttpConnection(makeClientConnection(port));
 }
 
 IntegrationCodecClientPtr
-BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
-                                        Http::CodecClient::Type type) {
+HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
       cluster, "",
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_))),
       false, "")};
-  return IntegrationCodecClientPtr{
-      new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
+  return IntegrationCodecClientPtr{new IntegrationCodecClient(*dispatcher_, std::move(conn),
+                                                              host_description, client_protocol_)};
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
@@ -356,7 +354,11 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
   registerTestServerPorts(port_names);
 }
 
-void BaseIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
+HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type client_protocol,
+                                         Network::Address::IpVersion version)
+    : BaseIntegrationTest(version), client_protocol_(client_protocol) {}
+
+void HttpIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
                                                         uint32_t request_body_size,
                                                         Http::TestHeaderMapImpl& response_headers,
                                                         uint32_t response_size) {
@@ -377,7 +379,7 @@ void BaseIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl&
   response_->waitForEndStream();
 }
 
-void BaseIntegrationTest::cleanupUpstreamAndDownstream() {
+void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   codec_client_->close();
   if (fake_upstream_connection_) {
     fake_upstream_connection_->close();
@@ -385,7 +387,7 @@ void BaseIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-void BaseIntegrationTest::waitForNextUpstreamRequest() {
+void HttpIntegrationTest::waitForNextUpstreamRequest() {
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
@@ -396,12 +398,11 @@ void BaseIntegrationTest::waitForNextUpstreamRequest() {
   upstream_request_->waitForEndStream(*dispatcher_);
 }
 
-void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
-                                                               Http::CodecClient::Type type,
+void HttpIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
                                                                uint64_t request_size,
                                                                uint64_t response_size,
                                                                bool big_header) {
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
 
                   [&]() -> void {
                     Http::TestHeaderMapImpl request_headers{
@@ -424,10 +425,10 @@ void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientCo
   EXPECT_EQ(response_size, response_->body().size());
 }
 
-void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type, bool close_upstream) {
+void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
+    Network::ClientConnectionPtr&& conn, bool close_upstream) {
 
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
                   [&]() -> void {
                     Http::TestHeaderMapImpl request_headers{{":method", "GET"},
                                                             {":path", "/test/long/url"},
@@ -457,33 +458,33 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
   EXPECT_EQ(0U, response_->body().size());
 }
 
-void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterNotFound() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", type, version_);
+      lookupPort("http"), "GET", "/notfound", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type) {
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type, version_);
+void HttpIntegrationTest::testRouterNotFoundWithBody(uint32_t port) {
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      port, "POST", "/notfound", "foo", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterRedirect() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/foo", "", type, version_, "www.redirect.com");
+      lookupPort("http"), "GET", "/foo", "", client_protocol_, version_, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
                response->headers().get(Http::Headers::get().Location)->value().c_str());
 }
 
-void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testDrainClose() {
   test_server_->drainManager().draining_ = true;
 
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     codec_client_->makeHeaderOnlyRequest(
                         Http::TestHeaderMapImpl{{":method", "GET"},
@@ -497,17 +498,17 @@ void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
 
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  if (type == Http::CodecClient::Type::HTTP2) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
 
   test_server_->drainManager().draining_ = false;
 }
 
-void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
+    Network::ClientConnectionPtr&& conn) {
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
       [&]() -> void {
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                             {":path", "/test/long/url"},
@@ -524,7 +525,7 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); },
       [&]() -> void { response_->waitForEndStream(); }};
 
-  if (type == Http::CodecClient::Type::HTTP1) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
     actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
     actions.push_back([&]() -> void { codec_client_->close(); });
@@ -540,10 +541,10 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete(
   EXPECT_EQ("upstream connect error or disconnect/reset before headers", response_->body());
 }
 
-void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
+    Network::ClientConnectionPtr&& conn) {
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
       [&]() -> void {
         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                      {":path", "/test/long/url"},
@@ -558,7 +559,7 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
       [&]() -> void { fake_upstream_connection_->close(); },
       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }};
 
-  if (type == Http::CodecClient::Type::HTTP1) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
     actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
     actions.push_back([&]() -> void { response_->waitForReset(); });
@@ -575,10 +576,10 @@ void BaseIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   EXPECT_EQ(0U, response_->body().size());
 }
 
-void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
+    Network::ClientConnectionPtr&& conn) {
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
       [&]() -> void {
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                             {":path", "/test/long/url"},
@@ -609,10 +610,10 @@ void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
   EXPECT_FALSE(response_->complete());
 }
 
-void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
+    Network::ClientConnectionPtr&& conn) {
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
       [&]() -> void {
         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                      {":path", "/test/long/url"},
@@ -646,10 +647,10 @@ void BaseIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   EXPECT_EQ(512U, response_->body().size());
 }
 
-void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
-    Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
+    Network::ClientConnectionPtr&& conn) {
   std::list<std::function<void()>> actions = {
-      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn), type); },
+      [&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
       [&]() -> void {
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                             {":path", "/test/long/url"},
@@ -676,7 +677,7 @@ void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
     actions.push_back([&]() -> void { fake_upstream_connection_->waitForDisconnect(); });
   }
 
-  if (type == Http::CodecClient::Type::HTTP1) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
     actions.push_back([&]() -> void { codec_client_->waitForDisconnect(); });
   } else {
     actions.push_back([&]() -> void { codec_client_->close(); });
@@ -692,9 +693,9 @@ void BaseIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(
   EXPECT_EQ(512U, response_->body().size());
 }
 
-void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testRetry() {
   executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        [&]() -> void {
          codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                     {":path", "/test/long/url"},
@@ -733,12 +734,10 @@ void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
        [&]() -> void { cleanupUpstreamAndDownstream(); }});
 }
 
-void BaseIntegrationTest::testGrpcRetry() {
+void HttpIntegrationTest::testGrpcRetry() {
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"grpc-status", "0"}};
   executeActions(
-      {[&]() -> void {
-         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-       },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        [&]() -> void {
          request_encoder_ = &codec_client_->startRequest(
              Http::TestHeaderMapImpl{{":method", "POST"},
@@ -790,9 +789,9 @@ void BaseIntegrationTest::testGrpcRetry() {
        [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
 }
 
-void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testTwoRequests() {
   executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        // Request 1.
        [&]() -> void {
          codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -857,31 +856,31 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
   connection.run();
 }
 
-void BaseIntegrationTest::testBadFirstline() {
+void HttpIntegrationTest::testBadFirstline() {
   std::string response;
   sendRawHttpAndWaitForResponse("hello", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testMissingDelimiter() {
+void HttpIntegrationTest::testMissingDelimiter() {
   std::string response;
   sendRawHttpAndWaitForResponse("GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testInvalidCharacterInFirstline() {
+void HttpIntegrationTest::testInvalidCharacterInFirstline() {
   std::string response;
   sendRawHttpAndWaitForResponse("GE(T / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testLowVersion() {
+void HttpIntegrationTest::testLowVersion() {
   std::string response;
   sendRawHttpAndWaitForResponse("GET / HTTP/0.8\r\nHost: host\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void BaseIntegrationTest::testHttp10Request() {
+void HttpIntegrationTest::testHttp10Request() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -896,7 +895,7 @@ void BaseIntegrationTest::testHttp10Request() {
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
-void BaseIntegrationTest::testNoHost() {
+void HttpIntegrationTest::testNoHost() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -911,7 +910,7 @@ void BaseIntegrationTest::testNoHost() {
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
-void BaseIntegrationTest::testAbsolutePath() {
+void HttpIntegrationTest::testAbsolutePath() {
   Buffer::OwnedImpl buffer("GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -926,7 +925,7 @@ void BaseIntegrationTest::testAbsolutePath() {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testAbsolutePathWithPort() {
+void HttpIntegrationTest::testAbsolutePathWithPort() {
   Buffer::OwnedImpl buffer("GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -941,7 +940,7 @@ void BaseIntegrationTest::testAbsolutePathWithPort() {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testAbsolutePathWithoutPort() {
+void HttpIntegrationTest::testAbsolutePathWithoutPort() {
   Buffer::OwnedImpl buffer("GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -956,17 +955,17 @@ void BaseIntegrationTest::testAbsolutePathWithoutPort() {
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testAllowAbsoluteSameRelative() {
+void HttpIntegrationTest::testAllowAbsoluteSameRelative() {
   // Ensure that relative urls behave the same with allow_absolute_url enabled and without
   testEquivalent("GET /foo/bar HTTP/1.1\r\nHost: host\r\n\r\n");
 }
 
-void BaseIntegrationTest::testConnect() {
+void HttpIntegrationTest::testConnect() {
   // Ensure that connect behaves the same with allow_absolute_url enabled and without
   testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
 }
 
-void BaseIntegrationTest::testEquivalent(const std::string& request) {
+void HttpIntegrationTest::testEquivalent(const std::string& request) {
   Buffer::OwnedImpl buffer1(request);
   std::string response1;
   RawConnectionDriver connection1(
@@ -994,7 +993,7 @@ void BaseIntegrationTest::testEquivalent(const std::string& request) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-void BaseIntegrationTest::testBadPath() {
+void HttpIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
   RawConnectionDriver connection(
@@ -1009,8 +1008,8 @@ void BaseIntegrationTest::testBadPath() {
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
-void BaseIntegrationTest::testValidZeroLengthContent(Http::CodecClient::Type type) {
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+void HttpIntegrationTest::testValidZeroLengthContent() {
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     Http::TestHeaderMapImpl request_headers{{":method", "POST"},
                                                             {":path", "/test/long/url"},
@@ -1025,8 +1024,8 @@ void BaseIntegrationTest::testValidZeroLengthContent(Http::CodecClient::Type typ
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type) {
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+void HttpIntegrationTest::testInvalidContentLength() {
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                         {":path", "/test/long/url"},
@@ -1035,7 +1034,7 @@ void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type)
                                                 *response_);
                   },
                   [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
+                    if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
                       codec_client_->waitForDisconnect();
                     } else {
                       response_->waitForReset();
@@ -1043,7 +1042,7 @@ void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type)
                     }
                   }});
 
-  if (type == Http::CodecClient::Type::HTTP1) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
@@ -1052,8 +1051,8 @@ void BaseIntegrationTest::testInvalidContentLength(Http::CodecClient::Type type)
   }
 }
 
-void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type type) {
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+void HttpIntegrationTest::testMultipleContentLengths() {
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                         {":path", "/test/long/url"},
@@ -1062,7 +1061,7 @@ void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type typ
                                                 *response_);
                   },
                   [&]() -> void {
-                    if (type == Http::CodecClient::Type::HTTP1) {
+                    if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
                       codec_client_->waitForDisconnect();
                     } else {
                       response_->waitForReset();
@@ -1070,7 +1069,7 @@ void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type typ
                     }
                   }});
 
-  if (type == Http::CodecClient::Type::HTTP1) {
+  if (client_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
@@ -1079,12 +1078,12 @@ void BaseIntegrationTest::testMultipleContentLengths(Http::CodecClient::Type typ
   }
 }
 
-void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
+void HttpIntegrationTest::testOverlyLongHeaders() {
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   big_headers.addCopy("big", std::string(60 * 1024, 'a'));
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http"), type); },
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     std::string long_value(7500, 'x');
                     codec_client_->startRequest(big_headers, *response_);
@@ -1095,12 +1094,10 @@ void BaseIntegrationTest::testOverlyLongHeaders(Http::CodecClient::Type type) {
   EXPECT_STREQ("431", response_->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testUpstreamProtocolError() {
+void HttpIntegrationTest::testUpstreamProtocolError() {
   FakeRawConnectionPtr fake_upstream_connection;
   executeActions(
-      {[&]() -> void {
-         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-       },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        [&]() -> void {
          codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                              {":path", "/test/long/url"},
@@ -1119,11 +1116,9 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
 }
 
-void BaseIntegrationTest::testDownstreamResetBeforeResponseComplete() {
+void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   std::list<std::function<void()>> actions = {
-      [&]() -> void {
-        codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
-      },
+      [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
       [&]() -> void {
         request_encoder_ =
             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -1166,14 +1161,11 @@ void BaseIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   EXPECT_EQ(512U, response_->body().size());
 }
 
-void BaseIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
+void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
   executeActions(
-      {[&]() -> void {
-         codec_client_ =
-             makeHttpConnection(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP2);
-       },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http_buffer")); },
        [&]() -> void {
          request_encoder_ =
              &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},

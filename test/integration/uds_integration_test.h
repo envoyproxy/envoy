@@ -11,10 +11,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class UdsIntegrationTest : public BaseIntegrationTest,
+class UdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  UdsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  UdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */
