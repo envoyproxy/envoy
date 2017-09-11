@@ -35,7 +35,8 @@ public:
 
   /**
    * Returns the v2 name for the provided v1 name. If it doesn't match one of the explicitly
-   * provided names, it will return the same name. v1_name the name to convert.
+   * provided names, it will return the same name.
+   * @param v1_name the name to convert.
    */
   const std::string getV2Name(const std::string& v1_name) const {
     auto it = v1_to_v2_names_.find(v1_name);
