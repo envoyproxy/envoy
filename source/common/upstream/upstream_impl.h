@@ -22,7 +22,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
-#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
