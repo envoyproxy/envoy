@@ -17,6 +17,10 @@ public:
   // and admin connections.
   ConfigHelper(const Network::Address::IpVersion version);
 
+  // Add a new listener with the specified name, IpVersion and port.
+  void addListener(const std::string& name, const Network::Address::IpVersion version,
+                   uint32_t port = 0);
+
   // Set the upstream ports.  The size of this vector must match the number of socket addresses
   // across all configured clusters.
   void setUpstreamPorts(const std::vector<uint32_t>& ports);
@@ -24,8 +28,8 @@ public:
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
 
-  // Return the bootstrap configuration for dyamic edits.
-  envoy::api::v2::Bootstrap& bootstrap() { return bootstrap_; }
+  // Return the bootstrap configuration for hand-off to Envoy.
+  const envoy::api::v2::Bootstrap& bootstrap() { return bootstrap_; }
 
 private:
   // The bootstrap proto Envoy will start up with.

@@ -10,25 +10,20 @@
 
 namespace Envoy {
 
-std::string basic_config = R"EOF(
+const std::string basic_config = R"EOF(
 static_resources:
   listeners:
-    name: listener_0
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
     filter_chains:
       filters:
         name: http_connection_manager
         config:
-          httpFilters:
+          http_filters:
             name: router
             config:
               deprecated_v1: true
-          codecType: HTTP1
-          routeConfig:
-            virtualHosts:
+          codec_type: HTTP1
+          route_config:
+            virtual_hosts:
               name: integration
               routes:
                 route:
@@ -53,15 +48,14 @@ admin:
 )EOF";
 
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version) {
+  // Add the default listener.
+  addListener("listener_0", version);
+
   std::string filename =
       TestEnvironment::writeStringToFileForTest("basic_config.yaml", basic_config);
   MessageUtil::loadFromFile(filename, bootstrap_);
 
   // Fix up all the socket addresses with the correct version.
-  auto* admin = bootstrap_.mutable_admin();
-  auto* admin_socket_addr = admin->mutable_address()->mutable_socket_address();
-  admin_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
-
   auto* static_resources = bootstrap_.mutable_static_resources();
   auto* listener = static_resources->mutable_listeners(0);
   auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
@@ -70,6 +64,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version) {
   auto* cluster = static_resources->mutable_clusters(0);
   auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
   host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+}
+
+void ConfigHelper::addListener(const std::string& name, const Network::Address::IpVersion version,
+                               uint32_t port) {
+  auto listener = bootstrap_.mutable_static_resources()->add_listeners();
+  listener->set_name(name);
+  auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
+  listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+  listener_socket_addr->set_port_value(port);
 }
 
 void ConfigHelper::setUpstreamPorts(const std::vector<uint32_t>& ports) {
