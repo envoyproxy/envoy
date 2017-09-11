@@ -124,7 +124,9 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
       });
 }
 
@@ -139,7 +141,9 @@ TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
       });
 }
 
