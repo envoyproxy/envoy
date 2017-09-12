@@ -81,7 +81,7 @@ AdsWatchPtr AdsApiImpl::subscribe(const std::string& type_url,
                                   const std::vector<std::string>& resources,
                                   AdsCallbacks& callbacks) {
   auto watch =
-      std::unique_ptr<AdsWatchImpl>(new AdsWatchImpl(resources, callbacks, watches_[type_url]));
+      std::unique_ptr<AdsWatch>(new AdsWatchImpl(resources, callbacks, watches_[type_url]));
   ENVOY_LOG(debug, "ADS subscribe for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the

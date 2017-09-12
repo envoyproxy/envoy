@@ -81,14 +81,14 @@ public:
     listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(GetParam()));
     listener_socket_addr->set_port_value(0);
     auto* hcm_filter = listener.mutable_filter_chains()->Add()->mutable_filters()->Add();
-    hcm_filter->set_name("http_connection_manager");
+    hcm_filter->set_name("envoy.http_connection_manager");
     envoy::api::v2::filter::HttpConnectionManager hcm_config;
     hcm_config.set_codec_type(envoy::api::v2::filter::HttpConnectionManager::HTTP2);
     auto* rds = hcm_config.mutable_rds();
     rds->set_route_config_name(route_config);
     rds->mutable_config_source()->mutable_ads();
     auto* router_filter = hcm_config.mutable_http_filters()->Add();
-    router_filter->set_name("router");
+    router_filter->set_name("envoy.router");
     (*router_filter->mutable_config()->mutable_fields())["deprecated_v1"].set_bool_value(true);
     MessageUtil::jsonConvert(hcm_config, *hcm_filter->mutable_config());
     return listener;
