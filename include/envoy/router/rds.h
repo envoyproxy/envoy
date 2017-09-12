@@ -21,6 +21,11 @@ public:
    *         each request flow.
    */
   virtual Router::ConfigConstSharedPtr config() PURE;
+
+  /**
+   * @return const std::string& version info from last accepted config.
+   */
+  virtual const std::string& versionInfo() const PURE;
 };
 
 /**

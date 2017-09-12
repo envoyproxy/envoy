@@ -88,6 +88,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }
     subscription_->onReceiveMessage(std::move(response));
+    EXPECT_EQ(version_, subscription_->versionInfo());
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -107,6 +108,8 @@ public:
   Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
 };
+
+// TODO(danielhochman): test with RDS and ensure version_info is same as what API returned
 
 } // namespace Config
 } // namespace Envoy

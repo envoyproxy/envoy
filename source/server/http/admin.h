@@ -97,6 +97,10 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
+    const std::string& versionInfo() const override {
+      static const std::string* command = new std::string("");
+      return *command;
+    }
 
     Router::ConfigConstSharedPtr config_;
   };

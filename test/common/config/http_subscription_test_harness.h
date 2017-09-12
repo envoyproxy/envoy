@@ -120,6 +120,7 @@ public:
     if (accept) {
       version_ = version;
     }
+    EXPECT_EQ(version_, subscription_->versionInfo());
     request_in_progress_ = false;
     timerTick();
   }

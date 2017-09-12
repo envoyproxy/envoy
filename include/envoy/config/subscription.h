@@ -59,6 +59,11 @@ public:
    * @param resources vector of resource names to fetch.
    */
   virtual void updateResources(const std::vector<std::string>& resources) PURE;
+
+  /**
+   * @return version info from last accepted onConfigUpdate.
+   */
+  virtual const std::string& versionInfo() const PURE;
 };
 
 /**
@@ -70,6 +75,7 @@ public:
   COUNTER(update_success)               \
   COUNTER(update_failure)               \
   COUNTER(update_rejected)
+// clang-format on
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h

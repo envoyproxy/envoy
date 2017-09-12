@@ -6,6 +6,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/hash.h"
+#include "common/common/hex.h"
 #include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -47,6 +49,14 @@ public:
       resource.UnpackTo(typed_resource);
     }
     return typed_resources;
+  }
+
+  /**
+   * Legacy APIs uses JSON and do not have an explicit version. Hash the body and append
+   * a user-friendly prefix.
+   */
+  static std::string computeHashedVersion(const std::string& input) {
+    return "hash_" + Hex::uint64ToHex(HashUtil::xxHash64(input));
   }
 
   /**
