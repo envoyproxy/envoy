@@ -21,6 +21,8 @@ envoy_cc_test(
         "//source/common/stats:statsd_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
