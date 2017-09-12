@@ -135,6 +135,13 @@ cc_library(
 )
 
 cc_library(
+    name = "xxhash",
+    srcs = ["thirdparty_build/lib/xxhash.a"],
+    hdrs = ["thirdparty_build/include/xxhash.h"],
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = ["thirdparty_build/lib/libyaml-cpp.a"],
     hdrs = glob(["thirdparty_build/include/yaml-cpp/**/*.h"]),
