@@ -10,6 +10,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/macros.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/conn_manager_impl.h"
@@ -58,10 +59,7 @@ public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
-    const std::string& versionInfo() const override {
-      static const std::string* version = new std::string("");
-      return *version;
-    }
+    const std::string& versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };

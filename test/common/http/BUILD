@@ -84,6 +84,7 @@ envoy_cc_test(
         "//include/envoy/http:access_log_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:macros",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",

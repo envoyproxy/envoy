@@ -129,6 +129,7 @@ envoy_cc_library(
     linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",
+        "//source/common/common:macros",
     ],
 )
 

@@ -18,6 +18,14 @@ namespace Envoy {
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
 
 /**
+ * Construct On First Use idiom.
+ * See https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use.
+ */
+#define CONSTRUCT_ON_FIRST_USE(type, ...)                                                          \
+  static const type* objectptr = new type{__VA_ARGS__};                                            \
+  return *objectptr;
+
+/**
  * Have a generic fall-through for different versions of C++
  */
 #if __cplusplus >= 201402L // C++14, C++17 and above

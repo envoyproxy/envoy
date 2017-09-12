@@ -12,6 +12,7 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
@@ -97,10 +98,7 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
-    const std::string& versionInfo() const override {
-      static const std::string* command = new std::string("");
-      return *command;
-    }
+    const std::string& versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
     Router::ConfigConstSharedPtr config_;
   };
