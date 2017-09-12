@@ -7,6 +7,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -56,9 +57,8 @@ public:
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterSharedPtr filter_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_{new Upstream::HostDescriptionImpl(
-      cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::Metadata::default_instance(), "")};
+  Upstream::HostDescriptionConstSharedPtr host_{Upstream::makeTestHostDescription(cluster_,
+                                                "tcp://127.0.0.1:80")};
 };
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {

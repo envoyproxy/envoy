@@ -8,6 +8,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -158,9 +159,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cm.thread_local_cluster_.cluster_.info_, "", Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::Metadata::default_instance(), 1, ""));
+  conn_info.host_description_ = Upstream::makeTestHost(cm.thread_local_cluster_.cluster_.info_,
+                                                       "tcp://127.0.0.1:80");
   EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);

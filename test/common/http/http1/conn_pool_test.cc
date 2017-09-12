@@ -8,6 +8,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -40,10 +41,7 @@ class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster)
-      : ConnPoolImpl(dispatcher,
-                     Upstream::HostSharedPtr{new Upstream::HostImpl(
-                         cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
-                         envoy::api::v2::Metadata::default_instance(), 1, "")},
+      : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 
