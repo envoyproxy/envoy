@@ -267,6 +267,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:singleton",
         "//source/common/json:config_schemas_lib",

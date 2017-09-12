@@ -6,6 +6,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/hash.h"
+#include "common/common/hex.h"
 #include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -54,7 +56,7 @@ public:
    * a user-friendly prefix.
    */
   static std::string computeHashedVersion(const std::string& input) {
-    return "hash_" + std::to_string(std::hash<std::string>{}(input));
+    return "hash_" + Hex::uint64ToHex(HashUtil::xxHash64(input));
   }
 
   /**

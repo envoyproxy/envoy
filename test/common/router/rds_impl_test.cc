@@ -232,14 +232,14 @@ TEST_F(RdsImplTest, Basic) {
 
   // Test Admin /routes handler. Now we should have an empty route table, with exception of name.
   const std::string routes_expected_output_only_name = R"EOF({
-    "version_info": "hash_5155986269879860237",
+    "version_info": "hash_15ed54077da94d8b",
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
     "route_table_dump": {"name":"foo_route_config"}
 }
 )EOF";
 
-  EXPECT_EQ("hash_5155986269879860237", rds_->versionInfo());
+  EXPECT_EQ("hash_15ed54077da94d8b", rds_->versionInfo());
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
@@ -298,7 +298,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(cm_, get("bar")).Times(0);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_10773541860894967652", rds_->versionInfo());
+  EXPECT_EQ("hash_7a3f97b327d08382", rds_->versionInfo());
   EXPECT_EQ("foo", rds_->config()
                        ->route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}}, 0)
                        ->routeEntry()
@@ -307,7 +307,7 @@ TEST_F(RdsImplTest, Basic) {
   // Test Admin /routes handler. The route table should now have the information given in
   // response2_json.
   const std::string routes_expected_output_full_table = R"EOF({
-    "version_info": "hash_10773541860894967652",
+    "version_info": "hash_7a3f97b327d08382",
     "route_config_name": "foo_route_config",
     "cluster_name": "foo_cluster",
     "route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
