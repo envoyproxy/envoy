@@ -335,8 +335,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                       added_via_api) {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const auto& host : cluster.hosts()) {
-    new_hosts->emplace_back(HostSharedPtr{
-        new HostImpl(info_, "", Network::Utility::fromProtoAddress(host), false, 1, "")});
+    new_hosts->emplace_back(
+        HostSharedPtr{new HostImpl(info_, "", Network::Utility::fromProtoAddress(host),
+                                   envoy::api::v2::Metadata::default_instance(), 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
@@ -512,7 +513,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
                                               Network::Utility::getAddressWithPort(*address, port_),
-                                              false, 1, ""));
+                                              envoy::api::v2::Metadata::default_instance(), 1, ""));
         }
 
         std::vector<HostSharedPtr> hosts_added;

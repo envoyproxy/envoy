@@ -67,6 +67,7 @@ envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/config:cds_json_lib",
         "//source/common/event:dispatcher_lib",
@@ -75,7 +76,6 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:health_checker_lib",
-        "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
         "//test/mocks/network:network_mocks",
@@ -90,6 +90,7 @@ envoy_cc_test(
     name = "host_utility_test",
     srcs = ["host_utility_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:upstream_includes",
@@ -102,6 +103,7 @@ envoy_cc_test(
     name = "load_balancer_impl_test",
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
@@ -198,6 +200,7 @@ envoy_cc_test(
         "//conditions:default": ["ring_hash_lb_test.cc"],
     }),
     deps = [
+        ":utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_includes",
@@ -257,5 +260,8 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
     ],
 )

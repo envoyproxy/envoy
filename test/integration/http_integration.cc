@@ -17,6 +17,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -126,11 +127,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "",
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_))),
-      false, "")};
+  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return IntegrationCodecClientPtr{new IntegrationCodecClient(*dispatcher_, std::move(conn),
                                                               host_description, client_protocol_)};
 }
