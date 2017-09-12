@@ -20,10 +20,10 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: http_connection_manager
+        name: envoy.http_connection_manager
         config:
           http_filters:
-            name: router
+            name: envoy.router
             config:
               deprecated_v1: true
           codec_type: HTTP1

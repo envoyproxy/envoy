@@ -64,7 +64,7 @@ public:
 
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
-        access_logs_{AccessLog::InstanceSharedPtr{new AccessLog::InstanceImpl(
+        access_logs_{AccessLog::InstanceSharedPtr{new AccessLog::FileAccessLog(
             access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
             log_manager_)}},
         codec_(new NiceMock<MockServerConnection>()),

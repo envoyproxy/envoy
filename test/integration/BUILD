@@ -175,6 +175,7 @@ envoy_cc_test_library(
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
+        "//source/server/config/http:file_access_log_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:ip_tagging_lib",
@@ -243,6 +244,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http:codec_client_lib",
     ],
 )

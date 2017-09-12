@@ -8,6 +8,7 @@
 
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"

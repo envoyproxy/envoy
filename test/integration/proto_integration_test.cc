@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
