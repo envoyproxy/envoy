@@ -3,7 +3,7 @@
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
 
@@ -19,10 +19,11 @@ using Envoy::ProtobufWkt::Empty;
 namespace Envoy {
 
 class GrpcJsonTranscoderIntegrationTest
-    : public BaseIntegrationTest,
+    : public HttpIntegrationTest,
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  GrpcJsonTranscoderIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  GrpcJsonTranscoderIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Global initializer for all integration tests.
    */
@@ -49,7 +50,7 @@ protected:
                        const std::string& response_body) {
     response_.reset(new IntegrationStreamDecoder(*dispatcher_));
 
-    codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
 
     if (!request_body.empty()) {
       request_encoder_ = &codec_client_->startRequest(request_headers, *response_);

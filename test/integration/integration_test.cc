@@ -17,115 +17,99 @@ namespace Envoy {
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+  testRouterNotFoundWithBody(lookupPort("http"));
 }
 
 TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP1);
+  testRouterNotFoundWithBody(lookupPort("http_buffer"));
 }
 
-TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
-TEST_P(IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  executeActions(
-      {[&]() -> void {
-         codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-       },
-       [&]() -> void {
-         codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                      {":path", "/healthcheck"},
-                                                                      {":authority", "host"},
-                                                                      {"connection", "close"}},
-                                              *response_);
-       },
-       [&]() -> void { response_->waitForEndStream(); },
-       [&]() -> void { codec_client_->waitForDisconnect(); }});
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
+                  [&]() -> void {
+                    codec_client_->makeHeaderOnlyRequest(
+                        Http::TestHeaderMapImpl{{":method", "GET"},
+                                                {":path", "/healthcheck"},
+                                                {":authority", "host"},
+                                                {"connection", "close"}},
+                        *response_);
+                  },
+                  [&]() -> void { response_->waitForEndStream(); },
+                  [&]() -> void { codec_client_->waitForDisconnect(); }});
 
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")), 1024, 512,
+                                       false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
-                                       Http::CodecClient::Type::HTTP1, 4 * 1024 * 1024,
-                                       4 * 1024 * 1024, false);
+                                       4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
-                                       Http::CodecClient::Type::HTTP1, 1024 * 1024, 1024 * 1024,
-                                       false);
+                                       1024 * 1024, 1024 * 1024, false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512, true);
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, true);
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP1, true);
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), true);
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
-                                         Http::CodecClient::Type::HTTP1, true);
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")), true);
 }
 
 TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
-                                         Http::CodecClient::Type::HTTP1, false);
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), false);
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                    Http::CodecClient::Type::HTTP1);
+  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
-                                                     Http::CodecClient::Type::HTTP1);
+  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                      Http::CodecClient::Type::HTTP1);
+  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
-                                                       Http::CodecClient::Type::HTTP1);
+  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
 }
 
 TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")),
-                                                  Http::CodecClient::Type::HTTP1);
+  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")));
 }
 
-TEST_P(IntegrationTest, Retry) { testRetry(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, Retry) { testRetry(); }
 
-TEST_P(IntegrationTest, RetryHittingBufferLimit) {
-  testRetryHittingBufferLimit(Http::CodecClient::Type::HTTP1);
-}
+TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 
-TEST_P(IntegrationTest, HittingDecoderFilterLimit) {
-  testHittingDecoderFilterLimit(Http::CodecClient::Type::HTTP1);
-}
+TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
+
+TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
 
 // Test hitting the bridge filter with too many response bytes to buffer.  Given
 // the headers are not proxied, the connection manager will send a 500.
@@ -135,8 +119,7 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions({[&]() -> void {
-                    codec_client = makeHttpConnection(lookupPort("bridge_with_buffer_limits"),
-                                                      Http::CodecClient::Type::HTTP1);
+                    codec_client = makeHttpConnection(lookupPort("bridge_with_buffer_limits"));
                   },
                   [&]() -> void {
                     Http::StreamEncoder* request_encoder;
@@ -172,11 +155,7 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
                   [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
 
-TEST_P(IntegrationTest, HittingEncoderFilterLimit) {
-  testHittingEncoderFilterLimit(Http::CodecClient::Type::HTTP1);
-}
-
-TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(Http::CodecClient::Type::HTTP1); }
+TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
 
 TEST_P(IntegrationTest, BadFirstline) { testBadFirstline(); }
 
@@ -200,20 +179,12 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) { testAbsolutePathWithoutPort()
 
 TEST_P(IntegrationTest, Connect) { testConnect(); }
 
-TEST_P(IntegrationTest, ValidZeroLengthContent) {
-  testValidZeroLengthContent(Http::CodecClient::Type::HTTP1);
-}
+TEST_P(IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }
 
-TEST_P(IntegrationTest, InvalidContentLength) {
-  testInvalidContentLength(Http::CodecClient::Type::HTTP1);
-}
-TEST_P(IntegrationTest, MultipleContentLengths) {
-  testMultipleContentLengths(Http::CodecClient::Type::HTTP1);
-}
+TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
+TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
-TEST_P(IntegrationTest, OverlyLongHeaders) {
-  testOverlyLongHeaders(Http::CodecClient::Type::HTTP1);
-}
+TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
