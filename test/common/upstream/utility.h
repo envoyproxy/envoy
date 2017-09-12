@@ -64,16 +64,17 @@ parseSdsClusterFromJson(const std::string& json_string,
   return cluster;
 }
 
-inline HostSharedPtr
-makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url, uint32_t weight = 1) {
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+                                  uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                                     envoy::api::v2::Metadata::default_instance(), weight, "")};
 }
 
-inline HostDescriptionConstSharedPtr
-makeTestHostDescription(ClusterInfoConstSharedPtr cluster, const std::string& url) {
-  return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
-    cluster, "", Network::Utility::resolveUrl(url), envoy::api::v2::Metadata::default_instance(), "")};
+inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
+                                                             const std::string& url) {
+  return HostDescriptionConstSharedPtr{
+      new HostDescriptionImpl(cluster, "", Network::Utility::resolveUrl(url),
+                              envoy::api::v2::Metadata::default_instance(), "")};
 }
 
 } // namespace
