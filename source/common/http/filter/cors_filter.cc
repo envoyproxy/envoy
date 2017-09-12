@@ -91,8 +91,9 @@ void CorsFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbac
 };
 
 void CorsFilter::initialize() {
-  route_cors_policy_ = decoder_callbacks_->route()->routeEntry()->corsPolicy();
-  virtual_host_cors_policy_ = decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
+  route_cors_policy_ = &decoder_callbacks_->route()->routeEntry()->corsPolicy();
+  virtual_host_cors_policy_ =
+      &decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
 }
 
 bool CorsFilter::isOriginAllowed(Http::HeaderString& origin) {

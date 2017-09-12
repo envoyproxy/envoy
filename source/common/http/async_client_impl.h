@@ -129,10 +129,10 @@ private:
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-    const Router::CorsPolicySharedPtr corsPolicy() const override { return cors_policy_; }
+    const Router::CorsPolicy& corsPolicy() const override { return cors_policy_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const std::shared_ptr<NullCorsPolicy> cors_policy_;
+    static const NullCorsPolicy cors_policy_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
@@ -142,7 +142,7 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const Router::CorsPolicySharedPtr corsPolicy() const override { return cors_policy_; }
+    const Router::CorsPolicy& corsPolicy() const override { return cors_policy_; }
     void finalizeRequestHeaders(Http::HeaderMap&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -169,7 +169,7 @@ private:
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
 
-    static const std::shared_ptr<NullCorsPolicy> cors_policy_;
+    static const NullCorsPolicy cors_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
