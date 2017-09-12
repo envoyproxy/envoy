@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

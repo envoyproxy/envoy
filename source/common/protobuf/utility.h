@@ -65,6 +65,7 @@ public:
   }
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
   /**
@@ -75,7 +76,9 @@ public:
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
-    message.UnpackTo(&typed_message);
+    if (!message.UnpackTo(&typed_message)) {
+      throw EnvoyException("Unable to unpack " + message.DebugString());
+    }
     return typed_message;
   };
 
