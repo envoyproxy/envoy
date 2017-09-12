@@ -25,6 +25,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
