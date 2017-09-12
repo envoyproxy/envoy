@@ -107,6 +107,7 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
       std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
+      // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy
       uint64_t hash = std::hash<std::string>()(hash_key);
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});
