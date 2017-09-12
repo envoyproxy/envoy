@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -324,7 +325,7 @@ uint64_t Field::hash() const {
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   asRapidJsonDocument().Accept(writer);
-  return std::hash<std::string>{}(buffer.GetString());
+  return HashUtil::xxHash64(buffer.GetString());
 }
 
 bool Field::getBoolean(const std::string& name) const {

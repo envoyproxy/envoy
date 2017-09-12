@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
