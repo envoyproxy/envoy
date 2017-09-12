@@ -60,6 +60,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   membership_change, Counter, Total cluster membership changes
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total
+  retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits.
   update_attempt, Counter, Total cluster membership update attempts
   update_success, Counter, Total cluster membership update successes
   update_failure, Counter, Total cluster membership update failures

@@ -134,7 +134,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
-    deps = ["//source/common/config:metadata_lib"],
+    deps = [
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+    ],
 )
 
 envoy_cc_test(

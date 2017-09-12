@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -22,34 +23,26 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
-    const std::string string_type = filters[i].deprecated_v1().type();
-    const std::string string_name = filters[i].name();
-    const auto& proto_config = filters[i].config();
+    const auto& proto_config = filters[i];
+    const ProtobufTypes::String string_type = proto_config.deprecated_v1().type();
+    const ProtobufTypes::String string_name = proto_config.name();
     ENVOY_LOG(info, "  filter #{}:", i);
     ENVOY_LOG(info, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
 
     // Now see if there is a factory that will accept the config.
-    Configuration::NamedNetworkFilterConfigFactory* factory =
-        Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
-    if (factory != nullptr) {
-      Configuration::NetworkFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecated_v1", false)) {
-        callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
-      } else {
-        auto message = factory->createEmptyConfigProto();
-        if (!message) {
-          throw EnvoyException(
-              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
-        }
-        MessageUtil::jsonConvert(proto_config, *message);
-        callback = factory->createFilterFactoryFromProto(*message, context);
-      }
-      ret.push_back(callback);
+    Configuration::NetworkFilterFactoryCb callback;
+    if (filter_config->getBoolean("deprecated_v1", false)) {
+      callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {
-      throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
+      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+      callback = factory.createFilterFactoryFromProto(*message, context);
     }
+    ret.push_back(callback);
   }
   return ret;
 }

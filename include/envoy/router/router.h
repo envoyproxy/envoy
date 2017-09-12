@@ -65,6 +65,11 @@ public:
 };
 
 /**
+ * RetryStatus whether request should be retried or not.
+ */
+enum class RetryStatus { No, NoOverflow, Yes };
+
+/**
  * Wraps retry state for an active routed request.
  */
 class RetryState {
@@ -85,13 +90,13 @@ public:
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
-   * @return TRUE if a retry should take place. @param callback will be called at some point in the
-   *         future. Otherwise a retry should not take place and the callback will never be called.
-   *         Calling code should proceed with error handling.
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
+   *         called. Calling code should proceed with error handling.
    */
-  virtual bool shouldRetry(const Http::HeaderMap* response_headers,
-                           const Optional<Http::StreamResetReason>& reset_reason,
-                           DoRetryCallback callback) PURE;
+  virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
+                                  const Optional<Http::StreamResetReason>& reset_reason,
+                                  DoRetryCallback callback) PURE;
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;

@@ -7,11 +7,15 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gtest/gtest.h"
+
+using testing::InvokeWithoutArgs;
+using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -204,6 +208,26 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, SendLocalReply) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks, encodeData(_, true));
+  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+}
+
+TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    is_reset = true;
+  }));
+  EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
+  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
 } // namespace Http

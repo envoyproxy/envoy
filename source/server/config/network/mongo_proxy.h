@@ -4,6 +4,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "common/config/well_known_names.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -17,7 +19,7 @@ public:
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
 
-  std::string name() override { return "mongo_proxy"; }
+  std::string name() override { return Config::NetworkFilterNames::get().MONGO_PROXY; }
 };
 
 } // namespace Configuration

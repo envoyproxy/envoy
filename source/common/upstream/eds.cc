@@ -5,6 +5,7 @@
 #include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"

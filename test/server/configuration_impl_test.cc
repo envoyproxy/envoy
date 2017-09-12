@@ -2,6 +2,7 @@
 #include <list>
 #include <string>
 
+#include "common/config/well_known_names.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -249,7 +250,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException, "No HttpTracerFactory found for type: invalid");
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -268,7 +270,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name("envoy.statsd");
+  sink.set_name(Config::StatsSinkNames::get().STATSD);
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
@@ -300,7 +302,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException, "No Stats::Sink found for name: envoy.invalid");
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'envoy.invalid'");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
@@ -323,9 +326,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "sink object does not have 'name' attribute to look up the implementation");
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Provided name for static registration lookup was empty.");
 }
 
 } // namespace Configuration
