@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 
+#include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
@@ -61,7 +62,7 @@ public:
       coded_stream.SetSerializationDeterministic(true);
       message.SerializeToCodedStream(&coded_stream);
     }
-    return std::hash<std::string>{}(text);
+    return HashUtil::xxHash64(text);
   }
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);

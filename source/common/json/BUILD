@@ -25,6 +25,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
