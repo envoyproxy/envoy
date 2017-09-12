@@ -18,12 +18,6 @@ using testing::_;
 namespace Envoy {
 namespace Upstream {
 
-static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 const std::string& url) {
-  return std::make_shared<HostImpl>(cluster, "", Network::Utility::resolveUrl(url),
-                                    envoy::api::v2::Metadata::default_instance(), 1, "");
-}
-
 class TestLoadBalancerContext : public LoadBalancerContext {
 public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
@@ -50,12 +44,12 @@ public:
 TEST_F(RingHashLoadBalancerTest, NoHost) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); };
 
 TEST_F(RingHashLoadBalancerTest, Basic) {
-  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
+  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
   cluster_.healthy_hosts_ = cluster_.hosts_;
 
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
@@ -107,8 +101,8 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
 }
 
 TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
-  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
       .WillByDefault(Return(3));
   cluster_.runCallbacks({}, {});
@@ -125,8 +119,8 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
     EXPECT_EQ(cluster_.hosts_[1], lb_.chooseHost(&context));
   }
 
-  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
+  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
   cluster_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.

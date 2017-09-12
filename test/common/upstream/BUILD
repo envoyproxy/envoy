@@ -75,9 +75,9 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:health_checker_lib",
-        "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/redis:redis_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -94,6 +94,7 @@ envoy_cc_test(
         "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
@@ -106,6 +107,7 @@ envoy_cc_test(
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
@@ -257,5 +259,8 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
     ],
 )

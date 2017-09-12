@@ -90,7 +90,7 @@ protected:
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   const bool canary_;
-  const envoy::api::v2::Metadata& metadata_;
+  const envoy::api::v2::Metadata metadata_;
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;

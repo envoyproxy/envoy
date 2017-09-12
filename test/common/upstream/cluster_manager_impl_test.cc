@@ -557,9 +557,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Fire a member callback on the local cluster, which should not call any update callbacks on
   // the deleted cluster.
-  foo->hosts_ = {
-      HostSharedPtr{new HostImpl(foo->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                                 envoy::api::v2::Metadata::default_instance(), 1, "")}};
+  foo->hosts_ = {makeTestHost(foo->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(membership_updated, ready());
   foo->runCallbacks(foo->hosts_, {});
 
@@ -600,9 +598,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
-  cluster2->hosts_ = {HostSharedPtr{
-      new HostImpl(cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                   envoy::api::v2::Metadata::default_instance(), 1, "")}};
+  cluster2->hosts_ = {makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
