@@ -42,7 +42,7 @@ public:
 private:
   friend class CorsFilterTest;
 
-  const std::list<std::string>& allowOrigin();
+  const std::list<std::string>& allowOrigins();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();

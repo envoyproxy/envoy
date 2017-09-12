@@ -99,7 +99,7 @@ void CorsFilter::initialize() {
 }
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
-  for (const auto& o : allowOrigin()) {
+  for (const auto& o : allowOrigins()) {
     if (o == "*" || origin == o.c_str()) {
       return true;
     }
@@ -107,11 +107,11 @@ bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
   return false;
 }
 
-const std::list<std::string>& CorsFilter::allowOrigin() {
-  if (!route_cors_policy_->allowOrigin().empty()) {
-    return route_cors_policy_->allowOrigin();
+const std::list<std::string>& CorsFilter::allowOrigins() {
+  if (!route_cors_policy_->allowOrigins().empty()) {
+    return route_cors_policy_->allowOrigins();
   }
-  return virtual_host_cors_policy_->allowOrigin();
+  return virtual_host_cors_policy_->allowOrigins();
 }
 
 const std::string& CorsFilter::allowMethods() {

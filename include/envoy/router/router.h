@@ -41,7 +41,7 @@ public:
   /**
    * @return std::list<std::string>& access-control-allow-origin values.
    */
-  virtual const std::list<std::string>& allowOrigin() const PURE;
+  virtual const std::list<std::string>& allowOrigins() const PURE;
 
   /**
    * @return std::string access-control-allow-methods value.

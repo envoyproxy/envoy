@@ -87,7 +87,7 @@ protected:
 private:
   struct NullCorsPolicy : public Router::CorsPolicy {
     // Router::CorsPolicy
-    const std::list<std::string>& allowOrigin() const override { return allow_origin_; };
+    const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
     const std::string& allowMethods() const override { return EMPTY_STRING; };
     const std::string& allowHeaders() const override { return EMPTY_STRING; };
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };

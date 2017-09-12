@@ -2066,7 +2066,7 @@ TEST(RoutePropertyTest, TestCorsConfig) {
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
   EXPECT_EQ(cors_policy.enabled(), true);
-  EXPECT_THAT(cors_policy.allowOrigin(), ElementsAreArray({"test-origin"}));
+  EXPECT_THAT(cors_policy.allowOrigins(), ElementsAreArray({"test-origin"}));
   EXPECT_EQ(cors_policy.allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy.allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy.exposeHeaders(), "test-expose-headers");

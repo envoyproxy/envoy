@@ -39,7 +39,7 @@ public:
 class TestCorsPolicy : public CorsPolicy {
 public:
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigin() const override { return allow_origin_; };
+  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
