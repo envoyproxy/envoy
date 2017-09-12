@@ -39,7 +39,7 @@ domains
   The first route that matches will be used.
 
 :ref:`cors <config_http_filters_cors>`
-  *(optional, object)* Specifies the route's CORS policy.
+  *(optional, object)* Specifies the virtual host's CORS policy.
 
 .. _config_http_conn_man_route_table_vhost_require_ssl:
 

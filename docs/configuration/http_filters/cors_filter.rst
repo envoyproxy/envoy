@@ -5,14 +5,14 @@ CORS filter
 
 This is a filter which handles Cross-Origin Resource Sharing requests based on route or virtual host settings.
 For the meaning of the headers please refer to the pages below.
-https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
-https://www.w3.org/TR/cors/
+
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
+- https://www.w3.org/TR/cors/
 
 
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "cors",
     "config": {}
   }
@@ -29,7 +29,7 @@ Both the route and the virtual host need to set enabled to true.
   {
     "cors": {
         "enabled": false,
-        "allow_origin": "http://foo.example",
+        "allow_origin": ["http://foo.example"],
         "allow_methods": "POST, GET, OPTIONS",
         "allow_headers": "Content-Type",
         "allow_credentials": false,
@@ -39,11 +39,11 @@ Both the route and the virtual host need to set enabled to true.
   }
 
 enabled
-  *(optional, boolean)* Defaults to false. Setting *enabled* to false on a route disables CORS
+  *(optional, boolean)* Defaults to true. Setting *enabled* to false on a route disables CORS
   for this route only. The setting has no effect on a virtual host.
 
 allow_origin
-  *(optional, string)* The origins that will be allowed to do CORS request.
+  *(optional, array)* The origins that will be allowed to do CORS request. Wildcard "\*" will allow any origin.
 
 allow_methods
   *(optional, string)* The content for the access-control-allow-methods header.
