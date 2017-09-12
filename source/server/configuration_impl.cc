@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -102,34 +101,20 @@ void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, I
       MessageUtil::getJsonObjectFromMessage(configuration.http().config());
 
   // Now see if there is a factory that will accept the config.
-  HttpTracerFactory* factory = Registry::FactoryRegistry<HttpTracerFactory>::getFactory(type);
-  if (factory != nullptr) {
-    http_tracer_ = factory->createHttpTracer(*driver_config, server, *cluster_manager_);
-  } else {
-    throw EnvoyException(fmt::format("No HttpTracerFactory found for type: {}", type));
-  }
+  auto& factory = Config::Utility::getAndCheckFactory<HttpTracerFactory>(type);
+  http_tracer_ = factory.createHttpTracer(*driver_config, server, *cluster_manager_);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
   for (const envoy::api::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
-    if (sink_object.name().empty()) {
-      throw EnvoyException(
-          "sink object does not have 'name' attribute to look up the implementation");
-    }
+    // Generate factory and translate stats sink custom config
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
+    ProtobufTypes::MessagePtr message =
+        Config::Utility::translateToFactoryConfig(sink_object, factory);
 
-    ProtobufTypes::String name = sink_object.name();
-    StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
-    if (factory != nullptr) {
-      ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-      if (sink_object.has_config()) {
-        MessageUtil::jsonConvert(sink_object.config(), *message);
-      }
-      stats_sinks_.emplace_back(factory->createStatsSink(*message, server));
-    } else {
-      throw EnvoyException(fmt::format("No Stats::Sink found for name: {}", name));
-    }
+    stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }
 }
 

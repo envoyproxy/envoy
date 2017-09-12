@@ -22,6 +22,7 @@ envoy_cc_library(
     deps = [
         ":protobuf",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",

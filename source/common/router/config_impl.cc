@@ -15,9 +15,11 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
@@ -68,9 +70,7 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   Optional<uint64_t> hash;
   const Http::HeaderEntry* header = headers.get(header_name_);
   if (header) {
-    // TODO(mattklein123): Compile in murmur3/city/etc. and potentially allow the user to choose so
-    // we know exactly what we are going to get.
-    hash.value(std::hash<std::string>()(header->value().c_str()));
+    hash.value(HashUtil::xxHash64(header->value().c_str()));
   }
   return hash;
 }
@@ -224,7 +224,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata =
-        route.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_ROUTER);
+        route.metadata().filter_metadata().find(Envoy::Config::HttpFilterNames::get().ROUTER);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }

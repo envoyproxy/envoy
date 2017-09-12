@@ -226,7 +226,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
-      decoder_callbacks_->addDecodedData(data);
+      decoder_callbacks_->addDecodedData(data, true);
     }
   }
   return Http::FilterHeadersStatus::Continue;
@@ -273,7 +273,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::HeaderMap&
   readToBuffer(*transcoder_->RequestOutput(), data);
 
   if (data.length()) {
-    decoder_callbacks_->addDecodedData(data);
+    decoder_callbacks_->addDecodedData(data, true);
   }
   return Http::FilterTrailersStatus::Continue;
 }
@@ -311,6 +311,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming()) {
+    // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
   // TODO(lizan): Check ResponseStatus
@@ -329,7 +330,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (data.length()) {
-    encoder_callbacks_->addEncodedData(data);
+    encoder_callbacks_->addEncodedData(data, true);
   }
 
   if (method_->server_streaming()) {

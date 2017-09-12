@@ -16,6 +16,7 @@ envoy_cc_test(
     ],
     deps = [
         "//include/envoy/registry",
+        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:statsd_lib",
         "//source/server/config/stats:statsd_lib",
