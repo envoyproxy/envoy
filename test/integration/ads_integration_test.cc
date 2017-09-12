@@ -1,7 +1,8 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 
 #include "api/cds.pb.h"
@@ -14,10 +15,10 @@
 namespace Envoy {
 namespace {
 
-class AdsIntegrationTest : public BaseIntegrationTest,
+class AdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
@@ -107,6 +108,20 @@ public:
     return route_config;
   }
 
+  void makeSingleRequest() {
+    registerTestServerPorts({"http"});
+    auto client_conn = makeClientConnection(lookupPort("http"));
+    testRouterHeaderOnlyRequestAndResponse(std::move(client_conn), true);
+    cleanupUpstreamAndDownstream();
+    fake_upstream_connection_ = nullptr;
+  }
+
+  void initialize() {
+    ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+    ads_stream_ = ads_connection_->waitForNewStream();
+    ads_stream_->startGrpcStream();
+  }
+
   FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
@@ -114,11 +129,11 @@ public:
 INSTANTIATE_TEST_CASE_P(IpVersions, AdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
-  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  ads_stream_ = ads_connection_->waitForNewStream();
-  ads_stream_->startGrpcStream();
+  initialize();
 
+  // Send initial configuration, validate we can process a request.
   expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "");
   sendDiscoveryResponse(Config::TypeUrl::get().Cluster, buildCluster("cluster_0"), "1");
 
@@ -128,7 +143,6 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "1");
   expectDiscoveryRequest(Config::TypeUrl::get().Listener, "");
-
   sendDiscoveryResponse(Config::TypeUrl::get().Listener,
                         buildListener("listener_0", "route_config_0"), "1");
 
@@ -141,6 +155,77 @@ TEST_P(AdsIntegrationTest, Basic) {
   expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1");
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
+  sendDiscoveryResponse(Config::TypeUrl::get().Cluster, buildCluster("cluster_1"), "2");
+  sendDiscoveryResponse(Config::TypeUrl::get().ClusterLoadAssignment,
+                        buildClusterLoadAssignment("cluster_1"), "2");
+  expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "2");
+  expectDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2");
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildRouteConfig("route_config_0", "cluster_1"), "2");
+  expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2");
+
+  makeSingleRequest();
+
+  // Upgrade LDS/RDS, validate we can process a request.
+  sendDiscoveryResponse(Config::TypeUrl::get().Listener,
+                        buildListener("listener_1", "route_config_1"), "2");
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildRouteConfig("route_config_1", "cluster_1"), "3");
+  expectDiscoveryRequest(Config::TypeUrl::get().Listener, "2");
+  expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "3");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  makeSingleRequest();
+}
+
+// Validate that we can recover from failures.
+TEST_P(AdsIntegrationTest, Failure) {
+  initialize();
+
+  // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
+  // process a request.
+  expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().Cluster, buildClusterLoadAssignment("cluster_0"),
+                        "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().Listener, "");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().Cluster, buildCluster("cluster_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().ClusterLoadAssignment, buildCluster("cluster_0"),
+                        "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().Cluster, "1");
+  expectDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().ClusterLoadAssignment,
+                        buildClusterLoadAssignment("cluster_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1");
+  sendDiscoveryResponse(Config::TypeUrl::get().Listener,
+                        buildRouteConfig("listener_0", "route_config_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().Listener, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().Listener,
+                        buildListener("listener_0", "route_config_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildListener("route_config_0", "cluster_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().Listener, "1");
+  expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "");
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildRouteConfig("route_config_0", "cluster_0"), "1");
+
+  expectDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
 }
 
 } // namespace

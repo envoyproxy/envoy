@@ -23,7 +23,7 @@ envoy_cc_test(
         "envoy_rds",
     ],
     deps = [
-        ":integration_lib",
+        ":http_integration_lib",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:network_utility_lib",
