@@ -39,7 +39,7 @@ public:
   virtual ~CorsPolicy() {}
 
   /**
-   * @return std::string access-control-allow-origin value.
+   * @return std::list<std::string>& access-control-allow-origin values.
    */
   virtual const std::list<std::string>& allowOrigin() const PURE;
 
