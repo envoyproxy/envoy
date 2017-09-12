@@ -1,4 +1,5 @@
 #include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 
 #include "gtest/gtest.h"
 

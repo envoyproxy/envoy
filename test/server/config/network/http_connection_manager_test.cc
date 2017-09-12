@@ -68,7 +68,7 @@ TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(json_string), context_,
                                   date_provider_, route_config_provider_manager_),
-      EnvoyException, "unable to create http filter factory for 'foo'");
+      EnvoyException, "Didn't find a registered implementation for name: 'foo'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {

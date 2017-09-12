@@ -4,12 +4,14 @@
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/singleton.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "api/base.pb.h"
 #include "api/cds.pb.h"
@@ -138,6 +140,52 @@ public:
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
     return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation. Note: this is a proto string
+   * because it is assumed that this value will be pulled directly from the configuration proto.
+   */
+  template <class Factory> static Factory& getAndCheckFactory(const ProtobufTypes::String& name) {
+    if (name.empty()) {
+      throw EnvoyException("Provided name for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
+
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", name));
+    }
+
+    return *factory;
+  }
+
+  /**
+   * Translate a nested config into a proto message provided by the implementation factory.
+   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
+   * provided because for statically registered implementations, a custom config is generally
+   * optional, which means the conversion must be done conditionally.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class ProtoMessage, class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
+                                                            Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    if (config == nullptr) {
+      throw EnvoyException(fmt::format(
+          "{} factory returned nullptr instead of empty config message.", factory.name()));
+    }
+
+    if (enclosing_message.has_config()) {
+      MessageUtil::jsonConvert(enclosing_message.config(), *config);
+    }
+
+    return config;
   }
 
   /**

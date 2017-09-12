@@ -103,9 +103,9 @@ private:
   FilterConfigSharedPtr config_;
   Envoy::RateLimit::ClientPtr client_;
   StreamDecoderFilterCallbacks* callbacks_{};
-  bool initiating_call_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  bool initiating_call_{};
 };
 
 } // namespace RateLimit

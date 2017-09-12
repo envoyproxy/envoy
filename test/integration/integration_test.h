@@ -1,14 +1,14 @@
 #pragma once
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class IntegrationTest : public BaseIntegrationTest,
+class IntegrationTest : public HttpIntegrationTest,
                         public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  IntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */
@@ -18,7 +18,9 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server.json",
-                     {"http", "http_forward", "http_buffer", "rds"});
+                     {"http", "http_forward", "http_with_buffer_limits",
+                      "dynamo_with_buffer_limits", "bridge_with_buffer_limits", "http_buffer",
+                      "tcp_proxy", "rds"});
   }
 
   /**

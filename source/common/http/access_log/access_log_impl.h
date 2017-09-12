@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/access_log_config.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -135,14 +136,29 @@ private:
   const std::string runtime_key_;
 };
 
-class InstanceImpl : public Instance {
-public:
-  InstanceImpl(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
-               Envoy::AccessLog::AccessLogManager& log_manager);
+InstanceSharedPtr instanceFromProto(const envoy::api::v2::filter::AccessLog& config,
+                                    Runtime::Loader& runtime,
+                                    Envoy::AccessLog::AccessLogManager& log_manager);
 
+/**
+ * Access log factory that reads the configuration from proto.
+ */
+class AccessLogFactory {
+public:
+  /**
+   * Read a filter definition from proto and instantiate an Instance.
+   */
   static InstanceSharedPtr fromProto(const envoy::api::v2::filter::AccessLog& config,
-                                     Runtime::Loader& runtime,
-                                     Envoy::AccessLog::AccessLogManager& log_manager);
+                                     Server::Configuration::FactoryContext& context);
+};
+
+/**
+ * Access log Instance that writes logs to a file.
+ */
+class FileAccessLog : public Instance {
+public:
+  FileAccessLog(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
+                Envoy::AccessLog::AccessLogManager& log_manager);
 
   // Http::AccessLog::Instance
   void log(const HeaderMap* request_headers, const HeaderMap* response_headers,

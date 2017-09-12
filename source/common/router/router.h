@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -121,9 +122,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> hashKey() const override {
@@ -138,6 +137,9 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }
+
+protected:
+  RetryStatePtr retry_state_;
 
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
@@ -168,13 +170,14 @@ private:
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
-    void onAboveWriteBufferHighWatermark() override {
-      // Have the connection manager disable reads on the downstream stream.
+    void onAboveWriteBufferHighWatermark() override { disableDataFromDownstream(); }
+    void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
+
+    void disableDataFromDownstream() {
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
       parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     }
-    void onBelowWriteBufferLowWatermark() override {
-      // Have the connection manager enable reads on the downstream stream.
+    void enableDataFromDownstream() {
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
       parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
     }
@@ -206,7 +209,7 @@ private:
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
     Http::StreamEncoder* request_encoder_{};
     Optional<Http::StreamResetReason> deferred_reset_reason_;
-    Buffer::InstancePtr buffered_request_body_;
+    Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
 
@@ -259,10 +262,10 @@ private:
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
-  RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
+  uint32_t buffer_limit_{0};
   bool stream_destroyed_{};
 
   bool downstream_response_started_ : 1;

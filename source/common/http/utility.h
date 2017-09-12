@@ -97,6 +97,21 @@ public:
    */
   static void sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, const std::string& body_text);
+  /**
+   * Create a locally generated response using the provided lambdas.
+   * @param encode_headers supplies the function to encode response headers.
+   * @param encode_data supplies the function to encode the response body.
+   * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+   *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+   *                 is invoked in the context of sendLocalReply().
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type.
+   */
+  static void
+  sendLocalReply(std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+                 std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
+                 const bool& is_reset, Code response_code, const std::string& body_text);
 
   /**
    * Send a redirect response (301).

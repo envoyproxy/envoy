@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/http/filter:buffer_filter_lib",
         "//source/common/json:config_schemas_lib",
     ],
@@ -27,6 +28,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/dynamo:dynamo_filter_lib",
     ],
 )
@@ -38,8 +40,24 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/http/filter:fault_filter_lib",
         "//source/common/json:config_schemas_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "file_access_log_lib",
+    srcs = ["file_access_log.cc"],
+    hdrs = ["file_access_log.h"],
+    external_deps = ["envoy_filter_http_connection_manager"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:access_log_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/http/access_log:access_log_formatter_lib",
+        "//source/common/http/access_log:access_log_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -50,6 +68,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/grpc:http1_bridge_filter_lib",
     ],
 )
@@ -60,6 +79,7 @@ envoy_cc_library(
     hdrs = ["grpc_json_transcoder.h"],
     deps = [
         "//include/envoy/server:instance_interface",
+        "//source/common/config:well_known_names",
         "//source/common/grpc:json_transcoder_filter_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
@@ -72,6 +92,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/grpc:grpc_web_filter_lib",
     ],
 )
@@ -83,6 +104,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/http/filter:ip_tagging_filter_lib",
         "//source/common/json:config_schemas_lib",
     ],
@@ -93,6 +115,7 @@ envoy_cc_library(
     srcs = ["lightstep_http_tracer.cc"],
     hdrs = ["lightstep_http_tracer.h"],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:lightstep_tracer_lib",
         "//source/server:configuration_lib",
@@ -106,6 +129,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",
     ],
@@ -118,6 +142,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
@@ -129,6 +154,7 @@ envoy_cc_library(
     srcs = ["zipkin_http_tracer.cc"],
     hdrs = ["zipkin_http_tracer.h"],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/server:configuration_lib",
     ],

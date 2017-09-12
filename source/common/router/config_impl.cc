@@ -18,6 +18,7 @@
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
@@ -224,7 +225,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata =
-        route.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_ROUTER);
+        route.metadata().filter_metadata().find(Envoy::Config::HttpFilterNames::get().ROUTER);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }

@@ -4,6 +4,7 @@
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
+#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
 
@@ -25,7 +26,10 @@ void LdsJson::translateListener(const Json::Object& json_listener,
 
   for (const auto& json_filter : json_listener.getObjectArray("filters", true)) {
     auto* filter = filter_chain->mutable_filters()->Add();
-    JSON_UTIL_SET_STRING(*json_filter, *filter, name);
+
+    // Translate v1 name to v2 name.
+    filter->set_name(
+        Config::NetworkFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +

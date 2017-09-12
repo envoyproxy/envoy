@@ -170,6 +170,8 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )

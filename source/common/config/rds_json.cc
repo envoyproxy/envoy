@@ -5,6 +5,7 @@
 #include "common/config/base_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/metadata.h"
+#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 
 namespace Envoy {
@@ -267,7 +268,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
   if (json_route.hasObject("opaque_config")) {
     const Json::ObjectSharedPtr obj = json_route.getObject("opaque_config");
     auto& filter_metadata =
-        (*route.mutable_metadata()->mutable_filter_metadata())[MetadataFilters::get().ENVOY_ROUTER];
+        (*route.mutable_metadata()->mutable_filter_metadata())[HttpFilterNames::get().ROUTER];
     obj->iterate([&filter_metadata](const std::string& name, const Json::Object& value) {
       (*filter_metadata.mutable_fields())[name].set_string_value(value.asString());
       return true;

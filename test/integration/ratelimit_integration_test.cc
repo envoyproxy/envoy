@@ -3,17 +3,17 @@
 #include "common/grpc/common.h"
 #include "common/ratelimit/ratelimit.pb.h"
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class RatelimitIntegrationTest : public BaseIntegrationTest,
+class RatelimitIntegrationTest : public HttpIntegrationTest,
                                  public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  RatelimitIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
@@ -30,7 +30,7 @@ public:
 
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn), Http::CodecClient::Type::HTTP1);
+    codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
