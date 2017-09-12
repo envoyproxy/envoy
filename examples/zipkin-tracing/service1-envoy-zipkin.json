@@ -20,7 +20,10 @@
                   "routes": [
                     {
                       "prefix": "/",
-                      "cluster": "local_service"
+                      "cluster": "local_service",
+                      "decorator": {
+                        "operation": "checkAvailability"
+                      }
                     }
                   ]
                 }
@@ -58,7 +61,10 @@
                     {
                       "timeout_ms": 0,
                       "prefix": "/trace/2",
-                      "cluster": "service2"
+                      "cluster": "service2",
+                      "decorator": {
+                        "operation": "checkStock"
+                      }
                     }
                   ]
                 }

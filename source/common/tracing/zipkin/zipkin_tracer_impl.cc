@@ -19,6 +19,8 @@ void ZipkinSpan::finishSpan(Tracing::SpanFinalizer& finalizer) {
   span_.finish();
 }
 
+void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
+
 void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
   span_.setTag(name, value);
 }

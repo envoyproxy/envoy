@@ -59,14 +59,14 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   timestamp_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
 
+  span_ptr->setName(span_name);
+
   if (config.operationName() == Tracing::OperationName::Egress) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
     uint64_t random_number = random_generator_.random();
     span_ptr->setId(random_number);
-
-    span_ptr->setName(span_name);
 
     // Set the parent id to the id of the previous span
     span_ptr->setParentId(previous_context.id());

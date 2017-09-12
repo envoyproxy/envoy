@@ -214,6 +214,7 @@ public:
   // Router::Route
   MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+  MOCK_CONST_METHOD0(decorator, const Decorator*());
 
   testing::NiceMock<MockRouteEntry> route_entry_;
 };
