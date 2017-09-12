@@ -56,6 +56,7 @@ public:
   Buffer::OwnedImpl data_;
   TestHeaderMapImpl request_headers_;
   std::shared_ptr<Router::TestCorsPolicy> cors_policy_;
+  Router::MockRedirectEntry redirect_entry_;
 };
 
 TEST_F(CorsFilterTest, RequestWithoutOrigin) {
@@ -321,6 +322,54 @@ TEST_F(CorsFilterTest, EncodeWithNonMatchingOrigin) {
   cors_policy_->allow_origin_.push_back("localhost");
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  Http::TestHeaderMapImpl response_headers{};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-credentials"));
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, RedirectRoute) {
+  ON_CALL(*decoder_callbacks_.route_, redirectEntry()).WillByDefault(Return(&redirect_entry_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  Http::TestHeaderMapImpl response_headers{};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-credentials"));
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, EmptyRoute) {
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  Http::TestHeaderMapImpl response_headers{};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("", response_headers.get_("access-control-allow-credentials"));
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, EmptyRouteEntry) {
+  ON_CALL(*decoder_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 

@@ -88,6 +88,11 @@ void CorsFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbac
 };
 
 void CorsFilter::initialize() {
+  if (decoder_callbacks_->route() == nullptr ||
+      decoder_callbacks_->route()->redirectEntry() != nullptr ||
+      decoder_callbacks_->route()->routeEntry() == nullptr) {
+    bad_route_ = true;
+  }
   route_cors_policy_ = &decoder_callbacks_->route()->routeEntry()->corsPolicy();
   virtual_host_cors_policy_ =
       &decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
@@ -144,7 +149,7 @@ bool CorsFilter::allowCredentials() {
   return virtual_host_cors_policy_->allowCredentials();
 }
 
-bool CorsFilter::enabled() { return route_cors_policy_->enabled(); }
+bool CorsFilter::enabled() { return !bad_route_ && route_cors_policy_->enabled(); }
 
 } // namespace Http
 } // namespace Envoy

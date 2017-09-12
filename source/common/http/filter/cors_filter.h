@@ -56,6 +56,7 @@ private:
   const Envoy::Router::CorsPolicy* route_cors_policy_{};
   const Envoy::Router::CorsPolicy* virtual_host_cors_policy_{};
   bool is_cors_request_{};
+  bool bad_route_{};
   const Http::HeaderEntry* origin_{};
 };
 
