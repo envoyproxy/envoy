@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 
+#include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
@@ -103,6 +104,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   decoding_buffer_.drain(decoding_buffer_.length());
   decoding_buffer_.move(data);
   data.add(decoded);
+  // Any block of 4 bytes or more should have been decoded and passed through.
+  ASSERT(decoding_buffer_.length() < 4);
   return Http::FilterDataStatus::Continue;
 }
 
@@ -189,9 +192,9 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   buffer.move(temp);
   if (is_text_response_) {
     Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
-    encoder_callbacks_->addEncodedData(encoded);
+    encoder_callbacks_->addEncodedData(encoded, true);
   } else {
-    encoder_callbacks_->addEncodedData(buffer);
+    encoder_callbacks_->addEncodedData(buffer, true);
   }
   return Http::FilterTrailersStatus::Continue;
 }

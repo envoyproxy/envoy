@@ -179,6 +179,8 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
 
 void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
 
+uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {

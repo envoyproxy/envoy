@@ -231,6 +231,7 @@ public:
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_healthy)                                                                      \
   GAUGE  (membership_total)                                                                        \
+  COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
   COUNTER(update_failure)

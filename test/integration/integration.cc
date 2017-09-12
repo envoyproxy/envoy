@@ -36,6 +36,13 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
+void IntegrationStreamDecoder::waitForHeaders() {
+  if (!headers_.get()) {
+    waiting_for_headers_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   ASSERT(body_data_waiting_length_ == 0);
   body_data_waiting_length_ = size;
@@ -59,7 +66,7 @@ void IntegrationStreamDecoder::waitForReset() {
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
-  if (end_stream && waiting_for_end_stream_) {
+  if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
     dispatcher_.exit();
   }
 }

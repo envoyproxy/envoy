@@ -33,12 +33,9 @@ public:
   int write(int fd) override;
   void postProcess() override { checkLowWatermark(); }
 
-  void setWatermarks(uint32_t watermark) {
-    if (watermark != 0) {
-      setWatermarks(watermark / 2, watermark);
-    }
-  }
+  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
+  uint32_t highWatermark() const { return high_watermark_; }
 
 private:
   void checkHighWatermark();
@@ -56,6 +53,8 @@ private:
   // been called.
   bool above_high_watermark_called_{false};
 };
+
+typedef std::unique_ptr<WatermarkBuffer> WatermarkBufferPtr;
 
 class WatermarkBufferFactory : public WatermarkFactory {
 public:

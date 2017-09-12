@@ -17,8 +17,9 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_http2.json",
-                     {"echo", "http", "http_buffer", "http_buffer_limits"});
+    createTestServer(
+        "test/config/integration/server_http2.json",
+        {"echo", "http", "http_buffer", "http_with_buffer_limits", "dynamo_with_buffer_limits"});
   }
 
   void simultaneousRequest(uint32_t port, int32_t request1_bytes, int32_t request2_bytes);

@@ -43,6 +43,7 @@ public:
   void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
+  uint32_t bufferLimit() override;
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}

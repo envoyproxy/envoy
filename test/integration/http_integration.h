@@ -132,7 +132,10 @@ protected:
   void testMultipleContentLengths();
   void testDrainClose();
   void testRetry();
+  void testRetryHittingBufferLimit();
   void testGrpcRetry();
+  void testHittingDecoderFilterLimit();
+  void testHittingEncoderFilterLimit();
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

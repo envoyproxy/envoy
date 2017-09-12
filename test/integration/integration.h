@@ -31,6 +31,7 @@ public:
   Http::StreamResetReason reset_reason() { return reset_reason_; }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  void waitForHeaders();
   void waitForBodyData(uint64_t size);
   void waitForEndStream();
   void waitForReset();
@@ -54,6 +55,7 @@ private:
   std::string body_;
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
+  bool waiting_for_headers_{};
   bool saw_reset_{};
   Http::StreamResetReason reset_reason_{};
 };

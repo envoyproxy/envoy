@@ -81,6 +81,8 @@ TEST_P(Http2UpstreamIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
+TEST_P(Http2UpstreamIntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
+
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {

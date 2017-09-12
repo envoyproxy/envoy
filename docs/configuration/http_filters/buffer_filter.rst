@@ -19,8 +19,8 @@ with partial requests and high network latency.
   }
 
 max_request_bytes
-  *(required, integer)* The maximum request size that the filter will before before it stops
-  buffering and returns a 413 response.
+  *(required, integer)* The maximum request size that the filter will before the connection manager
+  will stop buffering and return a 413 response.
 
 max_request_time_s
   *(required, integer)* The maximum amount of time that the filter will wait for a complete request
@@ -37,4 +37,3 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   :widths: 1, 1, 2
 
   rq_timeout, Counter, Total requests that timed out waiting for a full request
-  rq_too_large, Counter, Total requests that failed due to being too large
