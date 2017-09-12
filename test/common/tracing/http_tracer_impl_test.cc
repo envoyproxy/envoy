@@ -439,14 +439,13 @@ public:
   MockConfig config_;
   MockDriver* driver_;
   HttpTracerPtr tracer_;
+  std::vector<Tracing::DecoratorConstSharedPtr> decorators_;
 };
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
-  EXPECT_CALL(config_, operationName()).Times(2);
+  EXPECT_CALL(config_, operationName()).Times(1);
   EXPECT_CALL(request_info_, startTime());
-  const std::string operation_name = "ingress";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
-      .WillOnce(Return(nullptr));
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, request_info_.start_time_)).WillOnce(Return(nullptr));
 
   tracer_->startSpan(config_, request_headers_, request_info_);
 }
@@ -454,15 +453,32 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
 TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   EXPECT_CALL(request_info_, startTime());
   EXPECT_CALL(local_info_, nodeName());
-  EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
+  EXPECT_CALL(config_, operationName()).Times(1).WillRepeatedly(Return(OperationName::Egress));
+  EXPECT_CALL(config_, decorators()).WillOnce(ReturnRef(decorators_));
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  const std::string operation_name = "egress test";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
-      .WillOnce(Return(span));
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, request_info_.start_time_)).WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("node_id", "node_name"));
+
+  tracer_->startSpan(config_, request_headers_, request_info_);
+}
+
+TEST_F(HttpTracerImplTest, BasicFunctionalityDecoratedSpan) {
+  std::vector<Tracing::DecoratorConstSharedPtr> decorators(1);
+  MockDecorator* decorator = new MockDecorator();
+  decorator->operation_ = "myOp";
+  decorator->match_ = true;
+  decorators[0] = std::unique_ptr<MockDecorator>(decorator);
+
+  EXPECT_CALL(config_, operationName()).Times(1);
+  EXPECT_CALL(config_, decorators()).WillOnce(ReturnRef(decorators));
+  EXPECT_CALL(request_info_, startTime());
+
+  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  EXPECT_CALL(*driver_, startSpan_(_, _, _, request_info_.start_time_)).WillOnce(Return(span));
+  EXPECT_CALL(*span, setOperation("myOp"));
 
   tracer_->startSpan(config_, request_headers_, request_info_);
 }

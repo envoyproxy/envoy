@@ -28,11 +28,69 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
+
+DecoratorImplBase::DecoratorImplBase(
+    const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator)
+    : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(decorator.match(), case_sensitive, true)),
+      method_(decorator.match().method()), operation_(decorator.operation()) {}
+
+bool DecoratorImplBase::match(const Http::HeaderMap& headers) const {
+  if (method_ == envoy::api::v2::filter::HttpConnectionManager_Tracing_DecoratorMatch::UNDEFINED) {
+    return true;
+  }
+  std::string method =
+      envoy::api::v2::filter::HttpConnectionManager_Tracing_DecoratorMatch::HttpMethod_Name(
+          method_);
+  return method == headers.Method()->value().c_str();
+}
+
+void DecoratorImplBase::apply(const Tracing::SpanPtr& span) const {
+  if (operation_.size() > 0) {
+    span->setOperation(operation_);
+  }
+}
+
+PrefixDecoratorImpl::PrefixDecoratorImpl(
+    const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator)
+    : DecoratorImplBase(decorator), prefix_(decorator.match().prefix()) {}
+
+bool PrefixDecoratorImpl::match(const Http::HeaderMap& headers) const {
+  return DecoratorImplBase::match(headers) &&
+         StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_);
+}
+
+PathDecoratorImpl::PathDecoratorImpl(
+    const envoy::api::v2::filter::HttpConnectionManager_Tracing_Decorator& decorator)
+    : DecoratorImplBase(decorator), path_(decorator.match().path()) {}
+
+bool PathDecoratorImpl::match(const Http::HeaderMap& headers) const {
+  if (!DecoratorImplBase::match(headers)) {
+    return false;
+  }
+
+  const Http::HeaderString& path = headers.Path()->value();
+  const char* query_string_start = strchr(path.c_str(), '?');
+  size_t compare_length = path.size();
+  if (query_string_start != nullptr) {
+    compare_length = query_string_start - path.c_str();
+  }
+
+  if (compare_length != path_.size()) {
+    return false;
+  }
+
+  if (case_sensitive_) {
+    return (0 == strncmp(path.c_str(), path_.c_str(), compare_length));
+  } else {
+    return (0 == strncasecmp(path.c_str(), path_.c_str(), compare_length));
+  }
+}
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
@@ -912,6 +970,11 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
 const std::vector<Http::LowerCaseString>&
 ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
   return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+}
+
+const std::vector<Tracing::DecoratorConstSharedPtr>&
+ConnectionManagerImpl::ActiveStream::decorators() const {
+  return connection_manager_.config_.tracingConfig()->decorators_;
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {

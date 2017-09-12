@@ -33,6 +33,7 @@ public:
 
   // Tracing::Span
   void finishSpan(SpanFinalizer& finalizer) override;
+  void setOperation(const std::string& operation) override;
   void setTag(const std::string& name, const std::string& value) override;
   void injectContext(Http::HeaderMap& request_headers) override;
   SpanPtr spawnChild(const Config& config, const std::string& name, SystemTime start_time) override;

@@ -23,6 +23,10 @@ void LightStepSpan::finishSpan(SpanFinalizer& finalizer) {
   span_.Finish();
 }
 
+void LightStepSpan::setOperation(const std::string& operation) {
+  span_.SetOperationName(operation);
+}
+
 void LightStepSpan::setTag(const std::string& name, const std::string& value) {
   span_.SetTag(name, value);
 }

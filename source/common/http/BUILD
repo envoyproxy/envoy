@@ -88,6 +88,7 @@ envoy_cc_library(
         "conn_manager_impl.h",
         "conn_manager_utility.h",
     ],
+    external_deps = ["envoy_filter_http_connection_manager"],
     deps = [
         ":codes_lib",
         ":date_provider_lib",

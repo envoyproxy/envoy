@@ -32,7 +32,7 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}};
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, {}};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
   }
 

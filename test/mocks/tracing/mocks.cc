@@ -9,6 +9,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Tracing {
 
+MockDecorator::MockDecorator() {}
+MockDecorator::~MockDecorator() {}
+
 MockSpan::MockSpan() {}
 MockSpan::~MockSpan() {}
 

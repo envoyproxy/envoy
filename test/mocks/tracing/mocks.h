@@ -15,6 +15,20 @@ inline bool operator==(const TransportContext& lhs, const TransportContext& rhs)
   return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
 }
 
+class MockDecorator : public Decorator {
+public:
+  MockDecorator();
+  ~MockDecorator();
+
+  virtual bool match(const Http::HeaderMap&) const override { return match_; };
+  virtual void apply(const Tracing::SpanPtr& span) const override {
+    span->setOperation(operation_);
+  };
+
+  std::string operation_;
+  bool match_;
+};
+
 class MockConfig : public Config {
 public:
   MockConfig();
@@ -22,9 +36,11 @@ public:
 
   MOCK_CONST_METHOD0(operationName, OperationName());
   MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(decorators, const std::vector<Tracing::DecoratorConstSharedPtr>&());
 
   OperationName operation_name_{OperationName::Ingress};
   std::vector<Http::LowerCaseString> headers_;
+  std::vector<Tracing::DecoratorConstSharedPtr> decorators_;
 };
 
 class MockSpan : public Span {
@@ -32,6 +48,7 @@ public:
   MockSpan();
   ~MockSpan();
 
+  MOCK_METHOD1(setOperation, void(const std::string& operation));
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
   MOCK_METHOD1(finishSpan, void(SpanFinalizer& finalizer));
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
