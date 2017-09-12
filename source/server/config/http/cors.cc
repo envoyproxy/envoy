@@ -16,9 +16,8 @@ namespace Configuration {
 HttpFilterFactoryCb CorsFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
                                                           FactoryContext&) {
 
-  Http::CorsFilterConfigConstSharedPtr config(new Http::CorsFilterConfig{});
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Http::CorsFilter(config)});
+  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Http::CorsFilter()});
   };
 }
 

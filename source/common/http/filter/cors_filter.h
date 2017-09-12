@@ -8,22 +8,14 @@
 namespace Envoy {
 namespace Http {
 
-/**
- * Configuration for the cors filter.
- */
-struct CorsFilterConfig {};
-
-typedef std::shared_ptr<const CorsFilterConfig> CorsFilterConfigConstSharedPtr;
-
 class CorsFilter : public StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  CorsFilter(CorsFilterConfigConstSharedPtr config);
-  ~CorsFilter();
+  CorsFilter();
 
   void initialize();
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
@@ -57,15 +49,14 @@ private:
   const std::string& maxAge();
   bool allowCredentials();
   bool enabled();
-  bool isOriginAllowed(Http::HeaderString& origin);
+  bool isOriginAllowed(const Http::HeaderString& origin);
 
-  CorsFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
   const Envoy::Router::CorsPolicy* route_cors_policy_{};
   const Envoy::Router::CorsPolicy* virtual_host_cors_policy_{};
   bool is_cors_request_{};
-  Http::HeaderEntry* origin_{};
+  const Http::HeaderEntry* origin_{};
 };
 
 } // namespace Http

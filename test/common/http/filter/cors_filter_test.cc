@@ -28,7 +28,7 @@ namespace Http {
 
 class CorsFilterTest : public testing::Test {
 public:
-  CorsFilterTest() : config_{new CorsFilterConfig{}}, filter_(config_) {
+  CorsFilterTest() : filter_() {
     cors_policy_.reset(new Router::TestCorsPolicy());
     cors_policy_->enabled_ = true;
     cors_policy_->allow_origin_.push_back("*");
@@ -52,7 +52,6 @@ public:
 
   NiceMock<MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  std::shared_ptr<CorsFilterConfig> config_;
   CorsFilter filter_;
   Buffer::OwnedImpl data_;
   TestHeaderMapImpl request_headers_;

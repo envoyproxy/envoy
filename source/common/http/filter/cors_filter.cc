@@ -9,10 +9,7 @@
 namespace Envoy {
 namespace Http {
 
-CorsFilter::CorsFilter(CorsFilterConfigConstSharedPtr config)
-    : config_(config), is_cors_request_(false) {}
-
-CorsFilter::~CorsFilter() {}
+CorsFilter::CorsFilter() : is_cors_request_(false) {}
 
 FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
   origin_ = headers.Origin();
@@ -32,12 +29,12 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   is_cors_request_ = true;
 
-  auto method = headers.Method();
+  const auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
     return FilterHeadersStatus::Continue;
   }
 
-  auto requestMethod = headers.AccessControlRequestMethod();
+  const auto requestMethod = headers.AccessControlRequestMethod();
   if (requestMethod == nullptr || requestMethod->value() == "") {
     return FilterHeadersStatus::Continue;
   }
@@ -96,7 +93,7 @@ void CorsFilter::initialize() {
       &decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy();
 }
 
-bool CorsFilter::isOriginAllowed(Http::HeaderString& origin) {
+bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
   for (const auto& o : allowOrigin()) {
     if (o == "*" || origin == o.c_str()) {
       return true;
