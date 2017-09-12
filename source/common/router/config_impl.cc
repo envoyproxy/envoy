@@ -225,7 +225,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata =
-        route.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_ROUTER);
+        route.metadata().filter_metadata().find(Envoy::Config::HttpFilterNames::get().ROUTER);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
