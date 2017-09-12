@@ -12,6 +12,33 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "legacy_json_integration_test",
+    srcs = ["legacy_json_integration_test.cc"],
+    data = [
+        "//test/config/integration:echo_server.json",
+        "//test/config/integration:server.json",
+        "//test/config/integration:server_grpc_json_transcoder.json",
+        "//test/config/integration:server_http2.json",
+        "//test/config/integration:server_http2_upstream.json",
+        "//test/config/integration:server_proxy_proto.json",
+        "//test/config/integration:server_ratelimit.json",
+        "//test/config/integration:server_ssl.json",
+        "//test/config/integration:server_uds.json",
+        "//test/config/integration:server_xfcc.json",
+        "//test/config/integration:tcp_proxy.json",
+        "//test/config/integration/certs",
+        "//test/proto:bookstore_proto_descriptor",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "proto_integration_test",
     srcs = ["proto_integration_test.cc"],
     deps = [
