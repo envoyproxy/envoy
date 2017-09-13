@@ -374,6 +374,24 @@ private:
 };
 
 /**
+ * Route entry implementation for regular expression match routing.
+ */
+class RegexRouteEntryImpl : public RouteEntryImplBase {
+public:
+  RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
+                      Runtime::Loader& loader);
+
+  // Router::RouteEntry
+  void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+
+private:
+  const std::regex regex_;
+};
+
+/**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
  */

@@ -42,6 +42,14 @@ public:
   static QueryParams parseQueryString(const std::string& url);
 
   /**
+   * Finds the start of the query string in a path
+   * @param path supplies a HeaderString& to search for the query string
+   * @return const char* a pointer to the beginning of the query string, or the end of the
+   *         path if there is no query
+   */
+  static const char* findQueryStringStart(const HeaderString& path);
+
+  /**
    * Parse a particular value out of a cookie
    * @param headers supplies the headers to get the cookie from.
    * @param key the key for the particular cookie value to return

@@ -95,6 +95,43 @@ TEST(RouteMatcherTest, TestRoutes) {
       ]
     },
     {
+      "name": "regex",
+      "domains": ["bat.com"],
+      "routes": [
+        {
+          "regex": "/t[io]c",
+          "cluster": "clock"
+        },
+        {
+          "regex": "/baa+",
+          "cluster": "sheep"
+        },
+        {
+          "regex": ".*/\\d{3}$",
+          "cluster": "three_numbers",
+          "prefix_rewrite": "/rewrote"
+        },
+        {
+          "regex": ".*",
+          "cluster": "regex_default"
+        }
+      ]
+    },
+    {
+      "name": "regex2",
+      "domains": ["bat2.com"],
+      "routes": [
+        {
+          "regex": "",
+          "cluster": "nothingness"
+        },
+        {
+          "regex": ".*",
+          "cluster": "regex_default"
+        }
+      ]
+    },
+    {
       "name": "default",
       "domains": ["*"],
       "routes": [
@@ -214,6 +251,41 @@ TEST(RouteMatcherTest, TestRoutes) {
   EXPECT_EQ("instant-server",
             config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
 
+  // Regular Expression matching
+  EXPECT_EQ("clock",
+            config.route(genHeaders("bat.com", "/tic", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("clock",
+            config.route(genHeaders("bat.com", "/toc", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat.com", "/tac", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat.com", "", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat.com", "/tick", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat.com", "/tic/toc", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("sheep",
+            config.route(genHeaders("bat.com", "/baa", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "sheep",
+      config.route(genHeaders("bat.com", "/baaaaaaaaaaaa", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat.com", "/ba", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("nothingness",
+            config.route(genHeaders("bat2.com", "", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("regex_default",
+            config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
+
+  // Regular Expression matching with query string params
+  EXPECT_EQ(
+      "clock",
+      config.route(genHeaders("bat.com", "/tic?tac=true", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "regex_default",
+      config.route(genHeaders("bat.com", "/tac?tic=true", "GET"), 0)->routeEntry()->clusterName());
+
   // Timeout testing.
   EXPECT_EQ(std::chrono::milliseconds(30000),
             config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->timeout());
@@ -310,6 +382,28 @@ TEST(RouteMatcherTest, TestRoutes) {
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
 
+  // Prefix rewrite for regular expression matching
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/647", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers);
+    EXPECT_EQ("/rewrote", headers.get_(Http::Headers::get().Path));
+  }
+
+  // Prefix rewrite for regular expression matching with query string
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/970?foo=true", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers);
+    EXPECT_EQ("/rewrote?foo=true", headers.get_(Http::Headers::get().Path));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/foo/bar/238?bar=true", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers);
+    EXPECT_EQ("/rewrote?bar=true", headers.get_(Http::Headers::get().Path));
+  }
+
   // Virtual cluster testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "GET");
@@ -328,6 +422,10 @@ TEST(RouteMatcherTest, TestRoutes) {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123", "PUT");
     EXPECT_EQ("update_ride",
               config.route(headers, 0)->routeEntry()->virtualCluster(headers)->name());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123/456", "POST");
+    EXPECT_EQ("other", config.route(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers =
@@ -1908,8 +2006,112 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
-  EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException, "routes must specify one of prefix/path/regex");
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "regex": "/[bc]at",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException, "routes must specify one of prefix/path/regex");
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "path": "/foo",
+            "regex": "/[bc]at",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException, "routes must specify one of prefix/path/regex");
+  ;
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "path": "/foo",
+            "regex": "/[bc]at",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException, "routes must specify one of prefix/path/regex");
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException, "routes must specify one of prefix/path/regex");
 }
 
 TEST(RouteMatcherTest, TestOpaqueConfig) {

@@ -26,8 +26,8 @@ such that they include network level failures.
   }
 
 pattern
-  *(required, string)* Specifies a regex pattern to use for matching requests. The regex grammar
-  used is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  *(required, string)* Specifies a regex pattern to use for matching requests. The entire path of the request
+  must match the regex. The regex grammar used is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
 
 name
   *(required, string)* Specifies the name of the virtual cluster. The virtual cluster name as well
@@ -37,5 +37,11 @@ name
 method
   *(optional, string)* Optionally specifies the HTTP method to match on. For example *GET*, *PUT*,
   etc.
+
+  Examples:
+
+    * The regex */rides/\d+* matches the path */rides/0*
+    * The regex */rides/\d+* matches the path */rides/123*
+    * The regex */rides/\d+* does not match the path */rides/123/456*
 
 Documentation for :ref:`virtual cluser statistics <config_http_filters_router_stats>`.

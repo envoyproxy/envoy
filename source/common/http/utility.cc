@@ -71,6 +71,10 @@ Utility::QueryParams Utility::parseQueryString(const std::string& url) {
   return params;
 }
 
+const char* Utility::findQueryStringStart(const HeaderString& path) {
+  return std::find(path.c_str(), path.c_str() + path.size(), '?');
+}
+
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
 
   struct State {
