@@ -49,7 +49,7 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
   resources[0].set_name(route_config_name_);
   callbacks_->onConfigUpdate(resources);
-  version_info_ = Config::Utility::computeHashedVersion(response_body);
+  version_info_ = Envoy::Config::Utility::computeHashedVersion(response_body);
   stats_.update_success_.inc();
 }
 
