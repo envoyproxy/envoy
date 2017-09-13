@@ -149,9 +149,9 @@ public:
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 
   /**
-   * @return last accepted version from fetch.
+   * @return std::string last accepted version from fetch.
    */
-  virtual const std::string& versionInfo() const PURE;
+  virtual const std::string versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;

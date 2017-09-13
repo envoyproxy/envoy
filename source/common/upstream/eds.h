@@ -23,7 +23,7 @@ public:
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                  bool added_via_api);
 
-  const std::string& versionInfo() const { return subscription_->versionInfo(); }
+  const std::string versionInfo() const { return subscription_->versionInfo(); }
 
   // Upstream::Cluster
   void initialize() override;

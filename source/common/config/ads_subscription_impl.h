@@ -40,7 +40,7 @@ public:
     watch_ = ads_api_.subscribe(type_url_, resources, *this);
   }
 
-  const std::string& versionInfo() const override { NOT_IMPLEMENTED; }
+  const std::string versionInfo() const override { NOT_IMPLEMENTED; }
 
   // Config::AdsCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources) override {

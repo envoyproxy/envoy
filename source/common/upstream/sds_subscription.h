@@ -27,7 +27,7 @@ public:
                   Runtime::RandomGenerator& random);
 
   // Config::Subscription
-  const std::string& versionInfo() const override { return version_info_; }
+  const std::string versionInfo() const override { return version_info_; }
 
 private:
   // Config::Subscription

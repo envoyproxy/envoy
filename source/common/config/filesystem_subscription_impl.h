@@ -47,7 +47,7 @@ public:
     UNREFERENCED_PARAMETER(resources);
   }
 
-  const std::string& versionInfo() const override { return version_info_; }
+  const std::string versionInfo() const override { return version_info_; }
 
 private:
   void refresh() {

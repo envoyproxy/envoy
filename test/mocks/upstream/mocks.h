@@ -146,7 +146,7 @@ public:
 
   MOCK_METHOD0(initialize, void());
   MOCK_METHOD1(setInitializedCb, void(std::function<void()> callback));
-  MOCK_CONST_METHOD0(versionInfo, const std::string&());
+  MOCK_CONST_METHOD0(versionInfo, const std::string());
 
   std::function<void()> initialized_callback_;
 };

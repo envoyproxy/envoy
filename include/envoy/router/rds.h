@@ -23,9 +23,9 @@ public:
   virtual Router::ConfigConstSharedPtr config() PURE;
 
   /**
-   * @return const std::string& version info from last accepted config.
+   * @return const std::string version info from last accepted config.
    */
-  virtual const std::string& versionInfo() const PURE;
+  virtual const std::string versionInfo() const PURE;
 };
 
 /**

@@ -46,7 +46,7 @@ private:
     NOT_IMPLEMENTED;
   }
 
-  const std::string& versionInfo() const override { return version_info_; }
+  const std::string versionInfo() const override { return version_info_; }
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;

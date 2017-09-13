@@ -23,7 +23,7 @@ public:
                              SubscriptionCallbacks<ResourceType>& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
 
-  MOCK_CONST_METHOD0_T(versionInfo, const std::string&());
+  MOCK_CONST_METHOD0_T(versionInfo, const std::string());
 };
 
 class MockAdsWatch : public AdsWatch {
