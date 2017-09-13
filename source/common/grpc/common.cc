@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -191,8 +192,7 @@ void Common::validateResponse(Http::Message& http_response) {
 }
 
 const std::string& Common::typeUrlPrefix() {
-  static const std::string* type_url = new std::string("type.googleapis.com");
-  return *type_url;
+  CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
 }
 
 std::string Common::typeUrl(const std::string& qualified_name) {

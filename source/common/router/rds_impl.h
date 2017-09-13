@@ -49,10 +49,7 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
-  const std::string& versionInfo() const override {
-    static const std::string* version = new std::string("static");
-    return *version;
-  }
+  const std::string& versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, "static"); }
 
 private:
   ConfigConstSharedPtr config_;

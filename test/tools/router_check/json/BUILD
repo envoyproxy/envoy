@@ -12,4 +12,5 @@ envoy_cc_library(
     name = "tool_config_schemas_lib",
     srcs = ["tool_config_schemas.cc"],
     hdrs = ["tool_config_schemas.h"],
+    deps = ["//source/common/common:macros"],
 )
