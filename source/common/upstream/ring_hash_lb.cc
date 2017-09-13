@@ -21,7 +21,8 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
 }
 
 HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
-  if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
+    stats_.lb_healthy_panic_.inc();
     return all_hosts_ring_.chooseHost(context, random_);
   } else {
     return healthy_hosts_ring_.chooseHost(context, random_);

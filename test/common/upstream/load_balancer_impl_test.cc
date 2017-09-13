@@ -371,6 +371,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
