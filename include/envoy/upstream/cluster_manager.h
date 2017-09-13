@@ -149,9 +149,14 @@ public:
   virtual void setInitializedCb(std::function<void()> callback) PURE;
 
   /**
-   * @return last accepted version from fetch.
+   * @return std::string last accepted version from fetch.
+   *
+   * TODO(dnoe): This would ideally return by reference, but this causes a
+   *             problem due to incompatible string implementations returned by
+   *             protobuf generated code. Revisit when string implementations
+   *             are converged.
    */
-  virtual const std::string& versionInfo() const PURE;
+  virtual const std::string versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;

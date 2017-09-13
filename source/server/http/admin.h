@@ -98,7 +98,7 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
-    const std::string& versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+    const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
     Router::ConfigConstSharedPtr config_;
   };
