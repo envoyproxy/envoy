@@ -88,6 +88,23 @@ public:
 };
 
 /**
+ * This is a helper used by InstanceImpl::run() on the stack. It's broken out to make testing
+ * easier.
+ */
+class RunHelper : Logger::Loggable<Logger::Id::main> {
+public:
+  RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
+            AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
+            std::function<void()> workers_start_cb);
+
+private:
+  Event::SignalEventPtr sigterm_;
+  Event::SignalEventPtr sig_usr_1_;
+  Event::SignalEventPtr sig_hup_;
+  bool shutdown_{};
+};
+
+/**
  * This is the actual full standalone server which stiches together various common components.
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
@@ -162,9 +179,6 @@ private:
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Stats::ScopePtr admin_scope_;
-  Event::SignalEventPtr sigterm_;
-  Event::SignalEventPtr sig_usr_1_;
-  Event::SignalEventPtr sig_hup_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   LocalInfo::LocalInfoPtr local_info_;

@@ -129,6 +129,14 @@ public:
   TimerCb callback_;
 };
 
+class MockSignalEvent : public SignalEvent {
+public:
+  MockSignalEvent(MockDispatcher* dispatcher);
+  ~MockSignalEvent();
+
+  SignalCb callback_;
+};
+
 class MockFileEvent : public FileEvent {
 public:
   MockFileEvent();

@@ -12,7 +12,9 @@
 #include "gtest/gtest.h"
 
 using testing::InSequence;
+using testing::SaveArg;
 using testing::StrictMock;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -32,6 +34,54 @@ TEST(ServerInstanceUtil, flushHelper) {
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
   InstanceUtil::flushCountersAndGaugesToSinks(sinks, store);
+}
+
+class RunHelperTest : public testing::Test {
+public:
+  RunHelperTest() {
+    InSequence s;
+
+    sigterm_ = new Event::MockSignalEvent(&dispatcher_);
+    sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
+    sighup_ = new Event::MockSignalEvent(&dispatcher_);
+    EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
+
+    helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
+                                [this] { start_workers_.ready(); }));
+  }
+
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<MockHotRestart> hot_restart_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  InitManagerImpl init_manager_;
+  ReadyWatcher start_workers_;
+  std::unique_ptr<RunHelper> helper_;
+  std::function<void()> cm_init_callback_;
+  Event::MockSignalEvent* sigterm_;
+  Event::MockSignalEvent* sigusr1_;
+  Event::MockSignalEvent* sighup_;
+};
+
+TEST_F(RunHelperTest, Normal) {
+  EXPECT_CALL(start_workers_, ready());
+  cm_init_callback_();
+}
+
+TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
+  EXPECT_CALL(start_workers_, ready()).Times(0);
+  sigterm_->callback_();
+  cm_init_callback_();
+}
+
+TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
+  EXPECT_CALL(start_workers_, ready()).Times(0);
+  Init::MockTarget target;
+  init_manager_.registerTarget(target);
+  EXPECT_CALL(target, initialize(_));
+  cm_init_callback_();
+  sigterm_->callback_();
+  target.callback_();
 }
 
 // Class creates minimally viable server instance for testing.
