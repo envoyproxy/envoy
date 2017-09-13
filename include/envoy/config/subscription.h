@@ -62,6 +62,11 @@ public:
 
   /**
    * @return std::string version info from last accepted onConfigUpdate.
+   *
+   * TODO(dnoe): This would ideally return by reference, but this causes a
+   *             problem due to incompatible string implementations returned by
+   *             protobuf generated code. Revisit when string implementations
+   *             are converged.
    */
   virtual const std::string versionInfo() const PURE;
 };
