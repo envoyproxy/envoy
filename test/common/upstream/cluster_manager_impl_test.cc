@@ -747,8 +747,56 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-  dns_timer_->callback_();
+
+  factory_.tls_.shutdownThread();
+}
+
+// This is a regression test for a use-after-free in
+// ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(), where a removal at one
+// priority from the ConnPoolsContainer would delete the ConnPoolsContainer mid-iteration over the
+// pool.
+TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "dns_resolvers": [ "1.2.3.4:80" ],
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://localhost:11001"}]
+    }]
+  }
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromJson(json));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_))
+      .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
+
+  Http::ConnectionPool::MockInstance* cp = dynamic_cast<Http::ConnectionPool::MockInstance*>(
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr));
+
+  // Immediate drain, since this can happen with the HTTP codecs.
+  EXPECT_CALL(*cp, addDrainedCallback(_))
+      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+
+  // Remove the first host, this should lead to the cp being drained, without
+  // crash.
+  dns_timer_->callback_();
+  dns_callback(TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }

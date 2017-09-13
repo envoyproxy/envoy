@@ -483,6 +483,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
         host_http_conn_pool_map_.erase(old_host);
       }
     });
+
+    // The above addDrainedCallback() drain completion callback might execute immediately. This can
+    // then effectively nuke 'container', which means we can't continue to loop on its contents
+    // (we're done here).
+    if (host_http_conn_pool_map_.count(old_host) == 0) {
+      break;
+    }
   }
 }
 
