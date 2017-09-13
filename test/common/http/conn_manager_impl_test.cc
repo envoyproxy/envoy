@@ -265,7 +265,7 @@ public:
   MockStream stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  uint32_t initial_buffer_limit_;
+  uint32_t initial_buffer_limit_{};
   bool streaming_filter_{false};
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
