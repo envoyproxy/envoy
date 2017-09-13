@@ -7,6 +7,8 @@ dependencies:
     # Cache homebrew and everything it installs.
     - "/usr/local"
   pre:
+    # Some CircleCI OS X hosts have wonky times. Force a time sync.
+    - sudo ntpdate -vu time.apple.com
     - brew ls --versions coreutils >/dev/null || brew install coreutils
     - brew ls --versions wget >/dev/null || brew install wget
     - brew ls --versions cmake >/dev/null || brew install cmake
