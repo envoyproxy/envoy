@@ -258,46 +258,37 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
-  HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
-                "");
-  EXPECT_EQ(cluster.info_.get(), &host.cluster());
-  EXPECT_EQ("", host.hostname());
-  EXPECT_FALSE(host.canary());
-  EXPECT_EQ("", host.zone());
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  EXPECT_EQ(cluster.info_.get(), &host->cluster());
+  EXPECT_EQ("", host->hostname());
+  EXPECT_FALSE(host->canary());
+  EXPECT_EQ("", host->zone());
 }
 
 TEST(HostImplTest, Weight) {
   MockCluster cluster;
 
-  {
-    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 0,
-                  "");
-    EXPECT_EQ(1U, host.weight());
-  }
+  EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
+  EXPECT_EQ(100U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 101)->weight());
 
-  {
-    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false,
-                  101, "");
-    EXPECT_EQ(100U, host.weight());
-  }
-
-  {
-    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 50,
-                  "");
-    EXPECT_EQ(50U, host.weight());
-    host.weight(51);
-    EXPECT_EQ(51U, host.weight());
-    host.weight(0);
-    EXPECT_EQ(1U, host.weight());
-    host.weight(101);
-    EXPECT_EQ(100U, host.weight());
-  }
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 50);
+  EXPECT_EQ(50U, host->weight());
+  host->weight(51);
+  EXPECT_EQ(51U, host->weight());
+  host->weight(0);
+  EXPECT_EQ(1U, host->weight());
+  host->weight(101);
+  EXPECT_EQ(100U, host->weight());
 }
 
 TEST(HostImplTest, HostameCanaryAndZone) {
   MockCluster cluster;
+  envoy::api::v2::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                true, 1, "hello");
+                metadata, 1, "hello");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());

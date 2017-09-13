@@ -58,6 +58,10 @@ public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
+    const std::string& versionInfo() const override {
+      static const std::string* version = new std::string("");
+      return *version;
+    }
 
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
@@ -678,7 +682,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
   conn_info.connection_ = upstream_connection_;
   conn_info.host_description_.reset(
       new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                             envoy::api::v2::Metadata::default_instance(), 1, ""));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())

@@ -20,6 +20,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -177,8 +178,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
-  request_info_.upstream_host_ = std::make_shared<Upstream::HostDescriptionImpl>(
-      cluster, "", Network::Utility::resolveUrl("tcp://10.0.0.5:1234"), false, "");
+  request_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
 
   const std::string json = R"EOF(
       {

@@ -147,6 +147,11 @@ public:
    * server. If the initial load fails, the callback will also be called.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * @return last accepted version from fetch.
+   */
+  virtual const std::string& versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;

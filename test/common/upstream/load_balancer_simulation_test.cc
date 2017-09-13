@@ -23,8 +23,8 @@ namespace Upstream {
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, zone)};
+  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
+                                    envoy::api::v2::Metadata::default_instance(), weight, zone)};
 }
 
 /**

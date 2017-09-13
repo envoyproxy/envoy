@@ -81,6 +81,8 @@ public:
     sendDiscoveryRequest();
   }
 
+  const std::string& versionInfo() const override { return request_.version_info(); }
+
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
     UNREFERENCED_PARAMETER(metadata);

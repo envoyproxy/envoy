@@ -3,6 +3,7 @@
 #include "envoy/config/ads.h"
 #include "envoy/config/subscription.h"
 
+#include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
@@ -39,6 +40,8 @@ public:
   void updateResources(const std::vector<std::string>& resources) override {
     watch_ = ads_api_.subscribe(type_url_, resources, *this);
   }
+
+  const std::string& versionInfo() const override { NOT_IMPLEMENTED; }
 
   // Config::AdsCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources) override {

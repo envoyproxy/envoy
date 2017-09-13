@@ -42,6 +42,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",

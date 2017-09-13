@@ -9,6 +9,8 @@
 #include "server/config/stats/statsd.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "api/bootstrap.pb.h"
@@ -42,14 +44,19 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   EXPECT_NE(dynamic_cast<Stats::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
 
-TEST(StatsConfigTest, ValidUdpIpStatsd) {
+class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
   envoy::api::v2::StatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
   envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
-  socket_address.set_address("127.0.0.1");
+  auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
+  socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);

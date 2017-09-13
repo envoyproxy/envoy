@@ -76,6 +76,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
@@ -117,6 +118,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(counters, std::list<Stats::CounterSharedPtr>());
   MOCK_CONST_METHOD1(createConnection_, MockCreateConnectionData(Event::Dispatcher& dispatcher));
