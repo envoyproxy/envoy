@@ -23,7 +23,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ads_api_lib",
     hdrs = ["ads_api_impl.h"],
-    external_deps = ["envoy_ads"],
+    external_deps = ["envoy_discovery"],
     deps = [
         "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
@@ -34,7 +34,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ads_subscription_lib",
     hdrs = ["ads_subscription_impl.h"],
-    external_deps = ["envoy_ads"],
+    external_deps = ["envoy_discovery"],
     deps = [
         "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",

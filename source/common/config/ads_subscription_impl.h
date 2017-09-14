@@ -8,7 +8,7 @@
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/ads.pb.h"
+#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
