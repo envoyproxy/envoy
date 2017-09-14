@@ -6,6 +6,11 @@ Route
 A route is both a specification of how to match a request as well as in indication of what to do
 next (e.g., redirect, forward, rewrite, etc.).
 
+.. attention::
+
+  Envoy supports routing on HTTP method via :ref:`header matching
+  <config_http_conn_man_route_table_route_headers>`.
+
 .. code-block:: json
 
   {
@@ -316,6 +321,18 @@ regex
 
   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
   header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+
+.. attention::
+
+  To route on HTTP method, use the special HTTP/2 *:method* header. This works for both
+  HTTP/1 and HTTP/2 as Envoy normalizes headers. E.g.,
+
+  .. code-block:: json
+
+    {
+      "name": ":method",
+      "value": "POST"
+    }
 
 .. _config_http_conn_man_route_table_route_weighted_clusters:
 
