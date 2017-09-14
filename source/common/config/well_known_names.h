@@ -102,13 +102,15 @@ public:
   const std::string RATE_LIMIT = "envoy.rate_limit";
   // Router filter
   const std::string ROUTER = "envoy.router";
+  // Health checking filter
+  const std::string HEALTH_CHECK = "envoy.health_check";
 
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, IP_TAGGING, RATE_LIMIT, ROUTER}) {}
+                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

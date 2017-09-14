@@ -15,23 +15,22 @@ class UdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   UdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Initializer for an individual test.
-   */
-  void SetUp() override {
+
+  void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        TestEnvironment::unixDomainSocketPath("udstest.2.sock"), FakeHttpConnection::Type::HTTP1));
-    createTestServer("test/config/integration/server_uds.json", {"http"});
-  }
 
-  /**
-   * Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
+    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      for (int i = 0; i < static_resources->clusters_size(); ++i) {
+        auto* cluster = static_resources->mutable_clusters(i);
+        for (int j = 0; j < cluster->hosts_size(); ++j) {
+          cluster->mutable_hosts(j)->clear_socket_address();
+          cluster->mutable_hosts(j)->mutable_pipe()->set_path(
+              TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
+        }
+      }
+    });
   }
 };
 } // namespace Envoy

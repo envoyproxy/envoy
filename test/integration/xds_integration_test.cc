@@ -12,7 +12,8 @@ class XdsIntegrationTest : public HttpIntegrationTest,
 public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
-  void SetUp() override {
+  void initialize() override {
+    BaseIntegrationTest::initialize();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer(
@@ -25,18 +26,13 @@ public:
         },
         {"http"});
   }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, XdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 } // namespace

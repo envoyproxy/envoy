@@ -21,7 +21,8 @@
 namespace Envoy {
 namespace Xfcc {
 
-void XfccIntegrationTest::SetUp() {
+void XfccIntegrationTest::initialize() {
+  BaseIntegrationTest::initialize();
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();

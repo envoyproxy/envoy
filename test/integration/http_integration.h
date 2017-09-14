@@ -71,12 +71,28 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
-  HttpIntegrationTest(Http::CodecClient::Type client_protocol, Network::Address::IpVersion version);
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version);
+  virtual ~HttpIntegrationTest() {}
+
+  void SetUp();
+  void TearDown();
+
+protected:
+  // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
+  void initialize() override;
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
-protected:
+  // Set up the fake upstream connections.  This is called by initialize() and
+  // is virtual to allow subclass overrides.
+  virtual void createUpstreams();
+  // sets downstream_protocol_ and alters the client protocol in the config_helper_
+  void setDownstreamProtocol(Http::CodecClient::Type type);
+  // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
+  void setUpstreamProtocol(FakeHttpConnection::Type type);
+
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
@@ -95,19 +111,24 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
+  typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
+
   void testRouterRedirect();
   void testRouterNotFound();
-  void testRouterNotFoundWithBody(uint32_t port);
-  void testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
-                                            uint64_t request_size, uint64_t response_size,
-                                            bool big_header);
-  void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
-                                              bool close_upstream);
-  void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
-  void testRouterUpstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn);
-  void testRouterDownstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
-  void testRouterDownstreamDisconnectBeforeResponseComplete(Network::ClientConnectionPtr&& conn);
-  void testRouterUpstreamResponseBeforeRequestComplete(Network::ClientConnectionPtr&& conn);
+  void testRouterNotFoundWithBody();
+  void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
+                                            bool big_header,
+                                            ConnectionCreationFunction* creator = nullptr);
+  void testRouterHeaderOnlyRequestAndResponse(bool close_upstream,
+                                              ConnectionCreationFunction* creator = nullptr);
+  void testRouterUpstreamDisconnectBeforeRequestComplete();
+  void
+  testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
+  void testRouterDownstreamDisconnectBeforeRequestComplete(
+      ConnectionCreationFunction* creator = nullptr);
+  void testRouterDownstreamDisconnectBeforeResponseComplete(
+      ConnectionCreationFunction* creator = nullptr);
+  void testRouterUpstreamResponseBeforeRequestComplete();
   void testTwoRequests();
   void testOverlyLongHeaders();
   // HTTP/1 tests
@@ -141,6 +162,8 @@ protected:
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
 
+  Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
+
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
@@ -153,7 +176,15 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
-  // The codec type for the client-to-envoy connection
-  Http::CodecClient::Type client_protocol_;
+  // The named ports for createGeneratedApiTestServer
+  std::vector<std::string> named_ports_{{"http"}};
+  // The ports from upstreams created in createUpstreams()
+  std::vector<uint32_t> ports_;
+
+private:
+  // The codec type for the client-to-Envoy connection
+  Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  // The type for the Envoy-to-backend connection
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
 };
 } // namespace Envoy

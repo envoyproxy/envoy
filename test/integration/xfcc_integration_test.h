@@ -30,13 +30,10 @@ public:
   const std::string client_san_ = "SAN=spiffe://lyft.com/frontend-team";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Initializer for an individual test.
-   */
-  void SetUp() override;
-  /**
-   * Destructor for an individual test.
-   */
+
+  void initialize() override;
+
+  void SetUp() override { initialize(); }
   void TearDown() override;
 
   Ssl::ServerContextPtr createUpstreamSslContext();

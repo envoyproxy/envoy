@@ -19,12 +19,11 @@ INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
 
 TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
-TEST_P(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http"));
-}
+TEST_P(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
 
 TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http_buffer"));
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterNotFoundWithBody();
 }
 
 TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(); }
@@ -38,58 +37,59 @@ TEST_P(Http2IntegrationTest, MultipleContentLengths) { testMultipleContentLength
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")), 1024, 512,
-                                       false);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")), 1024 * 1024,
-                                       1024 * 1024, false);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
-                                       1024 * 1024, 1024 * 1024, false);
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), true);
+  testRouterHeaderOnlyRequestAndResponse(true);
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")), true);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterHeaderOnlyRequestAndResponse(true);
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, true);
+  testRouterRequestAndResponseWithBody(1024, 512, true);
 }
 
 TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), false);
+  testRouterHeaderOnlyRequestAndResponse(false);
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
 TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterDownstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(Http2IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
+  testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamResponseBeforeRequestComplete();
 }
 
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
@@ -121,6 +121,7 @@ TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
 }
 
 TEST_P(Http2IntegrationTest, BadMagic) {
+  initialize();
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
@@ -135,6 +136,7 @@ TEST_P(Http2IntegrationTest, BadMagic) {
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
+  initialize();
   Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
   RawConnectionDriver connection(
@@ -149,6 +151,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 }
 
 TEST_P(Http2IntegrationTest, GoAway) {
+  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
   executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     request_encoder_ = &codec_client_->startRequest(
@@ -171,8 +174,7 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
-void Http2IntegrationTest::simultaneousRequest(uint32_t port, int32_t request1_bytes,
-                                               int32_t request2_bytes) {
+void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::StreamEncoder* encoder1;
@@ -182,7 +184,7 @@ void Http2IntegrationTest::simultaneousRequest(uint32_t port, int32_t request1_b
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(port); },
+      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
        // Start request 1
        [&]() -> void {
          encoder1 =
@@ -264,12 +266,11 @@ void Http2IntegrationTest::simultaneousRequest(uint32_t port, int32_t request1_b
        [&]() -> void { fake_upstream_connection2->waitForDisconnect(); }});
 }
 
-TEST_P(Http2IntegrationTest, SimultaneousRequest) {
-  simultaneousRequest(lookupPort("http"), 1024, 512);
-}
+TEST_P(Http2IntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 512); }
 
 TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
-  simultaneousRequest(lookupPort("http_with_buffer_limits"), 1024 * 32, 1024 * 16);
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
+  simultaneousRequest(1024 * 32, 1024 * 16);
 }
 
 } // namespace Envoy

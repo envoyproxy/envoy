@@ -1,5 +1,7 @@
 #include "test/config/utility.h"
 
+#include "envoy/http/codec.h"
+
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
@@ -52,7 +54,28 @@ admin:
       port_value: 0
 )EOF";
 
+const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
+    R"EOF(
+name: envoy.buffer
+config:
+  deprecated_v1: true
+  value:
+    max_request_bytes : 5242880
+    max_request_time_s : 120
+)EOF";
+
+const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
+    R"EOF(
+name: envoy.health_check
+config:
+  deprecated_v1: true
+  value:
+    pass_through_mode: false
+    endpoint: /healthcheck
+)EOF";
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version) {
+  RELEASE_ASSERT(!finalized_);
   std::string filename =
       TestEnvironment::writeStringToFileForTest("basic_config.yaml", basic_config);
   MessageUtil::loadFromFile(filename, bootstrap_);
@@ -72,25 +95,143 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version) {
   host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
 }
 
-void ConfigHelper::setUpstreamPorts(const std::vector<uint32_t>& ports) {
+void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
+  RELEASE_ASSERT(!finalized_);
+  for (auto config_modifier : config_modifiers_) {
+    config_modifier(bootstrap_);
+  }
+
   uint32_t port_idx = 0;
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
     for (int j = 0; j < cluster->hosts_size(); ++j) {
-      auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-      RELEASE_ASSERT(ports.size() >= port_idx);
-      host_socket_addr->set_port_value(ports[port_idx++]);
+      if (cluster->mutable_hosts(j)->has_socket_address()) {
+        auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+        RELEASE_ASSERT(ports.size() >= port_idx);
+        host_socket_addr->set_port_value(ports[port_idx++]);
+      }
     }
   }
   ASSERT(port_idx == ports.size());
+  finalized_ = true;
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
+  RELEASE_ASSERT(!finalized_);
   bootstrap_.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
       ->mutable_source_address()
       ->set_address(address_string);
+}
+
+void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std::string& prefix) {
+  RELEASE_ASSERT(!finalized_);
+  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+
+  auto* virtual_host = hcm_config.mutable_route_config()->mutable_virtual_hosts(0);
+  virtual_host->set_domains(0, domains);
+  virtual_host->mutable_routes(0)->mutable_match()->set_prefix(prefix);
+
+  storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
+                                   uint32_t downstream_buffer_limit) {
+  RELEASE_ASSERT(!finalized_);
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1);
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
+  }
+
+  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+  if (hcm_config.codec_type() == envoy::api::v2::filter::HttpConnectionManager::HTTP2) {
+    uint32_t size =
+        std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+    auto* options = hcm_config.mutable_http2_protocol_options();
+    options->mutable_initial_stream_window_size()->set_value(size);
+    storeHttpConnectionManager(hcm_config);
+  }
+}
+
+void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
+                            const std::string& cluster,
+                            envoy::api::v2::VirtualHost::TlsRequirementType type) {
+  RELEASE_ASSERT(!finalized_);
+  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+
+  auto* virtual_host = hcm_config.mutable_route_config()->add_virtual_hosts();
+  virtual_host->add_domains(domains);
+  virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+  virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);
+  virtual_host->set_require_tls(type);
+
+  storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::addFilter(const std::string& config) {
+  RELEASE_ASSERT(!finalized_);
+  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+
+  auto* filter_list_back = hcm_config.add_http_filters();
+  const std::string json = Json::Factory::loadFromYamlString(config)->asJsonString();
+  MessageUtil::loadFromJson(json, *filter_list_back);
+
+  // Now move it to the front.
+  for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+    hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+  }
+  storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::setClientCodec(envoy::api::v2::filter::HttpConnectionManager::CodecType type) {
+  RELEASE_ASSERT(!finalized_);
+  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+  hcm_config.set_codec_type(type);
+  storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::loadHttpConnectionManager(envoy::api::v2::filter::HttpConnectionManager& hcm) {
+  RELEASE_ASSERT(!finalized_);
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* filter_chain = listener->mutable_filter_chains(0);
+  auto* hcm_config_struct = filter_chain->mutable_filters(0)->mutable_config();
+  MessageUtil::jsonConvert(*hcm_config_struct, hcm);
+}
+
+void ConfigHelper::storeHttpConnectionManager(
+    const envoy::api::v2::filter::HttpConnectionManager& hcm) {
+  RELEASE_ASSERT(!finalized_);
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* filter_chain = listener->mutable_filter_chains(0);
+  auto* hcm_config_struct = filter_chain->mutable_filters(0)->mutable_config();
+
+  MessageUtil::jsonConvert(hcm, *hcm_config_struct);
+}
+
+void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
+  RELEASE_ASSERT(!finalized_);
+  config_modifiers_.push_back(function);
+}
+
+void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
+  RELEASE_ASSERT(!finalized_);
+  config_modifiers_.push_back(([&](envoy::api::v2::Bootstrap&) -> void {
+    envoy::api::v2::filter::HttpConnectionManager hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    function(hcm_config);
+    storeHttpConnectionManager(hcm_config);
+  }));
 }
 
 } // namespace Envoy
