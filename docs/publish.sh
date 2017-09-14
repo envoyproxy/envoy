@@ -28,7 +28,7 @@ then
   ssh-add .publishdocskey
 
   echo 'cloning'
-  git clone git@github.com:lyft/envoy $PUBLISH_DIR
+  git clone git@github.com:envoyproxy/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
   git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
@@ -36,8 +36,8 @@ then
   cp -r $DOCS_DIR/* $PUBLISH_DIR
   cd $PUBLISH_DIR
 
-  git config user.name "lyft-buildnotify(travis)"
-  git config user.email lyft-buildnotify@users.noreply.github.com
+  git config user.name "envoy-docs(travis)"
+  git config user.email envoy-docs@users.noreply.github.com
   echo 'add'
   git add .
   echo 'commit'

@@ -13,5 +13,4 @@ if [ ! -d "${BUILD_DIR}"/venv ]; then
 fi
 
 source "${BUILD_DIR}"/venv/bin/activate
-cp -r "${SCRIPT_DIR}"/landing_generated/* "${DOCS_OUTPUT_DIR}"
-sphinx-build -W -b html "${SCRIPT_DIR}" "${DOCS_OUTPUT_DIR}"/docs
+sphinx-build -W -b html "${SCRIPT_DIR}" "${DOCS_OUTPUT_DIR}"
