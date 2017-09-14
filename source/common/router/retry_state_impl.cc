@@ -40,6 +40,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   }
 
   request_headers.removeEnvoyRetryOn();
+  request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
   return ret;
 }
