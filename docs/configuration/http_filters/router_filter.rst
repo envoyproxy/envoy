@@ -11,7 +11,6 @@ redirection, the filter also handles retry, statistics, etc.
 .. code-block:: json
 
   {
-    "type": "decoder",
     "name": "router",
     "config": {
       "dynamic_stats": "..."

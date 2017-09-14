@@ -8,7 +8,6 @@ MongoDB :ref:`architecture overview <arch_overview_mongo>`.
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "mongo_proxy",
     "config": {
       "stat_prefix": "...",
@@ -30,7 +29,7 @@ fault
   *(optional, object)* If specified, the filter will inject faults based on the values in the object.
 
 Fault configuration
--------------------  
+-------------------
 
 Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB operations: Query, Insert,
 GetMore, and KillCursors. Once an active delay is in progress, all incoming data up until the timer event fires
@@ -186,7 +185,7 @@ mongo.fault.fixed_delay.percent
 
 mongo.fault.fixed_delay.duration_ms
   The delay duration in milliseconds. Defaults to the *duration_ms* specified in the config.
-  
+
 Access log format
 -----------------
 

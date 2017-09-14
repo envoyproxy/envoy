@@ -8,7 +8,6 @@ TCP proxy :ref:`architecture overview <arch_overview_tcp_proxy>`.
 .. code-block:: json
 
   {
-    "type": "read",
     "name": "tcp_proxy",
     "config": {
       "stat_prefix": "...",
@@ -140,4 +139,3 @@ statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
   downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection.
   downstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from downstream.
   downstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from downstream.
-

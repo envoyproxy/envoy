@@ -8,7 +8,6 @@ Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_
 .. code-block:: json
 
   {
-    "type": "read",
     "name": "client_ssl_auth",
     "config": {
       "auth_api_cluster": "...",

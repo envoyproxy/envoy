@@ -12,7 +12,6 @@ words, installing this filter is a no-op in the filter chain.
 .. code-block:: json
 
   {
-    "type": "decoder",
     "name": "ip_tagging",
     "config": {
       "request_type": "...",

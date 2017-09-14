@@ -38,7 +38,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           },
           "config": {"type" : "object"}
         },
-        "required": ["type", "name", "config"],
+        "required": ["name", "config"],
         "additionalProperties": false
       }
     },
@@ -244,7 +244,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "name" : {"type": "string"},
           "config": {"type" : "object"}
         },
-        "required": ["type", "name", "config"],
+        "required": ["name", "config"],
         "additionalProperties" : false
       }
     },
