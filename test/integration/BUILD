@@ -77,7 +77,7 @@ envoy_cc_test(
         "//test/config/integration:server_cors_filter.json",
     ],
     deps = [
-        ":integration_lib",
+        ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/http:http_mocks",

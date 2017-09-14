@@ -1,14 +1,14 @@
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-class CorsFilterIntegrationTest : public BaseIntegrationTest,
+class CorsFilterIntegrationTest : public HttpIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CorsFilterIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  CorsFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Global initializer for all integration tests.
    */
@@ -30,9 +30,7 @@ protected:
   void testPreflight(Http::TestHeaderMapImpl&& request_headers,
                      Http::TestHeaderMapImpl&& expected_response_headers) {
     executeActions({
-        [&]() -> void {
-          codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-        },
+        [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
         [&]() -> void { codec_client_->makeHeaderOnlyRequest(request_headers, *response_); },
         [&]() -> void { response_->waitForEndStream(); },
         [&]() -> void { cleanupUpstreamAndDownstream(); },
@@ -45,9 +43,7 @@ protected:
   void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
                          Http::TestHeaderMapImpl&& expected_response_headers) {
     executeActions({
-        [&]() -> void {
-          codec_client_ = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
-        },
+        [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
         [&]() -> void {
           sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
         },
@@ -124,9 +120,7 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
       });
 }
 
@@ -141,9 +135,7 @@ TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
           {"origin", "test-origin"},
       },
       Http::TestHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"},
       });
 }
 
