@@ -17,7 +17,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   subscription_->start({"cluster0", "cluster1"}, callbacks_);
-  verifyStats(1, 0, 0, 1);
+  verifyStats(2, 0, 0, 1);
   // Ensure this doesn't cause an issue by sending a request, since we don't
   // have a gRPC stream.
   subscription_->updateResources({"cluster2"});
@@ -33,11 +33,11 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   verifyStats(1, 0, 0, 0);
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
-  subscription_->onReceiveTrailingMetadata(std::move(trailers));
+  subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  subscription_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  verifyStats(1, 0, 0, 1);
+  subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  verifyStats(2, 0, 0, 1);
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
@@ -48,24 +48,22 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 // Validate that When the management server gets multiple requests for the same version, it can
 // ignore later ones. This allows the nonce to be used.
 TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
+  InSequence s;
   startSubscription({"cluster0", "cluster1"});
   verifyStats(1, 0, 0, 0);
   // First with the initial, empty version update to "0".
-  expectSendMessage({"cluster2"}, "");
   updateResources({"cluster2"});
   verifyStats(2, 0, 0, 0);
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", false);
   verifyStats(3, 0, 1, 0);
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);
   verifyStats(4, 1, 1, 0);
   // Now with version "0" update to "1".
-  expectSendMessage({"cluster3"}, "0");
   updateResources({"cluster3"});
   verifyStats(5, 1, 1, 0);
-  deliverConfigUpdate({"cluster2"}, "1", false);
+  deliverConfigUpdate({"cluster3"}, "1", false);
   verifyStats(6, 1, 2, 0);
-  Mock::VerifyAndClearExpectations(&async_stream_);
-  deliverConfigUpdate({"cluster2"}, "1", true);
+  deliverConfigUpdate({"cluster3"}, "1", true);
   verifyStats(7, 2, 2, 0);
 }
 

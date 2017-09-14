@@ -114,7 +114,7 @@ public:
   MOCK_METHOD1(removePrimaryCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_METHOD0(adsProvider, Config::AdsApi&());
+  MOCK_METHOD0(adsMux, Config::GrpcMux&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

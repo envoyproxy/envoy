@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/ads.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 
 #include "gmock/gmock.h"
@@ -26,24 +26,25 @@ public:
   MOCK_CONST_METHOD0_T(versionInfo, const std::string());
 };
 
-class MockAdsWatch : public AdsWatch {
+class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
-  MockAdsWatch();
-  virtual ~MockAdsWatch();
+  MockGrpcMuxWatch();
+  virtual ~MockGrpcMuxWatch();
 
   MOCK_METHOD0(cancel, void());
 };
 
-class MockAdsApi : public AdsApi {
+class MockGrpcMux : public GrpcMux {
 public:
-  MockAdsApi();
-  virtual ~MockAdsApi();
+  MockGrpcMux();
+  virtual ~MockGrpcMux();
 
+  MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
-               AdsWatch*(const std::string& type_url, const std::vector<std::string>& resources,
-                         AdsCallbacks& callbacks));
-  AdsWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
-                        AdsCallbacks& callbacks);
+               GrpcMuxWatch*(const std::string& type_url, const std::vector<std::string>& resources,
+                             GrpcMuxCallbacks& callbacks));
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+                            GrpcMuxCallbacks& callbacks);
 };
 
 } // namespace Config

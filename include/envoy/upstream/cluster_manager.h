@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/ads.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
@@ -123,9 +123,9 @@ public:
    * the management of clusters but instead is required early in ClusterManager/server
    * initialization and in various sites that need ClusterManager for xDS API interfacing.
    *
-   * @return AdsApi& ADS API provider referencee.
+   * @return GrpcMux& ADS API provider referencee.
    */
-  virtual Config::AdsApi& adsProvider() PURE;
+  virtual Config::GrpcMux& adsMux() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

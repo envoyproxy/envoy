@@ -2,6 +2,7 @@
 
 #include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/resources.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -43,6 +44,8 @@ public:
         *method_descriptor_, stats_));
   }
 
+  ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
+
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
     envoy::api::v2::DiscoveryRequest expected_request;
@@ -54,6 +57,7 @@ public:
       expected_request.set_version_info(version);
     }
     expected_request.set_response_nonce(last_response_nonce_);
+    expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
@@ -65,9 +69,9 @@ public:
     // These are just there to add coverage to the null implementations of these
     // callbacks.
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{}};
-    subscription_->onReceiveInitialMetadata(std::move(response_headers));
+    subscription_->grpcMux().onReceiveInitialMetadata(std::move(response_headers));
     Http::TestHeaderMapImpl request_headers;
-    subscription_->onCreateInitialMetadata(request_headers);
+    subscription_->grpcMux().onCreateInitialMetadata(request_headers);
   }
 
   void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
@@ -77,11 +81,15 @@ public:
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
+    response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
-      envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
-      load_assignment->set_cluster_name(cluster);
-      response->add_resources()->PackFrom(*load_assignment);
+      if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
+          last_cluster_names_.end()) {
+        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        load_assignment->set_cluster_name(cluster);
+        response->add_resources()->PackFrom(*load_assignment);
+      }
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
         .WillOnce(ThrowOnRejectedConfig(accept));
@@ -89,15 +97,20 @@ public:
       expectSendMessage(last_cluster_names_, version);
       version_ = version;
     } else {
-      expectSendMessage(last_cluster_names_, version_);
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      expectSendMessage(last_cluster_names_, version_);
     }
-    subscription_->onReceiveMessage(std::move(response));
+    subscription_->grpcMux().onReceiveMessage(std::move(response));
     EXPECT_EQ(version_, subscription_->versionInfo());
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
+    std::vector<std::string> cluster_superset = cluster_names;
+    cluster_superset.insert(cluster_superset.end(), last_cluster_names_.begin(),
+                            last_cluster_names_.end());
+    expectSendMessage(cluster_superset, version_);
+    expectSendMessage(cluster_names, version_);
     subscription_->updateResources(cluster_names);
     last_cluster_names_ = cluster_names;
   }

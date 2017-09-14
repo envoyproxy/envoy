@@ -16,7 +16,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/ads_api_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -36,8 +36,8 @@ public:
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& primary_dispatcher,
                             const LocalInfo::LocalInfo& local_info)
-      : runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), primary_dispatcher_(primary_dispatcher),
+      : primary_dispatcher_(primary_dispatcher), runtime_(runtime), stats_(stats), tls_(tls),
+        random_(random), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
@@ -57,6 +57,9 @@ public:
                       const Optional<envoy::api::v2::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
 
+protected:
+  Event::Dispatcher& primary_dispatcher_;
+
 private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -64,7 +67,6 @@ private:
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
-  Event::Dispatcher& primary_dispatcher_;
   const LocalInfo::LocalInfo& local_info_;
 };
 
@@ -126,7 +128,8 @@ public:
   ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
                      Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                     AccessLog::AccessLogManager& log_manager);
+                     AccessLog::AccessLogManager& log_manager,
+                     Event::Dispatcher& primary_dispatcher);
 
   // Upstream::ClusterManager
   bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) override;
@@ -158,7 +161,7 @@ public:
     return source_address_;
   }
 
-  Config::AdsApi& adsProvider() override { return ads_api_; }
+  Config::GrpcMux& adsMux() override { return *ads_mux_; }
 
 private:
   /**
@@ -244,7 +247,7 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  Config::AdsApiImpl ads_api_;
+  Config::GrpcMuxPtr ads_mux_;
 };
 
 } // namespace Upstream

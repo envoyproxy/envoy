@@ -1,0 +1,23 @@
+dynamic_resources:
+  lds_config: {ads: {}}
+  cds_config: {ads: {}}
+  ads_config:
+    api_type: GRPC
+    cluster_name: [ads_cluster]
+static_resources:
+  clusters:
+  - name: ads_cluster
+    connect_timeout: { seconds: 5 }
+    type: STATIC
+    hosts:
+    - socket_address:
+        address: {{ ntop_ip_loopback_address }}
+        port_value: {{ ads_upstream }}
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0

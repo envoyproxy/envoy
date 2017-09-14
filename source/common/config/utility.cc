@@ -4,8 +4,10 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
+#include "common/config/resources.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "fmt/format.h"
 
@@ -98,6 +100,23 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
                            json_lds.getInteger("refresh_delay_ms", 30000),
                            json_lds.getString("api_type", ApiType::get().RestLegacy),
                            *lds_config.mutable_api_config_source());
+}
+
+std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Config::TypeUrl::get().Listener) {
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  ASSERT(false);
+  return "";
 }
 
 } // namespace Config

@@ -4,8 +4,8 @@
 
 #include "envoy/config/subscription.h"
 
-#include "common/config/ads_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
+#include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
@@ -75,7 +75,7 @@ public:
       break;
     }
     case envoy::api::v2::ConfigSource::kAds: {
-      result.reset(new AdsSubscriptionImpl<ResourceType>(cm.adsProvider(), stats));
+      result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(cm.adsMux(), stats));
       break;
     }
     default:

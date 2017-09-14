@@ -14,6 +14,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "test/test_common/printers.h"
 
@@ -125,6 +126,17 @@ public:
 #else
     return "127.0.0.9";
 #endif
+  }
+
+  /**
+   * Return typed proto message object for YAML.
+   * @param yaml YAML string.
+   * @return MessageType parsed from yaml.
+   */
+  template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
+    MessageType message;
+    MessageUtil::loadFromYaml(yaml, message);
+    return message;
   }
 };
 
