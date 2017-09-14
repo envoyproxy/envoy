@@ -209,7 +209,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json)),
-                            EnvoyException, "unable to create filter factory for 'invalid'");
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
 }
 
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {

@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/ads.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
@@ -115,6 +116,16 @@ public:
    * bind need occur.
    */
   virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+
+  /**
+   * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
+   * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
+   * the management of clusters but instead is required early in ClusterManager/server
+   * initialization and in various sites that need ClusterManager for xDS API interfacing.
+   *
+   * @return AdsApi& ADS API provider referencee.
+   */
+  virtual Config::AdsApi& adsProvider() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
@@ -136,6 +147,16 @@ public:
    * server. If the initial load fails, the callback will also be called.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * @return std::string last accepted version from fetch.
+   *
+   * TODO(dnoe): This would ideally return by reference, but this causes a
+   *             problem due to incompatible string implementations returned by
+   *             protobuf generated code. Revisit when string implementations
+   *             are converged.
+   */
+  virtual const std::string versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;

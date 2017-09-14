@@ -370,7 +370,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     }
   }
 
-  access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
+  access_logs_.emplace_back(new Http::AccessLog::FileAccessLog(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
 }

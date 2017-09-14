@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/http:filter_utility_lib",
         "//source/common/http:headers_lib",

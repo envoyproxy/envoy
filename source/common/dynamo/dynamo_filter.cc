@@ -36,6 +36,7 @@ Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end
   if (end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
+    // Buffer until the complete request has been processed.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }
@@ -110,6 +111,7 @@ Http::FilterDataStatus DynamoFilter::encodeData(Buffer::Instance& data, bool end
   if (end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
+    // Buffer until the complete response has been processed.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }

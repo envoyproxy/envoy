@@ -1,5 +1,6 @@
 #include "common/tracing/zipkin/span_context.h"
 
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
@@ -12,30 +13,21 @@ namespace {
 /**
  * @return String that separates the span-context fields in its string-serialized form.
  */
-static const std::string& fieldSeparator() {
-  static const std::string* field_separator = new std::string(";");
-
-  return *field_separator;
-}
+static const std::string& fieldSeparator() { CONSTRUCT_ON_FIRST_USE(std::string, ";") }
 
 /**
  * @return String value corresponding to an empty span context.
  */
 static const std::string& unitializedSpanContext() {
-  static const std::string* unitialized_span_context =
-      new std::string("0000000000000000" + fieldSeparator() + "0000000000000000" +
-                      fieldSeparator() + "0000000000000000");
-
-  return *unitialized_span_context;
+  CONSTRUCT_ON_FIRST_USE(std::string, "0000000000000000" + fieldSeparator() + "0000000000000000" +
+                                          fieldSeparator() + "0000000000000000");
 }
 
 /**
  * @return String with regular expression to match a 16-digit hexadecimal number.
  */
 static const std::string& hexDigitGroupRegexStr() {
-  static const std::string* hex_digit_group_regex_str = new std::string("([0-9,a-z]{16})");
-
-  return *hex_digit_group_regex_str;
+  CONSTRUCT_ON_FIRST_USE(std::string, "([0-9,a-z]{16})");
 }
 
 /**
@@ -47,14 +39,13 @@ static const std::string& hexDigitGroupRegexStr() {
  */
 static const std::string& spanContextRegexStr() {
   // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
-  static const std::string* span_context_regex_str = new std::string(
-      "^" + hexDigitGroupRegexStr() + fieldSeparator() + hexDigitGroupRegexStr() +
-      fieldSeparator() + hexDigitGroupRegexStr() + "((" + fieldSeparator() + "(" +
-      ZipkinCoreConstants::get().CLIENT_SEND + "|" + ZipkinCoreConstants::get().SERVER_RECV + "|" +
-      ZipkinCoreConstants::get().CLIENT_RECV + "|" + ZipkinCoreConstants::get().SERVER_SEND +
-      "))*)$");
-
-  return *span_context_regex_str;
+  CONSTRUCT_ON_FIRST_USE(std::string, "^" + hexDigitGroupRegexStr() + fieldSeparator() +
+                                          hexDigitGroupRegexStr() + fieldSeparator() +
+                                          hexDigitGroupRegexStr() + "((" + fieldSeparator() + "(" +
+                                          ZipkinCoreConstants::get().CLIENT_SEND + "|" +
+                                          ZipkinCoreConstants::get().SERVER_RECV + "|" +
+                                          ZipkinCoreConstants::get().CLIENT_RECV + "|" +
+                                          ZipkinCoreConstants::get().SERVER_SEND + "))*)$");
 }
 
 /**
@@ -64,9 +55,7 @@ static const std::string& spanContextRegexStr() {
  * cannot be initialized statically.
  */
 static const std::regex& spanContextRegex() {
-  static const std::regex* span_context_regex = new std::regex(spanContextRegexStr());
-
-  return *span_context_regex;
+  CONSTRUCT_ON_FIRST_USE(std::regex, spanContextRegexStr());
 }
 } // namespace
 

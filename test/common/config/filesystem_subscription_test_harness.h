@@ -74,10 +74,13 @@ public:
                     Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
                         response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
-    if (!accept) {
+    if (accept) {
+      version_ = version;
+    } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }
     updateFile(file_json);
+    EXPECT_EQ(version_, subscription_.versionInfo());
   }
 
   void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected,
@@ -88,6 +91,7 @@ public:
   }
 
   const std::string path_;
+  std::string version_;
   Event::DispatcherImpl dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;

@@ -74,4 +74,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "supported_commands_lib",
     hdrs = ["supported_commands.h"],
+    deps = [
+        "//source/common/common:macros",
+    ],
 )

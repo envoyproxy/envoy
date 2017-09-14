@@ -8,6 +8,8 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -44,6 +46,11 @@ public:
    * @return whether the host is a canary.
    */
   virtual bool canary() const PURE;
+
+  /**
+   * @return the metadata associated with this host
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 
   /**
    * @return the cluster the host is a member of.

@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/compiler_requirements.h"
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
@@ -91,18 +92,15 @@ Server::Options& TestEnvironment::getOptions() {
 }
 
 const std::string& TestEnvironment::temporaryDirectory() {
-  static const std::string* temporary_directory = new std::string(getCheckedEnvVar("TEST_TMPDIR"));
-  return *temporary_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_TMPDIR"));
 }
 
 const std::string& TestEnvironment::runfilesDirectory() {
-  static const std::string* runfiles_directory = new std::string(getCheckedEnvVar("TEST_RUNDIR"));
-  return *runfiles_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_RUNDIR"));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
-  static const std::string* uds_directory = new std::string(getOrCreateUnixDomainSocketDirectory());
-  return *uds_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getOrCreateUnixDomainSocketDirectory());
 }
 
 std::string TestEnvironment::substitute(const std::string& str,

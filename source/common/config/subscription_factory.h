@@ -4,6 +4,7 @@
 
 #include "envoy/config/subscription.h"
 
+#include "common/config/ads_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
@@ -71,6 +72,10 @@ public:
       default:
         NOT_REACHED;
       }
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kAds: {
+      result.reset(new AdsSubscriptionImpl<ResourceType>(cm.adsProvider(), stats));
       break;
     }
     default:

@@ -179,6 +179,8 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
 
 void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
 
+uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -261,8 +263,7 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
-    : connection_(connection), output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                              [&]() -> void { this->onBelowLowWatermark(); },
+    : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);

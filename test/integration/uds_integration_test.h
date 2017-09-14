@@ -4,17 +4,17 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/integration/fake_upstream.h"
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class UdsIntegrationTest : public BaseIntegrationTest,
+class UdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  UdsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  UdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

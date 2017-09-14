@@ -1,8 +1,12 @@
 #pragma once
 
+#include "envoy/upstream/upstream.h"
+
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
+#include "common/network/utility.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "fmt/printf.h"
 
@@ -58,6 +62,19 @@ parseSdsClusterFromJson(const std::string& json_string,
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   return cluster;
+}
+
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+                                  uint32_t weight = 1) {
+  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
+                                    envoy::api::v2::Metadata::default_instance(), weight, "")};
+}
+
+inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
+                                                             const std::string& url) {
+  return HostDescriptionConstSharedPtr{
+      new HostDescriptionImpl(cluster, "", Network::Utility::resolveUrl(url),
+                              envoy::api::v2::Metadata::default_instance(), "")};
 }
 
 } // namespace

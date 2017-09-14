@@ -20,6 +20,7 @@ envoy_cc_library(
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/config:ads_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -41,6 +42,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",

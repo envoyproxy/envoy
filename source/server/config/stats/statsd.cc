@@ -4,6 +4,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/well_known_names.h"
 #include "common/stats/statsd.h"
 
 #include "api/bootstrap.pb.h"
@@ -41,7 +42,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
   return std::unique_ptr<envoy::api::v2::StatsdSink>(new envoy::api::v2::StatsdSink());
 }
 
-std::string StatsdSinkFactory::name() { return "envoy.statsd"; }
+std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STATSD; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

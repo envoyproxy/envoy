@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/config/well_known_names.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
 
@@ -34,7 +35,7 @@ public:
     return std::unique_ptr<envoy::api::v2::filter::HttpConnectionManager>(
         new envoy::api::v2::filter::HttpConnectionManager());
   }
-  std::string name() override { return "http_connection_manager"; }
+  std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 };
 
 /**

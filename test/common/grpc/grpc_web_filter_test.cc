@@ -287,9 +287,8 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests response trailers.
   Buffer::OwnedImpl trailers_buffer;
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_)).WillOnce(Invoke([&](Buffer::Instance& data) {
-    trailers_buffer.move(data);
-  }));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); }));
   Http::TestHeaderMapImpl response_trailers;
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");

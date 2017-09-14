@@ -1,14 +1,15 @@
 #pragma once
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2UpstreamIntegrationTest : public BaseIntegrationTest,
+class Http2UpstreamIntegrationTest : public HttpIntegrationTest,
                                      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  Http2UpstreamIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  Http2UpstreamIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

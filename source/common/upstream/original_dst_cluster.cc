@@ -62,7 +62,7 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
         host.reset(new HostImpl(info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
-                                false, 1, ""));
+                                envoy::api::v2::Metadata::default_instance(), 1, ""));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map.  We just failed to find it in

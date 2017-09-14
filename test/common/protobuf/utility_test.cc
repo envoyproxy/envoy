@@ -1,3 +1,4 @@
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/environment.h"
@@ -30,7 +31,7 @@ TEST(UtilityTest, LoadTextProtoFromFile) {
       ->mutable_source_address()
       ->set_address("1.1.1.1");
 
-  std::string bootstrap_text;
+  ProtobufTypes::String bootstrap_text;
   ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);

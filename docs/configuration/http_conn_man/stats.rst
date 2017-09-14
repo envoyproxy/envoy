@@ -44,6 +44,7 @@ statistics:
    downstream_rq_rx_reset, Counter, Total request resets received
    downstream_rq_tx_reset, Counter, Total request resets sent
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
+   downstream_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body.
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
    downstream_rq_4xx, Counter, Total 4xx responses
@@ -51,6 +52,7 @@ statistics:
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
    downstream_rq_non_ws_on_ws_route, Counter, Total HTTP requests rejected by WebSocket enabled routes due to missing upgrade header
    downstream_rq_time, Timer, Request time milliseconds
+   rs_too_large, Counter, Total response errors due to buffering an overly large body.
 
 Per user agent statistics
 -------------------------

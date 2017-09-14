@@ -370,6 +370,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames.  Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
+  // Make sure the limits were configured properly in test set up.
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->bufferLimit());
+  EXPECT_EQ(initial_stream_window, client_.getStream(1)->bufferLimit());
+
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
@@ -500,6 +504,29 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
 
   // Regression test that the window is consumed even if the stream is destroyed early.
   EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
+}
+
+// Test the HTTP2 pending_recv_data_ buffer going over and under watermark limits.
+TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
+  initialize();
+  MockStreamCallbacks callbacks;
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Set artificially small watermarks to make the recv buffer easy to overrun.  In production,
+  // the recv buffer can be overrun by a client which negotiates a larger
+  // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
+  // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
+  server_.getStream(1)->setWriteBufferWatermarks(10, 20);
+
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl data(std::string(40, 'a'));
+  request_encoder_->encodeData(data, false);
 }
 
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {

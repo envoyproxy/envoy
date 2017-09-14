@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -188,6 +189,14 @@ void Common::validateResponse(Http::Message& http_response) {
     throw Exception(grpc_status_code.value(),
                     grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
   }
+}
+
+const std::string& Common::typeUrlPrefix() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
+}
+
+std::string Common::typeUrl(const std::string& qualified_name) {
+  return typeUrlPrefix() + "/" + qualified_name;
 }
 
 } // namespace Grpc

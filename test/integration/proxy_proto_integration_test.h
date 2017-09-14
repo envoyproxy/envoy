@@ -4,16 +4,16 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/integration/fake_upstream.h"
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class ProxyProtoIntegrationTest : public BaseIntegrationTest,
+class ProxyProtoIntegrationTest : public HttpIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ProxyProtoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  ProxyProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

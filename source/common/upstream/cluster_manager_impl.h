@@ -16,6 +16,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/ads_api_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -157,6 +158,8 @@ public:
     return source_address_;
   }
 
+  Config::AdsApi& adsProvider() override { return ads_api_; }
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
@@ -241,6 +244,7 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
+  Config::AdsApiImpl ads_api_;
 };
 
 } // namespace Upstream
