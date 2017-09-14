@@ -58,8 +58,10 @@ public:
 
   void sendDiscoveryRequest() {
     if (stream_ == nullptr) {
+      ENVOY_LOG(trace, "Unable to sendDiscoveryRequest() on null stream");
       return;
     }
+    ENVOY_LOG(trace, "sendDiscoveryRequest: {}", request_.DebugString());
     stream_->sendMessage(request_, false);
   }
 
@@ -79,6 +81,7 @@ public:
                                                                        resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
     sendDiscoveryRequest();
+    stats_.update_attempt_.inc();
   }
 
   const std::string versionInfo() const override { return request_.version_info(); }
@@ -107,6 +110,7 @@ public:
     // This effectively ACK/NACKs the accepted configuration.
     ENVOY_LOG(debug, "Sending version update: {}", message->version_info());
     stats_.update_attempt_.inc();
+    request_.set_response_nonce(message->nonce());
     sendDiscoveryRequest();
   }
 

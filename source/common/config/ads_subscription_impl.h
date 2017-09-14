@@ -38,6 +38,7 @@ public:
 
   void updateResources(const std::vector<std::string>& resources) override {
     watch_ = ads_api_.subscribe(type_url_, resources, *this);
+    stats_.update_attempt_.inc();
   }
 
   const std::string versionInfo() const override { NOT_IMPLEMENTED; }

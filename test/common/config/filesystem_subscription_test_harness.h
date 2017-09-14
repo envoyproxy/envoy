@@ -38,7 +38,7 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
-    UNREFERENCED_PARAMETER(cluster_names);
+    subscription_.updateResources(cluster_names);
   }
 
   void updateFile(const std::string json, bool run_dispatcher = true) {
