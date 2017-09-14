@@ -6,7 +6,7 @@
 
 #include "common/common/logger.h"
 
-#include "api/ads.pb.h"
+#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
