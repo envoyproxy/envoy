@@ -23,8 +23,7 @@
               "routes": [
                 {
                   "prefix": "/cors-vhost-config",
-                  "cluster": "cluster_1"
-                },
+                  "cluster": "cluster_1"                },
                 {
                   "prefix": "/no-cors",
                   "cluster": "cluster_1",

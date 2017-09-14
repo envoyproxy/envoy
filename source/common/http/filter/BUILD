@@ -32,8 +32,6 @@ envoy_cc_library(
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",

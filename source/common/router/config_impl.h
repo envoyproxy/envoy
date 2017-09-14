@@ -76,7 +76,7 @@ public:
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
-  bool allowCredentials() const override { return allow_credentials_; };
+  const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
 
 private:
@@ -85,7 +85,7 @@ private:
   std::string allow_headers_;
   std::string expose_headers_;
   std::string max_age_{};
-  bool allow_credentials_;
+  Optional<bool> allow_credentials_{};
   bool enabled_;
 };
 
@@ -109,7 +109,7 @@ public:
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
 
   // Router::VirtualHost
-  const CorsPolicy& corsPolicy() const override { return cors_policy_; }
+  const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
@@ -142,7 +142,7 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
-  const CorsPolicyImpl cors_policy_;
+  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
@@ -223,7 +223,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const CorsPolicy& corsPolicy() const override { return cors_policy_; }
+  const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
@@ -276,7 +276,7 @@ private:
       return parent_->finalizeRequestHeaders(headers);
     }
 
-    const CorsPolicy& corsPolicy() const override { return parent_->corsPolicy(); }
+    const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
@@ -343,7 +343,7 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
-  const CorsPolicyImpl cors_policy_;
+  std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;

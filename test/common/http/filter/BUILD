@@ -26,7 +26,6 @@ envoy_cc_test(
     name = "cors_filter_test",
     srcs = ["cors_filter_test.cc"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http/filter:cors_filter_lib",
         "//test/mocks/buffer:buffer_mocks",

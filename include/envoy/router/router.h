@@ -64,9 +64,9 @@ public:
   virtual const std::string& maxAge() const PURE;
 
   /**
-   * @return bool Whether access-control-allow-credentials should be true.
+   * @return const Optional<bool>& Whether access-control-allow-credentials should be true.
    */
-  virtual bool allowCredentials() const PURE;
+  virtual const Optional<bool>& allowCredentials() const PURE;
 
   /**
    * @return bool Whether CORS is enabled for the route or virtual host.
@@ -185,9 +185,9 @@ public:
   virtual ~VirtualHost() {}
 
   /**
-   * @return const CorsPolicy& the CORS policy for this virtual host.
+   * @return const CorsPolicy* the CORS policy for this virtual host.
    */
-  virtual const CorsPolicy& corsPolicy() const PURE;
+  virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
    * @return const std::string& the name of the virtual host.
@@ -230,9 +230,9 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
-   * @return const CorsPolicy& the CORS policy for this virtual host.
+   * @return const CorsPolicy* the CORS policy for this virtual host.
    */
-  virtual const CorsPolicy& corsPolicy() const PURE;
+  virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For

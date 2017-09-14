@@ -44,7 +44,7 @@ public:
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
-  bool allowCredentials() const override { return allow_credentials_; };
+  const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
 
   std::list<std::string> allow_origin_{};
@@ -52,7 +52,7 @@ public:
   std::string allow_headers_{};
   std::string expose_headers_{};
   std::string max_age_{};
-  bool allow_credentials_{false};
+  Optional<bool> allow_credentials_{};
   bool enabled_{false};
 };
 
@@ -156,7 +156,7 @@ public:
   // Router::VirtualHost
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
-  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy&());
+  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -193,7 +193,7 @@ public:
   MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
-  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy&());
+  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

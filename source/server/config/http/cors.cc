@@ -1,13 +1,8 @@
 #include "server/config/http/cors.h"
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-
 #include "envoy/registry/registry.h"
 
 #include "common/http/filter/cors_filter.h"
-#include "common/json/config_schemas.h"
 
 namespace Envoy {
 namespace Server {

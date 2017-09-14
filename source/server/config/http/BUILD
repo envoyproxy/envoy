@@ -28,7 +28,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/http/filter:cors_filter_lib",
-        "//source/common/json:config_schemas_lib",
     ],
 )
 

@@ -3,16 +3,13 @@
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
 
-class CorsFilter : public StreamFilter, Logger::Loggable<Logger::Id::filter> {
+class CorsFilter : public StreamFilter {
 public:
   CorsFilter();
-
-  void initialize();
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -42,7 +39,7 @@ public:
 private:
   friend class CorsFilterTest;
 
-  const std::list<std::string>& allowOrigins();
+  const std::list<std::string>* allowOrigins();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();
@@ -53,10 +50,8 @@ private:
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  const Envoy::Router::CorsPolicy* route_cors_policy_{};
-  const Envoy::Router::CorsPolicy* virtual_host_cors_policy_{};
+  std::vector<const Envoy::Router::CorsPolicy*> policies_{};
   bool is_cors_request_{};
-  bool bad_route_{};
   const Http::HeaderEntry* origin_{};
 };
 

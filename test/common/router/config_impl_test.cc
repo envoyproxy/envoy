@@ -2032,7 +2032,52 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-TEST(RoutePropertyTest, TestCorsConfig) {
+TEST(RoutePropertyTest, TestVHostCorsConfig) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "cors" : {
+        "allow_origin": ["test-origin"],
+        "allow_methods": "test-methods",
+        "allow_headers": "test-headers",
+        "expose_headers": "test-expose-headers",
+        "max_age": "test-max-age",
+        "allow_credentials": true
+      },
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats"
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST(RoutePropertyTest, TestRouteCorsConfig) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -2062,16 +2107,16 @@ TEST(RoutePropertyTest, TestCorsConfig) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  const Router::CorsPolicy& cors_policy =
+  const Router::CorsPolicy* cors_policy =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
 
-  EXPECT_EQ(cors_policy.enabled(), true);
-  EXPECT_THAT(cors_policy.allowOrigins(), ElementsAreArray({"test-origin"}));
-  EXPECT_EQ(cors_policy.allowMethods(), "test-methods");
-  EXPECT_EQ(cors_policy.allowHeaders(), "test-headers");
-  EXPECT_EQ(cors_policy.exposeHeaders(), "test-expose-headers");
-  EXPECT_EQ(cors_policy.maxAge(), "test-max-age");
-  EXPECT_EQ(cors_policy.allowCredentials(), true);
+  EXPECT_EQ(cors_policy->enabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
 TEST(RoutePropertyTest, TestBadCorsConfig) {

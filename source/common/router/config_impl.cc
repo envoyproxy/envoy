@@ -52,7 +52,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
   allow_headers_ = config.allow_headers();
   expose_headers_ = config.expose_headers();
   max_age_ = config.max_age();
-  allow_credentials_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_credentials, false);
+  if (config.has_allow_credentials()) {
+    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+  }
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
@@ -93,7 +95,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
-      cors_policy_(route.route().cors()), vhost_(vhost),
+      vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       use_websocket_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false)),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
@@ -144,6 +146,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   include_vh_rate_limits_ =
       (rate_limit_policy_.empty() ||
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
+
+  if (route.route().has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -399,7 +405,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
-      cors_policy_(virtual_host.cors()), global_route_config_(global_route_config) {
+      global_route_config_(global_route_config) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -444,6 +450,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+  }
+
+  if (virtual_host.has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
   }
 }
 
