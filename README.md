@@ -14,9 +14,9 @@ to find out more about the origin story and design philosophy of Envoy.
 
 ## Related
 
-* [envoy-api](https://github.com/lyft/envoy-api): v2 API definitions.
-* [envoy-perf](https://github.com/lyft/envoy-perf): Performance testing framework.
-* [envoy-filter-example](https://github.com/lyft/envoy-filter-example): Example of how to add new filters
+* [data-plane-api](https://github.com/envoyproxy/data-plane-api): v2 API definitions.
+* [envoy-perf](https://github.com/envoyproxy/envoy-perf): Performance testing framework.
+* [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example): Example of how to add new filters
   and link to the main repository.
 
 ## Contact
