@@ -211,22 +211,6 @@ void InstanceImpl::initialize(Options& options,
   config_.reset(main_config);
   main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
 
-  // Setup signals.
-  sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
-    ENVOY_LOG(warn, "caught SIGTERM");
-    restarter_.terminateParent();
-    dispatcher_->exit();
-  });
-
-  sig_usr_1_ = dispatcher_->listenForSignal(SIGUSR1, [this]() -> void {
-    ENVOY_LOG(warn, "caught SIGUSR1");
-    access_log_manager_.reopen();
-  });
-
-  sig_hup_ = dispatcher_->listenForSignal(SIGHUP, []() -> void {
-    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-  });
-
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {
     stats_store_.addSink(*sink);
   }
@@ -283,14 +267,51 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-void InstanceImpl::run() {
+RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+                     HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
+                     InitManagerImpl& init_manager, std::function<void()> workers_start_cb) {
+
+  // Setup signals.
+  sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
+    ENVOY_LOG(warn, "caught SIGTERM");
+    shutdown_ = true;
+    hot_restart.terminateParent();
+    dispatcher.exit();
+  });
+
+  sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
+    ENVOY_LOG(warn, "caught SIGUSR1");
+    access_log_manager.reopen();
+  });
+
+  sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
+    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
+  });
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
-  // this can fire immediately if all clusters have already initialized.
-  clusterManager().setInitializedCb([this]() -> void {
+  // this can fire immediately if all clusters have already initialized. Also note that we need
+  // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
+  // starts.
+  cm.setInitializedCb([this, &init_manager, workers_start_cb]() {
+    if (shutdown_) {
+      return;
+    }
+
     ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
-    init_manager_.initialize([this]() -> void { startWorkers(); });
+    init_manager.initialize([this, workers_start_cb]() {
+      if (shutdown_) {
+        return;
+      }
+
+      workers_start_cb();
+    });
   });
+}
+
+void InstanceImpl::run() {
+  RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
+                   [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(warn, "starting main dispatch loop");
