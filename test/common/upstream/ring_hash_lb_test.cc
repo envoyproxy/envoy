@@ -92,6 +92,7 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
     EXPECT_EQ(cluster_.hosts_[2], lb_.chooseHost(nullptr));
   }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   cluster_.healthy_hosts_.clear();
   cluster_.runCallbacks({}, {});
@@ -99,6 +100,7 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
   }
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
 
 TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
