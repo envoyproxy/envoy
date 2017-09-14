@@ -22,19 +22,24 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "ads_api_lib",
+    srcs = ["ads_api_impl.cc"],
     hdrs = ["ads_api_impl.h"],
-    external_deps = ["envoy_ads"],
+    external_deps = ["envoy_discovery"],
     deps = [
+        ":utility_lib",
         "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/grpc:async_client_lib",
+        "//source/common/protobuf",
     ],
 )
 
 envoy_cc_library(
     name = "ads_subscription_lib",
     hdrs = ["ads_subscription_impl.h"],
-    external_deps = ["envoy_ads"],
+    external_deps = ["envoy_discovery"],
     deps = [
         "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
@@ -210,6 +215,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "resources_lib",
+    hdrs = ["resources.h"],
+    deps = ["//source/common/common:singleton"],
+)
+
+envoy_cc_library(
     name = "rds_json_lib",
     srcs = ["rds_json.cc"],
     hdrs = ["rds_json.h"],
@@ -258,10 +269,15 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = [
         "envoy_base",
+        "envoy_cds",
+        "envoy_eds",
+        "envoy_lds",
+        "envoy_rds",
         "envoy_filter_http_connection_manager",
     ],
     deps = [
         ":json_utility_lib",
+        "//include/envoy/config:ads_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/registry",
@@ -270,6 +286,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:singleton",
+        "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

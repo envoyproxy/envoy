@@ -16,6 +16,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:ads_subscription_lib",
+        "//source/common/config:resources_lib",
         "//test/mocks/config:config_mocks",
         "//test/test_common:utility_lib",
     ],

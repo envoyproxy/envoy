@@ -47,10 +47,16 @@ public:
   virtual ~AdsApi() {}
 
   /**
+   * Start streaming ADS messages.
+   */
+  virtual void start() PURE;
+
+  /**
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
    *                 type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources vector of resource names to fetch.
+   * @param resources vector of resource names to watch for on ADS. If this is empty, then all
+   *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until AdsWatch::cancel() is invoked.
    * @return AdsWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes away,
@@ -58,7 +64,7 @@ public:
    */
   virtual AdsWatchPtr subscribe(const std::string& type_url,
                                 const std::vector<std::string>& resources,
-                                AdsCallbacks& calllbacks) PURE;
+                                AdsCallbacks& callbacks) PURE;
 };
 
 } // namespace Config

@@ -161,10 +161,12 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
                                        ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
-                                       AccessLog::AccessLogManager& log_manager)
+                                       AccessLog::AccessLogManager& log_manager,
+                                       Event::Dispatcher& primary_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
-      ads_api_(bootstrap.dynamic_resources().ads_config(), *this) {
+      ads_api_(bootstrap.node(), bootstrap.dynamic_resources().ads_config(), *this,
+               primary_dispatcher) {
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -220,6 +222,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
   }
 
   init_helper_.onStaticLoadComplete();
+  ads_api_.start();
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
@@ -585,7 +588,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
-                                                  local_info, log_manager)};
+                                                  local_info, log_manager, primary_dispatcher_)};
 }
 
 Http::ConnectionPool::InstancePtr

@@ -45,7 +45,7 @@ public:
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                           AccessLog::AccessLogManager& log_manager);
+                           AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          LoadBalancerContext*) override;

@@ -6,6 +6,7 @@
 #include "common/config/json_utility.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "fmt/format.h"
 
@@ -98,6 +99,24 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
                            json_lds.getInteger("refresh_delay_ms", 30000),
                            json_lds.getString("api_type", ApiType::get().RestLegacy),
                            *lds_config.mutable_api_config_source());
+}
+
+std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.Listener")) {
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.RouteConfiguration")) {
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.Cluster")) {
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Grpc::Common::typeUrl("envoy.api.v2.ClusterLoadAssignment")) {
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
+  ASSERT(false);
+  // TODO(htuch): this is a protocol error.
+  return "unknown_name";
 }
 
 } // namespace Config
