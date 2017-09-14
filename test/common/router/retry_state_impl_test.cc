@@ -238,9 +238,11 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
 
 TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
+                                          {"x-envoy-retry-grpc-on", "cancelled"},
                                           {"x-envoy-max-retries", "3"}};
   setup(request_headers);
   EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+  EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
   EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
   EXPECT_TRUE(state_->enabled());
 

@@ -99,13 +99,6 @@ the header value to *true*.
 
 This is a convenience to avoid having to parse and understand XFF.
 
-.. _config_http_conn_man_headers_x-envoy-ip-tags:
-
-x-envoy-ip-tags
----------------
-
-This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
-
 .. _config_http_conn_man_headers_x-forwarded-client-cert:
 
 x-forwarded-client-cert
@@ -185,6 +178,8 @@ A few very important notes about XFF:
      Envoy will not consider it internal. This is a known "bug" due to the simplification of how
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
+
+.. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
 -----------------
