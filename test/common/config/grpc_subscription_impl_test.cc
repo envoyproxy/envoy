@@ -25,7 +25,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster2"}, "");
   timer_cb_();
-  verifyStats(2, 0, 0, 1);
+  verifyStats(3, 0, 0, 1);
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
@@ -43,6 +43,30 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   expectSendMessage({"cluster0", "cluster1"}, "");
   timer_cb_();
   verifyStats(2, 0, 0, 1);
+}
+
+// Validate that When the management server gets multiple requests for the same version, it can
+// ignore later ones. This allows the nonce to be used.
+TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
+  startSubscription({"cluster0", "cluster1"});
+  verifyStats(1, 0, 0, 0);
+  // First with the initial, empty version update to "0".
+  expectSendMessage({"cluster2"}, "");
+  updateResources({"cluster2"});
+  verifyStats(2, 0, 0, 0);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
+  verifyStats(3, 0, 1, 0);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  verifyStats(4, 1, 1, 0);
+  // Now with version "0" update to "1".
+  expectSendMessage({"cluster3"}, "0");
+  updateResources({"cluster3"});
+  verifyStats(5, 1, 1, 0);
+  deliverConfigUpdate({"cluster2"}, "1", false);
+  verifyStats(6, 1, 2, 0);
+  Mock::VerifyAndClearExpectations(&async_stream_);
+  deliverConfigUpdate({"cluster2"}, "1", true);
+  verifyStats(7, 2, 2, 0);
 }
 
 } // namespace

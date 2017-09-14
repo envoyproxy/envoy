@@ -58,6 +58,7 @@ envoy_cc_test_library(
     external_deps = ["envoy_eds"],
     deps = [
         ":subscription_test_harness",
+        "//source/common/common:hash_lib",
         "//source/common/config:grpc_subscription_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",

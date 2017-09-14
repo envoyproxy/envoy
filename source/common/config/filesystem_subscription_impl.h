@@ -45,6 +45,8 @@ public:
   void updateResources(const std::vector<std::string>& resources) override {
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
+    // Bump stats for consistence behavior with other xDS.
+    stats_.update_attempt_.inc();
   }
 
   const std::string versionInfo() const override { return version_info_; }
