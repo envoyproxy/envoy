@@ -8,7 +8,6 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 .. code-block:: json
 
   {
-    "type": "read",
     "name": "ratelimit",
     "config": {
       "stat_prefix": "...",

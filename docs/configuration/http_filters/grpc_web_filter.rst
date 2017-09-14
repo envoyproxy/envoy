@@ -11,7 +11,6 @@ following https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md.
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "grpc_web",
     "config": {}
   }

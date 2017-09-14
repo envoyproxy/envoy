@@ -12,13 +12,12 @@ and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to 
 Configure gRPC-JSON transcoder
 ------------------------------
 
-The filter config for the filter requires the descriptor file as well as a list of the gRPC 
+The filter config for the filter requires the descriptor file as well as a list of the gRPC
 services to be transcoded.
 
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "grpc_json_transcoder",
     "config": {
       "proto_descriptor": "proto.pb",
@@ -34,7 +33,7 @@ services to be transcoded.
 
 proto_descriptor
   *(required, string)* Supplies the binary protobuf descriptor set for the gRPC services.
-  The descriptor set has to include all of the types that are used in the services. Make sure 
+  The descriptor set has to include all of the types that are used in the services. Make sure
   to use the ``--include_import`` option for ``protoc``.
 
   To generate a protobuf descriptor set for the gRPC service, you'll also need to clone the

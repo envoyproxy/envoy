@@ -10,7 +10,6 @@ with partial requests and high network latency.
 .. code-block:: json
 
   {
-    "type": "decoder",
     "name": "buffer",
     "config": {
       "max_request_bytes": "...",

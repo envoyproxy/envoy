@@ -9,7 +9,6 @@ HTTP connection manager
 .. code-block:: json
 
   {
-    "type": "read",
     "name": "http_connection_manager",
     "config": {
       "codec_type": "...",

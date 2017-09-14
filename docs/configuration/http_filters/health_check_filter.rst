@@ -8,7 +8,6 @@ Health check filter :ref:`architecture overview <arch_overview_health_checking_f
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "health_check",
     "config": {
       "pass_through_mode": "...",

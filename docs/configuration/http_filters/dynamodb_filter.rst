@@ -8,13 +8,9 @@ DynamoDB :ref:`architecture overview <arch_overview_dynamo>`.
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "http_dynamo_filter",
     "config": {}
   }
-
-type
-  *(required, string)* Filter type. The only supported value is `both`.
 
 name
   *(required, string)* Filter name. The only supported value is `http_dynamo_filter`.
