@@ -4,7 +4,7 @@ C++ L7 proxy and communication bus
 
 ## Documentation
 
-* [Offical documentation](https://lyft.github.io/envoy).
+* [Offical documentation](https://envoyproxy.github.io).
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy.
