@@ -145,9 +145,8 @@ struct ActiveTestRequest {
     }
 
     if (type == Type::CreateConnection) {
-      expectNewStream();
-
       EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
+      expectNewStream();
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
@@ -541,6 +540,28 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Test draining a connection pool that has a pending connection.
+TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
+  InSequence s;
+  ReadyWatcher drained;
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
+  handle->cancel();
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
+              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(drained, ready());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   InSequence s;
 
@@ -552,11 +573,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   NiceMock<Http::MockStreamEncoder> request_encoder;
   Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
-
-  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
