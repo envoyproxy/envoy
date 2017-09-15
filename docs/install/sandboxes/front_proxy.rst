@@ -46,8 +46,8 @@ First let's create a new machine which will hold the containers::
 
 **Step 4: Clone the Envoy repo, and start all of our containers**
 
-If you have not cloned the envoy repo, clone it with ``git clone git@github.com:lyft/envoy``
-or ``git clone https://github.com/lyft/envoy.git``::
+If you have not cloned the envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
+or ``git clone https://github.com/envoyproxy/envoy.git``::
 
     $ pwd
     envoy/examples/front-proxy
