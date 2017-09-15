@@ -18,4 +18,4 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md)
 
-- [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/lyft/envoy-filter-example)
+- [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example)

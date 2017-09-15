@@ -81,7 +81,7 @@ maximize the chances of your PR being merged.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
 * If your PR involves any changes to 
-  [envoy-filter-example](https://github.com/lyft/envoy-filter-example) (for example making a new
+  [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example) (for example making a new
   branch so that CI can pass) it is your responsibility to follow through with merging those
   changes back to master once the CI dance is done.
 

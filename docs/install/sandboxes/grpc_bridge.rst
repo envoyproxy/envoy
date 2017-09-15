@@ -26,7 +26,7 @@ To build the Go gRPC service run::
   $ script/bootstrap
   $ script/build
 
-Note: ``build`` requires that your Envoy codebase (or a working copy thereof) is in ``$GOPATH/src/github.com/lyft/envoy``.
+Note: ``build`` requires that your Envoy codebase (or a working copy thereof) is in ``$GOPATH/src/github.com/envoyproxy/envoy``.
 
 Docker compose
 ~~~~~~~~~~~~~~
