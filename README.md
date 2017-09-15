@@ -43,5 +43,3 @@ for information on email list usage.
 If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
 envoy-security@googlegroups.com. We'll send a confirmation email to acknowledge your report, and we'll send an
 additional email when we've identified the issue positively or negatively.
-
-
