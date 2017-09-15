@@ -160,3 +160,10 @@ then you just add a line to every git commit message:
 using your real name (sorry, no pseudonyms or anonymous contributions.)
 
 You can add the sign off when creating the git commit via `git commit -s`.
+
+If you want this to be automatic you can set up some aliases:
+
+```
+git config --add alias.amend "commit -s --amend"
+git config --add alias.commit "commit -s"
+```
