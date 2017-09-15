@@ -4,6 +4,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -20,19 +21,17 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  if (decoder_callbacks_->route()->routeEntry()->corsPolicy()) {
-    policies_.push_back(decoder_callbacks_->route()->routeEntry()->corsPolicy());
-  }
-  if (decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy()) {
-    policies_.push_back(decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy());
-  }
+  policies_ = {{
+      decoder_callbacks_->route()->routeEntry()->corsPolicy(),
+      decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
+  }};
 
   if (!enabled()) {
     return FilterHeadersStatus::Continue;
   }
 
   origin_ = headers.Origin();
-  if (origin_ == nullptr || origin_->value() == "") {
+  if (origin_ == nullptr || origin_->value().empty()) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -48,7 +47,7 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
   }
 
   const auto requestMethod = headers.AccessControlRequestMethod();
-  if (requestMethod == nullptr || requestMethod->value() == "") {
+  if (requestMethod == nullptr || requestMethod->value().empty()) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -116,7 +115,7 @@ bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
 
 const std::list<std::string>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
-    if (!policy->allowOrigins().empty()) {
+    if (policy && !policy->allowOrigins().empty()) {
       return &policy->allowOrigins();
     }
   }
@@ -125,7 +124,7 @@ const std::list<std::string>* CorsFilter::allowOrigins() {
 
 const std::string& CorsFilter::allowMethods() {
   for (const auto policy : policies_) {
-    if (!policy->allowMethods().empty()) {
+    if (policy && !policy->allowMethods().empty()) {
       return policy->allowMethods();
     }
   }
@@ -134,7 +133,7 @@ const std::string& CorsFilter::allowMethods() {
 
 const std::string& CorsFilter::allowHeaders() {
   for (const auto policy : policies_) {
-    if (!policy->allowHeaders().empty()) {
+    if (policy && !policy->allowHeaders().empty()) {
       return policy->allowHeaders();
     }
   }
@@ -143,7 +142,7 @@ const std::string& CorsFilter::allowHeaders() {
 
 const std::string& CorsFilter::exposeHeaders() {
   for (const auto policy : policies_) {
-    if (!policy->exposeHeaders().empty()) {
+    if (policy && !policy->exposeHeaders().empty()) {
       return policy->exposeHeaders();
     }
   }
@@ -152,7 +151,7 @@ const std::string& CorsFilter::exposeHeaders() {
 
 const std::string& CorsFilter::maxAge() {
   for (const auto policy : policies_) {
-    if (!policy->maxAge().empty()) {
+    if (policy && !policy->maxAge().empty()) {
       return policy->maxAge();
     }
   }
@@ -161,7 +160,7 @@ const std::string& CorsFilter::maxAge() {
 
 bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
-    if (policy->allowCredentials().valid()) {
+    if (policy && policy->allowCredentials().valid()) {
       return policy->allowCredentials().value();
     }
   }
@@ -169,10 +168,12 @@ bool CorsFilter::allowCredentials() {
 }
 
 bool CorsFilter::enabled() {
-  if (policies_.size() == 0) {
-    return false;
+  for (const auto policy : policies_) {
+    if (policy) {
+      return policy->enabled();
+    }
   }
-  return policies_.front()->enabled();
+  return false;
 }
 
 } // namespace Http

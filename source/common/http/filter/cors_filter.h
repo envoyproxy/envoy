@@ -50,7 +50,7 @@ private:
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{};
   StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  std::vector<const Envoy::Router::CorsPolicy*> policies_{};
+  std::array<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 };
