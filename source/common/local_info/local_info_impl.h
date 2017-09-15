@@ -24,8 +24,8 @@ public:
     }
   }
 
-  // TODO(PiotrSikora): Revert https://github.com/lyft/envoy/pull/1500 once protobuf string types
-  // converge.
+  // TODO(PiotrSikora): Revert https://github.com/envoyproxy/envoy/pull/1500 once protobuf string
+  // types converge.
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string zoneName() const override { return node_.locality().zone(); }
