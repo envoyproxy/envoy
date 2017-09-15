@@ -96,7 +96,7 @@ mkdir -p "${ENVOY_COVERAGE_DIR}"
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
-# Hack due to https://github.com/lyft/envoy/issues/838 and the need to have
+# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
 # tools and bazel.rc available for build linkstamping.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
 mkdir -p "${ENVOY_CI_DIR}"/tools

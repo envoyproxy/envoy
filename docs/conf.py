@@ -32,7 +32,7 @@ import git
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks']
 
-extlinks = {'repo': ('https://github.com/lyft/envoy/blob/master/%s', '')}
+extlinks = {'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', '')}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

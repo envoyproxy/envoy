@@ -8,7 +8,7 @@ wget -O lightstep-tracer-cpp-"$VERSION".tar.gz https://github.com/lightstep/ligh
 tar xf lightstep-tracer-cpp-"$VERSION".tar.gz
 cd lightstep-tracer-cpp-"$VERSION"
 
-# see https://github.com/lyft/envoy/issues/1387 for progress
+# see https://github.com/envoyproxy/envoy/issues/1387 for progress
 cat > ../lightstep-missing-header.diff << EOF
 --- ./src/c++11/lightstep/options.h.bak	2017-08-04 09:30:19.527076744 -0400
 +++ ./src/c++11/lightstep/options.h	2017-08-04 09:30:33.742106924 -0400
