@@ -39,12 +39,12 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       ca_cert_file_(config.validation_context().trusted_ca().filename()),
-      cert_chain_file_(config.tls_certificates().size()
-                           ? config.tls_certificates()[0].certificate_chain().filename()
-                           : ""),
-      private_key_file_(config.tls_certificates().size()
-                            ? config.tls_certificates()[0].private_key().filename()
-                            : ""),
+      cert_chain_file_(config.tls_certificates().empty()
+                           ? ""
+                           : config.tls_certificates()[0].certificate_chain().filename()),
+      private_key_file_(config.tls_certificates().empty()
+                            ? ""
+                            : config.tls_certificates()[0].private_key().filename()),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
@@ -52,7 +52,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
                                    : config.validation_context().verify_certificate_hash()[0]) {
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
-  if (config.tls_certificates().size()) {
+  if (!config.tls_certificates().empty()) {
     // TODO(htuch): Support inline cert material delivery.
     ASSERT(config.tls_certificates()[0].certificate_chain().specifier_case() ==
            envoy::api::v2::DataSource::kFilename);
