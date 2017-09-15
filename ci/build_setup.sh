@@ -73,10 +73,10 @@ ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 # Setup Envoy consuming project.
 if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
 then
-  git clone https://github.com/lyft/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
 
-# This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
+# This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
 (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout b904b8ce9cabafb485e6b6fae1d0fd9e33ddfcc1)
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
