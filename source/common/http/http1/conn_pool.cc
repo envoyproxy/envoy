@@ -162,6 +162,10 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     client.connect_timer_.reset();
   }
 
+  // Note that the order in this function is important. Concretely, we must destroy the connect
+  // timer before we process a connected idle client, because if this results in an immediate
+  // drain/destruction event, we key off of the existence of the connect timer above to determine
+  // whether the client is in the ready list (connected) or the busy list (failed to connect).
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
     processIdleClient(client);
