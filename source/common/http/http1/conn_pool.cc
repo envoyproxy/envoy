@@ -129,7 +129,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       host_->stats().cx_connect_fail_.inc();
       removed = client.removeFromList(busy_clients_);
 
-      // Raw connect falures should never happen under normal circumstances. If we have an upstream
+      // Raw connect failures should never happen under normal circumstances. If we have an upstream
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
@@ -155,14 +155,20 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     if (check_for_drained) {
       checkForDrained();
     }
-  } else if (event == Network::ConnectionEvent::Connected) {
-    conn_connect_ms_->complete();
-    processIdleClient(client);
   }
 
   if (client.connect_timer_) {
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
+  }
+
+  // Note that the order in this function is important. Concretely, we must destroy the connect
+  // timer before we process a connected idle client, because if this results in an immediate
+  // drain/destruction event, we key off of the existence of the connect timer above to determine
+  // whether the client is in the ready list (connected) or the busy list (failed to connect).
+  if (event == Network::ConnectionEvent::Connected) {
+    conn_connect_ms_->complete();
+    processIdleClient(client);
   }
 }
 
