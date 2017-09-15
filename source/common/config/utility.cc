@@ -115,8 +115,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
-  ASSERT(false);
-  return "";
+  throw EnvoyException(
+      fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
 } // namespace Config

@@ -51,13 +51,15 @@ public:
                                                   discovery_request.resource_names().cend());
     if (expected_resource_names != resource_names) {
       return AssertionFailure() << fmt::format(
-                 "resources {} do not match expected {}",
+                 "resources {} do not match expected {} in {}",
                  fmt::join(resource_names.begin(), resource_names.end(), ","),
-                 fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","));
+                 fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
+                 discovery_request.DebugString());
     }
     if (expected_version != discovery_request.version_info()) {
-      return AssertionFailure() << fmt::format("version {} does not match expected {}",
-                                               discovery_request.version_info(), expected_version);
+      return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
+                                               discovery_request.version_info(), expected_version,
+                                               discovery_request.DebugString());
     }
     return AssertionSuccess();
   }
