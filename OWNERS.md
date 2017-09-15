@@ -1,5 +1,5 @@
-See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
-See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines.
+* See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
+* See [GOVERNANCE.md](GOVERNANCE.md) for governance guidelines.
 
 # Senior committers
 
