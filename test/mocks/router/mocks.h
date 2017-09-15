@@ -36,6 +36,26 @@ public:
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
 };
 
+class TestCorsPolicy : public CorsPolicy {
+public:
+  // Router::CorsPolicy
+  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
+  const std::string& allowMethods() const override { return allow_methods_; };
+  const std::string& allowHeaders() const override { return allow_headers_; };
+  const std::string& exposeHeaders() const override { return expose_headers_; };
+  const std::string& maxAge() const override { return max_age_; };
+  const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  bool enabled() const override { return enabled_; };
+
+  std::list<std::string> allow_origin_{};
+  std::string allow_methods_{};
+  std::string allow_headers_{};
+  std::string expose_headers_{};
+  std::string max_age_{};
+  Optional<bool> allow_credentials_{};
+  bool enabled_{false};
+};
+
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
@@ -136,9 +156,11 @@ public:
   // Router::VirtualHost
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
+  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+  TestCorsPolicy cors_policy_;
 };
 
 class MockHashPolicy : public HashPolicy {
@@ -171,6 +193,7 @@ public:
   MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
+  MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -180,6 +203,7 @@ public:
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
+  TestCorsPolicy cors_policy_;
 };
 
 class MockRoute : public Route {

@@ -36,7 +36,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "include_vh_rate_limits" : "...",
     "hash_policy": "{...}",
     "request_headers_to_add" : [],
-    "opaque_config": []
+    "opaque_config": [],
+    "cors": "{...}"
   }
 
 prefix
@@ -47,6 +48,9 @@ path
   *(sometimes required, string)* If specified, the route is an exact path rule meaning that the path
   must exactly match the :path header once the query string is removed. Either *prefix* or *path*
   must be specified.
+
+:ref:`cors <config_http_filters_cors>`
+  *(optional, object)* Specifies the route's CORS policy.
 
 .. _config_http_conn_man_route_table_route_cluster:
 

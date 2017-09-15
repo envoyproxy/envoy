@@ -32,6 +32,49 @@ public:
 };
 
 /**
+ * CorsPolicy for Route and VirtualHost.
+ */
+class CorsPolicy {
+public:
+  virtual ~CorsPolicy() {}
+
+  /**
+   * @return std::list<std::string>& access-control-allow-origin values.
+   */
+  virtual const std::list<std::string>& allowOrigins() const PURE;
+
+  /**
+   * @return std::string access-control-allow-methods value.
+   */
+  virtual const std::string& allowMethods() const PURE;
+
+  /**
+   * @return std::string access-control-allow-headers value.
+   */
+  virtual const std::string& allowHeaders() const PURE;
+
+  /**
+   * @return std::string access-control-expose-headers value.
+   */
+  virtual const std::string& exposeHeaders() const PURE;
+
+  /**
+   * @return std::string access-control-max-age value.
+   */
+  virtual const std::string& maxAge() const PURE;
+
+  /**
+   * @return const Optional<bool>& Whether access-control-allow-credentials should be true.
+   */
+  virtual const Optional<bool>& allowCredentials() const PURE;
+
+  /**
+   * @return bool Whether CORS is enabled for the route or virtual host.
+   */
+  virtual bool enabled() const PURE;
+};
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -147,6 +190,11 @@ public:
   virtual ~VirtualHost() {}
 
   /**
+   * @return const CorsPolicy* the CORS policy for this virtual host.
+   */
+  virtual const CorsPolicy* corsPolicy() const PURE;
+
+  /**
    * @return const std::string& the name of the virtual host.
    */
   virtual const std::string& name() const PURE;
@@ -185,6 +233,11 @@ public:
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return const CorsPolicy* the CORS policy for this virtual host.
+   */
+  virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For

@@ -84,6 +84,8 @@ class HttpFilterNameValues {
 public:
   // Buffer filter
   const std::string BUFFER = "envoy.buffer";
+  // CORS filter
+  const std::string CORS = "envoy.cors";
   // Dynamo filter
   const std::string DYNAMO = "envoy.http_dynamo_filter";
   // Fault filter
@@ -105,8 +107,8 @@ public:
   const V1Converter v1_converter_;
 
   HttpFilterNameValues()
-      : v1_converter_({BUFFER, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER, GRPC_WEB,
-                       IP_TAGGING, RATE_LIMIT, ROUTER}) {}
+      : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
+                       GRPC_WEB, IP_TAGGING, RATE_LIMIT, ROUTER}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

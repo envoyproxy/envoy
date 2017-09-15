@@ -46,6 +46,20 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 }
 
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
+  for (const auto& origin : config.allow_origin()) {
+    allow_origin_.push_back(origin);
+  }
+  allow_methods_ = config.allow_methods();
+  allow_headers_ = config.allow_headers();
+  expose_headers_ = config.expose_headers();
+  max_age_ = config.max_age();
+  if (config.has_allow_credentials()) {
+    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+  }
+  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
+}
+
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   if (!config.has_request_mirror_policy()) {
     return;
@@ -132,6 +146,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   include_vh_rate_limits_ =
       (rate_limit_policy_.empty() ||
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
+
+  if (route.route().has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -432,6 +450,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+  }
+
+  if (virtual_host.has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
   }
 }
 

@@ -15,6 +15,14 @@ namespace Http {
 class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
+  const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
+  const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
+  const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
+  const LowerCaseString AccessControlAllowHeaders{"access-control-allow-headers"};
+  const LowerCaseString AccessControlAllowMethods{"access-control-allow-methods"};
+  const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
+  const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
+  const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
@@ -54,6 +62,7 @@ public:
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
+  const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
@@ -119,6 +128,7 @@ public:
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
     const std::string Post{"POST"};
+    const std::string Options{"OPTIONS"};
   } MethodValues;
 
   struct {
@@ -141,6 +151,10 @@ public:
   struct {
     const std::string Trailers{"trailers"};
   } TEValues;
+
+  struct {
+    const std::string True{"true"};
+  } CORSValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;

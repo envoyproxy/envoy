@@ -601,6 +601,23 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
           "required": ["key", "value"],
           "additionalProperties": false
         }
+      },
+      "cors" : {
+        "type" : "object",
+        "properties" : {
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
+          "allow_methods" : {"type" : "string"},
+          "allow_headers" : {"type" : "string"},
+          "expose_headers" : {"type" : "string"},
+          "max_age" : {"type" : "string"},
+          "allow_credentials" : {"type" : "boolean"}
+        },
+        "required" : [],
+        "additionalProperties" : false
       }
     },
     "required" : ["name", "domains", "routes"],
@@ -718,6 +735,24 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "opaque_config" : {
         "type" : "object",
         "additionalProperties" : true
+      },
+      "cors" : {
+        "type" : "object",
+        "properties" : {
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
+          "allow_methods" : {"type" : "string"},
+          "allow_headers" : {"type" : "string"},
+          "expose_headers" : {"type" : "string"},
+          "max_age" : {"type" : "string"},
+          "allow_credentials" : {"type" : "boolean"},
+          "enabled" : {"type" : "boolean"}
+        },
+        "required" : [],
+        "additionalProperties" : false
       }
     },
     "additionalProperties" : false
