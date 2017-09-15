@@ -30,4 +30,5 @@ static_resources:
     connect_timeout: 0.25s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: google.com, port_value: 80 }}]
+    hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
+    tls_context: { sni: www.google.com }
