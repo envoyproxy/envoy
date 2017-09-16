@@ -3,6 +3,7 @@
 build --workspace_status_command=bazel/get_workspace_status
 
 # Basic ASAN/UBSAN that works for gcc
+build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr
@@ -14,6 +15,7 @@ build:asan --test_tag_filters=-no_asan
 build:asan --define signal_trace=disabled
 
 # Clang 5.0 ASAN
+build:clang-asan --define ENVOY_CONFIG_ASAN=1
 build:clang-asan --copt -D__SANITIZE_ADDRESS__
 build:clang-asan --copt -fsanitize=address,undefined
 build:clang-asan --linkopt -fsanitize=address,undefined
@@ -28,12 +30,14 @@ build:clang-asan --define signal_trace=disabled
 build:clang-asan --test_env=ASAN_SYMBOLIZER_PATH
 
 # Clang 5.0 TSAN
+build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled
 
 # Clang 5.0 MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --define tcmalloc=disabled
