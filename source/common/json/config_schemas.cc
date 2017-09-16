@@ -654,6 +654,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "prefix" : {"type" : "string"},
       "path" : {"type" : "string"},
+      "regex" : {"type" : "string"},
       "cluster" : {"type" : "string"},
       "cluster_header" : {"type" : "string"},
       "weighted_clusters": {"$ref" : "#/definitions/weighted_clusters"},

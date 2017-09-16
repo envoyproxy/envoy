@@ -377,7 +377,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
-    const char* query_string_start = strchr(path.c_str(), '?');
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
     size_t compare_length = path.size();
     if (query_string_start != nullptr) {
       compare_length = query_string_start - path.c_str();
@@ -398,6 +398,34 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
     }
   }
 
+  return nullptr;
+}
+
+RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
+                                         const envoy::api::v2::Route& route,
+                                         Runtime::Loader& loader)
+    : RouteEntryImplBase(vhost, route, loader),
+      regex_(std::regex{route.match().regex(), std::regex::optimize}) {}
+
+void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers);
+
+  const Http::HeaderString& path = headers.Path()->value();
+  const char* query_string_start = Http::Utility::findQueryStringStart(path);
+  ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
+  std::string matched_path(path.c_str(), query_string_start);
+  finalizePathHeader(headers, matched_path);
+}
+
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                 uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, random_value)) {
+    const Http::HeaderString& path = headers.Path()->value();
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
+    if (std::regex_match(path.c_str(), query_string_start, regex_)) {
+      return clusterEntry(headers, random_value);
+    }
+  }
   return nullptr;
 }
 
@@ -429,12 +457,16 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
     const bool has_prefix =
         route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;
     const bool has_path = route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPath;
+    const bool has_regex =
+        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kRegex;
     if (has_prefix) {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
-    } else {
-      ASSERT(has_path);
-      UNREFERENCED_PARAMETER(has_path);
+    } else if (has_path) {
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
+    } else {
+      ASSERT(has_regex);
+      UNREFERENCED_PARAMETER(has_regex);
+      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, runtime));
     }
 
     if (validate_clusters) {

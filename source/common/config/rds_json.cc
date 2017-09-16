@@ -174,14 +174,19 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
 
   auto* match = route.mutable_match();
 
+  // This is a trick to do a three-way XOR.
+  if ((json_route.hasObject("prefix") + json_route.hasObject("path") +
+       json_route.hasObject("regex")) != 1) {
+    throw EnvoyException("routes must specify one of prefix/path/regex");
+  }
+
   if (json_route.hasObject("prefix")) {
     match->set_prefix(json_route.getString("prefix"));
-  }
-  if (json_route.hasObject("path")) {
-    if (json_route.hasObject("prefix")) {
-      throw EnvoyException("routes must specify either prefix or path");
-    }
+  } else if (json_route.hasObject("path")) {
     match->set_path(json_route.getString("path"));
+  } else {
+    ASSERT(json_route.hasObject("regex"));
+    match->set_regex(json_route.getString("regex"));
   }
 
   JSON_UTIL_SET_BOOL(json_route, *match, case_sensitive);

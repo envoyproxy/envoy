@@ -16,6 +16,7 @@ next (e.g., redirect, forward, rewrite, etc.).
   {
     "prefix": "...",
     "path": "...",
+    "regex": "...",
     "cluster": "...",
     "cluster_header": "...",
     "weighted_clusters" : "{...}",
@@ -42,12 +43,27 @@ next (e.g., redirect, forward, rewrite, etc.).
 
 prefix
   *(sometimes required, string)* If specified, the route is a prefix rule meaning that the prefix
-  must match the beginning of the :path header. Either *prefix* or *path* must be specified.
+  must match the beginning of the :path header. One of *prefix*, *path*, or *regex* must be specified.
 
 path
   *(sometimes required, string)* If specified, the route is an exact path rule meaning that the path
-  must exactly match the :path header once the query string is removed. Either *prefix* or *path*
-  must be specified.
+  must exactly match the :path header once the query string is removed. One of *prefix*, *path*, or
+  *regex* must be specified.
+
+regex
+  *(sometimes required, string)* If specified, the route is a regular expression rule meaning that the
+  regex must match the :path header once the query string is removed. The entire path (without the
+  query string) must match the regex. The rule will not match if only a subsequence of the :path header
+  matches the regex. The regex grammar is defined `here
+  <http://en.cppreference.com/w/cpp/regex/ecmascript>`_. One of *prefix*, *path*, or
+  *regex* must be specified.
+
+  Examples:
+
+    * The regex */b[io]t* matches the path */bit*
+    * The regex */b[io]t* matches the path */bot*
+    * The regex */b[io]t* does not match the path */bite*
+    * The regex */b[io]t* does not match the path */bit/bot*
 
 :ref:`cors <config_http_filters_cors>`
   *(optional, object)* Specifies the route's CORS policy.
@@ -105,8 +121,9 @@ path_redirect
 
 prefix_rewrite
   *(optional, string)* Indicates that during forwarding, the matched prefix (or path) should be
-  swapped with this value. This option allows application URLs to be rooted at a different path
-  from those exposed at the reverse proxy layer.
+  swapped with this value. When using regex path matching, the entire path (not including
+  the query string) will be swapped with this value. This option allows application URLs to be
+  rooted at a different path from those exposed at the reverse proxy layer.
 
 .. _config_http_conn_man_route_table_route_host_rewrite:
 
@@ -318,8 +335,16 @@ value
 
 regex
   *(optional, boolean)* Specifies whether the header value is a regular
-  expression or not. Defaults to false. The regex grammar used in the value field
-  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  expression or not. Defaults to false. The entire request header value must match the regex. The
+  rule will not match if only a subsequence of the request header value matches the regex. The
+  regex grammar used in the value field is defined
+  `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+
+  Examples:
+
+    * The regex *\d{3}* matches the value *123*
+    * The regex *\d{3}* does not match the value *1234*
+    * The regex *\d{3}* does not match the value *123.456*
 
 .. attention::
 
