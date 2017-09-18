@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -53,6 +54,17 @@ public:
    * stream object and no further callbacks will be invoked.
    */
   virtual void resetStream() PURE;
+};
+
+/**
+ * Factory to create tracing span decorators for gRPC requests.
+ */
+template <class RequestType, class ResponseType> class AsyncSpanFinalizerFactory {
+public:
+  virtual ~AsyncSpanFinalizerFactory() {}
+
+  virtual Tracing::SpanFinalizerPtr create(const RequestType& request,
+                                           const ResponseType* response) PURE;
 };
 
 template <class ResponseType> class AsyncRequestCallbacks {
@@ -138,15 +150,17 @@ public:
    * @param service_method protobuf descriptor of gRPC service method.
    * @param request protobuf serializable message.
    * @param callbacks the callbacks to be notified of RPC status.
+   * @param parent_span the current parent tracing context.
    * @param timeout supplies the request timeout.
    * @return a request handle or nullptr if no request could be started. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
-  virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                             const RequestType& request,
-                             AsyncRequestCallbacks<ResponseType>& callbacks,
-                             const Optional<std::chrono::milliseconds>& timeout) PURE;
+  virtual AsyncRequest*
+  send(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
+       AsyncRequestCallbacks<ResponseType>& callbacks, Tracing::Span& parent_span,
+       AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory,
+       const Optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * Start a gRPC stream asynchronously.

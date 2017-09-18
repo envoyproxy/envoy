@@ -78,6 +78,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 }
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
+  active_span_.reset(new Tracing::MockSpan());
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, decodingBuffer()).WillByDefault(Return(buffer_.get()));
 
@@ -90,6 +91,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
         callbacks_.remove(&callbacks);
       }));
+
+  ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(*active_span_));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
@@ -97,6 +100,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, encodingBuffer()).WillByDefault(Return(buffer_.get()));
+  ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(*active_span_));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}

@@ -63,10 +63,9 @@ void Filter::initiateCall(const HeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(
-        *this, config_->domain(), descriptors,
-        {headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
-         headers.OtSpanContext() ? headers.OtSpanContext()->value().c_str() : EMPTY_STRING});
+    client_->limit(*this, config_->domain(), descriptors,
+                   headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
+                   callbacks_->activeSpan());
     initiating_call_ = false;
   }
 }

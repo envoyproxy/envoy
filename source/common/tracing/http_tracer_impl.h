@@ -64,6 +64,11 @@ public:
 
 class NullSpan : public Span {
 public:
+  static NullSpan& instance() {
+    static NullSpan* instance = new NullSpan();
+    return *instance;
+  }
+
   // Tracing::Span
   void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}

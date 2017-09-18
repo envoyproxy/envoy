@@ -7,7 +7,7 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
-#include "envoy/tracing/context.h"
+#include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {
 namespace RateLimit {
@@ -73,12 +73,13 @@ public:
    * @param callbacks supplies the completion callbacks.
    * @param domain specifies the rate limit domain.
    * @param descriptors specifies a list of descriptors to query.
-   * @param context provides transport context so that upstream can construct proper relationship
+   * @param request_id request id to propagate via upstream request headers.
+   * @param parent_span source for generating an egress child span as part of the trace.
    * between spans.
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
-                     const std::vector<Descriptor>& descriptors,
-                     const Tracing::TransportContext& context) PURE;
+                     const std::vector<Descriptor>& descriptors, const std::string& request_id,
+                     Tracing::Span& parent_span) PURE;
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
