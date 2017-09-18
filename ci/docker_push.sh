@@ -20,7 +20,8 @@ then
    docker push lyft/envoy:latest
    docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
    docker push lyft/envoy:$TRAVIS_COMMIT
-   docker rmi $(docker images -a -q)
+   docker rm $(docker ps -a -q) || true
+   docker rmi $(docker images -a -q) || true
 
    make -C ci/build_alpine_container
    docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:$TRAVIS_COMMIT
