@@ -65,6 +65,14 @@ public:
                                    envoy::api::v2::VirtualHost& virtual_host);
 
   /**
+   * Translate a v1 JSON decorator object to v2 envoy::api::v2::Decorator.
+   * @param json_decorator source v1 JSON decorator object.
+   * @param decorator destination v2 envoy::api::v2::Decorator.
+   */
+  static void translateDecorator(const Json::Object& json_decorator,
+                                 envoy::api::v2::Decorator& decorator);
+
+  /**
    * Translate a v1 JSON route object to v2 envoy::api::v2::Route.
    * @param json_route source v1 JSON route object.
    * @param route destination v2 envoy::api::v2::Route.

@@ -58,6 +58,7 @@ public:
   // Router::Route
   const RedirectEntry* redirectEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
+  const Decorator* decorator() const override { return nullptr; }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -201,6 +202,20 @@ private:
 };
 
 /**
+ * Implementation of Decorator that reads from the proto route decorator.
+ */
+class DecoratorImpl : public Decorator {
+public:
+  DecoratorImpl(const envoy::api::v2::Decorator& decorator);
+
+  // Decorator::apply
+  void apply(Tracing::Span& span) const override;
+
+private:
+  const std::string operation_;
+};
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -248,6 +263,7 @@ public:
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
   const RouteEntry* routeEntry() const override;
+  const Decorator* decorator() const override { return decorator_.get(); }
 
 protected:
   const bool case_sensitive_;
@@ -302,6 +318,7 @@ private:
     // Router::Route
     const RedirectEntry* redirectEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
+    const Decorator* decorator() const override { return nullptr; }
 
   private:
     const RouteEntryImplBase* parent_;
@@ -340,6 +357,8 @@ private:
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::Route& route);
 
+  static DecoratorConstPtr parseDecorator(const envoy::api::v2::Route& route);
+
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
@@ -366,6 +385,8 @@ private:
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
+
+  const DecoratorConstPtr decorator_;
 };
 
 /**
