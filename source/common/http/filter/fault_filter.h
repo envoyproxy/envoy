@@ -101,12 +101,13 @@ private:
   bool isAbortEnabled();
   bool isDelayEnabled();
   Optional<uint64_t> delayDuration();
-  std::string abortHttpStatus();
+  uint64_t abortHttpStatus();
 
   FaultFilterConfigSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
+  bool stream_destroyed_{};
 
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};
