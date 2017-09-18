@@ -51,7 +51,7 @@ protected:
 };
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
-TEST_F(EdsTest, OnWrongNameConfigUpdate) {
+TEST_F(EdsTest, OnConfigUpdateWrongName) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
@@ -62,17 +62,19 @@ TEST_F(EdsTest, OnWrongNameConfigUpdate) {
   EXPECT_TRUE(initialized);
 }
 
-// Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
-TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
-  // Too few.
+// Validate that onConfigUpdate() with empty cluster vector size ignores config.
+TEST_F(EdsTest, OnConfigUpdateEmpty) {
   bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
-  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
-  cluster_->onConfigUpdateFailed(nullptr);
+  cluster_->onConfigUpdate({});
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_empty").value());
   EXPECT_TRUE(initialized);
-  // Too many.
-  initialized = false;
+}
+
+// Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
+TEST_F(EdsTest, OnConfigUpdateWrongSize) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  bool initialized = false;
   cluster_->setInitializedCb([&initialized] { initialized = true; });
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
@@ -84,7 +86,7 @@ TEST_F(EdsTest, OnWrongSizeConfigUpdate) {
 }
 
 // Validate that onConfigUpdate() with the expected cluster accepts config.
-TEST_F(EdsTest, OnSuccessConfigUpdate) {
+TEST_F(EdsTest, OnConfigUpdateSuccess) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");

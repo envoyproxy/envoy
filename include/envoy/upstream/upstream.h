@@ -234,7 +234,9 @@ public:
   COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_empty)
+
 // clang-format on
 
 /**

@@ -42,6 +42,12 @@ void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this)
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
+  if (resources.empty()) {
+    ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
+    info_->stats().update_empty_.inc();
+    runInitializeCallbackIfAny();
+    return;
+  }
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
