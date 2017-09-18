@@ -267,7 +267,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route& route) {
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
-    ret = std::unique_ptr<Decorator>(new DecoratorImpl(route.decorator()));
+    ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
   }
   return ret;
 }
