@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/config/well_known_names.h"
 #include "common/filter/echo.h"
 
 namespace Envoy {
@@ -21,8 +22,7 @@ public:
     };
   }
 
-  std::string name() override { return "echo"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
+  std::string name() override { return Config::NetworkFilterNames::get().ECHO; }
 };
 
 /**

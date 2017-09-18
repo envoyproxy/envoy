@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -52,12 +53,14 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
+    expected_request.set_response_nonce(last_response_nonce_);
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-    expectSendMessage(cluster_names, "");
+    last_cluster_names_ = cluster_names;
+    expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names, callbacks_);
     // These are just there to add coverage to the null implementations of these
     // callbacks.
@@ -72,6 +75,8 @@ public:
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
         new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);
+    last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
+    response->set_nonce(last_response_nonce_);
     Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
@@ -81,18 +86,20 @@ public:
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
-      expectSendMessage(cluster_names, version);
+      expectSendMessage(last_cluster_names_, version);
       version_ = version;
     } else {
-      expectSendMessage(cluster_names, version_);
+      expectSendMessage(last_cluster_names_, version_);
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
     }
     subscription_->onReceiveMessage(std::move(response));
+    EXPECT_EQ(version_, subscription_->versionInfo());
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
     subscription_->updateResources(cluster_names);
+    last_cluster_names_ = cluster_names;
   }
 
   std::string version_;
@@ -106,7 +113,11 @@ public:
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
+  std::string last_response_nonce_;
+  std::vector<std::string> last_cluster_names_;
 };
+
+// TODO(danielhochman): test with RDS and ensure version_info is same as what API returned
 
 } // namespace Config
 } // namespace Envoy

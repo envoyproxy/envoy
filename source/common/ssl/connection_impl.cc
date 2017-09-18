@@ -32,10 +32,11 @@ getNullLocalAddress(const Network::Address::Instance& address) {
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Network::Address::InstanceConstSharedPtr remote_address,
                                Network::Address::InstanceConstSharedPtr local_address,
+                               Network::Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, using_original_dst,
-                              connected),
+    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
+                              using_original_dst, connected),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -72,7 +73,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer_->reserve(16384, slices, 2);
+    uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
       ENVOY_CONN_LOG(trace, "ssl read returns: {}", *this, rc);
@@ -99,7 +100,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     }
 
     if (slices_to_commit > 0) {
-      read_buffer_->commit(slices, slices_to_commit);
+      read_buffer_.commit(slices, slices_to_commit);
       if (shouldDrainReadBuffer()) {
         setReadBufferReady();
         keep_reading = false;
@@ -166,7 +167,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
   }
 
-  uint64_t original_buffer_length = write_buffer_.length();
+  uint64_t original_buffer_length = write_buffer_->length();
   uint64_t total_bytes_written = 0;
   bool keep_writing = true;
   while ((original_buffer_length != total_bytes_written) && keep_writing) {
@@ -177,7 +178,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const uint64_t MAX_SLICES = 32;
     Buffer::RawSlice slices[MAX_SLICES];
-    uint64_t num_slices = write_buffer_.getRawSlices(slices, MAX_SLICES);
+    uint64_t num_slices = write_buffer_->getRawSlices(slices, MAX_SLICES);
 
     uint64_t inner_bytes_written = 0;
     for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
@@ -212,7 +213,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // Draining must be done within the inner loop, otherwise we will keep getting the same slices
     // at the beginning of the buffer.
     if (inner_bytes_written > 0) {
-      write_buffer_.drain(inner_bytes_written);
+      write_buffer_->drain(inner_bytes_written);
     }
   }
 
@@ -305,9 +306,11 @@ std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                                           Network::Address::InstanceConstSharedPtr address)
+                                           Network::Address::InstanceConstSharedPtr address,
+                                           Network::Address::InstanceConstSharedPtr source_address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false, false, ctx, InitialState::Client) {}
+                     getNullLocalAddress(*address), source_address, false, false, ctx,
+                     InitialState::Client) {}
 
 void ClientConnectionImpl::connect() { doConnect(); }
 

@@ -370,6 +370,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames.  Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
+  // Make sure the limits were configured properly in test set up.
+  EXPECT_EQ(initial_stream_window, server_.getStream(1)->bufferLimit());
+  EXPECT_EQ(initial_stream_window, client_.getStream(1)->bufferLimit());
+
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window, 'a'));
@@ -399,6 +403,10 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
   MockStreamDecoder request_decoder2;
+  // When the server stream is created it should check the status of the
+  // underlying connection.  Pretend it is overrun.
+  EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_callbacks_, newStream(_))
       .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
         response_encoder2 = &encoder;
@@ -411,13 +419,23 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // been noticed that the connection was backed up.  Any new subscriber to
   // stream callbacks should get a callback when they addCallbacks.
   MockStreamCallbacks callbacks2;
-  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark()).Times(1);
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   request_encoder_->getStream().addCallbacks(callbacks2);
+
+  // Add a third callback to make testing removal mid-watermark call below more interesting.
+  MockStreamCallbacks callbacks3;
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  request_encoder_->getStream().addCallbacks(callbacks3);
 
   // Now unblock the server's stream.  This will cause the bytes to be consumed, flow control
   // updates to be sent, and the client to flush all queued data.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
+  // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
+  // and ensure it is not called.
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
+    request_encoder_->getStream().removeCallbacks(callbacks2);
+  }));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_.getStream(1)->readDisable(false);
   EXPECT_EQ(0, client_.getStream(1)->pending_send_data_.length());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
@@ -488,6 +506,29 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_EQ(initial_connection_window, nghttp2_session_get_remote_window_size(client_.session()));
 }
 
+// Test the HTTP2 pending_recv_data_ buffer going over and under watermark limits.
+TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
+  initialize();
+  MockStreamCallbacks callbacks;
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Set artificially small watermarks to make the recv buffer easy to overrun.  In production,
+  // the recv buffer can be overrun by a client which negotiates a larger
+  // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
+  // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
+  server_.getStream(1)->setWriteBufferWatermarks(10, 20);
+
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl data(std::string(40, 'a'));
+  request_encoder_->encodeData(data, false);
+}
+
 TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   initialize();
   MockStreamCallbacks callbacks;
@@ -504,8 +545,8 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   // ends.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
-  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
     client_.onUnderlyingConnectionAboveWriteBufferHighWatermark();
     client_.onUnderlyingConnectionBelowWriteBufferLowWatermark();

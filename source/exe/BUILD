@@ -32,8 +32,10 @@ envoy_cc_library(
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
         "//source/server/config/http:buffer_lib",
+        "//source/server/config/http:cors_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
+        "//source/server/config/http:file_access_log_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:grpc_web_lib",
@@ -47,6 +49,7 @@ envoy_cc_library(
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
+        "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
     ],
 )

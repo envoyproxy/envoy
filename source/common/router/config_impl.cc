@@ -15,15 +15,17 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {
@@ -42,6 +44,20 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+}
+
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
+  for (const auto& origin : config.allow_origin()) {
+    allow_origin_.push_back(origin);
+  }
+  allow_methods_ = config.allow_methods();
+  allow_headers_ = config.allow_headers();
+  expose_headers_ = config.expose_headers();
+  max_age_ = config.max_age();
+  if (config.has_allow_credentials()) {
+    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+  }
+  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
@@ -68,9 +84,7 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   Optional<uint64_t> hash;
   const Http::HeaderEntry* header = headers.get(header_name_);
   if (header) {
-    // TODO(mattklein123): Compile in murmur3/city/etc. and potentially allow the user to choose so
-    // we know exactly what we are going to get.
-    hash.value(std::hash<std::string>()(header->value().c_str()));
+    hash.value(HashUtil::xxHash64(header->value().c_str()));
   }
   return hash;
 }
@@ -133,6 +147,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   include_vh_rate_limits_ =
       (rate_limit_policy_.empty() ||
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
+
+  if (route.route().has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -217,7 +235,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata =
-        route.metadata().filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_ROUTER);
+        route.metadata().filter_metadata().find(Envoy::Config::HttpFilterNames::get().ROUTER);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
@@ -264,10 +282,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       }
 
       // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
-      //       the route table sticks around. In v1 of RDS we will likely snap the route table
-      //       in the connection manager to account for this, but we may eventually want to have
-      //       a chain of references that goes back to the route table root. That is complicated
-      //       though.
+      //       the route table sticks around. See snapped_route_config_ in
+      //       ConnectionManagerImpl::ActiveStream.
       return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
     }
   }
@@ -356,7 +372,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
-    const char* query_string_start = strchr(path.c_str(), '?');
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
     size_t compare_length = path.size();
     if (query_string_start != nullptr) {
       compare_length = query_string_start - path.c_str();
@@ -377,6 +393,35 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
     }
   }
 
+  return nullptr;
+}
+
+RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
+                                         const envoy::api::v2::Route& route,
+                                         Runtime::Loader& loader)
+    : RouteEntryImplBase(vhost, route, loader),
+      regex_(std::regex{route.match().regex(), std::regex::optimize}) {}
+
+void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers, 
+                                                 const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
+
+  const Http::HeaderString& path = headers.Path()->value();
+  const char* query_string_start = Http::Utility::findQueryStringStart(path);
+  ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
+  std::string matched_path(path.c_str(), query_string_start);
+  finalizePathHeader(headers, matched_path);
+}
+
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                 uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, random_value)) {
+    const Http::HeaderString& path = headers.Path()->value();
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
+    if (std::regex_match(path.c_str(), query_string_start, regex_)) {
+      return clusterEntry(headers, random_value);
+    }
+  }
   return nullptr;
 }
 
@@ -409,12 +454,16 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
     const bool has_prefix =
         route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;
     const bool has_path = route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPath;
+    const bool has_regex =
+        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kRegex;
     if (has_prefix) {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
-    } else {
-      ASSERT(has_path);
-      UNREFERENCED_PARAMETER(has_path);
+    } else if (has_path) {
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
+    } else {
+      ASSERT(has_regex);
+      UNREFERENCED_PARAMETER(has_regex);
+      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, runtime));
     }
 
     if (validate_clusters) {
@@ -430,6 +479,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+  }
+
+  if (virtual_host.has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
   }
 }
 

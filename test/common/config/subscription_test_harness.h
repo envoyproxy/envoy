@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/config/utility.h"
+
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"

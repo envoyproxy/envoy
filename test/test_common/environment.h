@@ -148,5 +148,15 @@ public:
    * @param args program path and arguments.
    */
   static void exec(const std::vector<std::string>& args);
+
+  /**
+   * Dumps the contents of the string into a tempoary file from temporaryDirectory() + filename.
+   *
+   * @param filename: the name of the file to use
+   * @param contents: the data to go in the file.
+   * @return the fully qualified path of the output file.
+   */
+  static std::string writeStringToFileForTest(const std::string& filename,
+                                              const std::string& contents);
 };
 } // namespace Envoy

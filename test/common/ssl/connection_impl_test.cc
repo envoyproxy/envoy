@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
@@ -26,11 +27,11 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::StrictMock;
 using testing::_;
 
+namespace Envoy {
 namespace Ssl {
 
 namespace {
@@ -58,8 +59,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -340,8 +341,8 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
   Ssl::ConnectionImpl* ssl_connection =
@@ -404,8 +405,8 @@ TEST_P(SslConnectionImplTest, SslError) {
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
@@ -449,8 +450,8 @@ public:
     client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
     client_ctx_ = manager_->createSslClientContext(stats_store_, *client_ctx_config_);
 
-    client_connection_ =
-        dispatcher_->createSslClientConnection(*client_ctx_, socket_.localAddress());
+    client_connection_ = dispatcher_->createSslClientConnection(
+        *client_ctx_, socket_.localAddress(), source_address_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -514,22 +515,21 @@ public:
   }
 
   void singleWriteTest(uint32_t read_buffer_limit, uint32_t bytes_to_write) {
-    MockBuffer* client_write_buffer = nullptr;
+    MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_.reset(new Event::DispatcherImpl(Buffer::FactoryPtr{factory}));
+    dispatcher_.reset(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{factory}));
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_())
-        .Times(4)
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          return new StrictMock<MockBuffer>; // client read buffer.
-        }))
-        .WillOnce(Invoke([&]() -> Buffer::Instance* {
-          client_write_buffer = new StrictMock<MockBuffer>;
+    EXPECT_CALL(*factory, create_(_, _))
+        .Times(2)
+        .WillOnce(Invoke([&](std::function<void()> below_low,
+                             std::function<void()> above_high) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
           return client_write_buffer;
         }))
-        .WillRepeatedly(Invoke([]() -> Buffer::Instance* {
-          return new Buffer::OwnedImpl; // server buffers.
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
     initialize(read_buffer_limit);
@@ -556,7 +556,7 @@ public:
     std::string data_written;
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-                              Invoke(client_write_buffer, &MockBuffer::baseMove)));
+                              Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
     EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
       client_write_buffer->baseDrain(n);
       dispatcher_->exit();
@@ -565,6 +565,10 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
 
+    disconnect();
+  }
+
+  void disconnect() {
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -602,9 +606,10 @@ public:
   ClientContextPtr client_ctx_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;
-  Network::MockConnectionCallbacks server_callbacks_;
+  NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
+  Network::Address::InstanceConstSharedPtr source_address_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
@@ -627,6 +632,36 @@ TEST_P(SslReadBufferLimitTest, SomeLimit) {
 TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5 * 1024, 1024); }
 
 TEST_P(SslReadBufferLimitTest, WritesLargerThanBufferLimit) { singleWriteTest(1024, 5 * 1024); }
+
+TEST_P(SslReadBufferLimitTest, TestBind) {
+  std::string address_string = TestUtility::getIpv4Loopback();
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, 0)};
+  } else {
+    address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, 0)};
+  }
+
+  initialize(0);
+
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+        EXPECT_EQ("", server_connection_->nextProtocol());
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
+
+  disconnect();
+}
 
 } // namespace Ssl
 } // namespace Envoy

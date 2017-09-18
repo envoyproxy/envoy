@@ -49,11 +49,11 @@ public:
   /**
    * Translate a v1 JSON Cluster to v2 envoy::api::v2::Cluster.
    * @param json_cluster source v1 JSON Cluster object.
-   * @param sds_config SDS config if 'sds' discovery type.
+   * @param eds_config SDS config if 'sds' discovery type.
    * @param cluster destination v2 envoy::api::v2::Cluster.
    */
   static void translateCluster(const Json::Object& json_cluster,
-                               const Optional<Upstream::SdsConfig>& sds_config,
+                               const Optional<envoy::api::v2::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster);
 };
 

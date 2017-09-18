@@ -21,7 +21,8 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
 }
 
 HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
-  if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
+    stats_.lb_healthy_panic_.inc();
     return all_hosts_ring_.chooseHost(context, random_);
   } else {
     return healthy_hosts_ring_.chooseHost(context, random_);
@@ -107,6 +108,7 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
       std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
+      // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
       uint64_t hash = std::hash<std::string>()(hash_key);
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});

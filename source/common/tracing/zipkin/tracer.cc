@@ -3,20 +3,26 @@
 #include <chrono>
 
 #include "common/common/utility.h"
+#include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Zipkin {
 
-SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp) {
+SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
+                          SystemTime timestamp) {
   // Build the endpoint
   Endpoint ep(service_name_, address_);
 
   // Build the CS annotation
   Annotation cs;
   cs.setEndpoint(std::move(ep));
-  cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+  if (config.operationName() == Tracing::OperationName::Egress) {
+    cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+  } else {
+    cs.setValue(ZipkinCoreConstants::get().SERVER_RECV);
+  }
 
   // Create an all-new span, with no parent id
   SpanPtr span_ptr(new Span());
@@ -44,8 +50,8 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp) {
   return span_ptr;
 }
 
-SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp,
-                          SpanContext& previous_context) {
+SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
+                          SystemTime timestamp, SpanContext& previous_context) {
   SpanPtr span_ptr(new Span());
   Annotation annotation;
   uint64_t timestamp_micro;
@@ -53,7 +59,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp,
   timestamp_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
 
-  if (previous_context.annotationSet().sr_ && !previous_context.annotationSet().cs_) {
+  if (config.operationName() == Tracing::OperationName::Egress) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
@@ -70,7 +76,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp,
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
-  } else if (previous_context.annotationSet().cs_ && !previous_context.annotationSet().sr_) {
+  } else if (config.operationName() == Tracing::OperationName::Ingress) {
     // We need to create a new span that will share context with the previous span
 
     // Initialize the shared context for the new span

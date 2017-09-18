@@ -23,6 +23,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
@@ -74,11 +75,13 @@ namespace Http {
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(downstream_rq_non_ws_on_ws_route)                                                        \
+  COUNTER(downstream_rq_too_large)                                                              \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
-  TIMER  (downstream_rq_time)
+  TIMER  (downstream_rq_time)                                                                      \
+  COUNTER(rs_too_large)
 // clang-format on
 
 /**
@@ -307,11 +310,13 @@ private:
 
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
     void commonHandleBufferData(Buffer::Instance& provided_data);
-    bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data);
+    bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
+                                       bool& buffer_was_streaming);
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
     void commonContinue();
-    virtual Buffer::InstancePtr& bufferedData() PURE;
+    virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
+    virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
     virtual bool complete() PURE;
     virtual void doHeaders(bool end_stream) PURE;
     virtual void doData(bool end_stream) PURE;
@@ -319,9 +324,7 @@ private:
     virtual const HeaderMapPtr& trailers() PURE;
 
     // Http::StreamFilterCallbacks
-    uint64_t connectionId() override;
     const Network::Connection* connection() override;
-    Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
@@ -348,7 +351,8 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
-    Buffer::InstancePtr& bufferedData() override { return parent_.buffered_request_data_; }
+    Buffer::WatermarkBufferPtr createBuffer() override;
+    Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
@@ -360,7 +364,7 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     // Http::StreamDecoderFilterCallbacks
-    void addDecodedData(Buffer::Instance& data) override;
+    void addDecodedData(Buffer::Instance& data, bool streaming) override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -374,6 +378,11 @@ private:
     addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+    void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+    uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
+
+    void requestDataTooLarge();
+    void requestDataDrained();
 
     StreamDecoderFilterSharedPtr handle_;
   };
@@ -391,7 +400,8 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
-    Buffer::InstancePtr& bufferedData() override { return parent_.buffered_response_data_; }
+    Buffer::WatermarkBufferPtr createBuffer() override;
+    Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
     void doHeaders(bool end_stream) override {
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
@@ -403,13 +413,18 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
-    void addEncodedData(Buffer::Instance& data) override;
+    void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
+    void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+    uint32_t encoderBufferLimit() override { return parent_.buffer_limit_; }
     void continueEncoding() override;
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
     }
+
+    void responseDataTooLarge();
+    void responseDataDrained();
 
     StreamEncoderFilterSharedPtr handle_;
   };
@@ -438,11 +453,11 @@ private:
     uint64_t connectionId();
     const Network::Connection* connection();
     Ssl::Connection* ssl();
-    void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
+    void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
-    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data);
+    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
@@ -505,10 +520,19 @@ private:
       State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
 
       uint32_t filter_call_state_{0};
+      // The following 3 members are booleans rather than part of the space-saving bitfield as they
+      // are passed as arguments to functions expecting bools.  Extend State using the bitfield
+      // where possible.
+      bool encoder_filters_streaming_{true};
+      bool decoder_filters_streaming_{true};
+      bool destroyed_{false};
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;
     };
+
+    // Possibly increases buffer_limit_ to the value of limit.
+    void setBufferLimit(uint32_t limit);
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -516,10 +540,10 @@ private:
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;
-    Buffer::InstancePtr buffered_response_data_; // TODO(mattklein123): buffer data stat
+    Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
     HeaderMapPtr request_headers_;
-    Buffer::InstancePtr buffered_request_data_; // TODO(mattklein123): buffer data stat
+    Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
@@ -529,6 +553,7 @@ private:
     AccessLog::RequestInfoImpl request_info_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
   };
 

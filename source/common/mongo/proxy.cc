@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 
@@ -12,7 +13,7 @@
 #include "common/common/utility.h"
 #include "common/mongo/codec_impl.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Mongo {
@@ -36,38 +37,47 @@ void AccessLog::logMessage(const Message& message, bool full,
 }
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
-                         Runtime::Loader& runtime, AccessLogSharedPtr access_log)
+                         Runtime::Loader& runtime, AccessLogSharedPtr access_log,
+                         const FaultConfigSharedPtr& fault_config)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
-      runtime_(runtime), access_log_(access_log) {
-
-  if (!runtime_.snapshot().featureEnabled("mongo.connection_logging_enabled", 100)) {
+      runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
+  if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
+                                          100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
     // don't ever log.
     access_log_.reset();
   }
 }
 
-ProxyFilter::~ProxyFilter() {}
+ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_get_more_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded GET_MORE: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_insert_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded INSERT: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_kill_cursors_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded KILL_CURSORS: {}", message->toString(true));
 }
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
+  tryInjectDelay();
+
   stats_.op_query_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded QUERY: {}", message->toString(true));
@@ -190,7 +200,8 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {
-  if (!sniffing_ || !runtime_.snapshot().featureEnabled("mongo.proxy_enabled", 100)) {
+  if (!sniffing_ ||
+      !runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ProxyEnabled, 100)) {
     // Safety measure just to make sure that if we have a decoding error we keep going and lose
     // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
@@ -211,15 +222,25 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 void ProxyFilter::logMessage(Message& message, bool full) {
-  if (access_log_ && runtime_.snapshot().featureEnabled("mongo.logging_enabled", 100)) {
+  if (access_log_ &&
+      runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().LoggingEnabled, 100)) {
     access_log_->logMessage(message, full, read_callbacks_->upstreamHost().get());
   }
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    if (delay_timer_) {
+      delay_timer_->disableTimer();
+      delay_timer_.reset();
+    }
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
     stats_.cx_destroy_local_with_active_rq_.inc();
   }
+
   if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
@@ -228,7 +249,8 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
   read_buffer_.add(data);
   doDecode(read_buffer_);
-  return Network::FilterStatus::Continue;
+
+  return delay_timer_ ? Network::FilterStatus::StopIteration : Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus ProxyFilter::onWrite(Buffer::Instance& data) {
@@ -239,6 +261,53 @@ Network::FilterStatus ProxyFilter::onWrite(Buffer::Instance& data) {
 
 DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
+}
+
+Optional<uint64_t> ProxyFilter::delayDuration() {
+  Optional<uint64_t> result;
+
+  if (!fault_config_) {
+    return result;
+  }
+
+  if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
+                                          fault_config_->delayPercent())) {
+    return result;
+  }
+
+  const uint64_t duration = runtime_.snapshot().getInteger(
+      MongoRuntimeConfig::get().FixedDelayDurationMs, fault_config_->delayDuration());
+
+  // Delay only if the duration is > 0ms.
+  if (duration > 0) {
+    result.value(duration);
+  }
+
+  return result;
+}
+
+void ProxyFilter::delayInjectionTimerCallback() {
+  delay_timer_.reset();
+
+  // Continue request processing.
+  read_callbacks_->continueReading();
+}
+
+void ProxyFilter::tryInjectDelay() {
+  // Do not try to inject delays if there is an active delay.
+  // Make sure to capture stats for the request otherwise.
+  if (delay_timer_) {
+    return;
+  }
+
+  const Optional<uint64_t> delay_ms = delayDuration();
+
+  if (delay_ms.valid()) {
+    delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { delayInjectionTimerCallback(); });
+    delay_timer_->enableTimer(std::chrono::milliseconds(delay_ms.value()));
+    stats_.delays_injected_.inc();
+  }
 }
 
 } // namespace Mongo

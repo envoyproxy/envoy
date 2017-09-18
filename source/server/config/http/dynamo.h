@@ -4,6 +4,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "common/config/well_known_names.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -15,8 +17,7 @@ class DynamoFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string& stat_prefix,
                                           FactoryContext& context) override;
-  std::string name() override { return "http_dynamo_filter"; }
-  HttpFilterType type() override { return HttpFilterType::Both; }
+  std::string name() override { return Config::HttpFilterNames::get().DYNAMO; }
 };
 
 } // namespace Configuration

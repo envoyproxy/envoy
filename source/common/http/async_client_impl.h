@@ -85,6 +85,20 @@ protected:
   AsyncClientImpl& parent_;
 
 private:
+  struct NullCorsPolicy : public Router::CorsPolicy {
+    // Router::CorsPolicy
+    const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
+    const std::string& allowMethods() const override { return EMPTY_STRING; };
+    const std::string& allowHeaders() const override { return EMPTY_STRING; };
+    const std::string& exposeHeaders() const override { return EMPTY_STRING; };
+    const std::string& maxAge() const override { return EMPTY_STRING; };
+    const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
+    bool enabled() const override { return false; };
+
+    static const std::list<std::string> allow_origin_;
+    static const Optional<bool> allow_credentials_;
+  };
+
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
     // Router::RateLimitPolicy
     const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
@@ -116,6 +130,7 @@ private:
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+    const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
   };
@@ -129,6 +144,7 @@ private:
     const std::string& clusterName() const override { return cluster_name_; }
     void finalizeRequestHeaders(Http::HeaderMap&,
                                 const Http::AccessLog::RequestInfo&) const override {}
+    const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;
@@ -181,9 +197,7 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  uint64_t connectionId() override { return 0; }
   const Network::Connection* connection() override { return nullptr; }
-  Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
@@ -193,7 +207,7 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  void addDecodedData(Buffer::Instance&) override { NOT_IMPLEMENTED; }
+  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
   const Buffer::Instance* decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
@@ -204,6 +218,8 @@ private:
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void setDecoderBufferLimit(uint32_t) override {}
+  uint32_t decoderBufferLimit() override { return 0; }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;

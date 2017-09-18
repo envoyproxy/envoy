@@ -52,6 +52,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "hash_lib",
+    hdrs = ["hash.h"],
+    external_deps = ["xxhash"],
+)
+
+envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
@@ -123,6 +129,7 @@ envoy_cc_library(
     linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",
+        "//source/common/common:macros",
     ],
 )
 

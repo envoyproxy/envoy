@@ -7,7 +7,7 @@
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Zipkin {
@@ -41,9 +41,11 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   request_headers.insertOtSpanContext().value(context.serializeToString());
 }
 
-Tracing::SpanPtr ZipkinSpan::spawnChild(const std::string& name, SystemTime start_time) {
+Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
+                                        SystemTime start_time) {
   SpanContext context(span_);
-  return Tracing::SpanPtr{new ZipkinSpan(*tracer_.startSpan(name, start_time, context), tracer_)};
+  return Tracing::SpanPtr{
+      new ZipkinSpan(*tracer_.startSpan(config, name, start_time, context), tracer_)};
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
@@ -76,8 +78,8 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::string&,
-                                   SystemTime start_time) {
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+                                   const std::string&, SystemTime start_time) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
 
@@ -102,10 +104,10 @@ Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::
     // being at the receiving end, will add the SR annotation to the shared span context.
 
     new_zipkin_span =
-        tracer.startSpan(request_headers.Host()->value().c_str(), start_time, context);
+        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
   } else {
     // Create a root Zipkin span. No context was found in the headers.
-    new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(), start_time);
+    new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));

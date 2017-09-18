@@ -19,11 +19,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion> {
@@ -35,7 +35,8 @@ public:
                                               .use_proxy_proto_ = true,
                                               .use_original_dst_ = false,
                                               .per_connection_buffer_limit_bytes_ = 0})) {
-    conn_ = dispatcher_.createClientConnection(socket_.localAddress());
+    conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
+                                               Network::Address::InstanceConstSharedPtr());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
@@ -293,7 +294,8 @@ public:
                                               .use_proxy_proto_ = true,
                                               .use_original_dst_ = false,
                                               .per_connection_buffer_limit_bytes_ = 0})) {
-    conn_ = dispatcher_.createClientConnection(local_dst_address_);
+    conn_ = dispatcher_.createClientConnection(local_dst_address_,
+                                               Network::Address::InstanceConstSharedPtr());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 

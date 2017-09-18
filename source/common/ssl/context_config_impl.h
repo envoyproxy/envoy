@@ -28,8 +28,7 @@ public:
   const std::string& verifyCertificateHash() const override { return verify_certificate_hash_; };
 
 protected:
-  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config,
-                    const envoy::api::v2::TlsCertificate& cert);
+  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
 
 private:
   static const std::string DEFAULT_CIPHER_SUITES;

@@ -1,16 +1,34 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/hash.h"
+#include "common/common/hex.h"
+#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "api/base.pb.h"
 #include "api/filter/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Config {
+
+/**
+ * Constant Api Type Values, used by envoy::api::v2::ApiConfigSource.
+ */
+class ApiTypeValues {
+public:
+  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string Rest{"REST"};
+  const std::string Grpc{"GRPC"};
+};
+
+typedef ConstSingleton<ApiTypeValues> ApiType;
 
 /**
  * General config API utilities.
@@ -34,10 +52,29 @@ public:
   }
 
   /**
+   * Legacy APIs uses JSON and do not have an explicit version. Hash the body and append
+   * a user-friendly prefix.
+   */
+  static std::string computeHashedVersion(const std::string& input) {
+    return "hash_" + Hex::uint64ToHex(HashUtil::xxHash64(input));
+  }
+
+  /**
    * Extract refresh_delay as a std::chrono::milliseconds from envoy::api::v2::ApiConfigSource.
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
+
+  /**
+   * Populate an envoy::api::v2::ApiConfigSource.
+   * @param cluster supplies the cluster name for the ApiConfigSource.
+   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
+   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
+   * @param api_config_source a reference to the envoy::api::v2::ApiConfigSource object to populate.
+   */
+  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                                       const std::string& api_type,
+                                       envoy::api::v2::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -69,12 +106,12 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Convert a v1 SdsConfig to v2 EDS envoy::api::v2::ConfigSource.
-   * @param sds_config source v1 SdsConfig.
+   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::ConfigSource.
+   * @param json_config source v1 SDS JSON config.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
    */
-  static void sdsConfigToEdsConfig(const Upstream::SdsConfig& sds_config,
-                                   envoy::api::v2::ConfigSource& eds_config);
+  static void translateEdsConfig(const Json::Object& json_config,
+                                 envoy::api::v2::ConfigSource& eds_config);
 
   /**
    * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.
@@ -106,6 +143,52 @@ public:
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
     return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation. Note: this is a proto string
+   * because it is assumed that this value will be pulled directly from the configuration proto.
+   */
+  template <class Factory> static Factory& getAndCheckFactory(const ProtobufTypes::String& name) {
+    if (name.empty()) {
+      throw EnvoyException("Provided name for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
+
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", name));
+    }
+
+    return *factory;
+  }
+
+  /**
+   * Translate a nested config into a proto message provided by the implementation factory.
+   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
+   * provided because for statically registered implementations, a custom config is generally
+   * optional, which means the conversion must be done conditionally.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class ProtoMessage, class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
+                                                            Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    if (config == nullptr) {
+      throw EnvoyException(fmt::format(
+          "{} factory returned nullptr instead of empty config message.", factory.name()));
+    }
+
+    if (enclosing_message.has_config()) {
+      MessageUtil::jsonConvert(enclosing_message.config(), *config);
+    }
+
+    return config;
   }
 };
 

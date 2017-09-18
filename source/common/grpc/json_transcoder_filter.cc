@@ -7,6 +7,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -36,8 +37,6 @@ namespace Grpc {
 
 namespace {
 
-const std::string TYPE_URL_PREFIX{"type.googleapis.com"};
-
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
 // implementation based on JsonRequestTranslator & ResponseToJsonTranslator
@@ -59,10 +58,10 @@ public:
   ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() {
     return request_stream_.get();
   }
-  Status RequestStatus() { return request_translator_->Output().Status(); }
+  ProtobufUtil::Status RequestStatus() { return request_translator_->Output().Status(); }
 
   ZeroCopyInputStream* ResponseOutput() { return response_stream_.get(); }
-  Status ResponseStatus() { return response_translator_->Status(); }
+  ProtobufUtil::Status ResponseStatus() { return response_translator_->Status(); }
 
 private:
   std::unique_ptr<JsonRequestTranslator> request_translator_;
@@ -106,8 +105,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
 
   path_matcher_ = pmb.Build();
 
-  type_helper_.reset(new google::grpc::transcoding::TypeHelper(
-      Protobuf::util::NewTypeResolverForDescriptorPool(TYPE_URL_PREFIX, &descriptor_pool_)));
+  type_helper_.reset(
+      new google::grpc::transcoding::TypeHelper(Protobuf::util::NewTypeResolverForDescriptorPool(
+          Common::typeUrlPrefix(), &descriptor_pool_)));
 
   const auto print_config = config.getObject("print_options", true);
   print_options_.add_whitespace = print_config->getBoolean("add_whitespace", false);
@@ -119,7 +119,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
       print_config->getBoolean("preserve_proto_field_names", false);
 }
 
-Status JsonTranscoderConfig::createTranscoder(
+ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
@@ -138,10 +138,10 @@ Status JsonTranscoderConfig::createTranscoder(
   method_descriptor =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_descriptor) {
-    return Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
+    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
   }
 
-  Status status = methodToRequestInfo(method_descriptor, &request_info);
+  auto status = methodToRequestInfo(method_descriptor, &request_info);
   if (!status.ok()) {
     return status;
   }
@@ -163,27 +163,28 @@ Status JsonTranscoderConfig::createTranscoder(
       new JsonRequestTranslator(type_helper_->Resolver(), &request_input, request_info,
                                 method_descriptor->client_streaming(), true)};
 
-  const auto response_type_url =
-      TYPE_URL_PREFIX + "/" + method_descriptor->output_type()->full_name();
+  const auto response_type_url = Common::typeUrl(method_descriptor->output_type()->full_name());
   std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
       &response_input, print_options_)};
 
   transcoder.reset(
       new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
-  return Status();
+  return ProtobufUtil::Status();
 }
 
-Status JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
-                                                 google::grpc::transcoding::RequestInfo* info) {
-  auto request_type_url = TYPE_URL_PREFIX + "/" + method->input_type()->full_name();
+ProtobufUtil::Status
+JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
+                                          google::grpc::transcoding::RequestInfo* info) {
+  auto request_type_url = Common::typeUrl(method->input_type()->full_name());
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());
-    return Status(Code::NOT_FOUND, "Could not resolve type: " + method->input_type()->full_name());
+    return ProtobufUtil::Status(Code::NOT_FOUND,
+                                "Could not resolve type: " + method->input_type()->full_name());
   }
 
-  return Status();
+  return ProtobufUtil::Status();
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
@@ -225,7 +226,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
-      decoder_callbacks_->addDecodedData(data);
+      decoder_callbacks_->addDecodedData(data, true);
     }
   }
   return Http::FilterHeadersStatus::Continue;
@@ -272,7 +273,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::HeaderMap&
   readToBuffer(*transcoder_->RequestOutput(), data);
 
   if (data.length()) {
-    decoder_callbacks_->addDecodedData(data);
+    decoder_callbacks_->addDecodedData(data, true);
   }
   return Http::FilterTrailersStatus::Continue;
 }
@@ -310,6 +311,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming()) {
+    // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
   // TODO(lizan): Check ResponseStatus
@@ -328,7 +330,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (data.length()) {
-    encoder_callbacks_->addEncodedData(data);
+    encoder_callbacks_->addEncodedData(data, true);
   }
 
   if (method_->server_streaming()) {

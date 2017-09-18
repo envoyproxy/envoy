@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -134,20 +135,25 @@ public:
 typedef std::unique_ptr<Instance> InstancePtr;
 
 /**
- * A factory for creating buffers.
+ * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */
-class Factory {
+class WatermarkFactory {
 public:
-  virtual ~Factory() {}
+  virtual ~WatermarkFactory() {}
 
   /**
    * Creates and returns a unique pointer to a new buffer.
+   * @param below_low_watermark supplies a function to call if the buffer goes under a configured
+   *   low watermark.
+   * @param above_high_watermark supplies a function to call if the buffer goes over a configured
+   *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create() PURE;
+  virtual InstancePtr create(std::function<void()> below_low_watermark,
+                             std::function<void()> above_high_watermark) PURE;
 };
 
-typedef std::unique_ptr<Factory> FactoryPtr;
+typedef std::unique_ptr<WatermarkFactory> WatermarkFactoryPtr;
 
 } // namespace Buffer
 } // namespace Envoy

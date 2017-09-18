@@ -2,11 +2,14 @@
 
 #include <arpa/inet.h>
 
+#include "common/common/assert.h"
 #include "common/common/base64.h"
+#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/filter_utility.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -39,9 +42,9 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
-    // TODO(fengli): Return error response.
-    return Http::FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::Continue;
   }
+  is_grpc_web_request_ = true;
 
   setupStatTracking(headers);
 
@@ -70,6 +73,10 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
 }
 
 Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
   if (!is_text_request_) {
     // No additional transcoding required if gRPC client is sending binary request.
     return Http::FilterDataStatus::Continue;
@@ -87,14 +94,27 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
                   decoding_buffer_.length()));
+  if (decoded.empty()) {
+    // Error happened when decoding base64.
+    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
+                                  "Bad gRPC-web request, invalid base64 data.");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   decoding_buffer_.drain(decoding_buffer_.length());
   decoding_buffer_.move(data);
   data.add(decoded);
+  // Any block of 4 bytes or more should have been decoded and passed through.
+  ASSERT(decoding_buffer_.length() < 4);
   return Http::FilterDataStatus::Continue;
 }
 
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (do_stat_tracking_) {
     chargeStat(headers);
   }
@@ -109,6 +129,10 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
 }
 
 Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
   if (!is_text_response_) {
     // No additional transcoding required if gRPC-Web client asked for binary response.
     return Http::FilterDataStatus::Continue;
@@ -139,6 +163,10 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+  if (!is_grpc_web_request_) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   if (do_stat_tracking_) {
     chargeStat(trailers);
   }
@@ -164,9 +192,9 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   buffer.move(temp);
   if (is_text_response_) {
     Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
-    encoder_callbacks_->addEncodedData(encoded);
+    encoder_callbacks_->addEncodedData(encoded, true);
   } else {
-    encoder_callbacks_->addEncodedData(buffer);
+    encoder_callbacks_->addEncodedData(buffer, true);
   }
   return Http::FilterTrailersStatus::Continue;
 }

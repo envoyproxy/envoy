@@ -57,12 +57,12 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
+                               Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
-      read_buffer_(dispatcher.getBufferFactory().create()),
-      write_buffer_(Buffer::InstancePtr{dispatcher.getBufferFactory().create()},
-                    [this]() -> void { this->onLowWatermark(); },
-                    [this]() -> void { this->onHighWatermark(); }),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
       using_original_dst_(using_original_dst) {
 
@@ -79,6 +79,20 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   file_event_ = dispatcher_.createFileEvent(
       fd_, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+  if (bind_to_address != nullptr) {
+    int rc = bind_to_address->bind(fd);
+    if (rc < 0) {
+      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", bind_to_address->asString(),
+                     strerror(errno));
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      state_ |= InternalState::BindError;
+
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+    }
+  }
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -108,7 +122,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  uint64_t data_to_write = write_buffer_.length();
+  uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
     if (data_to_write > 0) {
@@ -147,7 +161,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
-  buffer_stats_.reset();
+  connection_stats_.reset();
 
   file_event_.reset();
   ::close(fd_);
@@ -245,7 +259,7 @@ void ConnectionImpl::readDisable(bool disable) {
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain.  Instead fake an event to make sure the buffered data
     // gets processed regardless.
-    if (read_buffer_->length() > 0) {
+    if (read_buffer_.length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
@@ -283,7 +297,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
     // That code assumes that we never change existing write_buffer_ chain elements between calls
     // to SSL_write(). That code will have to change if we ever copy here.
-    write_buffer_.move(data);
+    write_buffer_->move(data);
 
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
@@ -316,7 +330,7 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
-    write_buffer_.setWatermarks(limit + 1);
+    static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
   }
 }
 
@@ -344,6 +358,17 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   if (state_ & InternalState::ImmediateConnectionError) {
     ENVOY_CONN_LOG(debug, "raising immediate connect error", *this);
     closeSocket(ConnectionEvent::RemoteClose);
+    return;
+  }
+
+  if (state_ & InternalState::BindError) {
+    ENVOY_CONN_LOG(debug, "raising bind error", *this);
+    // Update stats here, rather than on bind failure, to give the caller a chance to
+    // setConnectionStats.
+    if (connection_stats_ && connection_stats_->bind_errors_) {
+      connection_stats_->bind_errors_->inc();
+    }
+    closeSocket(ConnectionEvent::LocalClose);
     return;
   }
 
@@ -378,7 +403,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     //
     // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
     // ioctl(). The extra syscall is not worth it.
-    int rc = read_buffer_->read(fd_, 16384);
+    int rc = read_buffer_.read(fd_, 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", *this, rc);
 
     // Remote close. Might need to raise data before raising close.
@@ -409,7 +434,7 @@ void ConnectionImpl::onReadReady() {
   ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();
-  uint64_t new_buffer_size = read_buffer_->length();
+  uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   onRead(new_buffer_size);
 
@@ -424,11 +449,11 @@ ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
-    if (write_buffer_.length() == 0) {
+    if (write_buffer_->length() == 0) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    int rc = write_buffer_.write(fd_);
+    int rc = write_buffer_->write(fd_);
     ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
@@ -476,7 +501,7 @@ void ConnectionImpl::onWriteReady() {
   }
 
   IoResult result = doWriteToSocket();
-  uint64_t new_buffer_size = write_buffer_.length();
+  uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   if (result.action_ == PostIoAction::Close) {
@@ -510,35 +535,36 @@ void ConnectionImpl::doConnect() {
   }
 }
 
-void ConnectionImpl::setBufferStats(const BufferStats& stats) {
-  ASSERT(!buffer_stats_);
-  buffer_stats_.reset(new BufferStats(stats));
+void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+  ASSERT(!connection_stats_);
+  connection_stats_.reset(new ConnectionStats(stats));
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
-                                           buffer_stats_->read_total_,
-                                           buffer_stats_->read_current_);
+                                           connection_stats_->read_total_,
+                                           connection_stats_->read_current_);
 }
 
 void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
-  if (!buffer_stats_) {
+  if (!connection_stats_) {
     return;
   }
 
   ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
-                                           buffer_stats_->write_total_,
-                                           buffer_stats_->write_current_);
+                                           connection_stats_->write_total_,
+                                           connection_stats_->write_current_);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                           Address::InstanceConstSharedPtr address)
+ClientConnectionImpl::ClientConnectionImpl(
+    Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
+    const Network::Address::InstanceConstSharedPtr source_address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), false, false) {}
+                     getNullLocalAddress(*address), source_address, false, false) {}
 
 } // namespace Network
 } // namespace Envoy

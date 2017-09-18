@@ -8,7 +8,6 @@ Health check filter :ref:`architecture overview <arch_overview_health_checking_f
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "health_check",
     "config": {
       "pass_through_mode": "...",
@@ -16,6 +15,13 @@ Health check filter :ref:`architecture overview <arch_overview_health_checking_f
       "cache_time_ms": "...",
      }
   }
+
+Note that the filter will automatically fail health checks and set the
+:ref:`x-envoy-immediate-health-check-fail
+<config_http_filters_router_x-envoy-immediate-health-check-fail>` header if the
+:ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin endpoint has been
+called. (The :ref:`/healthcheck/ok <operations_admin_interface_healthcheck_ok>` admin endpoint
+reverses this behavior).
 
 pass_through_mode
   *(required, boolean)* Specifies whether the filter operates in pass through mode or not.

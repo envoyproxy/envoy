@@ -5,6 +5,7 @@
 #include "common/stats/statsd.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -36,13 +37,12 @@ public:
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
-    conn_info.host_description_.reset(new Upstream::HostImpl(
-        Upstream::ClusterInfoConstSharedPtr{new Upstream::MockClusterInfo}, "",
-        Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+    conn_info.host_description_ = Upstream::makeTestHost(
+        Upstream::ClusterInfoConstSharedPtr{new Upstream::MockClusterInfo}, "tcp://127.0.0.1:80");
 
     EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
         .WillOnce(Return(conn_info));
-    EXPECT_CALL(*connection_, setBufferStats(_));
+    EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, connect());
   }
 

@@ -16,8 +16,8 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/ads_api_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/json/json_loader.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "api/bootstrap.pb.h"
@@ -41,11 +41,12 @@ public:
         local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
-  ClusterManagerPtr
-  clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
-                         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager) override;
+  ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+                                            Stats::Store& stats, ThreadLocal::Instance& tls,
+                                            Runtime::Loader& runtime,
+                                            Runtime::RandomGenerator& random,
+                                            const LocalInfo::LocalInfo& local_info,
+                                            AccessLog::AccessLogManager& log_manager) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
@@ -53,7 +54,8 @@ public:
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                      const Optional<SdsConfig>& sds_config, ClusterManager& cm) override;
+                      const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                      ClusterManager& cm) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -116,14 +118,13 @@ struct ClusterManagerStats {
 };
 
 /**
- * Implementation of ClusterManager that reads from a JSON configuration, maintains a central
+ * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterManagerImpl(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
-                     ClusterManagerFactory& factory, Stats::Store& stats,
-                     ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+  ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 
@@ -152,6 +153,12 @@ public:
     cds_api_.reset();
     primary_clusters_.clear();
   }
+
+  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
+    return source_address_;
+  }
+
+  Config::AdsApi& adsProvider() override { return ads_api_; }
 
 private:
   /**
@@ -218,8 +225,6 @@ private:
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void initializeClustersFromV1Json(const Json::Object& config);
-  void initializeClustersFromV2Proto(const envoy::api::v2::Bootstrap& bootstrap);
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
@@ -232,12 +237,14 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
-  Optional<SdsConfig> sds_config_;
+  Optional<envoy::api::v2::ConfigSource> eds_config_;
+  Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
+  Config::AdsApiImpl ads_api_;
 };
 
 } // namespace Upstream

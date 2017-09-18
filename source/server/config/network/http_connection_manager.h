@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/config/well_known_names.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
 
@@ -27,23 +28,14 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                      FactoryContext& context) override;
 
-  std::string name() override { return "http_connection_manager"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
-};
-
-/**
- * DEPRECATED - Implemented by each HTTP filter and registered via registerHttpFilterConfigFactory()
- * or the convenience class RegisterHttpFilterConfigFactory.
- */
-class HttpFilterConfigFactory {
-public:
-  virtual ~HttpFilterConfigFactory() {}
-
-  virtual HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                                     const Json::Object& config,
-                                                     const std::string& stat_prefix,
-                                                     Server::Instance& server) PURE;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::unique_ptr<envoy::api::v2::filter::HttpConnectionManager>(
+        new envoy::api::v2::filter::HttpConnectionManager());
+  }
+  std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 };
 
 /**
@@ -101,31 +93,10 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
-  /**
-   * DEPRECATED - Register an HttpFilterConfigFactory implementation as an option to create
-   * instances of HttpFilterFactoryCb.
-   * @param factory the HttpFilterConfigFactory implementation
-   */
-  static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {
-    filterConfigFactories().push_back(&factory);
-  }
-
   static const std::string DEFAULT_SERVER_STRING;
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
-
-  /**
-   * DEPRECATED - Returns a list of the currently registered HttpFilterConfigFactory
-   * implementations.
-   */
-  static std::list<HttpFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<HttpFilterConfigFactory*>* filter_config_factories =
-        new std::list<HttpFilterConfigFactory*>;
-    return *filter_config_factories;
-  }
-
-  HttpFilterType stringToType(const std::string& type);
 
   FactoryContext& context_;
   std::list<HttpFilterFactoryCb> filter_factories_;
@@ -148,22 +119,6 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
-};
-
-/**
- * DEPRECATED @see HttpFilterConfigFactory.  An instantiation of this class registers a
- * HttpFilterConfigFactory implementation (T) so it can be used to create instances of
- * HttpFilterFactoryCb.
- */
-template <class T> class RegisterHttpFilterConfigFactory {
-public:
-  /**
-   * Registers the implementation.
-   */
-  RegisterHttpFilterConfigFactory() {
-    static T* instance = new T;
-    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(*instance);
-  }
 };
 
 } // namespace Configuration

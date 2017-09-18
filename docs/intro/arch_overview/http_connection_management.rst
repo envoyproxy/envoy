@@ -28,6 +28,12 @@ HTTP/1.1, the codec translates the serial/pipelining capabilities of the protoco
 that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
 understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.
 
+HTTP header sanitizing
+----------------------
+
+The HTTP connection manager performs various :ref:`header sanitizing
+<config_http_conn_man_header_sanitizing>` actions for security reasons.
+
 .. _arch_overview_http_access_logs:
 
 HTTP access logging

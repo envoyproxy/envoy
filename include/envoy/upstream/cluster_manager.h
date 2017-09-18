@@ -7,9 +7,9 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/ads.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
@@ -108,17 +108,27 @@ public:
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
+
+  /**
+   * Returns an optional source address for upstream connections to bind to.
+   *
+   * @return Network::Address::InstanceConstSharedPtr a source address to bind to or nullptr if no
+   * bind need occur.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+
+  /**
+   * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
+   * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
+   * the management of clusters but instead is required early in ClusterManager/server
+   * initialization and in various sites that need ClusterManager for xDS API interfacing.
+   *
+   * @return AdsApi& ADS API provider referencee.
+   */
+  virtual Config::AdsApi& adsProvider() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
-
-/**
- * Global configuration for any SDS clusters.
- */
-struct SdsConfig {
-  std::string sds_cluster_name_;
-  std::chrono::milliseconds refresh_delay_;
-};
 
 /**
  * Abstract interface for a CDS API provider.
@@ -137,6 +147,16 @@ public:
    * server. If the initial load fails, the callback will also be called.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * @return std::string last accepted version from fetch.
+   *
+   * TODO(dnoe): This would ideally return by reference, but this causes a
+   *             problem due to incompatible string implementations returned by
+   *             protobuf generated code. Revisit when string implementations
+   *             are converged.
+   */
+  virtual const std::string versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;
@@ -149,15 +169,14 @@ public:
   virtual ~ClusterManagerFactory() {}
 
   /**
-   * Allocate a cluster manager from configuration JSON.
-   * TODO(htuch): Once bootstrap is sufficiently capable, switch to a translation from the JSON v1
-   * cluster manager config -> v2 proto and drop the config parameter.
+   * Allocate a cluster manager from configuration proto.
    */
-  virtual ClusterManagerPtr
-  clusterManagerFromJson(const Json::Object& config, const envoy::api::v2::Bootstrap& bootstrap,
-                         Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager) PURE;
+  virtual ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+                                                    Stats::Store& stats, ThreadLocal::Instance& tls,
+                                                    Runtime::Loader& runtime,
+                                                    Runtime::RandomGenerator& random,
+                                                    const LocalInfo::LocalInfo& local_info,
+                                                    AccessLog::AccessLogManager& log_manager) PURE;
 
   /**
    * Allocate an HTTP connection pool.
@@ -178,7 +197,8 @@ public:
    * Create a CDS API provider from configuration proto.
    */
   virtual CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                              const Optional<SdsConfig>& sds_config, ClusterManager& cm) PURE;
+                              const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                              ClusterManager& cm) PURE;
 };
 
 } // namespace Upstream

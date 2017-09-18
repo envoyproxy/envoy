@@ -2,6 +2,7 @@
 #include <list>
 #include <string>
 
+#include "common/config/well_known_names.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -14,11 +15,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -55,21 +56,10 @@ protected:
 };
 
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
-  std::string json = R"EOF(
-  {
-    "listeners": [],
-
-    "cluster_manager": {
-      "clusters": []
-    }
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   envoy::api::v2::Bootstrap bootstrap;
 
   MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
 }
@@ -83,21 +73,22 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
 
     "cluster_manager": {
       "clusters": []
-    }
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
   {
     "listeners" : [],
     "cluster_manager": {
@@ -113,15 +104,15 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
           ]
         }
       ]
-    }
+    },
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   ASSERT_EQ(1U, config.clusterManager().clusters().count("test_cluster"));
   EXPECT_EQ(8192U, config.clusterManager()
@@ -150,21 +141,21 @@ TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
         "driver": {
           "type": "lightstep",
           "config": {
+            "collector_cluster": "cluster_0",
             "access_token_file": "/etc/envoy/envoy.cfg"
           }
         }
       }
-    }
+    },
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.cluster_name_ = "";
   MainImpl config;
-  EXPECT_THROW(config.initialize(*loader, bootstrap, server_, cluster_manager_factory_),
-               EnvoyException);
+  EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
 }
 
 TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
@@ -178,16 +169,16 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
     ],
     "cluster_manager": {
       "clusters": []
-    }
+    },
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.cluster_name_ = "";
   MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
 }
@@ -209,20 +200,21 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
         "driver": {
           "type": "lightstep",
           "config": {
+            "collector_cluster": "cluster_0",
             "access_token_file": "/etc/envoy/envoy.cfg"
           }
         }
       }
-    }
+    },
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.cluster_name_ = "";
   MainImpl config;
-  config.initialize(*loader, bootstrap, server_, cluster_manager_factory_);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
 }
@@ -242,22 +234,101 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
     "tracing": {
       "http": {
         "driver": {
-          "type": "invalid",
+          "type": "lightstep",
           "config": {
+            "collector_cluster": "cluster_0",
             "access_token_file": "/etc/envoy/envoy.cfg"
           }
         }
       }
-    }
+    },
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(*loader, bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "No HttpTracerFactory found for type: invalid");
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
+}
+
+TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
+  sink.set_name(Config::StatsSinkNames::get().STATSD);
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(1, config.statsSinks().size());
+}
+
+TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  envoy::api::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
+  sink.set_name("envoy.invalid");
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'envoy.invalid'");
+}
+
+TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
+  std::string json = R"EOF(
+  {
+    "listeners": [],
+
+    "cluster_manager": {
+      "clusters": []
+    },
+
+    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
+  auto& field_map = *sink.mutable_config()->mutable_fields();
+  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Provided name for static registration lookup was empty.");
 }
 
 } // namespace Configuration

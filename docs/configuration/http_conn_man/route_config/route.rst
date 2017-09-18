@@ -6,11 +6,17 @@ Route
 A route is both a specification of how to match a request as well as in indication of what to do
 next (e.g., redirect, forward, rewrite, etc.).
 
+.. attention::
+
+  Envoy supports routing on HTTP method via :ref:`header matching
+  <config_http_conn_man_route_table_route_headers>`.
+
 .. code-block:: json
 
   {
     "prefix": "...",
     "path": "...",
+    "regex": "...",
     "cluster": "...",
     "cluster_header": "...",
     "weighted_clusters" : "{...}",
@@ -31,17 +37,36 @@ next (e.g., redirect, forward, rewrite, etc.).
     "include_vh_rate_limits" : "...",
     "hash_policy": "{...}",
     "request_headers_to_add" : [],
-    "opaque_config": []
+    "opaque_config": [],
+    "cors": "{...}"
   }
 
 prefix
   *(sometimes required, string)* If specified, the route is a prefix rule meaning that the prefix
-  must match the beginning of the :path header. Either *prefix* or *path* must be specified.
+  must match the beginning of the :path header. One of *prefix*, *path*, or *regex* must be specified.
 
 path
   *(sometimes required, string)* If specified, the route is an exact path rule meaning that the path
-  must exactly match the :path header once the query string is removed. Either *prefix* or *path*
-  must be specified.
+  must exactly match the :path header once the query string is removed. One of *prefix*, *path*, or
+  *regex* must be specified.
+
+regex
+  *(sometimes required, string)* If specified, the route is a regular expression rule meaning that the
+  regex must match the :path header once the query string is removed. The entire path (without the
+  query string) must match the regex. The rule will not match if only a subsequence of the :path header
+  matches the regex. The regex grammar is defined `here
+  <http://en.cppreference.com/w/cpp/regex/ecmascript>`_. One of *prefix*, *path*, or
+  *regex* must be specified.
+
+  Examples:
+
+    * The regex */b[io]t* matches the path */bit*
+    * The regex */b[io]t* matches the path */bot*
+    * The regex */b[io]t* does not match the path */bite*
+    * The regex */b[io]t* does not match the path */bit/bot*
+
+:ref:`cors <config_http_filters_cors>`
+  *(optional, object)* Specifies the route's CORS policy.
 
 .. _config_http_conn_man_route_table_route_cluster:
 
@@ -96,8 +121,9 @@ path_redirect
 
 prefix_rewrite
   *(optional, string)* Indicates that during forwarding, the matched prefix (or path) should be
-  swapped with this value. This option allows application URLs to be rooted at a different path
-  from those exposed at the reverse proxy layer.
+  swapped with this value. When using regex path matching, the entire path (not including
+  the query string) will be swapped with this value. This option allows application URLs to be
+  rooted at a different path from those exposed at the reverse proxy layer.
 
 .. _config_http_conn_man_route_table_route_host_rewrite:
 
@@ -238,7 +264,7 @@ HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 retry_on
   *(required, string)* specifies the conditions under which retry takes place. These are the same
   conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
-  :ref:`config_http_filters_router_x-envoy-grpc-retry-on`.
+  :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
 
 num_retries
   *(optional, integer)* specifies the allowed number of retries. This parameter is optional and
@@ -263,8 +289,8 @@ Shadow
 
 The router is capable of shadowing traffic from one cluster to another. The current implementation
 is "fire and forget," meaning Envoy will not wait for the shadow cluster to respond before returning
-the response from the primary cluster. All normal statistics are collected however for the shadow
-cluster making thie feature useful for testing.
+the response from the primary cluster. All normal statistics are collected for the shadow
+cluster making this feature useful for testing.
 
 During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
 useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
@@ -309,13 +335,33 @@ value
 
 regex
   *(optional, boolean)* Specifies whether the header value is a regular
-  expression or not. Defaults to false. The regex grammar used in the value field
-  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  expression or not. Defaults to false. The entire request header value must match the regex. The
+  rule will not match if only a subsequence of the request header value matches the regex. The
+  regex grammar used in the value field is defined
+  `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+
+  Examples:
+
+    * The regex *\d{3}* matches the value *123*
+    * The regex *\d{3}* does not match the value *1234*
+    * The regex *\d{3}* does not match the value *123.456*
 
 .. attention::
 
   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
   header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+
+.. attention::
+
+  To route on HTTP method, use the special HTTP/2 *:method* header. This works for both
+  HTTP/1 and HTTP/2 as Envoy normalizes headers. E.g.,
+
+  .. code-block:: json
+
+    {
+      "name": ":method",
+      "value": "POST"
+    }
 
 .. _config_http_conn_man_route_table_route_weighted_clusters:
 

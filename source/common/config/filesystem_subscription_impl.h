@@ -45,7 +45,11 @@ public:
   void updateResources(const std::vector<std::string>& resources) override {
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
+    // Bump stats for consistence behavior with other xDS.
+    stats_.update_attempt_.inc();
   }
+
+  const std::string versionInfo() const override { return version_info_; }
 
 private:
   void refresh() {
@@ -58,6 +62,7 @@ private:
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources);
+      version_info_ = message.version_info();
       stats_.update_success_.inc();
       ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
                 message.DebugString());
@@ -75,6 +80,7 @@ private:
   }
 
   const std::string path_;
+  std::string version_info_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   SubscriptionStats stats_;

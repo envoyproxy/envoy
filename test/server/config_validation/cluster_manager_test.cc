@@ -1,8 +1,6 @@
-#include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/json/json_loader.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -16,6 +14,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -33,16 +32,10 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info);
 
-  std::string json = R"EOF(
-  {
-    "clusters": []
-  }
-  )EOF";
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   AccessLog::MockAccessLogManager log_manager;
-  envoy::api::v2::Bootstrap bootstrap;
-  ClusterManagerPtr cluster_manager = factory.clusterManagerFromJson(
-      *config, bootstrap, stats, tls, runtime, random, local_info, log_manager);
+  const envoy::api::v2::Bootstrap bootstrap;
+  ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(
+      bootstrap, stats, tls, runtime, random, local_info, log_manager);
   EXPECT_EQ(nullptr,
             cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);

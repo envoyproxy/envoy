@@ -6,7 +6,7 @@ set -e
 
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
-NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
+[ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
 export ENVOY_SRCDIR=/source
 
@@ -73,11 +73,11 @@ ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 # Setup Envoy consuming project.
 if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
 then
-  git clone https://github.com/lyft/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
 
-# This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 8442ed70a5fc55662ca1a6d45fde2d23a4cb4adf)
+# This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout b904b8ce9cabafb485e6b6fae1d0fd9e33ddfcc1)
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # Also setup some space for building Envoy standalone.
@@ -96,7 +96,7 @@ mkdir -p "${ENVOY_COVERAGE_DIR}"
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
-# Hack due to https://github.com/lyft/envoy/issues/838 and the need to have
+# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
 # tools and bazel.rc available for build linkstamping.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
 mkdir -p "${ENVOY_CI_DIR}"/tools

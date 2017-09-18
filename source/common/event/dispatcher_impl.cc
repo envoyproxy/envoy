@@ -26,9 +26,9 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::FactoryPtr{new Buffer::OwnedImplFactory}) {}
+    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {}
 
-DispatcherImpl::DispatcherImpl(Buffer::FactoryPtr&& factory)
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
     : buffer_factory_(std::move(factory)), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
@@ -69,16 +69,20 @@ void DispatcherImpl::clearDeferredDeleteList() {
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address) {
+DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
+                                       Network::Address::InstanceConstSharedPtr source_address) {
   ASSERT(isThreadSafe());
-  return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
+  return Network::ClientConnectionPtr{
+      new Network::ClientConnectionImpl(*this, address, source_address)};
 }
 
 Network::ClientConnectionPtr
 DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstanceConstSharedPtr address) {
+                                          Network::Address::InstanceConstSharedPtr address,
+                                          Network::Address::InstanceConstSharedPtr source_address) {
   ASSERT(isThreadSafe());
-  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
+  return Network::ClientConnectionPtr{
+      new Ssl::ClientConnectionImpl(*this, ssl_ctx, address, source_address)};
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

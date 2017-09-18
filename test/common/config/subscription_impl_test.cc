@@ -1,3 +1,4 @@
+#include "test/common/config/ads_subscription_test_harness.h"
 #include "test/common/config/filesystem_subscription_test_harness.h"
 #include "test/common/config/grpc_subscription_test_harness.h"
 #include "test/common/config/http_subscription_test_harness.h"
@@ -11,6 +12,7 @@ enum class SubscriptionType {
   Grpc,
   Http,
   Filesystem,
+  Ads,
 };
 
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
@@ -25,6 +27,9 @@ public:
       break;
     case SubscriptionType::Filesystem:
       test_harness_.reset(new FilesystemSubscriptionTestHarness());
+      break;
+    case SubscriptionType::Ads:
+      test_harness_.reset(new AdsSubscriptionTestHarness());
       break;
     }
   }
@@ -56,7 +61,7 @@ public:
 
 INSTANTIATE_TEST_CASE_P(SubscriptionImplTest, SubscriptionImplTest,
                         testing::ValuesIn({SubscriptionType::Grpc, SubscriptionType::Http,
-                                           SubscriptionType::Filesystem}));
+                                           SubscriptionType::Filesystem, SubscriptionType::Ads}));
 
 // Validate basic request-response succeeds.
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {
@@ -112,6 +117,7 @@ TEST_P(SubscriptionImplTest, UpdateResources) {
   verifyStats(2, 1, 0, 0);
   expectSendMessage({"cluster2"}, "0");
   updateResources({"cluster2"});
+  verifyStats(3, 1, 0, 0);
 }
 
 } // namespace

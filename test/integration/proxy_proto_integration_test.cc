@@ -17,8 +17,7 @@ TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 254.254.254.254 65535 1234\r\n");
   conn->write(buf);
 
-  testRouterRequestAndResponseWithBody(std::move(conn), Http::CodecClient::Type::HTTP1, 1024, 512,
-                                       false);
+  testRouterRequestAndResponseWithBody(std::move(conn), 1024, 512, false);
 }
 
 TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBufferV6) {
@@ -27,8 +26,7 @@ TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBufferV6) {
   Buffer::OwnedImpl buf("PROXY TCP6 1:2:3::4 FE00:: 65535 1234\r\n");
   conn->write(buf);
 
-  testRouterRequestAndResponseWithBody(std::move(conn), Http::CodecClient::Type::HTTP1, 1024, 512,
-                                       false);
+  testRouterRequestAndResponseWithBody(std::move(conn), 1024, 512, false);
 }
 
 } // namespace Envoy

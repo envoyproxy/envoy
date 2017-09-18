@@ -42,7 +42,24 @@ enum class FilterDataStatus {
   // Do not iterate to any of the remaining filters in the chain, and buffer body data for later
   // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // This should be called by filters which must parse a larger block of the incoming data before
+  // continuing processing and so can not push back on streaming data via watermarks.
+  //
+  // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
+  // be sent to the user.  On the response path exceeding buffer limits will result in a 500.
   StopIterationAndBuffer,
+  // Do not iterate to any of the remaining filters in the chain, and buffer body data for later
+  // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // This will cause the flow of incoming data to cease until one of the continue.*() functions is
+  // called.
+  //
+  // This should be returned by filters which can nominally stream data but have a transient back-up
+  // such as the configured delay of the fault filter, or if the router filter is still fetching an
+  // upstream connection.
+  StopIterationAndWatermark,
   // Do not iterate to any of the remaining filters in the chain, but do not buffer any of the
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
@@ -71,21 +88,9 @@ public:
   virtual ~StreamFilterCallbacks() {}
 
   /**
-   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
-   * instead.
-   */
-  virtual uint64_t connectionId() PURE;
-
-  /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
    */
   virtual const Network::Connection* connection() PURE;
-
-  /**
-   * DEPRECATED: Do not call this function as it will be removed. Use the connection() callback
-   * instead.
-   */
-  virtual Ssl::Connection* ssl() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
@@ -175,8 +180,11 @@ public:
    * followed by decodeTrailers().
    *
    * It is an error to call this method in any other case.
+   *
+   * @param data Buffer::Instance supplies the data to be decoded.
+   * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
-  virtual void addDecodedData(Buffer::Instance& data) PURE;
+  virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -234,6 +242,22 @@ public:
    * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
    */
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
+
+  /**
+   * This routine may be called to change the buffer limit for decoder filters.
+   *
+   * @param boolean supplies the desired buffer limit.
+   */
+  virtual void setDecoderBufferLimit(uint32_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for decoder filters. Filters should abide by
+   * this limit or change it via setDecoderBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint32_t decoderBufferLimit() PURE;
 };
 
 /**
@@ -331,8 +355,11 @@ public:
    * followed by encodeTrailers().
    *
    * It is an error to call this method in any other case.
+   *
+   * @param data Buffer::Instance supplies the data to be encoded.
+   * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
-  virtual void addEncodedData(Buffer::Instance& data) PURE;
+  virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.
@@ -343,6 +370,22 @@ public:
    * Called when a encoder filter goes from over its high watermark to under its low watermark.
    */
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * This routine may be called to change the buffer limit for encoder filters.
+   *
+   * @limit settings supplies the desired buffer limit.
+   */
+  virtual void setEncoderBufferLimit(uint32_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for encoder filters. Filters should abide by
+   * this limit or change it via setEncoderBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint32_t encoderBufferLimit() PURE;
 };
 
 /**

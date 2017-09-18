@@ -27,12 +27,20 @@ public:
 class Common {
 public:
   /**
-   * Returns the GrpcStatus code from a given set of headers, if present.
-   * @param headers the headers to parse.
+   * Returns the GrpcStatus code from a given set of trailers, if present.
+   * @param trailers the trailers to parse.
    * @return Optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid status
    *         is found.
    */
-  static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& headers);
+  static Optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers);
+
+  /**
+   * Returns the grpc-message from a given set of trailers, if present.
+   * @param trailers the trailers to parse.
+   * @return std::string the gRPC status message or empty string if grpc-message is not present in
+   *         trailers.
+   */
+  static std::string getGrpcMessage(const Http::HeaderMap& trailers);
 
   /**
    * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
@@ -103,6 +111,18 @@ public:
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
    */
   static void validateResponse(Http::Message& http_response);
+
+  /**
+   * @return const std::string& type URL prefix.
+   */
+  static const std::string& typeUrlPrefix();
+
+  /**
+   * Prefix type URL to a qualified name.
+   * @param qualified_name packagename.messagename.
+   * @return qualified_name prefixed with typeUrlPrefix + "/".
+   */
+  static std::string typeUrl(const std::string& qualified_name);
 
   static const std::string GRPC_CONTENT_TYPE;
 

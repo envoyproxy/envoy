@@ -6,6 +6,7 @@
 #include "common/config/protocol_json.h"
 #include "common/config/rds_json.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -88,8 +89,18 @@ void FilterJson::translateAccessLogFilter(
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
                                     envoy::api::v2::filter::AccessLog& access_log) {
-  JSON_UTIL_SET_STRING(json_access_log, access_log, path);
-  JSON_UTIL_SET_STRING(json_access_log, access_log, format);
+  envoy::api::v2::filter::FileAccessLog file_access_log;
+
+  JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
+  JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
+
+  ProtobufWkt::Struct& custom_config = *access_log.mutable_config();
+  MessageUtil::jsonConvert(file_access_log, custom_config);
+
+  // Statically registered access logs are a v2-only feature, so use the standard internal file
+  // access log for json config conversion.
+  access_log.set_name(Config::AccessLogNames::get().FILE);
+
   if (json_access_log.hasObject("filter")) {
     translateAccessLogFilter(*json_access_log.getObject("filter"), *access_log.mutable_filter());
   }
@@ -123,10 +134,16 @@ void FilterJson::translateHttpConnectionManager(
   for (const auto& json_filter : json_http_connection_manager.getObjectArray("filters", true)) {
     auto* filter = http_connection_manager.mutable_http_filters()->Add();
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
+
+    // Translate v1 name to v2 name.
+    filter->set_name(
+        Config::HttpFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const auto status = Protobuf::util::JsonStringToMessage(
-        json_filter->getObject("config")->asJsonString(), filter->mutable_config());
+    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
+                                    json_filter->getObject("config")->asJsonString() + "}";
+
+    const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
     UNREFERENCED_PARAMETER(status);
@@ -157,7 +174,6 @@ void FilterJson::translateHttpConnectionManager(
 
   if (json_http_connection_manager.hasObject("http2_settings")) {
     ProtocolJson::translateHttp2ProtocolOptions(
-        json_http_connection_manager.getString("http_codec_options", ""),
         *json_http_connection_manager.getObject("http2_settings"),
         *http_connection_manager.mutable_http2_protocol_options());
   }

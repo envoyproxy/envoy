@@ -130,8 +130,7 @@ bool LoadBalancerBase::earlyExitNonZoneRouting() {
   return false;
 }
 
-bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& stats,
-                                        Runtime::Loader& runtime) {
+bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
       std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
   double healthy_percent = host_set.hosts().size() == 0
@@ -140,7 +139,6 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& s
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
-    stats.lb_healthy_panic_.inc();
     return true;
   }
 
@@ -211,7 +209,8 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
 const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
+    stats_.lb_healthy_panic_.inc();
     return host_set_.hosts();
   }
 
@@ -223,7 +222,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  if (LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(*local_host_set_, runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     return host_set_.healthyHosts();
   }

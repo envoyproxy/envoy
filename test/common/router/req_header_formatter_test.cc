@@ -29,12 +29,12 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
 
 TEST(RequestHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
-  const std::string s1 = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(s1));
+  const std::string downstream_addr = "127.0.0.1";
+  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "CLIENT_IP";
   RequestHeaderFormatter requestHeaderFormatter(variable);
   const std::string formatted_string = requestHeaderFormatter.format(request_info);
-  EXPECT_EQ(s1, formatted_string);
+  EXPECT_EQ(downstream_addr, formatted_string);
 }
 
 TEST(RequestHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -48,8 +48,8 @@ TEST(RequestHeaderFormatterTest, TestFormatWithProtocolVariable) {
 
 TEST(RequestHeaderFormatterTest, WrongVariableToFormat) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
-  const std::string s1 = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(s1));
+  const std::string downstream_addr = "127.0.0.1";
+  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "INVALID_VARIABLE";
   EXPECT_THROW_WITH_MESSAGE(RequestHeaderFormatter requestHeaderFormatter(variable), EnvoyException,
                             "field 'INVALID_VARIABLE' not supported as custom request header");
@@ -94,8 +94,8 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
-  const std::string s1 = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(s1));
+  const std::string downstream_addr = "127.0.0.1";
+  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   req_header_parser->evaluateRequestHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
 }
@@ -120,6 +120,7 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
   req_header_parser->evaluateRequestHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
+  EXPECT_EQ("static-value", headerMap.get_("static-header"));
 }
 
 } // namespace Router

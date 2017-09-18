@@ -18,10 +18,14 @@ envoy_cc_library(
     name = "json_loader_lib",
     srcs = ["json_loader.cc"],
     hdrs = ["json_loader.h"],
-    external_deps = ["rapidjson"],
+    external_deps = [
+        "rapidjson",
+        "yaml_cpp",
+    ],
     deps = [
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],

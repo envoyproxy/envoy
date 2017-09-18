@@ -9,6 +9,18 @@ load(
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "ads_subscription_test_harness",
+    srcs = ["ads_subscription_test_harness.h"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        ":subscription_test_harness",
+        "//source/common/config:ads_subscription_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
@@ -46,6 +58,7 @@ envoy_cc_test_library(
     external_deps = ["envoy_eds"],
     deps = [
         ":subscription_test_harness",
+        "//source/common/common:hash_lib",
         "//source/common/config:grpc_subscription_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -102,6 +115,7 @@ envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
     deps = [
+        ":ads_subscription_test_harness",
         ":filesystem_subscription_test_harness",
         ":grpc_subscription_test_harness",
         ":http_subscription_test_harness",
@@ -112,13 +126,19 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "subscription_test_harness",
     srcs = ["subscription_test_harness.h"],
-    deps = ["//test/mocks/stats:stats_mocks"],
+    deps = [
+        "//source/common/config:utility_lib",
+        "//test/mocks/stats:stats_mocks",
+    ],
 )
 
 envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
-    deps = ["//source/common/config:metadata_lib"],
+    deps = [
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+    ],
 )
 
 envoy_cc_test(

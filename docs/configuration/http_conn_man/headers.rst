@@ -99,13 +99,6 @@ the header value to *true*.
 
 This is a convenience to avoid having to parse and understand XFF.
 
-.. _config_http_conn_man_headers_x-envoy-ip-tags:
-
-x-envoy-ip-tags
----------------
-
-This header is populated by the :ref:`Ip Tagging Filter<config_http_filters_ip_tagging>`. Behavior is under development.
-
 .. _config_http_conn_man_headers_x-forwarded-client-cert:
 
 x-forwarded-client-cert
@@ -113,7 +106,7 @@ x-forwarded-client-cert
 
 *x-forwarded-clinet-cert* (XFCC) is a proxy header which indicates certificate information of part
 or all of the clients or proxies that a request has flowed through, on its way from the client to the
-server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the reqeust.
+server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
 The XFCC header value is a comma (",") separated string. Each substring is an XFCC element, which
 holds information added by a single proxy. A proxy can append the current client certificate

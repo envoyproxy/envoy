@@ -127,6 +127,7 @@ def envoy_cc_library(name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             envoy_external_dep_path('spdlog'),
+            envoy_external_dep_path('fmtlib'),
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,

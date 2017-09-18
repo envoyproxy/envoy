@@ -7,11 +7,15 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
+
+using testing::InvokeWithoutArgs;
+using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -109,7 +113,6 @@ Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
   envoy::api::v2::Http2ProtocolOptions http2_protocol_options;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::ProtocolJson::translateHttp2ProtocolOptions(
-      json_object_ptr->getString("http_codec_options", ""),
       *json_object_ptr->getObject("http2_settings", true), http2_protocol_options);
   return Utility::parseHttp2Settings(http2_protocol_options);
 }
@@ -141,31 +144,6 @@ TEST(HttpUtility, parseHttp2Settings) {
     EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
     EXPECT_EQ(3U, http2_settings.initial_stream_window_size_);
     EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
-  }
-
-  {
-    auto http2_settings = parseHttp2SettingsFromJson(R"raw({
-                                         "http_codec_options": "no_compression"
-                                        })raw");
-    EXPECT_EQ(0, http2_settings.hpack_table_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-              http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
-              http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
-              http2_settings.initial_connection_window_size_);
-  }
-
-  {
-    const auto json = R"raw({
-                              "http_codec_options": "no_compression",
-                              "http2_settings" : {
-                                "hpack_table_size": 1
-                              }
-                            })raw";
-    EXPECT_THROW_WITH_MESSAGE(
-        parseHttp2SettingsFromJson(json), EnvoyException,
-        "'http_codec_options.no_compression' conflicts with 'http2_settings.hpack_table_size'");
   }
 }
 
@@ -230,6 +208,26 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, SendLocalReply) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks, encodeData(_, true));
+  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+}
+
+TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    is_reset = true;
+  }));
+  EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
+  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
 } // namespace Http

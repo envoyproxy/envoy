@@ -7,23 +7,18 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 
+namespace Envoy {
 namespace Upstream {
-
-static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 const std::string& url, uint32_t weight = 1) {
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, "")};
-}
 
 class RoundRobinLoadBalancerTest : public testing::Test {
 public:
@@ -56,39 +51,39 @@ TEST_F(RoundRobinLoadBalancerTest, NoHosts) {
 
 TEST_F(RoundRobinLoadBalancerTest, SingleHost) {
   init(false);
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")};
   cluster_.hosts_ = cluster_.healthy_hosts_;
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(RoundRobinLoadBalancerTest, Normal) {
   init(false);
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
   cluster_.hosts_ = cluster_.healthy_hosts_;
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   init(false);
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
-  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
+                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
 
   EXPECT_EQ(cluster_.hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(cluster_.hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(cluster_.hosts_[2], lb_->chooseHost(nullptr));
 
   // Take the threshold back above the panic threshold.
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:83")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:83")};
 
   EXPECT_EQ(cluster_.healthy_hosts_[3], lb_->chooseHost(nullptr));
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -99,13 +94,13 @@ TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   init(true);
   HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
   HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
 
   cluster_.hosts_ = *hosts;
   cluster_.healthy_hosts_ = *hosts;
@@ -138,16 +133,16 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   init(true);
   HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
   HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
   HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
@@ -167,13 +162,13 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   init(true);
   HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
   HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -203,27 +198,27 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   init(true);
   HostVectorSharedPtr upstream_hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:84")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:84")}));
   HostVectorSharedPtr local_hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:0"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:1"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:2")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:0"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:1"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:2")}));
 
   HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-        newTestHost(cluster_.info_, "tcp://127.0.0.1:82")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-        newTestHost(cluster_.info_, "tcp://127.0.0.1:84")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+        makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
+        makeTestHost(cluster_.info_, "tcp://127.0.0.1:84")}}));
 
   HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:0")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:1")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:2")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:0")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:1")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:2")}}));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -254,11 +249,11 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   // upstream_hosts and local_hosts do not matter, zone aware routing is based on per zone hosts.
   HostVectorSharedPtr upstream_hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")}));
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
   HostVectorSharedPtr local_hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:0")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:0")}));
 
   HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>());
   HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>());
@@ -274,7 +269,7 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // situation.
   // Reuse the same host in all of the structures below to reduce time test takes and this does not
   // impact load balancing logic.
-  HostSharedPtr host = newTestHost(cluster_.info_, "tcp://127.0.0.1:80");
+  HostSharedPtr host = makeTestHost(cluster_.info_, "tcp://127.0.0.1:80");
   std::vector<HostSharedPtr> current(45000);
 
   for (int i = 0; i < 45000; ++i) {
@@ -315,9 +310,9 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   init(true);
   HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")}));
   HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
@@ -330,12 +325,12 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   init(true);
   HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.2:80")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.2:80")}));
   HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
       {{},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-        newTestHost(cluster_.info_, "tcp://127.0.0.2:80")}}));
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+        makeTestHost(cluster_.info_, "tcp://127.0.0.2:80")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
@@ -351,13 +346,13 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   init(true);
   HostVectorSharedPtr upstream_hosts(
-      new std::vector<HostSharedPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                                      newTestHost(cluster_.info_, "tcp://127.0.0.1:81")}));
+      new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}));
   HostVectorSharedPtr local_hosts(new std::vector<HostSharedPtr>({}, {}));
 
   HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
-      {{newTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
-       {newTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
+      {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
+       {makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
   HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>({{}, {}}));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -376,6 +371,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
@@ -394,7 +390,7 @@ public:
 TEST_F(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
 
 TEST_F(LeastRequestLoadBalancerTest, SingleHost) {
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")};
   cluster_.hosts_ = cluster_.healthy_hosts_;
 
   // Host weight is 1.
@@ -430,8 +426,8 @@ TEST_F(LeastRequestLoadBalancerTest, SingleHost) {
 }
 
 TEST_F(LeastRequestLoadBalancerTest, Normal) {
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
   stats_.max_host_weight_.set(1UL);
   cluster_.hosts_ = cluster_.healthy_hosts_;
   EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
@@ -455,8 +451,8 @@ TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceRuntimeOff) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
 
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
   stats_.max_host_weight_.set(3UL);
 
   cluster_.hosts_ = cluster_.healthy_hosts_;
@@ -471,8 +467,8 @@ TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceRuntimeOff) {
 }
 
 TEST_F(LeastRequestLoadBalancerTest, WeightImbalance) {
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
   stats_.max_host_weight_.set(3UL);
 
   cluster_.hosts_ = cluster_.healthy_hosts_;
@@ -516,8 +512,8 @@ TEST_F(LeastRequestLoadBalancerTest, WeightImbalance) {
 }
 
 TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81", 3)};
   stats_.max_host_weight_.set(3UL);
 
   cluster_.hosts_ = cluster_.healthy_hosts_;
@@ -552,8 +548,8 @@ public:
 TEST_F(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
 
 TEST_F(RandomLoadBalancerTest, Normal) {
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  cluster_.healthy_hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                             makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
   cluster_.hosts_ = cluster_.healthy_hosts_;
   EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_.chooseHost(nullptr));

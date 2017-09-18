@@ -7,13 +7,13 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
-namespace Envoy {
 using testing::_;
 
+namespace Envoy {
 namespace Json {
 
 std::vector<std::string> generateTestInputs() {

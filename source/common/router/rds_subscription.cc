@@ -6,6 +6,8 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -40,11 +42,13 @@ void RdsSubscription::createRequest(Http::Message& request) {
 
 void RdsSubscription::parseResponse(const Http::Message& response) {
   ENVOY_LOG(debug, "rds: parsing response");
-  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  const std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> resources;
   Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
   resources[0].set_name(route_config_name_);
   callbacks_->onConfigUpdate(resources);
+  version_info_ = Envoy::Config::Utility::computeHashedVersion(response_body);
   stats_.update_success_.inc();
 }
 

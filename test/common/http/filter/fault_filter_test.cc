@@ -21,7 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
@@ -30,6 +29,7 @@ using testing::ReturnRef;
 using testing::WithArgs;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 
 class FaultFilterTest : public testing::Test {
@@ -336,7 +336,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   timer_->callback_();
 
@@ -380,7 +380,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
   timer_->callback_();
 
@@ -630,7 +630,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
 
   filter_->onDestroy();
 }

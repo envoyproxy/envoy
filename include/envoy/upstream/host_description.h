@@ -5,7 +5,10 @@
 
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -45,14 +48,24 @@ public:
   virtual bool canary() const PURE;
 
   /**
+   * @return the metadata associated with this host
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
+
+  /**
    * @return the cluster the host is a member of.
    */
   virtual const ClusterInfo& cluster() const PURE;
 
   /**
-   * @return the host's outlier detection sink.
+   * @return the host's outlier detection monitor.
    */
-  virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
+  virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
+
+  /**
+   * @return the host's health checker monitor.
+   */
+  virtual HealthCheckHostMonitor& healthChecker() const PURE;
 
   /**
    * @return the hostname associated with the host if any.

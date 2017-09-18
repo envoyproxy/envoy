@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
 
@@ -36,7 +37,7 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
       new Tracing::HttpTracerImpl(std::move(lightstep_driver), server.localInfo()));
 }
 
-std::string LightstepHttpTracerFactory::name() { return "lightstep"; }
+std::string LightstepHttpTracerFactory::name() { return Config::HttpTracerNames::get().LIGHTSTEP; }
 
 /**
  * Static registration for the lightstep http tracer. @see RegisterFactory.

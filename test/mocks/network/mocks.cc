@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -20,6 +19,7 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Network {
 
 MockConnectionCallbacks::MockConnectionCallbacks() {}

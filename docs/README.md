@@ -10,7 +10,7 @@ The output can be found in `generated/docs`.
 
 The Envoy website, and docs are automatically built, and pushed on every commit 
 to master. This process is handled by Travis CI with the 
-[`publish.sh`](https://github.com/lyft/envoy/blob/master/docs/publish.sh) script. 
+[`publish.sh`](https://github.com/envoyproxy/envoy/blob/master/docs/publish.sh) script.
 
 In order to have this automatic process there is an encrypted ssh key at the root 
 of the envoy repo (`.publishdocskey.enc`). This key was encrypted with Travis CLI 

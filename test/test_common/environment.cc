@@ -1,6 +1,7 @@
 #include "test/test_common/environment.h"
 
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <fstream>
 #include <iostream>
@@ -13,6 +14,8 @@
 #include "common/common/assert.h"
 #include "common/common/compiler_requirements.h"
 #include "common/common/logger.h"
+#include "common/common/macros.h"
+#include "common/common/utility.h"
 
 #include "server/options_impl.h"
 
@@ -89,18 +92,15 @@ Server::Options& TestEnvironment::getOptions() {
 }
 
 const std::string& TestEnvironment::temporaryDirectory() {
-  static const std::string* temporary_directory = new std::string(getCheckedEnvVar("TEST_TMPDIR"));
-  return *temporary_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_TMPDIR"));
 }
 
 const std::string& TestEnvironment::runfilesDirectory() {
-  static const std::string* runfiles_directory = new std::string(getCheckedEnvVar("TEST_RUNDIR"));
-  return *runfiles_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_RUNDIR"));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
-  static const std::string* uds_directory = new std::string(getOrCreateUnixDomainSocketDirectory());
-  return *uds_directory;
+  CONSTRUCT_ON_FIRST_USE(std::string, getOrCreateUnixDomainSocketDirectory());
 }
 
 std::string TestEnvironment::substitute(const std::string& str,
@@ -179,7 +179,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute paths and other common things.
   out_json_string = substitute(out_json_string, version);
 
-  const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
+  const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
+  const std::string out_json_path =
+      TestEnvironment::temporaryPath(path + ".with.ports" + extension);
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
   {
     std::ofstream out_json_file(out_json_path);
@@ -206,4 +208,16 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
+
+std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
+                                                      const std::string& contents) {
+  const std::string out_path = TestEnvironment::temporaryPath(filename);
+  unlink(out_path.c_str());
+  {
+    std::ofstream out_file(out_path);
+    out_file << contents;
+  }
+  return out_path;
+}
+
 } // namespace Envoy

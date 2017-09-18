@@ -17,10 +17,10 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
-class MockDetectorHostSink : public DetectorHostSink {
+class MockDetectorHostMonitor : public DetectorHostMonitor {
 public:
-  MockDetectorHostSink();
-  ~MockDetectorHostSink();
+  MockDetectorHostMonitor();
+  ~MockDetectorHostMonitor();
 
   MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
@@ -61,6 +61,14 @@ public:
 
 } // namespace Outlier
 
+class MockHealthCheckHostMonitor : public HealthCheckHostMonitor {
+public:
+  MockHealthCheckHostMonitor();
+  ~MockHealthCheckHostMonitor();
+
+  MOCK_METHOD0(setUnhealthy, void());
+};
+
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();
@@ -68,15 +76,18 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
+  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
+  MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
-  testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
+  testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
+  testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
   testing::NiceMock<MockClusterInfo> cluster_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
@@ -97,23 +108,30 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
-  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
+    setHealthChecker_(health_checker);
+  }
+
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     setOutlierDetector_(outlier_detector);
   }
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(counters, std::list<Stats::CounterSharedPtr>());
   MOCK_CONST_METHOD1(createConnection_, MockCreateConnectionData(Event::Dispatcher& dispatcher));
   MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugeSharedPtr>());
+  MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
   MOCK_CONST_METHOD0(healthy, bool());
   MOCK_CONST_METHOD0(hostname, const std::string&());
-  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
-  MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostSinkPtr& outlier_detector));
+  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
+  MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));
+  MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostMonitorPtr& outlier_detector));
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
@@ -122,7 +140,7 @@ public:
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   testing::NiceMock<MockClusterInfo> cluster_;
-  testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
+  testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };

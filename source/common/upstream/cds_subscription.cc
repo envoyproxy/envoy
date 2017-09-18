@@ -8,19 +8,20 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
 
 CdsSubscription::CdsSubscription(Config::SubscriptionStats stats,
                                  const envoy::api::v2::ConfigSource& cds_config,
-                                 const Optional<SdsConfig>& sds_config, ClusterManager& cm,
-                                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                                 const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                                 ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                 Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
     : RestApiFetcher(cm, cds_config.api_config_source().cluster_name()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source())),
-      local_info_(local_info), stats_(stats), sds_config_(sds_config) {
+      local_info_(local_info), stats_(stats), eds_config_(eds_config) {
   const auto& api_config_source = cds_config.api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);
   // If we are building an CdsSubscription, the ConfigSource should be REST_LEGACY.
@@ -40,16 +41,18 @@ void CdsSubscription::createRequest(Http::Message& request) {
 
 void CdsSubscription::parseResponse(const Http::Message& response) {
   ENVOY_LOG(debug, "cds: parsing response");
-  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  const std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> clusters = response_json->getObjectArray("clusters");
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> resources;
   for (const Json::ObjectSharedPtr& cluster : clusters) {
-    Config::CdsJson::translateCluster(*cluster, sds_config_, *resources.Add());
+    Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add());
   }
 
   callbacks_->onConfigUpdate(resources);
+  version_info_ = Config::Utility::computeHashedVersion(response_body);
   stats_.update_success_.inc();
 }
 

@@ -80,6 +80,12 @@ public:
   virtual ObjectSharedPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
+   * Determine if an object is null.
+   * @return bool is the object null?
+   */
+  virtual bool isNull() const PURE;
+
+  /**
    * Get an array by name.
    * @param name supplies the key name.
    * @param allow_empty specifies whether to return an empty array if the key does not exist.
@@ -157,6 +163,21 @@ public:
    * @return the value of the object as a string (where the object is a string).
    */
   virtual std::string asString() const PURE;
+
+  /**
+   * @return the value of the object as a boolean (where the object is a boolean).
+   */
+  virtual bool asBoolean() const PURE;
+
+  /**
+   * @return the value of the object as a double (where the object is a double).
+   */
+  virtual double asDouble() const PURE;
+
+  /**
+   * @return the value of the object as an integer (where the object is an integer).
+   */
+  virtual int64_t asInteger() const PURE;
 
   /**
    * @return the JSON string representation of the object.

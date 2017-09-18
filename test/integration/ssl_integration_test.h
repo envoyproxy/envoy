@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "test/integration/integration.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
 
@@ -34,13 +34,13 @@ public:
 
 private:
   MockRuntimeIntegrationTestServer(const std::string& config_path)
-      : IntegrationTestServer(config_path, std::string()) {}
+      : IntegrationTestServer(config_path) {}
 };
 
-class SslIntegrationTest : public BaseIntegrationTest,
+class SslIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  SslIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  SslIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Initializer for an individual test.
    */

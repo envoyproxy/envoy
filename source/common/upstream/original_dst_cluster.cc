@@ -62,7 +62,7 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
         host.reset(new HostImpl(info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
-                                false, 1, ""));
+                                envoy::api::v2::Metadata::default_instance(), 1, ""));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map.  We just failed to find it in
@@ -93,9 +93,10 @@ OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context)
 
 OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
-                                       Ssl::ContextManager& ssl_context_manager,
+                                       Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                        Event::Dispatcher& dispatcher, bool added_via_api)
-    : ClusterImplBase(config, runtime, stats, ssl_context_manager, added_via_api),
+    : ClusterImplBase(config, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+                      added_via_api),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
                                    PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {

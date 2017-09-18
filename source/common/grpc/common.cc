@@ -10,13 +10,14 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -68,6 +69,11 @@ Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& traile
     return Optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
   return Optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
+}
+
+std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
+  const auto entry = trailers.GrpcMessage();
+  return entry ? entry->value().c_str() : EMPTY_STRING;
 }
 
 bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
@@ -183,6 +189,14 @@ void Common::validateResponse(Http::Message& http_response) {
     throw Exception(grpc_status_code.value(),
                     grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
   }
+}
+
+const std::string& Common::typeUrlPrefix() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
+}
+
+std::string Common::typeUrl(const std::string& qualified_name) {
+  return typeUrlPrefix() + "/" + qualified_name;
 }
 
 } // namespace Grpc

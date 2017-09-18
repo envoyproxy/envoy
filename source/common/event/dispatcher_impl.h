@@ -23,7 +23,7 @@ namespace Event {
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
   DispatcherImpl();
-  DispatcherImpl(Buffer::FactoryPtr&& factory);
+  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory);
   ~DispatcherImpl();
 
   /**
@@ -34,10 +34,12 @@ public:
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
   Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr address) override;
+  createClientConnection(Network::Address::InstanceConstSharedPtr address,
+                         Network::Address::InstanceConstSharedPtr source_address) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstanceConstSharedPtr address) override;
+                            Network::Address::InstanceConstSharedPtr address,
+                            Network::Address::InstanceConstSharedPtr source_address) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
@@ -57,7 +59,7 @@ public:
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
-  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
+  Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
 
 private:
   void runPostCallbacks();
@@ -71,7 +73,7 @@ private:
 #endif
 
   Thread::ThreadId run_tid_{};
-  Buffer::FactoryPtr buffer_factory_;
+  Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

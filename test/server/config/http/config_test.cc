@@ -2,9 +2,15 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/well_known_names.h"
+#include "common/http/access_log/access_log_impl.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
+#include "server/config/http/file_access_log.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
@@ -20,11 +26,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -39,7 +45,6 @@ TEST(HttpFilterConfigTest, BufferFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   BufferFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -71,7 +76,6 @@ TEST(HttpFilterConfigTest, RateLimitFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RateLimitFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -101,7 +105,6 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   DynamoFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -122,7 +125,6 @@ TEST(HttpFilterConfigTest, FaultFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -138,7 +140,6 @@ TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   GrpcHttp1BridgeFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -154,7 +155,6 @@ TEST(HttpFilterConfigTest, GrpcWebFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   GrpcWebFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -172,7 +172,6 @@ TEST(HttpFilterConfigTest, HealthCheckFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Both, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -204,7 +203,6 @@ TEST(HttpFilterConfigTest, RouterFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -240,7 +238,6 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   IpTaggingFilterConfig factory;
-  EXPECT_EQ(HttpFilterType::Decoder, factory.type());
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -267,7 +264,8 @@ TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
-      EnvoyException, "Double registration for name: 'router'");
+      EnvoyException,
+      fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
 }
 
 TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
@@ -290,7 +288,29 @@ TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
 TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
-      "Double registration for name: 'zipkin'");
+      "Double registration for name: 'envoy.zipkin'");
+}
+
+TEST(AccessLogConfigTest, FileAccessLogTest) {
+  auto factory = Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(
+      Config::AccessLogNames::get().FILE);
+  ASSERT_NE(nullptr, factory);
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  ASSERT_NE(nullptr, message);
+
+  envoy::api::v2::filter::FileAccessLog file_access_log;
+  file_access_log.set_path("/dev/null");
+  file_access_log.set_format("%START_TIME%");
+  MessageUtil::jsonConvert(file_access_log, *message);
+
+  Http::AccessLog::FilterPtr filter;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  Http::AccessLog::InstanceSharedPtr instance =
+      factory->createAccessLogInstance(*message, std::move(filter), context);
+  EXPECT_NE(nullptr, instance);
+  EXPECT_NE(nullptr, dynamic_cast<Http::AccessLog::FileAccessLog*>(instance.get()));
 }
 
 } // namespace Configuration

@@ -90,8 +90,8 @@ public:
    */
   StreamEncoder& newStream(StreamDecoder& response_decoder);
 
-  void setBufferStats(const Network::Connection::BufferStats& stats) {
-    connection_->setBufferStats(stats);
+  void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
+    connection_->setConnectionStats(stats);
   }
 
   void setCodecClientCallbacks(CodecClientCallbacks& callbacks) {

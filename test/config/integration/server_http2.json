@@ -184,7 +184,7 @@
       "config": {
         "codec_type": "http2",
         "http2_settings": {
-           "per_stream_buffer_limit": 1024
+           "initial_stream_window_size": 65535
         },
         "drain_timeout_ms": 5000,
         "stat_prefix": "router",
@@ -204,6 +204,42 @@
           ]
         },
         "filters": [
+          { "type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  },
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "per_connection_buffer_limit_bytes": 1024,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http2",
+        "http2_settings": {
+           "initial_stream_window_size": 65535
+        },
+        "drain_timeout_ms": 5000,
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/dynamo/url",
+                  "cluster": "cluster_3"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "http_dynamo_filter", "config": {} },
           { "type": "decoder", "name": "router", "config": {}}
         ]
       }

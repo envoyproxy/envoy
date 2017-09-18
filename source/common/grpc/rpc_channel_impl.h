@@ -26,7 +26,7 @@ namespace Grpc {
  *    needed.
  * 4) Inflight RPCs can be safely cancelled using cancel().
  * 5) See GrpcRequestImplTest for an example.
- * DEPRECATED: See https://github.com/lyft/envoy/issues/1102
+ * DEPRECATED: See https://github.com/envoyproxy/envoy/issues/1102
  */
 class RpcChannelImpl : public RpcChannel, public Http::AsyncClient::Callbacks {
 public:

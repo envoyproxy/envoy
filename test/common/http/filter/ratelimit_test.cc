@@ -19,7 +19,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -29,6 +28,7 @@ using testing::SetArgReferee;
 using testing::WithArgs;
 using testing::_;
 
+namespace Envoy {
 namespace Http {
 namespace RateLimit {
 
@@ -170,7 +170,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   request_headers_.addCopy(Http::Headers::get().RequestId, "requestid");
   request_headers_.addCopy(Http::Headers::get().OtSpanContext, "context");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());

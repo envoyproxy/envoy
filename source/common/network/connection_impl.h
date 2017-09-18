@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optional.h"
 #include "envoy/network/connection.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -45,7 +46,8 @@ class ConnectionImpl : public virtual Connection,
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address, bool using_original_dst,
+                 Address::InstanceConstSharedPtr local_address,
+                 Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected);
 
   ~ConnectionImpl();
@@ -67,7 +69,7 @@ public:
   bool readEnabled() const override;
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
-  void setBufferStats(const BufferStats& stats) override;
+  void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }
   State state() const override;
@@ -78,7 +80,7 @@ public:
   bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource
-  Buffer::Instance& getReadBuffer() override { return *read_buffer_; }
+  Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
 protected:
@@ -94,7 +96,7 @@ protected:
   void raiseEvent(ConnectionEvent event);
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() {
-    return read_buffer_limit_ > 0 && read_buffer_->length() >= read_buffer_limit_;
+    return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
   // shouldDrainReadBuffer().
@@ -109,8 +111,10 @@ protected:
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
-  Buffer::InstancePtr read_buffer_;
-  Buffer::WatermarkBuffer write_buffer_;
+  Buffer::OwnedImpl read_buffer_;
+  // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
+  // a generic pointer.
+  Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
 private:
@@ -120,6 +124,7 @@ private:
     static const uint32_t Connecting               = 0x2;
     static const uint32_t CloseWithFlush           = 0x4;
     static const uint32_t ImmediateConnectionError = 0x8;
+    static const uint32_t BindError                = 0x10;
   };
   // clang-format on
 
@@ -144,7 +149,7 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
-  std::unique_ptr<BufferStats> buffer_stats_;
+  std::unique_ptr<ConnectionStats> connection_stats_;
   // Tracks the number of times reads have been disabled.  If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
@@ -158,7 +163,9 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
+                       Address::InstanceConstSharedPtr remote_address,
+                       const Address::InstanceConstSharedPtr source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

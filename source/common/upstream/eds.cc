@@ -5,9 +5,12 @@
 #include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"
+
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -17,7 +20,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, added_via_api),
+    : BaseDynamicClusterImpl(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+                             added_via_api),
       local_info_(local_info), cluster_name_(cluster.eds_cluster_config().service_name().empty()
                                                  ? cluster.name()
                                                  : cluster.eds_cluster_config().service_name()) {
@@ -51,13 +55,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     const std::string& zone = locality_lb_endpoint.locality().zone();
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const bool canary = Config::Metadata::metadataValue(lb_endpoint.metadata(),
-                                                          Config::MetadataFilters::get().ENVOY_LB,
-                                                          Config::MetadataEnvoyLbKeys::get().CANARY)
-                              .bool_value();
       new_hosts.emplace_back(new HostImpl(
-          info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()), canary,
-          lb_endpoint.load_balancing_weight().value(), zone));
+          info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()),
+          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(), zone));
     }
   }
 

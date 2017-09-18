@@ -157,6 +157,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
     virtual void readDisable(bool disable) override;
+    virtual uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);
@@ -186,11 +187,9 @@ protected:
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
     Buffer::WatermarkBuffer pending_recv_data_{
-        Buffer::InstancePtr{new Buffer::OwnedImpl},
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
         [this]() -> void { this->pendingRecvBufferHighWatermark(); }};
     Buffer::WatermarkBuffer pending_send_data_{
-        Buffer::InstancePtr{new Buffer::OwnedImpl},
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;

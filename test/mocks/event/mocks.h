@@ -27,14 +27,17 @@ public:
   ~MockDispatcher();
 
   Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr address) override {
-    return Network::ClientConnectionPtr{createClientConnection_(address)};
+  createClientConnection(Network::Address::InstanceConstSharedPtr address,
+                         Network::Address::InstanceConstSharedPtr source_address) override {
+    return Network::ClientConnectionPtr{createClientConnection_(address, source_address)};
   }
 
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstanceConstSharedPtr address) override {
-    return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, address)};
+                            Network::Address::InstanceConstSharedPtr address,
+                            Network::Address::InstanceConstSharedPtr source_address) override {
+    return Network::ClientConnectionPtr{
+        createSslClientConnection_(ssl_ctx, address, source_address)};
   }
 
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
@@ -77,11 +80,13 @@ public:
 
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
-  MOCK_METHOD1(createClientConnection_,
-               Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address));
-  MOCK_METHOD2(createSslClientConnection_,
+  MOCK_METHOD2(createClientConnection_,
+               Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
+                                          Network::Address::InstanceConstSharedPtr source_address));
+  MOCK_METHOD3(createSslClientConnection_,
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstanceConstSharedPtr address));
+                                          Network::Address::InstanceConstSharedPtr address,
+                                          Network::Address::InstanceConstSharedPtr source_address));
   MOCK_METHOD1(createDnsResolver,
                Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
@@ -104,11 +109,11 @@ public:
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
-  Buffer::Factory& getBufferFactory() override { return *buffer_factory_; }
+  Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
 
 private:
   std::list<DeferredDeletablePtr> to_delete_;
-  Buffer::FactoryPtr buffer_factory_;
+  Buffer::WatermarkFactoryPtr buffer_factory_;
 };
 
 class MockTimer : public Timer {
@@ -122,6 +127,14 @@ public:
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
 
   TimerCb callback_;
+};
+
+class MockSignalEvent : public SignalEvent {
+public:
+  MockSignalEvent(MockDispatcher* dispatcher);
+  ~MockSignalEvent();
+
+  SignalCb callback_;
 };
 
 class MockFileEvent : public FileEvent {

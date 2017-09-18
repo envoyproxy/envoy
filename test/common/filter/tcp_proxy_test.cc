@@ -8,6 +8,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -18,13 +19,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Filter {
 
 TEST(TcpProxyConfigTest, NoRouteConfig) {
@@ -376,9 +377,8 @@ public:
       upstream_connection_ = new NiceMock<Network::MockClientConnection>();
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
-      conn_info.host_description_.reset(
-          new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "",
-                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+      conn_info.host_description_ = Upstream::makeTestHost(
+          cluster_manager_.thread_local_cluster_.cluster_.info_, "tcp://127.0.0.1:80");
       EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
           .WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))
@@ -394,6 +394,9 @@ public:
     EXPECT_EQ(return_connection ? Network::FilterStatus::Continue
                                 : Network::FilterStatus::StopIteration,
               filter_->onNewConnection());
+
+    EXPECT_EQ(Optional<uint64_t>(), filter_->hashKey());
+    EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
   }
 
   TcpProxyConfigSharedPtr config_;

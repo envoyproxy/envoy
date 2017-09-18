@@ -17,7 +17,8 @@ public:
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Network::Address::InstanceConstSharedPtr remote_address,
-                 Network::Address::InstanceConstSharedPtr local_address, bool using_original_dst,
+                 Network::Address::InstanceConstSharedPtr local_address,
+                 Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected, Context& ctx, InitialState state);
   ~ConnectionImpl();
 
@@ -54,7 +55,8 @@ private:
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
   ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                       Network::Address::InstanceConstSharedPtr address);
+                       Network::Address::InstanceConstSharedPtr address,
+                       Network::Address::InstanceConstSharedPtr source_address);
 
   // Network::ClientConnection
   void connect() override;

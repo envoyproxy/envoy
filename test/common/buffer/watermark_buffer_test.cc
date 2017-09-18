@@ -13,12 +13,12 @@ class WatermarkBufferTest : public testing::Test {
 public:
   WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
 
-  Buffer::WatermarkBuffer buffer_{InstancePtr{new OwnedImpl()},
-                                  [&]() -> void { ++times_low_watermark_called_; },
+  Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; }};
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
 };
+TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 
 TEST_F(WatermarkBufferTest, AddChar) {
   buffer_.add(TEN_BYTES, 10);
@@ -149,6 +149,13 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.setWatermarks(8, 20);
   buffer_.setWatermarks(10, 20);
   EXPECT_EQ(1, times_low_watermark_called_);
+
+  EXPECT_EQ(1, times_high_watermark_called_);
+  buffer_.setWatermarks(2);
+  EXPECT_EQ(2, times_high_watermark_called_);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(0);
+  EXPECT_EQ(2, times_low_watermark_called_);
 }
 
 TEST_F(WatermarkBufferTest, GetRawSlices) {
@@ -174,8 +181,7 @@ TEST_F(WatermarkBufferTest, Search) {
 TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
-  Buffer::WatermarkBuffer buffer1{InstancePtr{new OwnedImpl()},
-                                  [&]() -> void { ++low_watermark_buffer1; },
+  Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; }};
   buffer1.setWatermarks(5, 10);
 

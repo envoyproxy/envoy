@@ -28,7 +28,7 @@ typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
 /**
  * A formatter that expands the request header variable to a value based on info in RequestInfo.
  */
-class RequestHeaderFormatter : public HeaderFormatter, Logger::Loggable<Logger::Id::config> {
+class RequestHeaderFormatter : public HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& field_name);
 
@@ -63,7 +63,7 @@ typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
  * This class holds the parsing logic required during configuration build and
  * also perform evaluation for the variables at runtime.
  */
-class RequestHeaderParser : Logger::Loggable<Logger::Id::config> {
+class RequestHeaderParser {
 public:
   virtual ~RequestHeaderParser() {}
 

@@ -4,6 +4,8 @@
 
 #include "common/common/assert.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Singleton {
 

@@ -83,8 +83,9 @@ typedef std::unique_ptr<FakeStream> FakeStreamPtr;
  */
 class QueuedConnectionWrapper : public Network::ConnectionCallbacks {
 public:
-  QueuedConnectionWrapper(Network::Connection& connection)
-      : connection_(connection), parented_(false) {
+  QueuedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
+      : connection_(connection), parented_(false),
+        allow_unexpected_disconnects_(allow_unexpected_disconnects) {
     connection_.addConnectionCallbacks(*this);
   }
   void set_parented() {
@@ -96,8 +97,9 @@ public:
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     std::unique_lock<std::mutex> lock(lock_);
-    RELEASE_ASSERT(parented_ || (event != Network::ConnectionEvent::RemoteClose &&
-                                 event != Network::ConnectionEvent::LocalClose));
+    RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_ ||
+                   (event != Network::ConnectionEvent::RemoteClose &&
+                    event != Network::ConnectionEvent::LocalClose));
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
@@ -106,6 +108,7 @@ private:
   Network::Connection& connection_;
   bool parented_;
   std::mutex lock_;
+  bool allow_unexpected_disconnects_;
 };
 
 typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
@@ -160,7 +163,10 @@ public:
 
   FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
   Network::Connection& connection() { return connection_; }
-  FakeStreamPtr waitForNewStream();
+  // By default waitForNewStream assumes the next event is a new stream and
+  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // wait for a new stream, set ignore_spurious_events = true.
+  FakeStreamPtr waitForNewStream(bool ignore_spurious_events = false);
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
@@ -231,6 +237,7 @@ public:
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
+  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
@@ -249,5 +256,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
+  bool allow_unexpected_disconnects_;
 };
 } // namespace Envoy

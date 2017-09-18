@@ -16,6 +16,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/config/bootstrap_json.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
@@ -23,7 +24,6 @@
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
-#include "common/stats/statsd.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -46,8 +46,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
                                POOL_GAUGE_PREFIX(stats_store_, "server."))},
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
-      handler_(new ConnectionHandlerImpl(log(), *dispatcher_)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
@@ -65,9 +65,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(critical, "error initializing configuration '{}': {}",
-              options.configPath() +
-                  (options.bootstrapPath().empty() ? "" : (";" + options.bootstrapPath())),
+    ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
@@ -133,7 +131,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  InstanceUtil::flushCountersAndGaugesToSinks(stat_sinks_, stats_store_);
+  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
@@ -151,10 +149,16 @@ void InstanceImpl::initialize(Options& options,
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   envoy::api::v2::Bootstrap bootstrap;
-  if (!options.bootstrapPath().empty()) {
-    MessageUtil::loadFromFile(options.bootstrapPath(), bootstrap);
+  try {
+    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+  } catch (const EnvoyException& e) {
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  }
+  if (!bootstrap.has_admin()) {
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
@@ -162,7 +166,7 @@ void InstanceImpl::initialize(Options& options,
       new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
                                    options.serviceClusterName(), options.serviceNodeName()));
 
-  Configuration::InitialImpl initial_config(*config_json);
+  Configuration::InitialImpl initial_config(bootstrap);
   ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
@@ -205,25 +209,11 @@ void InstanceImpl::initialize(Options& options,
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(*config_json, bootstrap, *this, *cluster_manager_factory_);
+  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
 
-  // Setup signals.
-  sigterm_ = dispatcher_->listenForSignal(SIGTERM, [this]() -> void {
-    ENVOY_LOG(warn, "caught SIGTERM");
-    restarter_.terminateParent();
-    dispatcher_->exit();
-  });
-
-  sig_usr_1_ = dispatcher_->listenForSignal(SIGUSR1, [this]() -> void {
-    ENVOY_LOG(warn, "caught SIGUSR1");
-    access_log_manager_.reopen();
-  });
-
-  sig_hup_ = dispatcher_->listenForSignal(SIGHUP, []() -> void {
-    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
-  });
-
-  initializeStatSinks();
+  for (Stats::SinkPtr& sink : main_config->statsSinks()) {
+    stats_store_.addSink(*sink);
+  }
 
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
@@ -263,33 +253,6 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   }
 }
 
-void InstanceImpl::initializeStatSinks() {
-  if (config_->statsdUdpIpAddress().valid()) {
-    ENVOY_LOG(info, "statsd UDP ip address: {}", config_->statsdUdpIpAddress().value());
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(
-        thread_local_,
-        Network::Utility::parseInternetAddressAndPort(config_->statsdUdpIpAddress().value())));
-    stats_store_.addSink(*stat_sinks_.back());
-  } else if (config_->statsdUdpPort().valid()) {
-    // TODO(hennna): DEPRECATED - statsdUdpPort will be removed in 1.4.0.
-    ENVOY_LOG(warn, "statsd_local_udp_port has been DEPRECATED and will be removed in 1.4.0. "
-                    "Consider setting statsd_udp_ip_address instead.");
-    ENVOY_LOG(info, "statsd UDP port: {}", config_->statsdUdpPort().value());
-    Network::Address::InstanceConstSharedPtr address(
-        new Network::Address::Ipv4Instance(config_->statsdUdpPort().value()));
-    stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(thread_local_, address));
-    stats_store_.addSink(*stat_sinks_.back());
-  }
-
-  if (config_->statsdTcpClusterName().valid()) {
-    ENVOY_LOG(info, "statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
-    stat_sinks_.emplace_back(
-        new Stats::Statsd::TcpStatsdSink(*local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager(), stats_store_));
-    stats_store_.addSink(*stat_sinks_.back());
-  }
-}
-
 void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
   if (!flags_path.valid()) {
     return;
@@ -304,14 +267,51 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
 
 uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
-void InstanceImpl::run() {
+RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+                     HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
+                     InitManagerImpl& init_manager, std::function<void()> workers_start_cb) {
+
+  // Setup signals.
+  sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
+    ENVOY_LOG(warn, "caught SIGTERM");
+    shutdown_ = true;
+    hot_restart.terminateParent();
+    dispatcher.exit();
+  });
+
+  sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
+    ENVOY_LOG(warn, "caught SIGUSR1");
+    access_log_manager.reopen();
+  });
+
+  sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
+    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
+  });
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
-  // this can fire immediately if all clusters have already initialized.
-  clusterManager().setInitializedCb([this]() -> void {
+  // this can fire immediately if all clusters have already initialized. Also note that we need
+  // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
+  // starts.
+  cm.setInitializedCb([this, &init_manager, workers_start_cb]() {
+    if (shutdown_) {
+      return;
+    }
+
     ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
-    init_manager_.initialize([this]() -> void { startWorkers(); });
+    init_manager.initialize([this, workers_start_cb]() {
+      if (shutdown_) {
+        return;
+      }
+
+      workers_start_cb();
+    });
   });
+}
+
+void InstanceImpl::run() {
+  RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
+                   [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(warn, "starting main dispatch loop");
@@ -340,7 +340,7 @@ void InstanceImpl::run() {
   handler_.reset();
   thread_local_.shutdownThread();
   ENVOY_LOG(warn, "exiting");
-  log().flush();
+  ENVOY_FLUSH_LOG();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }

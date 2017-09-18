@@ -13,7 +13,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
@@ -179,6 +179,8 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
 
 void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disable); }
 
+uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -261,8 +263,7 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
-    : connection_(connection), output_buffer_(Buffer::InstancePtr{new Buffer::OwnedImpl()},
-                                              [&]() -> void { this->onBelowLowWatermark(); },
+    : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
@@ -416,7 +417,8 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
     throw CodecProtocolException(
         "http/1.1 protocol error: invalid url in request line, parsed invalid");
   } else {
-    if ((u.field_set & UF_HOST) == UF_HOST && (u.field_set & UF_SCHEMA) == UF_SCHEMA) {
+    if ((u.field_set & (1 << UF_HOST)) == (1 << UF_HOST) &&
+        (u.field_set & (1 << UF_SCHEMA)) == (1 << UF_SCHEMA)) {
       // RFC7230#5.7
       // When a proxy receives a request with an absolute-form of
       // request-target, the proxy MUST ignore the received Host header field
@@ -425,15 +427,21 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
       // new Host field-value based on the received request-target rather than
       // forward the received Host field-value.
 
+      uint16_t authority_len = u.field_data[UF_HOST].len;
+
+      if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+        authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+      }
+
       // Insert the host header, this will later be converted to :authority
       std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
-                           u.field_data[UF_HOST].len);
+                           authority_len);
 
       headers.insertHost().value(new_host);
 
       // RFC allows the absolute-uri to not end in /, but the absolute path form
       // must start with /
-      if ((u.field_set & UF_PATH) == UF_PATH && u.field_data[UF_PATH].len > 0) {
+      if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
         HeaderString new_path;
         new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
                          active_request_->request_url_.size() - u.field_data[UF_PATH].off);

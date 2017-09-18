@@ -37,7 +37,6 @@ normal gRPC requests over HTTP/2.
 .. code-block:: json
 
   {
-    "type": "both",
     "name": "grpc_http1_bridge",
     "config": {}
   }

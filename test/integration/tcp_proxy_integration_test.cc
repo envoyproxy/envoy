@@ -107,29 +107,28 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   std::unique_ptr<Ssl::ContextManager> context_manager(new Ssl::ContextManagerImpl(runtime));
   Ssl::ClientContextPtr context;
   ConnectionStatusCallbacks connect_callbacks;
-  MockBuffer* client_write_buffer;
+  MockWatermarkBuffer* client_write_buffer;
   executeActions({
       // Set up the mock buffer factory so the newly created SSL client will have a mock write
       // buffer.  This allows us to track the bytes actually written to the socket.
       [&]() -> void {
-        EXPECT_CALL(*mock_buffer_factory_, create_())
-            .Times(2)
-            .WillOnce(Invoke([&]() -> Buffer::Instance* {
-              return new Buffer::OwnedImpl; // client read buffer.
-            }))
-            .WillOnce(Invoke([&]() -> Buffer::Instance* {
-              client_write_buffer = new NiceMock<MockBuffer>;
+        EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
+            .Times(1)
+            .WillOnce(Invoke([&](std::function<void()> below_low,
+                                 std::function<void()> above_high) -> Buffer::Instance* {
+              client_write_buffer = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
               ON_CALL(*client_write_buffer, move(_))
-                  .WillByDefault(Invoke(client_write_buffer, &MockBuffer::baseMove));
+                  .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
               ON_CALL(*client_write_buffer, drain(_))
-                  .WillByDefault(Invoke(client_write_buffer, &MockBuffer::trackDrains));
+                  .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
               return client_write_buffer;
             }));
         // Set up the SSl client.
         Network::Address::InstanceConstSharedPtr address =
             Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
         context = Ssl::createClientSslContext(false, false, *context_manager);
-        ssl_client = dispatcher_->createSslClientConnection(*context, address);
+        ssl_client = dispatcher_->createSslClientConnection(
+            *context, address, Network::Address::InstanceConstSharedPtr());
       },
       // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
       // filter so there will be no pause waiting on auth data.

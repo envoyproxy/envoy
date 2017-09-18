@@ -48,12 +48,16 @@ public:
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
+  MOCK_CONST_METHOD0(requestReceivedDuration, std::chrono::microseconds());
+  MOCK_METHOD1(requestReceivedDuration, void(MonotonicTime time));
+  MOCK_CONST_METHOD0(responseReceivedDuration, std::chrono::microseconds());
+  MOCK_METHOD1(responseReceivedDuration, void(MonotonicTime time));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, Protocol());
   MOCK_METHOD1(protocol, void(Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
-  MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(duration, std::chrono::microseconds());
   MOCK_CONST_METHOD1(getResponseFlag, bool(Http::AccessLog::ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
@@ -63,6 +67,8 @@ public:
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
+  std::chrono::microseconds request_received_duration_;
+  std::chrono::microseconds response_received_duration_;
 };
 
 } // namespace AccessLog
@@ -156,6 +162,7 @@ public:
   MOCK_METHOD1(resetStream, void(StreamResetReason reason));
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
+  MOCK_METHOD0(bufferLimit, uint32_t());
 
   std::list<StreamCallbacks*> callbacks_{};
 };
@@ -233,9 +240,7 @@ public:
   ~MockStreamDecoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(connection, const Network::Connection*());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
@@ -248,6 +253,8 @@ public:
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
   MOCK_METHOD1(removeDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
+  MOCK_METHOD1(setDecoderBufferLimit, void(uint32_t));
+  MOCK_METHOD0(decoderBufferLimit, uint32_t());
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -256,7 +263,7 @@ public:
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
 
   MOCK_METHOD0(continueDecoding, void());
-  MOCK_METHOD1(addDecodedData, void(Buffer::Instance& data));
+  MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
@@ -273,9 +280,7 @@ public:
   ~MockStreamEncoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(connection, const Network::Connection*());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
@@ -286,9 +291,11 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
+  MOCK_METHOD1(setEncoderBufferLimit, void(uint32_t));
+  MOCK_METHOD0(encoderBufferLimit, uint32_t());
 
   // Http::StreamEncoderFilterCallbacks
-  MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));
+  MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 

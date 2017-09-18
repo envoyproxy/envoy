@@ -7,10 +7,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/instance.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
@@ -96,6 +98,7 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
+    const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
     Router::ConfigConstSharedPtr config_;
   };

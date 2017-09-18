@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -79,7 +80,8 @@ bool StatusCodeFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
 }
 
 bool DurationFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
-  return compareAgainstValue(info.duration().count());
+  return compareAgainstValue(
+      std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config,
@@ -143,36 +145,30 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
   return !info.healthCheck();
 }
 
-InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filter,
-                           FormatterPtr&& formatter,
-                           Envoy::AccessLog::AccessLogManager& log_manager)
+InstanceSharedPtr AccessLogFactory::fromProto(const envoy::api::v2::filter::AccessLog& config,
+                                              Server::Configuration::FactoryContext& context) {
+  FilterPtr filter;
+  if (config.has_filter()) {
+    filter = FilterFactory::fromProto(config.filter(), context.runtime());
+  }
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
+          config.name());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(config, factory);
+
+  return factory.createAccessLogInstance(*message, std::move(filter), context);
+}
+
+FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& filter,
+                             FormatterPtr&& formatter,
+                             Envoy::AccessLog::AccessLogManager& log_manager)
     : filter_(std::move(filter)), formatter_(std::move(formatter)) {
   log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
-InstanceSharedPtr InstanceImpl::fromProto(const envoy::api::v2::filter::AccessLog& config,
-                                          Runtime::Loader& runtime,
-                                          Envoy::AccessLog::AccessLogManager& log_manager) {
-  std::string access_log_path = config.path();
-
-  FilterPtr filter;
-  if (config.has_filter()) {
-    filter = FilterFactory::fromProto(config.filter(), runtime);
-  }
-
-  FormatterPtr formatter;
-  if (config.format().empty()) {
-    formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
-  } else {
-    formatter.reset(new FormatterImpl(config.format()));
-  }
-
-  return InstanceSharedPtr{
-      new InstanceImpl(access_log_path, std::move(filter), std::move(formatter), log_manager)};
-}
-
-void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
-                       const RequestInfo& request_info) {
+void FileAccessLog::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
+                        const RequestInfo& request_info) {
   static HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;

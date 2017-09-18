@@ -6,6 +6,7 @@
 
 #include "test/integration/utility.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -16,58 +17,57 @@ INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/healthcheck", "", Http::CodecClient::Type::HTTP1, version_);
+      lookupPort("http"), "GET", "/healthcheck", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/fail", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/healthcheck", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/ok", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/healthcheck", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http_buffer"), "GET", "/healthcheck",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationAdminTest, AdminLogging) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/logging", "", Http::CodecClient::Type::HTTP1, version_);
+      lookupPort("admin"), "GET", "/logging", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad level
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?level=blah",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad logger
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?blah=info",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // This is going to stomp over custom log levels that are set on the command line.
-  response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?level=warning", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/logging?level=warning", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   for (const Logger::Logger& logger : Logger::Registry::loggers()) {
@@ -75,7 +75,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   }
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?assert=trace",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
@@ -83,7 +83,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   const char* level_name = spdlog::level::level_names[default_log_level_];
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
                                                 fmt::format("/logging?level={}", level_name), "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   for (const Logger::Logger& logger : Logger::Registry::loggers()) {
@@ -93,47 +93,47 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 
 TEST_P(IntegrationAdminTest, Admin) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/", "", Http::CodecClient::Type::HTTP1, version_);
+      lookupPort("admin"), "GET", "/", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/server_info", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("400", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/hot_restart_version",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reset_counters", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/certs", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
-                                                Http::CodecClient::Type::HTTP1, version_);
+                                                client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
@@ -153,14 +153,13 @@ TEST_P(IntegrationAdminTest, Admin) {
 #ifdef TCMALLOC
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler?enable=n",
-                                                "", Http::CodecClient::Type::HTTP1, version_);
+                                                "", client_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }

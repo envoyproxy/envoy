@@ -17,7 +17,6 @@ If the rate limit service is called, and the response for any of the descriptors
 .. code-block:: json
 
   {
-    "type": "decoder",
     "name": "rate_limit",
     "config": {
       "domain": "...",

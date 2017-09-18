@@ -42,7 +42,7 @@ public:
     envoy::api::v2::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     cds_ =
-        CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_);
+        CdsApiImpl::create(cds_config, eds_config_, cm_, dispatcher_, random_, local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
@@ -90,7 +90,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
-  Optional<Upstream::SdsConfig> sds_config_;
+  Optional<envoy::api::v2::ConfigSource> eds_config_;
 };
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
@@ -108,7 +108,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   envoy::api::v2::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(
-      CdsApiImpl::create(cds_config, sds_config_, cm_, dispatcher_, random_, local_info_, store_),
+      CdsApiImpl::create(cds_config, eds_config_, cm_, dispatcher_, random_, local_info_, store_),
       EnvoyException);
 }
 
@@ -131,7 +131,9 @@ TEST_F(CdsApiImplTest, Basic) {
   expectAdd("cluster2");
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_EQ("", cds_->versionInfo());
   callbacks_->onSuccess(std::move(message));
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json), cds_->versionInfo());
 
   expectRequest();
   interval_timer_->callback_();
@@ -153,6 +155,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json), cds_->versionInfo());
 }
 
 TEST_F(CdsApiImplTest, Failure) {
@@ -181,6 +184,7 @@ TEST_F(CdsApiImplTest, Failure) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
+  EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_failure").value());
 }
@@ -203,6 +207,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
+  EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
 }

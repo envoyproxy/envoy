@@ -16,6 +16,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/config_validation/admin.h"
 #include "server/config_validation/api.h"
 #include "server/config_validation/cluster_manager.h"
 #include "server/config_validation/dns.h"
@@ -55,7 +56,7 @@ public:
                      ComponentFactory& component_factory);
 
   // Server::Instance
-  Admin& admin() override { NOT_IMPLEMENTED; }
+  Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return config_->clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
@@ -91,7 +92,7 @@ public:
   std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
-    return ProdListenerComponentFactory::createFilterFactoryList_(filters, *this, context);
+    return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                                     bool) override {
@@ -118,6 +119,7 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;

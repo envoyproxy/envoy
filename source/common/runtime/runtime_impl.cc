@@ -15,8 +15,8 @@
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
+#include "fmt/format.h"
 #include "openssl/rand.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {

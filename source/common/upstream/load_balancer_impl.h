@@ -20,7 +20,7 @@ public:
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  static bool isGlobalPanic(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime);
+  static bool isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime);
 };
 
 /**

@@ -7,6 +7,7 @@
 #include "common/json/json_loader.h"
 
 #include "api/lds.pb.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {
@@ -40,7 +41,8 @@ void LdsSubscription::createRequest(Http::Message& request) {
 
 void LdsSubscription::parseResponse(const Http::Message& response) {
   ENVOY_LOG(debug, "lds: parsing response");
-  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  const std::string response_body = response.bodyAsString();
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   response_json->validateSchema(Json::Schema::LDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> json_listeners = response_json->getObjectArray("listeners");
 
@@ -50,6 +52,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
   }
 
   callbacks_->onConfigUpdate(resources);
+  version_info_ = Config::Utility::computeHashedVersion(response_body);
   stats_.update_success_.inc();
 }
 

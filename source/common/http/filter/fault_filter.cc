@@ -18,6 +18,8 @@
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -209,8 +211,11 @@ void FaultFilter::recordAbortsInjectedStats() {
 }
 
 FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
-  return delay_timer_ == nullptr ? FilterDataStatus::Continue
-                                 : FilterDataStatus::StopIterationAndBuffer;
+  if (delay_timer_ == nullptr) {
+    return FilterDataStatus::Continue;
+  }
+  // If the request is too large, stop reading new data until the buffer drains.
+  return FilterDataStatus::StopIterationAndWatermark;
 }
 
 FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {

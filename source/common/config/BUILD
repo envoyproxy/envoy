@@ -21,6 +21,50 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ads_api_lib",
+    hdrs = ["ads_api_impl.h"],
+    external_deps = ["envoy_discovery"],
+    deps = [
+        "//include/envoy/config:ads_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "ads_subscription_lib",
+    hdrs = ["ads_subscription_impl.h"],
+    external_deps = ["envoy_discovery"],
+    deps = [
+        "//include/envoy/config:ads_interface",
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "bootstrap_json_lib",
+    srcs = ["bootstrap_json.cc"],
+    hdrs = ["bootstrap_json.h"],
+    external_deps = ["envoy_bootstrap"],
+    deps = [
+        ":address_json_lib",
+        ":cds_json_lib",
+        ":json_utility_lib",
+        ":lds_json_lib",
+        ":utility_lib",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "base_json_lib",
     srcs = ["base_json.cc"],
     hdrs = ["base_json.h"],
@@ -77,6 +121,7 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -111,6 +156,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -133,6 +179,7 @@ envoy_cc_library(
         ":address_json_lib",
         ":json_utility_lib",
         ":tls_context_json_lib",
+        ":well_known_names",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
@@ -171,6 +218,7 @@ envoy_cc_library(
         ":base_json_lib",
         ":json_utility_lib",
         ":metadata_lib",
+        ":well_known_names",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
@@ -182,6 +230,7 @@ envoy_cc_library(
     hdrs = ["subscription_factory.h"],
     external_deps = ["envoy_base"],
     deps = [
+        ":ads_subscription_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
@@ -215,9 +264,20 @@ envoy_cc_library(
         ":json_utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/registry",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:singleton",
         "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "well_known_names",
+    hdrs = ["well_known_names.h"],
+    deps = ["//source/common/common:singleton"],
 )

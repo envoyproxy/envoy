@@ -7,7 +7,6 @@ installed it will echo (write) all received data back to the connected downstrea
 .. code-block:: json
 
   {
-    "type": "read",
     "name": "echo",
     "config": {}
   }

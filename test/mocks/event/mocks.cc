@@ -3,7 +3,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -11,6 +10,7 @@ using testing::ReturnNew;
 using testing::SaveArg;
 using testing::_;
 
+namespace Envoy {
 namespace Event {
 
 MockDispatcher::MockDispatcher() {
@@ -35,6 +35,14 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) {
 }
 
 MockTimer::~MockTimer() {}
+
+MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
+  EXPECT_CALL(*dispatcher, listenForSignal_(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(this)))
+      .RetiresOnSaturation();
+}
+
+MockSignalEvent::~MockSignalEvent() {}
 
 MockFileEvent::MockFileEvent() {}
 MockFileEvent::~MockFileEvent() {}

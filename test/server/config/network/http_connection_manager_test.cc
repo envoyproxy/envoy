@@ -34,8 +34,8 @@ public:
   NiceMock<MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
   Router::RouteConfigProviderManagerImpl route_config_provider_manager_{
-      context_.runtime(), context_.dispatcher(), context_.random(), context_.localInfo(),
-      context_.threadLocal()};
+      context_.runtime(),   context_.dispatcher(),  context_.random(),
+      context_.localInfo(), context_.threadLocal(), context_.admin()};
 };
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
@@ -68,13 +68,14 @@ TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(json_string), context_,
                                   date_provider_, route_config_provider_manager_),
-      EnvoyException, "unable to create http filter factory for 'foo'");
+      EnvoyException, "Didn't find a registered implementation for name: 'foo'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string json_string = R"EOF(
   {
     "codec_type": "http1",
+    "server_name": "foo",
     "stat_prefix": "router",
     "route_config":
     {
@@ -107,6 +108,7 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
+  EXPECT_EQ("foo", config.serverName());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {

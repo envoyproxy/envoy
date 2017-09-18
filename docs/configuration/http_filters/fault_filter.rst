@@ -34,7 +34,6 @@ including the router filter.*
 .. code-block:: json
 
   {
-    "type" : "decoder",
     "name" : "fault",
     "config" : {
       "abort" : "{...}",

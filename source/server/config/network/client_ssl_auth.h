@@ -4,6 +4,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "common/config/well_known_names.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -16,8 +18,7 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
-  std::string name() override { return "client_ssl_auth"; }
-  NetworkFilterType type() override { return NetworkFilterType::Read; }
+  std::string name() override { return Config::NetworkFilterNames::get().CLIENT_SSL_AUTH; }
 };
 
 } // namespace Configuration

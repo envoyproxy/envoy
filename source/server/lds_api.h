@@ -25,6 +25,8 @@ public:
          Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
          ListenerManager& lm);
 
+  const std::string versionInfo() const { return subscription_->versionInfo(); }
+
   // Init::Target
   void initialize(std::function<void()> callback) override;
 

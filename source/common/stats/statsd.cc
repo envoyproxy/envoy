@@ -12,7 +12,7 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 
-#include "spdlog/spdlog.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Stats {
@@ -201,10 +201,11 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
     connection_ = std::move(info.connection_);
     connection_->addConnectionCallbacks(*this);
-    connection_->setBufferStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
-                                 parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
-                                 parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
-                                 parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_});
+    connection_->setConnectionStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
+                                     parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
+                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
+                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
+                                     &parent_.cluster_info_->stats().bind_errors_});
     connection_->connect();
   }
 

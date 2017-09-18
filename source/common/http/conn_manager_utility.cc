@@ -85,6 +85,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     }
 
     request_headers.removeEnvoyRetryOn();
+    request_headers.removeEnvoyRetryGrpcOn();
+    request_headers.removeEnvoyMaxRetries();
     request_headers.removeEnvoyUpstreamAltStatName();
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -107,9 +109,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     }
 
     if (!local_info.nodeName().empty()) {
-      // Following setReference() is safe because local info is constant for the life of the server.
-      request_headers.insertEnvoyDownstreamServiceNode().value().setReference(
-          local_info.nodeName());
+      request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
     }
   }
 

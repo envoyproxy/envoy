@@ -17,6 +17,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "api/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -102,6 +103,28 @@ public:
   template <class ProtoType> static bool protoEqual(ProtoType lhs, ProtoType rhs) {
     return lhs.GetTypeName() == rhs.GetTypeName() &&
            lhs.SerializeAsString() == rhs.SerializeAsString();
+  }
+
+  /**
+   * Parse bootstrap config from v1 JSON static config string.
+   * @param json_string source v1 JSON static config string.
+   * @return envoy::api::v2::Bootstrap.
+   */
+  static envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string);
+
+  /**
+   * Returns a "novel" IPv4 loopback address, if available.
+   * For many tests, we want a loopback address other than 127.0.0.1 where possible.  For some
+   * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
+   *
+   * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.
+   */
+  static std::string getIpv4Loopback() {
+#ifdef __APPLE__
+    return "127.0.0.1";
+#else
+    return "127.0.0.9";
+#endif
   }
 };
 
