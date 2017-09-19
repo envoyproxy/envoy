@@ -43,7 +43,6 @@ public:
   void setLineNumberEnd(uint64_t line_number) { line_number_end_ = line_number; }
 
   // Container factories for handler.
-  // TODO(danielhochman): figure out how to do make_shared on private constructors
   static FieldSharedPtr createObject() { return FieldSharedPtr{new Field(Type::Object)}; }
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }

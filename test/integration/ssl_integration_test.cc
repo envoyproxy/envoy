@@ -31,7 +31,6 @@ void SslIntegrationTest::SetUp() {
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
   registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-  // TODO(hennna): Add IPv6 support.
   test_server_ = MockRuntimeIntegrationTestServer::create(
       TestEnvironment::temporaryFileSubstitute("test/config/integration/server_ssl.json", port_map_,
                                                version_),
