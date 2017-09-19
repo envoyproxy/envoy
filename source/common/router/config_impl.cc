@@ -422,7 +422,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(std::regex{route.match().regex(), std::regex::optimize}) {}
+      regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers);
