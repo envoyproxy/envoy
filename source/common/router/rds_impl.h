@@ -60,7 +60,8 @@ private:
  */
 // clang-format off
 #define ALL_RDS_STATS(COUNTER)                                                                     \
-  COUNTER(config_reload)
+  COUNTER(config_reload)                                                                           \
+  COUNTER(update_empty)
 
 // clang-format on
 
