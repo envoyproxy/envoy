@@ -107,6 +107,20 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
+
+  } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
+    uint64_t parentId(0);
+    if (request_headers.XB3ParentSpanId()) {
+      parentId = std::stoull(request_headers.XB3ParentSpanId()->value().c_str(), nullptr, 16);
+    }
+
+    SpanContext context(std::stoull(request_headers.XB3TraceId()->value().c_str(), nullptr, 16),
+                        std::stoull(request_headers.XB3SpanId()->value().c_str(), nullptr, 16),
+                        parentId);
+
+    new_zipkin_span =
+        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
+
   } else {
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
