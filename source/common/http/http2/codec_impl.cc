@@ -590,7 +590,7 @@ void ConnectionImpl::sendPendingFrames() {
   }
 }
 
-void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
+void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disable_push) {
   ASSERT(http2_settings.hpack_table_size_ <= Http2Settings::MAX_HPACK_TABLE_SIZE);
   ASSERT(Http2Settings::MIN_MAX_CONCURRENT_STREAMS <= http2_settings.max_concurrent_streams_ &&
          http2_settings.max_concurrent_streams_ <= Http2Settings::MAX_MAX_CONCURRENT_STREAMS);
@@ -621,6 +621,13 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
         {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
     ENVOY_CONN_LOG(debug, "setting stream-level initial window size to {}", connection_,
                    http2_settings.initial_stream_window_size_);
+  }
+
+  if (disable_push) {
+    // Universally disable receiving push promise frames as we don't currently support them. nghttp2
+    // will fail the connection if the other side still sends them.
+    // TODO(mattklein123): Remove this when we correctly proxy push promise.
+    iv.push_back({NGHTTP2_SETTINGS_ENABLE_PUSH, 0});
   }
 
   if (!iv.empty()) {
@@ -739,7 +746,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(http2_settings);
+  sendSettings(http2_settings, true);
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
@@ -783,7 +790,7 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
     : ConnectionImpl(connection, scope, http2_settings), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(http2_settings);
+  sendSettings(http2_settings, false);
 }
 
 int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
