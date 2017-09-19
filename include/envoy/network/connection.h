@@ -124,6 +124,15 @@ public:
   virtual void readDisable(bool disable) PURE;
 
   /**
+   * Set if Envoy should detect TCP connection close when readDisable(true) is called.
+   * By default, this is true on newly created connections.
+   *
+   * @param should_detect supplies if disconnects should be detected when the connection has been
+   * read disabled
+   */
+  virtual void detectEarlyCloseWhenReadDisabled(bool should_detect) PURE;
+
+  /**
    * @return bool whether reading is enabled on the connection.
    */
   virtual bool readEnabled() const PURE;

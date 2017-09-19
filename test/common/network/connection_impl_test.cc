@@ -29,6 +29,7 @@ using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::Sequence;
 using testing::StrictMock;
@@ -286,6 +287,38 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   client_connection_->readDisable(false);
 
   disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, CloseOnNormalReadDisable) {
+  setUpBasicConnection();
+  connect();
+
+  client_connection_->readDisable(true);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
+  setUpBasicConnection();
+  connect();
+
+  client_connection_->detectEarlyCloseWhenReadDisabled(false);
+  client_connection_->readDisable(true);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  server_connection_->close(ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  client_connection_->readDisable(false);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 // Test that as watermark levels are changed, the appropriate callbacks are triggered.
