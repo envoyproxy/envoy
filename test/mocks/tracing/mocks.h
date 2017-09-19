@@ -32,6 +32,7 @@ public:
   MockSpan();
   ~MockSpan();
 
+  MOCK_METHOD1(setOperation, void(const std::string& operation));
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
   MOCK_METHOD1(finishSpan, void(SpanFinalizer& finalizer));
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));

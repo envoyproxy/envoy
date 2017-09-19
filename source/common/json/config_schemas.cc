@@ -601,6 +601,23 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
           "required": ["key", "value"],
           "additionalProperties": false
         }
+      },
+      "cors" : {
+        "type" : "object",
+        "properties" : {
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
+          "allow_methods" : {"type" : "string"},
+          "allow_headers" : {"type" : "string"},
+          "expose_headers" : {"type" : "string"},
+          "max_age" : {"type" : "string"},
+          "allow_credentials" : {"type" : "boolean"}
+        },
+        "required" : [],
+        "additionalProperties" : false
       }
     },
     "required" : ["name", "domains", "routes"],
@@ -637,6 +654,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "prefix" : {"type" : "string"},
       "path" : {"type" : "string"},
+      "regex" : {"type" : "string"},
       "cluster" : {"type" : "string"},
       "cluster_header" : {"type" : "string"},
       "weighted_clusters": {"$ref" : "#/definitions/weighted_clusters"},
@@ -718,6 +736,32 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "opaque_config" : {
         "type" : "object",
         "additionalProperties" : true
+      },
+      "decorator" : {
+        "type" : "object",
+        "properties" : {
+          "operation" : {"type" : "string"}
+        },
+        "required" : ["operation"],
+        "additionalProperties" : false
+      },
+      "cors" : {
+        "type" : "object",
+        "properties" : {
+          "allow_origin": {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+          }},
+          "allow_methods" : {"type" : "string"},
+          "allow_headers" : {"type" : "string"},
+          "expose_headers" : {"type" : "string"},
+          "max_age" : {"type" : "string"},
+          "allow_credentials" : {"type" : "boolean"},
+          "enabled" : {"type" : "boolean"}
+        },
+        "required" : [],
+        "additionalProperties" : false
       }
     },
     "additionalProperties" : false

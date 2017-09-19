@@ -30,7 +30,7 @@ Version history
 * Configurable timeout for the rate limit service call in the :ref:`network
   <config_network_filters_rate_limit>` and :ref:`HTTP <config_http_filters_rate_limit>` rate limit
   filters.
-* :ref:`x-envoy-grpc-retry-on <config_http_filters_router_x-envoy-grpc-retry-on>` header added.
+* :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>` header added.
 * :ref:`LDS API <arch_overview_dynamic_config_lds>` added.
 * TLS :ref:`require_client_certificate <config_listener_ssl_context_require_client_certificate>`
   option added.

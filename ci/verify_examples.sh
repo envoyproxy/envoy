@@ -28,10 +28,10 @@ tar -xf go1.7.1.linux-amd64.tar.gz
 sudo mv go /usr/local
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
-mkdir -p $GOPATH/src/github.com/lyft/envoy/examples/
-cp -r grpc-bridge $GOPATH/src/github.com/lyft/envoy/examples/
+mkdir -p $GOPATH/src/github.com/envoyproxy/envoy/examples/
+cp -r grpc-bridge $GOPATH/src/github.com/envoyproxy/envoy/examples/
 # build example
-cd $GOPATH/src/github.com/lyft/envoy/examples/grpc-bridge
+cd $GOPATH/src/github.com/envoyproxy/envoy/examples/grpc-bridge
 ./script/bootstrap
 ./script/build
 # verify example works

@@ -1,6 +1,8 @@
-![Envoy Logo](docs/envoy-logo-bg.png)
+![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
 
 C++ L7 proxy and communication bus
+
+Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNCF). If you are a company that wants to help shape the evolution of technologies that are container-packaged, dynamically-scheduled and microservices-oriented, consider joining the CNCF. For details about who's involved and how Envoy plays a role, read the CNCF [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 ## Documentation
 
@@ -38,8 +40,9 @@ for information on email list usage.
 
 ## Reporting security vulnerabilities
 
-If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
-security@lyft.com. We'll send a confirmation email to acknowledge your report, and we'll send an
+If you've found a vulnerability or a potential vulnerability in Envoy
+please let us know at envoy-security@googlegroups.com. We'll send a
+confirmation email to acknowledge your report, and we'll send an
 additional email when we've identified the issue positively or negatively.
 
 

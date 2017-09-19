@@ -35,6 +35,18 @@ void RdsJson::translateVirtualCluster(const Json::Object& json_virtual_cluster,
   virtual_cluster.set_method(method);
 }
 
+void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsPolicy& cors) {
+  for (const std::string& origin : json_cors.getStringArray("allow_origin", true)) {
+    cors.add_allow_origin(origin);
+  }
+  JSON_UTIL_SET_STRING(json_cors, cors, allow_methods);
+  JSON_UTIL_SET_STRING(json_cors, cors, allow_headers);
+  JSON_UTIL_SET_STRING(json_cors, cors, expose_headers);
+  JSON_UTIL_SET_STRING(json_cors, cors, max_age);
+  JSON_UTIL_SET_BOOL(json_cors, cors, allow_credentials);
+  JSON_UTIL_SET_BOOL(json_cors, cors, enabled);
+}
+
 void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
                                  envoy::api::v2::RateLimit& rate_limit) {
   json_rate_limit.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
@@ -149,6 +161,19 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     auto* header_value_option = virtual_host.mutable_request_headers_to_add()->Add();
     BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
   }
+
+  if (json_virtual_host.hasObject("cors")) {
+    auto* cors = virtual_host.mutable_cors();
+    const auto json_cors = json_virtual_host.getObject("cors");
+    translateCors(*json_cors, *cors);
+  }
+}
+
+void RdsJson::translateDecorator(const Json::Object& json_decorator,
+                                 envoy::api::v2::Decorator& decorator) {
+  if (json_decorator.hasObject("operation")) {
+    decorator.set_operation(json_decorator.getString("operation"));
+  }
 }
 
 void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Route& route) {
@@ -156,14 +181,19 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
 
   auto* match = route.mutable_match();
 
+  // This is a trick to do a three-way XOR.
+  if ((json_route.hasObject("prefix") + json_route.hasObject("path") +
+       json_route.hasObject("regex")) != 1) {
+    throw EnvoyException("routes must specify one of prefix/path/regex");
+  }
+
   if (json_route.hasObject("prefix")) {
     match->set_prefix(json_route.getString("prefix"));
-  }
-  if (json_route.hasObject("path")) {
-    if (json_route.hasObject("prefix")) {
-      throw EnvoyException("routes must specify either prefix or path");
-    }
+  } else if (json_route.hasObject("path")) {
     match->set_path(json_route.getString("path"));
+  } else {
+    ASSERT(json_route.hasObject("regex"));
+    match->set_regex(json_route.getString("regex"));
   }
 
   JSON_UTIL_SET_BOOL(json_route, *match, case_sensitive);
@@ -263,6 +293,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       const std::string header_name = json_route.getObject("hash_policy")->getString("header_name");
       action->mutable_hash_policy()->Add()->mutable_header()->set_header_name(header_name);
     }
+
+    if (json_route.hasObject("cors")) {
+      auto* cors = action->mutable_cors();
+      const auto json_cors = json_route.getObject("cors");
+      translateCors(*json_cors, *cors);
+    }
   }
 
   if (json_route.hasObject("opaque_config")) {
@@ -273,6 +309,11 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       (*filter_metadata.mutable_fields())[name].set_string_value(value.asString());
       return true;
     });
+  }
+
+  if (json_route.hasObject("decorator")) {
+    auto* decorator = route.mutable_decorator();
+    translateDecorator(*json_route.getObject("decorator"), *decorator);
   }
 }
 

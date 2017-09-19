@@ -38,6 +38,9 @@ domains
   *(required, array)* The list of routes that will be matched, in order, for incoming requests.
   The first route that matches will be used.
 
+:ref:`cors <config_http_filters_cors>`
+  *(optional, object)* Specifies the virtual host's CORS policy.
+
 .. _config_http_conn_man_route_table_vhost_require_ssl:
 
 require_ssl

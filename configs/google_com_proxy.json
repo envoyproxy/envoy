@@ -40,8 +40,11 @@
             "type": "logical_dns",
             "lb_type": "round_robin",
             "hosts": [{
-                "url": "tcp://google.com:80"
-            }]
+                "url": "tcp://google.com:443"
+            }],
+            "ssl_context": {
+                "sni": "www.google.com"
+            }
         }]
     }
 }

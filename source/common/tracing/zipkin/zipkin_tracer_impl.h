@@ -46,6 +46,12 @@ public:
   void finishSpan(Tracing::SpanFinalizer& finalizer) override;
 
   /**
+   * This method sets the operation name on the span.
+   * @param operation the operation name
+   */
+  void setOperation(const std::string& operation) override;
+
+  /**
    * This function adds a Zipkin "string" binary annotation to this span.
    * In Zipkin, binary annotations of the type "string" allow arbitrary key-value pairs
    * to be associated with a span.

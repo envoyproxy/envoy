@@ -46,6 +46,20 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 }
 
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
+  for (const auto& origin : config.allow_origin()) {
+    allow_origin_.push_back(origin);
+  }
+  allow_methods_ = config.allow_methods();
+  allow_headers_ = config.allow_headers();
+  expose_headers_ = config.expose_headers();
+  max_age_ = config.max_age();
+  if (config.has_allow_credentials()) {
+    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+  }
+  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
+}
+
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   if (!config.has_request_mirror_policy()) {
     return;
@@ -75,6 +89,15 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   return hash;
 }
 
+DecoratorImpl::DecoratorImpl(const envoy::api::v2::Decorator& decorator)
+    : operation_(decorator.operation()) {}
+
+void DecoratorImpl::apply(Tracing::Span& span) const {
+  if (!operation_.empty()) {
+    span.setOperation(operation_);
+  }
+}
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
@@ -91,7 +114,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
-      opaque_config_(parseOpaqueConfig(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent.
@@ -132,6 +155,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   include_vh_rate_limits_ =
       (rate_limit_policy_.empty() ||
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
+
+  if (route.route().has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -233,6 +260,14 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
         ret.emplace(it.first, it.second.string_value());
       }
     }
+  }
+  return ret;
+}
+
+DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route& route) {
+  DecoratorConstPtr ret;
+  if (route.has_decorator()) {
+    ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
   }
   return ret;
 }
@@ -359,7 +394,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
-    const char* query_string_start = strchr(path.c_str(), '?');
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
     size_t compare_length = path.size();
     if (query_string_start != nullptr) {
       compare_length = query_string_start - path.c_str();
@@ -380,6 +415,34 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
     }
   }
 
+  return nullptr;
+}
+
+RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
+                                         const envoy::api::v2::Route& route,
+                                         Runtime::Loader& loader)
+    : RouteEntryImplBase(vhost, route, loader),
+      regex_(std::regex{route.match().regex(), std::regex::optimize}) {}
+
+void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers);
+
+  const Http::HeaderString& path = headers.Path()->value();
+  const char* query_string_start = Http::Utility::findQueryStringStart(path);
+  ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
+  std::string matched_path(path.c_str(), query_string_start);
+  finalizePathHeader(headers, matched_path);
+}
+
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                 uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, random_value)) {
+    const Http::HeaderString& path = headers.Path()->value();
+    const char* query_string_start = Http::Utility::findQueryStringStart(path);
+    if (std::regex_match(path.c_str(), query_string_start, regex_)) {
+      return clusterEntry(headers, random_value);
+    }
+  }
   return nullptr;
 }
 
@@ -411,12 +474,16 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
     const bool has_prefix =
         route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;
     const bool has_path = route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPath;
+    const bool has_regex =
+        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kRegex;
     if (has_prefix) {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
-    } else {
-      ASSERT(has_path);
-      UNREFERENCED_PARAMETER(has_path);
+    } else if (has_path) {
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
+    } else {
+      ASSERT(has_regex);
+      UNREFERENCED_PARAMETER(has_regex);
+      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, runtime));
     }
 
     if (validate_clusters) {
@@ -432,6 +499,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+  }
+
+  if (virtual_host.has_cors()) {
+    cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
   }
 }
 

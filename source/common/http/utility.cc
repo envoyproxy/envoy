@@ -71,6 +71,10 @@ Utility::QueryParams Utility::parseQueryString(const std::string& url) {
   return params;
 }
 
+const char* Utility::findQueryStringStart(const HeaderString& path) {
+  return std::find(path.c_str(), path.c_str() + path.size(), '?');
+}
+
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
 
   struct State {
@@ -193,8 +197,6 @@ void Utility::sendLocalReply(
   encode_headers(std::move(response_headers), body_text.empty());
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
-    // TODO(htuch): We shouldn't encodeData() if the stream is reset in the encodeHeaders() above,
-    // see https://github.com/lyft/envoy/issues/1283.
     encode_data(buffer, true);
   }
 }

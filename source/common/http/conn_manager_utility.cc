@@ -85,6 +85,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     }
 
     request_headers.removeEnvoyRetryOn();
+    request_headers.removeEnvoyRetryGrpcOn();
+    request_headers.removeEnvoyMaxRetries();
     request_headers.removeEnvoyUpstreamAltStatName();
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();

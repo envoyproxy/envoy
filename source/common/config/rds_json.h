@@ -26,6 +26,13 @@ public:
                                       envoy::api::v2::VirtualCluster& virtual_cluster);
 
   /**
+   * Translate a v1 JSON cors object to v2 envoy::api::v2::CorsPolicy.
+   * @param json_cors source v1 JSON cors object.
+   * @param cors destination v2 envoy::api::v2::CorsPolicy.
+   */
+  static void translateCors(const Json::Object& json_cors, envoy::api::v2::CorsPolicy& cors);
+
+  /**
    * Translate a v1 JSON rate limit object to v2 envoy::api::v2::RateLimit.
    * @param json_rate_limit source v1 JSON rate limit object.
    * @param rate_limit destination v2 envoy::api::v2::RateLimit.
@@ -56,6 +63,14 @@ public:
    */
   static void translateVirtualHost(const Json::Object& json_virtual_host,
                                    envoy::api::v2::VirtualHost& virtual_host);
+
+  /**
+   * Translate a v1 JSON decorator object to v2 envoy::api::v2::Decorator.
+   * @param json_decorator source v1 JSON decorator object.
+   * @param decorator destination v2 envoy::api::v2::Decorator.
+   */
+  static void translateDecorator(const Json::Object& json_decorator,
+                                 envoy::api::v2::Decorator& decorator);
 
   /**
    * Translate a v1 JSON route object to v2 envoy::api::v2::Route.

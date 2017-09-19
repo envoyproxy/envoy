@@ -88,8 +88,7 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   EXPECT_NE(0LL, server_side_shared_context_span->startTime());
 
-  // span name should NOT be set (it was set in the CS side)
-  EXPECT_EQ("", server_side_shared_context_span->name());
+  EXPECT_EQ("my_span", server_side_shared_context_span->name());
 
   // trace id must be the same in the CS and SR sides
   EXPECT_EQ(root_span->traceId(), server_side_shared_context_span->traceId());
@@ -182,8 +181,7 @@ TEST(ZipkinTracerTest, spanCreation) {
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
   EXPECT_NE(0LL, new_shared_context_span->startTime());
 
-  // span name should NOT be set (it was set in the CS side)
-  EXPECT_EQ("", new_shared_context_span->name());
+  EXPECT_EQ("new_shared_context_span", new_shared_context_span->name());
 
   // trace id must be the same in the CS and SR sides
   EXPECT_EQ(root_span->traceId(), new_shared_context_span->traceId());

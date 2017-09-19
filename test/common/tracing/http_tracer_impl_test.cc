@@ -447,7 +447,6 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   const std::string operation_name = "ingress";
   EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
       .WillOnce(Return(nullptr));
-
   tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
@@ -460,7 +459,6 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   const std::string operation_name = "egress test";
   EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
       .WillOnce(Return(span));
-
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("node_id", "node_name"));
 

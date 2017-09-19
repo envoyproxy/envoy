@@ -218,7 +218,6 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
   static const uint64_t FRAME_HEADER_SIZE = 9;
 
-  // TODO(mattklein123): Back pressure.
   Buffer::OwnedImpl output(framehd, FRAME_HEADER_SIZE);
   output.move(pending_send_data_, length);
   parent_.connection_.write(output);
@@ -503,7 +502,6 @@ int ConnectionImpl::onInvalidFrame(int error_code) {
 }
 
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
-  // TODO(mattklein123): Back pressure.
   ENVOY_CONN_LOG(trace, "send data: bytes={}", connection_, length);
   Buffer::OwnedImpl buffer(data, length);
   connection_.write(buffer);

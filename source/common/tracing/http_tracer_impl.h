@@ -65,6 +65,7 @@ public:
 class NullSpan : public Span {
 public:
   // Tracing::Span
+  void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}
   void finishSpan(SpanFinalizer&) override {}
   void injectContext(Http::HeaderMap&) override {}

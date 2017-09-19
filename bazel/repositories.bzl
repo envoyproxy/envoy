@@ -27,7 +27,7 @@ def _repository_impl(ctxt):
     if result.return_code != 0:
         print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
               "for errors and ensure all prerequisites at " +
-              "https://github.com/lyft/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
+              "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
         # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
         fail("External dep build failed")
 

@@ -11,6 +11,7 @@ exports_files([
     "echo_server.json",
     "server.json",
     "server_ads.yaml",
+    "server_cors_filter.json",
     "server_grpc_json_transcoder.json",
     "server_http2.json",
     "server_http2_upstream.json",

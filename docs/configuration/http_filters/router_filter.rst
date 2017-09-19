@@ -33,6 +33,8 @@ ingress/response path. They are documented in this section.
 .. contents::
   :local:
 
+.. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:
+
 x-envoy-expected-rq-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -52,7 +54,7 @@ time unless explicitly specified. The number of retries can be explicitly set in
 :ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header.
 If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured and
 :ref:`config_http_filters_router_x-envoy-retry-on` or
-:ref:`config_http_filters_router_x-envoy-grpc-retry-on` headers are not specified, Envoy will not retry a failed request.
+:ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
 
 A few notes on how Envoy does retries:
 
@@ -120,9 +122,9 @@ Note that retry policies can also be applied at the :ref:`route level
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
-.. _config_http_filters_router_x-envoy-grpc-retry-on:
+.. _config_http_filters_router_x-envoy-retry-grpc-on:
 
-x-envoy-grpc-retry-on
+x-envoy-retry-grpc-on
 ^^^^^^^^^^^^^^^^^^^^^
 Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number of
 retries defaults to 1, and can be controlled by
@@ -141,13 +143,15 @@ deadline-exceeded
 resource-exhausted
   Envoy will attempt a retry if the gRPC status code in the response headers is "resource-exhausted" (8)
 
-As with the x-envoy-grpc-retry-on header, the number of retries can be controlled via the
+As with the x-envoy-retry-grpc-on header, the number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header
 
 Note that retry policies can also be applied at the :ref:`route level
 <config_http_conn_man_route_table_route_retry>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
+
+.. _config_http_filters_router_x-envoy-upstream-alt-stat-name:
 
 x-envoy-upstream-alt-stat-name
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

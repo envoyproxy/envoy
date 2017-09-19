@@ -33,7 +33,7 @@ build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled
 
 # Clang 5.0 MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
-# support (see https://github.com/lyft/envoy/issues/443).
+# support (see https://github.com/envoyproxy/envoy/issues/443).
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --define tcmalloc=disabled
