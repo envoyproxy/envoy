@@ -16,7 +16,7 @@ done
 if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
 then
    docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
-   docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
+   docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
    docker push lyft/envoy:latest
    docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
    docker push lyft/envoy:$TRAVIS_COMMIT
