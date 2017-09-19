@@ -605,6 +605,9 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
          codec_client_ = makeHttpConnection(lookupPort("dynamo_with_buffer_limits"));
        },
        [&]() -> void {
+         // Envoy will likely connect and proxy some unspecified amount of data before
+         // hitting the buffer limit and disconnecting.  Ignore this if it happens.
+         fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
          codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                     {":path", "/dynamo/url"},
                                                                     {":scheme", "http"},
@@ -612,9 +615,6 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
                                                                     {"x-forwarded-for", "10.0.0.1"},
                                                                     {"x-envoy-retry-on", "5xx"}},
                                             1024 * 65, *response_);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
        },
        [&]() -> void {
          response_->waitForEndStream();
