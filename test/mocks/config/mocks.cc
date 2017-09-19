@@ -15,5 +15,8 @@ GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
   return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
 }
 
+MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {}
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
+
 } // namespace Config
 } // namespace Envoy

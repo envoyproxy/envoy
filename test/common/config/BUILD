@@ -33,6 +33,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "grpc_mux_impl_test",
+    srcs = ["grpc_mux_impl_test.cc"],
+    external_deps = [
+        "envoy_discovery",
+        "envoy_eds",
+    ],
+    deps = [
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [

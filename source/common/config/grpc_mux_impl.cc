@@ -75,6 +75,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
+  ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   stream_->sendMessage(request, false);
 }
 
@@ -100,7 +101,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   if (requests_.count(type_url) == 0) {
     requests_[type_url].set_type_url(type_url);
     requests_[type_url].mutable_node()->MergeFrom(node_);
-    subscriptions_.push_front(type_url);
+    subscriptions_.emplace_back(type_url);
   }
 
   // This will send an updated request on each subscription.
@@ -123,6 +124,10 @@ void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+  if (requests_.count(type_url) == 0) {
+    ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
+    return;
+  }
   try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.

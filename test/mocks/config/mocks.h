@@ -47,5 +47,15 @@ public:
                             GrpcMuxCallbacks& callbacks);
 };
 
+class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
+public:
+  MockGrpcMuxCallbacks();
+  virtual ~MockGrpcMuxCallbacks();
+
+  MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string& version_info));
+  MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
+};
+
 } // namespace Config
 } // namespace Envoy
