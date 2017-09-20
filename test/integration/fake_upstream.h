@@ -75,10 +75,16 @@ public:
       return;
     }
     waitForData(client_dispatcher, 5);
-    EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+    {
+      std::unique_lock<std::mutex> lock(lock_);
+      EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+    }
     if (decoded_grpc_frames_.size() < 1) {
       waitForData(client_dispatcher, grpc_decoder_.length());
-      EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+      {
+        std::unique_lock<std::mutex> lock(lock_);
+        EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+      }
     }
     decodeGrpcFrame(message);
   }

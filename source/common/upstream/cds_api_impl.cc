@@ -48,8 +48,9 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
   }
 
   for (auto cluster : clusters_to_remove) {
-    if (cm_.removePrimaryCluster(cluster.first)) {
-      ENVOY_LOG(info, "cds: remove cluster '{}'", cluster.first);
+    const std::string cluster_name = cluster.first;
+    if (cm_.removePrimaryCluster(cluster_name)) {
+      ENVOY_LOG(info, "cds: remove cluster '{}'", cluster_name);
     }
   }
 
