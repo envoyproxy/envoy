@@ -9,21 +9,12 @@ class CorsFilterIntegrationTest : public HttpIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CorsFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Global initializer for all integration tests.
-   */
-  void SetUp() override {
+
+  void initialize() override {
+    BaseIntegrationTest::initialize();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server_cors_filter.json", {"http"});
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:

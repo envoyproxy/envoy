@@ -19,12 +19,11 @@ INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
 
 TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
-TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http"));
-}
+TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
 
 TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
-  testRouterNotFoundWithBody(lookupPort("http_buffer"));
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterNotFoundWithBody();
 }
 
 TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
@@ -32,6 +31,7 @@ TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(IntegrationTest, ConnectionClose) {
+  config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
   executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     codec_client_->makeHeaderOnlyRequest(
@@ -49,58 +49,59 @@ TEST_P(IntegrationTest, ConnectionClose) {
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")), 1024, 512,
-                                       false);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
-                                       4 * 1024 * 1024, 4 * 1024 * 1024, false);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_with_buffer_limits")),
-                                       1024 * 1024, 1024 * 1024, false);
+  config_helper_.setBufferLimits(1024, 1024);
+  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")), 1024, 512, true);
+  testRouterRequestAndResponseWithBody(1024, 512, true);
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), true);
+  testRouterHeaderOnlyRequestAndResponse(true);
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")), true);
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  testRouterHeaderOnlyRequestAndResponse(true);
 }
 
 TEST_P(IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")), false);
+  testRouterHeaderOnlyRequestAndResponse(false);
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterDownstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")));
+  testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
 TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")));
+  testRouterUpstreamResponseBeforeRequestComplete();
 }
 
 TEST_P(IntegrationTest, Retry) { testRetry(); }
@@ -114,13 +115,14 @@ TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLim
 // Test hitting the bridge filter with too many response bytes to buffer.  Given
 // the headers are not proxied, the connection manager will send a 500.
 TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
+  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: { deprecated_v1: true } }");
+  config_helper_.setBufferLimits(1024, 1024);
+
   IntegrationCodecClientPtr codec_client;
   FakeHttpConnectionPtr fake_upstream_connection;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
-  executeActions({[&]() -> void {
-                    codec_client = makeHttpConnection(lookupPort("bridge_with_buffer_limits"));
-                  },
+  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http")); },
                   [&]() -> void {
                     Http::StreamEncoder* request_encoder;
                     request_encoder = &codec_client->startRequest(
@@ -182,13 +184,27 @@ TEST_P(IntegrationTest, Connect) { testConnect(); }
 TEST_P(IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }
 
 TEST_P(IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
+
 TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
 TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
+void setRouteUsingWebsocket(envoy::api::v2::filter::HttpConnectionManager& hcm) {
+  auto route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+  route->mutable_match()->set_prefix("/websocket/test");
+  route->mutable_route()->set_prefix_rewrite("/websocket");
+  route->mutable_route()->set_cluster("cluster_0");
+  route->mutable_route()->mutable_use_websocket()->set_value("true");
+};
+
 TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+  // Set a less permissive default route so it does not pick up the /websocket query.
+  config_helper_.setDefaultHostAndRoute("*", "/asd");
+  // Enable websockets for the path /websocket/test
+  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+
   // WebSocket upgrade, send some data and disconnect downstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
@@ -223,6 +239,9 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 }
 
 TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
+  config_helper_.setDefaultHostAndRoute("*", "/asd");
+  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+
   // WebSocket upgrade, send some data and disconnect upstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;

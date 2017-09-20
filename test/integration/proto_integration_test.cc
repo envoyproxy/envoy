@@ -14,28 +14,11 @@
 namespace Envoy {
 namespace {
 
+// TODO(alyssawilk) move these test into integration_test.cc
 class ProtoIntegrationTest : public HttpIntegrationTest,
                              public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-
-  void SetUp() override {}
-
-  void initialize() {
-    // Fake upstream.
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-
-    config_helper_.setUpstreamPorts({fake_upstreams_.back()->localAddress()->ip()->port()});
-
-    const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-        "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-    createGeneratedApiTestServer(bootstrap_path, {"http"});
-  }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 TEST_P(ProtoIntegrationTest, TestBind) {
@@ -46,7 +29,6 @@ TEST_P(ProtoIntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
-  initialize();
 
   executeActions(
       {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
@@ -74,7 +56,6 @@ TEST_P(ProtoIntegrationTest, TestBind) {
 
 TEST_P(ProtoIntegrationTest, TestFailedBind) {
   config_helper_.setSourceAddress("8.8.8.8");
-  initialize();
 
   executeActions({[&]() -> void {
                     // Envoy will create and close some number of connections when trying to bind.

@@ -111,10 +111,20 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   BaseIntegrationTest(Network::Address::IpVersion version);
+  virtual ~BaseIntegrationTest() {}
+
+  virtual void initialize() {
+    RELEASE_ASSERT(!initialized_);
+    initialized_ = true;
+  }
+
   /**
    * Integration tests are composed of a sequence of actions which are run via this routine.
    */
   void executeActions(std::list<std::function<void()>> actions) {
+    if (!initialized_) {
+      initialize();
+    }
     for (const std::function<void()>& action : actions) {
       action();
     }
@@ -149,6 +159,7 @@ protected:
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
+  bool initialized_{}; // True if initialized() has been called.
 };
 
 } // namespace Envoy

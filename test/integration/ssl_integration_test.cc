@@ -21,7 +21,9 @@ using testing::Return;
 namespace Envoy {
 namespace Ssl {
 
-void SslIntegrationTest::SetUp() {
+void SslIntegrationTest::initialize() {
+  BaseIntegrationTest::initialize();
+
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
@@ -98,68 +100,99 @@ INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false), 16 * 1024 * 1024,
-                                       16 * 1024 * 1024, false);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false), 1024, 512, false);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
-  client_protocol_ = Http::CodecClient::Type::HTTP2;
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, false), 1024, 512, false);
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(true, false);
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVierfySAN) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, true), 1024, 512, false);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, true);
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
-  client_protocol_ = Http::CodecClient::Type::HTTP2;
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, true), 1024, 512, false);
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(true, true);
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
-  testRouterHeaderOnlyRequestAndResponse(makeSslClientConnection(false, false), true);
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterHeaderOnlyRequestAndResponse(true, &creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false));
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterUpstreamDisconnectBeforeResponseComplete(&creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeSslClientConnection(false, false));
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterDownstreamDisconnectBeforeRequestComplete(&creator);
   checkStats();
 }
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false));
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  testRouterDownstreamDisconnectBeforeResponseComplete(&creator);
   checkStats();
 }
 
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
 TEST_P(SslIntegrationTest, AdminCertEndpoint) {
+  initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/certs", "", client_protocol_, version_);
+      lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SslIntegrationTest, AltAlpn) {
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(true, false);
+  };
+  initialize();
   // Connect with ALPN, but we should end up using HTTP/1.
   MockRuntimeIntegrationTestServer* server =
       dynamic_cast<MockRuntimeIntegrationTestServer*>(test_server_.get());
   ON_CALL(server->runtime_->snapshot_, featureEnabled("ssl.alt_alpn", 0))
       .WillByDefault(Return(true));
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, false), 1024, 512, false);
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }
 

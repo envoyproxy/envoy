@@ -41,16 +41,13 @@ class SslIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SslIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Initializer for an individual test.
-   */
-  void SetUp() override;
 
-  /**
-   * Destructor for an individual test.
-   */
+  // Use old style configuration for now.
+  void initialize() override;
+
   void TearDown() override;
 
+  Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection(false, false); }
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
   ServerContextPtr createUpstreamSslContext();
   void checkStats();
