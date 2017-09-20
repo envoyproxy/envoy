@@ -30,6 +30,8 @@ public:
 class MockConnectionBase {
 public:
   void raiseEvent(Network::ConnectionEvent event);
+  void runHighWatermarkCallbacks();
+  void runLowWatermarkCallbacks();
 
   static uint64_t next_id_;
 
@@ -108,19 +110,6 @@ public:
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
-
-  // helper methods for testing
-  void runHighWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onAboveWriteBufferHighWatermark();
-    }
-  }
-
-  void runLowWatermarkCallbacks() {
-    for (auto* callback : callbacks_) {
-      callback->onBelowWriteBufferLowWatermark();
-    }
-  }
 };
 
 class MockActiveDnsQuery : public ActiveDnsQuery {
