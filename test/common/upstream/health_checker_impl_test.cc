@@ -614,6 +614,46 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 }
 
+TEST_F(HttpHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false));
+
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  test_sessions_[0]->request_encoder_.stream_.runHighWatermarkCallbacks();
+  test_sessions_[0]->request_encoder_.stream_.runLowWatermarkCallbacks();
+
+  respond(0, "200", true);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false));
+
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  test_sessions_[0]->client_connection_->runHighWatermarkCallbacks();
+  test_sessions_[0]->client_connection_->runLowWatermarkCallbacks();
+
+  respond(0, "200", true);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+}
+
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
     Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;

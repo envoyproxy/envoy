@@ -42,6 +42,18 @@ void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   }
 }
 
+void MockConnectionBase::runHighWatermarkCallbacks() {
+  for (auto* callback : callbacks_) {
+    callback->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void MockConnectionBase::runLowWatermarkCallbacks() {
+  for (auto* callback : callbacks_) {
+    callback->onBelowWriteBufferLowWatermark();
+  }
+}
+
 template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));

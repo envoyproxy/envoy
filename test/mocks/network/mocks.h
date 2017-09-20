@@ -30,6 +30,8 @@ public:
 class MockConnectionBase {
 public:
   void raiseEvent(Network::ConnectionEvent event);
+  void runHighWatermarkCallbacks();
+  void runLowWatermarkCallbacks();
 
   static uint64_t next_id_;
 
