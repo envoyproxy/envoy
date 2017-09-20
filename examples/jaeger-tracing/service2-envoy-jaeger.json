@@ -21,7 +21,10 @@
                     {
                       "timeout_ms": 0,
                       "prefix": "/",
-                      "cluster": "local_service"
+                      "cluster": "local_service",
+                      "decorator": {
+                        "operation": "checkStock"
+                      }
                     }
                   ]
                 }

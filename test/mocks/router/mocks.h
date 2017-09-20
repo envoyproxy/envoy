@@ -208,6 +208,18 @@ public:
   TestCorsPolicy cors_policy_;
 };
 
+class MockDecorator : public Decorator {
+public:
+  MockDecorator();
+  ~MockDecorator();
+
+  // Router::Decorator
+  MOCK_CONST_METHOD0(operation, const std::string&());
+  MOCK_CONST_METHOD1(apply, void(Tracing::Span& span));
+
+  std::string operation_{"fake_operation"};
+};
+
 class MockRoute : public Route {
 public:
   MockRoute();
@@ -216,8 +228,10 @@ public:
   // Router::Route
   MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+  MOCK_CONST_METHOD0(decorator, const Decorator*());
 
   testing::NiceMock<MockRouteEntry> route_entry_;
+  testing::NiceMock<MockDecorator> decorator_;
 };
 
 class MockConfig : public Config {

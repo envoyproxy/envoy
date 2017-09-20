@@ -170,6 +170,10 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
   Tracing::MockFinalizer finalizer;
 
+  // Currently not possible to access the operation from the span, but this
+  // invocation will make sure setting the operation does not cause a crash!
+  first_span->setOperation("myOperation");
+
   EXPECT_CALL(finalizer, finalize(_));
   first_span->finishSpan(finalizer);
 

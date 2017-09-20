@@ -38,7 +38,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "hash_policy": "{...}",
     "request_headers_to_add" : [],
     "opaque_config": [],
-    "cors": "{...}"
+    "cors": "{...}",
+    "decorator" : "{...}"
   }
 
 prefix
@@ -215,6 +216,10 @@ include_vh_rate_limits
 :ref:`hash_policy <config_http_conn_man_route_table_hash_policy>`
   *(optional, object)* Specifies the route's hashing policy if the upstream cluster uses a hashing
   :ref:`load balancer <arch_overview_load_balancing_types>`.
+
+:ref:`decorator <config_http_conn_man_route_table_decorator>`
+  *(optional, object)* Specifies the route's decorator used to enhance information reported about
+  the matched request.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
@@ -430,6 +435,23 @@ header_name
   *(required, string)* The name of the request header that will be used to obtain the hash key. If
   the request header is not present, the load balancer will use a random number as the hash,
   effectively making the load balancing policy random.
+
+.. _config_http_conn_man_route_table_decorator:
+
+Decorator
+---------
+
+Specifies the route's decorator.
+
+.. code-block:: json
+
+   {
+     "operation": "..."
+   }
+
+operation
+  *(required, string)* The operation name associated with the request matched to this route. If tracing is
+  enabled, this information will be used as the span name reported for this request.
 
 .. _config_http_conn_man_route_table_route_add_req_headers:
 

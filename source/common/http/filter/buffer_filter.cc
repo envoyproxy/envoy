@@ -54,13 +54,14 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
   return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void BufferFilter::onDestroy() { resetInternalState(); }
+void BufferFilter::onDestroy() {
+  resetInternalState();
+  stream_destroyed_ = true;
+}
 
 void BufferFilter::onRequestTimeout() {
-  // TODO(htuch): Switch this to Utility::sendLocalReply().
-  Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-      {Headers::get().Status, std::to_string(enumToInt(Http::Code::RequestTimeout))}}};
-  callbacks_->encodeHeaders(std::move(response_headers), true);
+  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::RequestTimeout,
+                                "buffer request timeout");
   config_->stats_.rq_timeout_.inc();
 }
 

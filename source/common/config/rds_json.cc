@@ -169,6 +169,13 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
   }
 }
 
+void RdsJson::translateDecorator(const Json::Object& json_decorator,
+                                 envoy::api::v2::Decorator& decorator) {
+  if (json_decorator.hasObject("operation")) {
+    decorator.set_operation(json_decorator.getString("operation"));
+  }
+}
+
 void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Route& route) {
   json_route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
@@ -302,6 +309,11 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       (*filter_metadata.mutable_fields())[name].set_string_value(value.asString());
       return true;
     });
+  }
+
+  if (json_route.hasObject("decorator")) {
+    auto* decorator = route.mutable_decorator();
+    translateDecorator(*json_route.getObject("decorator"), *decorator);
   }
 }
 

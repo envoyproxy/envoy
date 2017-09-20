@@ -89,6 +89,15 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   return hash;
 }
 
+DecoratorImpl::DecoratorImpl(const envoy::api::v2::Decorator& decorator)
+    : operation_(decorator.operation()) {}
+
+void DecoratorImpl::apply(Tracing::Span& span) const {
+  if (!operation_.empty()) {
+    span.setOperation(operation_);
+  }
+}
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
@@ -106,7 +115,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
-      opaque_config_(parseOpaqueConfig(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent.
@@ -244,6 +253,14 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
         ret.emplace(it.first, it.second.string_value());
       }
     }
+  }
+  return ret;
+}
+
+DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route& route) {
+  DecoratorConstPtr ret;
+  if (route.has_decorator()) {
+    ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
   }
   return ret;
 }
@@ -400,7 +417,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(std::regex{route.match().regex(), std::regex::optimize}) {}
+      regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers, 
                                                  const Http::AccessLog::RequestInfo& request_info) const {

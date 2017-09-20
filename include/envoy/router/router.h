@@ -12,6 +12,7 @@
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 
 namespace Envoy {
@@ -317,6 +318,22 @@ public:
 };
 
 /**
+ * An interface representing the Decorator.
+ */
+class Decorator {
+public:
+  virtual ~Decorator() {}
+
+  /**
+   * This method decorates the supplied span.
+   * @param Tracing::Span& the span.
+   */
+  virtual void apply(Tracing::Span& span) const PURE;
+};
+
+typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
+
+/**
  * An interface that holds a RedirectEntry or a RouteEntry for a request.
  */
 class Route {
@@ -332,6 +349,11 @@ public:
    * @return the route entry or nullptr if there is no matching route for the request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
+
+  /**
+   * @return the decorator or nullptr if not defined for the request.
+   */
+  virtual const Decorator* decorator() const PURE;
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;

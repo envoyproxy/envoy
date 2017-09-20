@@ -57,6 +57,12 @@ public:
   virtual ~Span() {}
 
   /**
+   * Set the operation name.
+   * @param operation the operation name
+   */
+  virtual void setOperation(const std::string& operation) PURE;
+
+  /**
    * Attach metadata to a Span, to be handled in an implementation-dependent fashion.
    * @param name the name of the tag
    * @param value the value to associate with the tag

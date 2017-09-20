@@ -20,7 +20,10 @@
                   "routes": [
                     {
                       "prefix": "/",
-                      "cluster": "service1"
+                      "cluster": "service1",
+                      "decorator": {
+                        "operation": "checkAvailability"
+                      }
                     }
                   ]
                 }

@@ -70,8 +70,10 @@ TEST_F(BufferFilterTest, RequestTimeout) {
   TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  TestHeaderMapImpl response_headers{{":status", "408"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  TestHeaderMapImpl response_headers{
+      {":status", "408"}, {"content-length", "22"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   timer_->callback_();
 
   filter_.onDestroy();

@@ -2462,6 +2462,51 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
                EnvoyException);
 }
 
+TEST(RouterMatcherTest, Decorator) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "foo",
+          "decorator": {
+            "operation": "myFoo"
+          }
+        },
+        {
+          "prefix": "/bar",
+          "cluster": "bar"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    Tracing::MockSpan span;
+    EXPECT_CALL(span, setOperation("myFoo"));
+    route->decorator()->apply(span);
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_EQ(nullptr, route->decorator());
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

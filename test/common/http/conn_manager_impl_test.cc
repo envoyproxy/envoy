@@ -378,6 +378,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
         return span;
       }));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
+      .WillOnce(
+          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan(_))
       .WillOnce(
           Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));

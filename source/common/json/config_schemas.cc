@@ -737,6 +737,14 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         "type" : "object",
         "additionalProperties" : true
       },
+      "decorator" : {
+        "type" : "object",
+        "properties" : {
+          "operation" : {"type" : "string"}
+        },
+        "required" : ["operation"],
+        "additionalProperties" : false
+      },
       "cors" : {
         "type" : "object",
         "properties" : {
