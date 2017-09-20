@@ -225,7 +225,7 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 }
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
-  addConfigModifier([=](envoy::api::v2::Bootstrap&) -> void {
+  addConfigModifier([function, this](envoy::api::v2::Bootstrap&) -> void {
     envoy::api::v2::filter::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);
