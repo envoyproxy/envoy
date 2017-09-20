@@ -1,0 +1,8 @@
+FROM ubuntu:xenial
+
+COPY ./build_and_install_deps.sh ./target_recipes.bzl ./recipe_wrapper.sh ./Makefile /
+COPY ./build_recipes/*.sh /build_recipes/
+
+COPY ./build_container_ubuntu.sh /
+
+RUN ./build_container_ubuntu.sh
