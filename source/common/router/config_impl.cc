@@ -80,7 +80,8 @@ HashPolicyImpl::HashPolicyImpl(
          envoy::api::v2::RouteAction::HashPolicy::kHeader);
 }
 
-Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) const {
+Optional<uint64_t> HashPolicyImpl::generateHash(const Network::Address::Instance*,
+                                                const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
   const Http::HeaderEntry* header = headers.get(header_name_);
   if (header) {

@@ -169,7 +169,9 @@ public:
   ~MockHashPolicy();
 
   // Router::HashPolicy
-  MOCK_CONST_METHOD1(generateHash, Optional<uint64_t>(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD2(generateHash,
+                     Optional<uint64_t>(const Network::Address::Instance* downstream_address,
+                                        const Http::HeaderMap& headers));
 };
 
 class MockRouteEntry : public RouteEntry {

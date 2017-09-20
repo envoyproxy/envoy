@@ -129,7 +129,9 @@ public:
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
-        return hash_policy->generateHash(*downstream_headers_);
+        const Network::Connection* connection = this->downstreamConnection();
+        return hash_policy->generateHash(connection ? &connection->remoteAddress() : nullptr,
+                                         *downstream_headers_);
       }
     }
     return {};

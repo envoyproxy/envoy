@@ -835,13 +835,13 @@ TEST(RouterMatcherTest, HashPolicy) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(NULL, headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(NULL, headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
