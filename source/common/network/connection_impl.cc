@@ -245,7 +245,11 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(read_enabled);
     state_ &= ~InternalState::ReadEnabled;
-    file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    if (detect_early_close_) {
+      file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    } else {
+      file_event_->setEnabled(Event::FileReadyType::Write);
+    }
   } else {
     if (read_disable_count_ > 0) {
       --read_disable_count_;
