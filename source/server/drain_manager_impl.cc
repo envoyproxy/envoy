@@ -32,16 +32,16 @@ bool DrainManagerImpl::drainClose() const {
   }
 
   // We use the tick time as in increasing chance that we shutdown connections.
-  return static_cast<uint64_t>(drain_time_completed_.count()) >
+  return static_cast<uint64_t>(drain_time_completed_.load()) >
          (server_.random().random() % server_.options().drainTime().count());
 }
 
 void DrainManagerImpl::drainSequenceTick() {
-  ENVOY_LOG(trace, "drain tick #{}", drain_time_completed_.count());
-  ASSERT(drain_time_completed_ < server_.options().drainTime());
-  drain_time_completed_ += std::chrono::seconds(1);
+  ENVOY_LOG(trace, "drain tick #{}", drain_time_completed_.load());
+  ASSERT(drain_time_completed_.load() < server_.options().drainTime().count());
+  ++drain_time_completed_;
 
-  if (drain_time_completed_ < server_.options().drainTime()) {
+  if (drain_time_completed_.load() < server_.options().drainTime().count()) {
     drain_tick_timer_->enableTimer(std::chrono::milliseconds(1000));
   } else if (drain_sequence_completion_) {
     drain_sequence_completion_();
