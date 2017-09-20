@@ -1,6 +1,7 @@
 #include "common/tracing/zipkin/zipkin_tracer_impl.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -107,20 +108,29 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
-
   } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
+    uint64_t traceId(0);
+    uint64_t spanId(0);
     uint64_t parentId(0);
+    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16)) {
+      throw EnvoyException(fmt::format("invalid hex string for XB3TraceId '{}'",
+                                       request_headers.XB3TraceId()->value().c_str()));
+    }
+    if (!StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16)) {
+      throw EnvoyException(fmt::format("invalid hex string for XB3SpanId '{}'",
+                                       request_headers.XB3SpanId()->value().c_str()));
+    }
     if (request_headers.XB3ParentSpanId()) {
-      parentId = std::stoull(request_headers.XB3ParentSpanId()->value().c_str(), nullptr, 16);
+      if (!StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16)) {
+        throw EnvoyException(fmt::format("invalid hex string for XB3ParentSpanId '{}'",
+                                         request_headers.XB3ParentSpanId()->value().c_str()));
+      }
     }
 
-    SpanContext context(std::stoull(request_headers.XB3TraceId()->value().c_str(), nullptr, 16),
-                        std::stoull(request_headers.XB3SpanId()->value().c_str(), nullptr, 16),
-                        parentId);
+    SpanContext context(traceId, spanId, parentId);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
-
   } else {
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
