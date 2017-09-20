@@ -137,14 +137,12 @@ public:
   }
 
   void makeSingleRequest() {
-    registerTestServerPorts({"http"});
-    auto client_conn = makeClientConnection(lookupPort("http"));
-    testRouterHeaderOnlyRequestAndResponse(std::move(client_conn), true);
+    testRouterHeaderOnlyRequestAndResponse(true);
     cleanupUpstreamAndDownstream();
     fake_upstream_connection_ = nullptr;
   }
 
-  void initialize() {
+  void initialize() override {
     ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream();
     ads_stream_->startGrpcStream();
