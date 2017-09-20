@@ -289,7 +289,12 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   disconnect(false);
 }
 
-TEST_P(ConnectionImplTest, CloseOnNormalReadDisable) {
+TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
+#ifdef __APPLE__
+  // On our current OSX build, the client connection does not get the early
+  // close notification and instead gets the close after reading the FIN.
+  return;
+#endif
   setUpBasicConnection();
   connect();
 
