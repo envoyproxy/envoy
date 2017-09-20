@@ -12,7 +12,6 @@ int main(int argc, char* argv[]) {
   try {
     Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(argv[1]);
 
-    // TODO(hennna): Switch to gflags
     if (argc == 4 && std::string(argv[3]) == "--details") {
       checktool.setShowDetails();
     }

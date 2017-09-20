@@ -197,8 +197,6 @@ void Utility::sendLocalReply(
   encode_headers(std::move(response_headers), body_text.empty());
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
-    // TODO(htuch): We shouldn't encodeData() if the stream is reset in the encodeHeaders() above,
-    // see https://github.com/envoyproxy/envoy/issues/1283.
     encode_data(buffer, true);
   }
 }

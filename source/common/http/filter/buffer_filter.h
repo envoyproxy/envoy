@@ -65,6 +65,7 @@ private:
   BufferFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
+  bool stream_destroyed_{};
 };
 
 } // Http

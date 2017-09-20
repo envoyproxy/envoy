@@ -13,6 +13,7 @@
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
+* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
 
 # Emeritus committers
 

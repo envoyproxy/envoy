@@ -66,6 +66,7 @@ public:
   std::string nextProtocol() const override { return ""; }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
+  void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
@@ -156,6 +157,7 @@ private:
   uint32_t read_disable_count_{0};
   const bool using_original_dst_;
   bool above_high_watermark_{false};
+  bool detect_early_close_{true};
 };
 
 /**

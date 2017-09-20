@@ -58,6 +58,7 @@ public:
   MOCK_CONST_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
+  MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
@@ -93,6 +94,7 @@ public:
   MOCK_CONST_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
+  MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
   MOCK_CONST_METHOD0(localAddress, const Address::Instance&());

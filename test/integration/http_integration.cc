@@ -702,26 +702,26 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: { deprecated_v1: true } }");
   config_helper_.setBufferLimits(1024, 1024);
 
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       [&]() -> void {
-         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                    {":path", "/dynamo/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"},
-                                                                    {"x-forwarded-for", "10.0.0.1"},
-                                                                    {"x-envoy-retry-on", "5xx"}},
-                                            1024 * 65, *response_);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
-       [&]() -> void {
-         response_->waitForEndStream();
-         EXPECT_TRUE(response_->complete());
-         EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
-       },
-       [&]() -> void { cleanupUpstreamAndDownstream(); }});
+  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
+                  [&]() -> void {
+                    // Envoy will likely connect and proxy some unspecified amount of data before
+                    // hitting the buffer limit and disconnecting.  Ignore this if it happens.
+                    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+                    codec_client_->makeRequestWithBody(
+                        Http::TestHeaderMapImpl{{":method", "POST"},
+                                                {":path", "/dynamo/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"},
+                                                {"x-forwarded-for", "10.0.0.1"},
+                                                {"x-envoy-retry-on", "5xx"}},
+                        1024 * 65, *response_);
+                  },
+                  [&]() -> void {
+                    response_->waitForEndStream();
+                    EXPECT_TRUE(response_->complete());
+                    EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
+                  },
+                  [&]() -> void { cleanupUpstreamAndDownstream(); }});
 }
 
 // Test hitting the dynamo filter with too many response bytes to buffer.  Given the request headers

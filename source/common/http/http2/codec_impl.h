@@ -231,7 +231,7 @@ protected:
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
-  void sendSettings(const Http2Settings& http2_settings);
+  void sendSettings(const Http2Settings& http2_settings, bool disable_push);
 
   static Http2Callbacks http2_callbacks_;
   static Http2Options http2_options_;
