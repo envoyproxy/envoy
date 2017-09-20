@@ -210,18 +210,17 @@ TEST_P(AdsIntegrationTest, Basic) {
   // Upgrade LDS/RDS, validate we can process a request.
   sendDiscoveryResponse(Config::TypeUrl::get().Listener,
                         buildListener("listener_1", "route_config_1"), "2");
-  // Avoid racing with route update, this makes the test more deterministic.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
-  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
-                        buildRouteConfig("route_config_1", "cluster_1"), "3");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
                                       {"route_config_1", "route_config_0"}));
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildRouteConfig("route_config_1", "cluster_1"), "3");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {"route_config_1"}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "3", {"route_config_1"}));
 
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   makeSingleRequest();
 }
 
