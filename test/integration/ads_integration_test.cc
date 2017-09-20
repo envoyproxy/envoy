@@ -212,11 +212,11 @@ TEST_P(AdsIntegrationTest, Basic) {
                         buildListener("listener_1", "route_config_1"), "2");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
                                       {"route_config_1", "route_config_0"}));
-  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
-                        buildRouteConfig("route_config_1", "cluster_1"), "3");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {"route_config_1"}));
+  sendDiscoveryResponse(Config::TypeUrl::get().RouteConfiguration,
+                        buildRouteConfig("route_config_1", "cluster_1"), "3");
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "3", {"route_config_1"}));
 
