@@ -196,7 +196,7 @@ void setRouteUsingWebsocket(envoy::api::v2::filter::HttpConnectionManager& hcm) 
   route->mutable_match()->set_prefix("/websocket/test");
   route->mutable_route()->set_prefix_rewrite("/websocket");
   route->mutable_route()->set_cluster("cluster_0");
-  route->mutable_route()->mutable_use_websocket()->set_value("true");
+  route->mutable_route()->mutable_use_websocket()->set_value(true);
 };
 
 TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
