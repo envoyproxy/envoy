@@ -111,9 +111,13 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
 
-    bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
-                     (upstream_host ? upstream_host->canary() : false);
-    bool internal_request = internal_request_header && internal_request_header->value() == "true";
+    const bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
+                           (upstream_host ? upstream_host->canary() : false);
+    const bool internal_request =
+        internal_request_header && internal_request_header->value() == "true";
+
+    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
+    const std::string zone_name = config_.local_info_.zoneName();
 
     Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                              cluster_->statsScope(),
@@ -123,7 +127,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
                                              route_entry_->virtualHost().name(),
                                              request_vcluster_ ? request_vcluster_->name()
                                                                : EMPTY_STRING,
-                                             config_.local_info_.zoneName(),
+                                             zone_name,
                                              upstreamZone(upstream_host),
                                              is_canary};
 
@@ -137,7 +141,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
                                                internal_request,
                                                EMPTY_STRING,
                                                EMPTY_STRING,
-                                               config_.local_info_.zoneName(),
+                                               zone_name,
                                                upstreamZone(upstream_host),
                                                is_canary};
 
@@ -550,7 +554,11 @@ void Filter::onUpstreamComplete() {
     upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
 
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
-    bool internal_request = internal_request_header && internal_request_header->value() == "true";
+    const bool internal_request =
+        internal_request_header && internal_request_header->value() == "true";
+
+    // TODO(mattklein123): Remove copy when G string compat issues are fixed.
+    const std::string zone_name = config_.local_info_.zoneName();
 
     Http::CodeUtility::ResponseTimingInfo info{config_.scope_,
                                                cluster_->statsScope(),
@@ -561,7 +569,7 @@ void Filter::onUpstreamComplete() {
                                                route_entry_->virtualHost().name(),
                                                request_vcluster_ ? request_vcluster_->name()
                                                                  : EMPTY_STRING,
-                                               config_.local_info_.zoneName(),
+                                               zone_name,
                                                upstreamZone(upstream_request_->upstream_host_)};
 
     Http::CodeUtility::chargeResponseTiming(info);
@@ -575,7 +583,7 @@ void Filter::onUpstreamComplete() {
                                                  internal_request,
                                                  EMPTY_STRING,
                                                  EMPTY_STRING,
-                                                 config_.local_info_.zoneName(),
+                                                 zone_name,
                                                  upstreamZone(upstream_request_->upstream_host_)};
 
       Http::CodeUtility::chargeResponseTiming(info);
