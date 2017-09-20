@@ -164,6 +164,18 @@ public:
   MOCK_METHOD0(bufferLimit, uint32_t());
 
   std::list<StreamCallbacks*> callbacks_{};
+
+  void runHighWatermarkCallbacks() {
+    for (auto* callback : callbacks_) {
+      callback->onAboveWriteBufferHighWatermark();
+    }
+  }
+
+  void runLowWatermarkCallbacks() {
+    for (auto* callback : callbacks_) {
+      callback->onBelowWriteBufferLowWatermark();
+    }
+  }
 };
 
 class MockStreamEncoder : public StreamEncoder {

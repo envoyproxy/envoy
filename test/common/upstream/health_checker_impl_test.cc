@@ -627,13 +627,8 @@ TEST_F(HttpHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  for (auto* callback : test_sessions_[0]->request_encoder_.stream_.callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
-
-  for (auto* callback : test_sessions_[0]->request_encoder_.stream_.callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
-  }
+  test_sessions_[0]->request_encoder_.stream_.runHighWatermarkCallbacks();
+  test_sessions_[0]->request_encoder_.stream_.runLowWatermarkCallbacks();
 
   respond(0, "200", true);
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
