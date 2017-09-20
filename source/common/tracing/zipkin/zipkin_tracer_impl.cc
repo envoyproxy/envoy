@@ -112,19 +112,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     uint64_t traceId(0);
     uint64_t spanId(0);
     uint64_t parentId(0);
-    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16)) {
-      throw EnvoyException(fmt::format("invalid hex string for XB3TraceId '{}'",
-                                       request_headers.XB3TraceId()->value().c_str()));
-    }
-    if (!StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16)) {
-      throw EnvoyException(fmt::format("invalid hex string for XB3SpanId '{}'",
-                                       request_headers.XB3SpanId()->value().c_str()));
-    }
-    if (request_headers.XB3ParentSpanId()) {
-      if (!StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16)) {
-        throw EnvoyException(fmt::format("invalid hex string for XB3ParentSpanId '{}'",
-                                         request_headers.XB3ParentSpanId()->value().c_str()));
-      }
+    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16)
+        || !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16)
+        || (request_headers.XB3ParentSpanId() && !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16))) {
+      return nullptr;
     }
 
     SpanContext context(traceId, spanId, parentId);

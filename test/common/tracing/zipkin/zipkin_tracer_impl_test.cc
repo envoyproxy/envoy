@@ -398,8 +398,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
   request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
 
-  EXPECT_THROW(driver_->startSpan(config_, request_headers_, operation_name_, start_time_),
-               EnvoyException);
+  EXPECT_EQ(nullptr, driver_->startSpan(config_, request_headers_, operation_name_, start_time_));
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
@@ -409,8 +408,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
   request_headers_.insertXB3SpanId().value(std::string("xyz"));
   request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
 
-  EXPECT_THROW(driver_->startSpan(config_, request_headers_, operation_name_, start_time_),
-               EnvoyException);
+  EXPECT_EQ(nullptr, driver_->startSpan(config_, request_headers_, operation_name_, start_time_));
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
@@ -420,8 +418,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
   request_headers_.insertXB3ParentSpanId().value(std::string("xyz"));
 
-  EXPECT_THROW(driver_->startSpan(config_, request_headers_, operation_name_, start_time_),
-               EnvoyException);
+  EXPECT_EQ(nullptr, driver_->startSpan(config_, request_headers_, operation_name_, start_time_));
 }
 } // namespace Zipkin
 } // namespace Envoy
