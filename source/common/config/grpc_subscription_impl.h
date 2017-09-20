@@ -33,27 +33,27 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : grpc_mux_(node, std::move(async_client), dispatcher, service_method),
-        ads_subscription_(grpc_mux_, stats) {}
+        grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
-    ads_subscription_.start(resources, callbacks);
+    grpc_mux_subscription_.start(resources, callbacks);
     grpc_mux_.start();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    ads_subscription_.updateResources(resources);
+    grpc_mux_subscription_.updateResources(resources);
   }
 
-  const std::string versionInfo() const override { return ads_subscription_.versionInfo(); }
+  const std::string versionInfo() const override { return grpc_mux_subscription_.versionInfo(); }
 
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:
   GrpcMuxImpl grpc_mux_;
-  GrpcMuxSubscriptionImpl<ResourceType> ads_subscription_;
+  GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
 };
 
 } // namespace Config
