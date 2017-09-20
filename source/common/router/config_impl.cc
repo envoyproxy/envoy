@@ -419,8 +419,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader),
       regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers, 
-                                                 const Http::AccessLog::RequestInfo& request_info) const {
+void RegexRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   const Http::HeaderString& path = headers.Path()->value();

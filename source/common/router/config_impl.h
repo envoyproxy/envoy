@@ -443,7 +443,7 @@ public:
                       Runtime::Loader& loader);
 
   // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers, 
+  void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const Http::AccessLog::RequestInfo& request_info) const override;
 
   // Router::Matchable
