@@ -29,12 +29,12 @@ then
             docker push lyft/envoy-build-${distro}:latest
 
             if [ "$distro" == "ubuntu" ]
+            then
                 echo "Updating lyft/envoy-build image"
                 docker tag lyft/envoy-build-${distro}:$TRAVIS_COMMIT lyft/envoy-build:$TRAVIS_COMMIT
                 docker push lyft/envoy-build:$TRAVIS_COMMIT
                 docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build:latest
                 docker push lyft/envoy-build:latest
-            then
             fi
         done
     else

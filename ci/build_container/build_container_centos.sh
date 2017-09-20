@@ -35,6 +35,6 @@ pushd /usr/lib/llvm-5.0/bin
 ln -s /opt/llvm-5.0.0/bin/llvm-symbolizer .
 popd
 
-echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' > /etc/profile.d/llvm.sh
+echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' >> /opt/app-root/etc/scl_enable
 
 EXPECTED_CXX_VERSION="g++ (GCC) 6.2.1 20160916 (Red Hat 6.2.1-3)" ./build_container_common.sh
