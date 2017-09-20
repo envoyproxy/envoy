@@ -21,6 +21,11 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
 }
 
+void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+  const std::string json = Json::Factory::loadFromYamlString(yaml)->asJsonString();
+  loadFromJson(json, message);
+}
+
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
   const std::string contents = Filesystem::fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
@@ -41,8 +46,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                          message.GetTypeName() + ")");
   }
   if (StringUtil::endsWith(path, ".yaml")) {
-    const std::string json = Json::Factory::loadFromYamlString(contents)->asJsonString();
-    loadFromJson(json, message);
+    loadFromYaml(contents, message);
   } else {
     loadFromJson(contents, message);
   }

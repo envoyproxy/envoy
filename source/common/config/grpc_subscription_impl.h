@@ -3,10 +3,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/logger.h"
-#include "common/config/utility.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "common/config/grpc_mux_impl.h"
+#include "common/config/grpc_mux_subscription_impl.h"
 
 #include "api/base.pb.h"
 
@@ -14,9 +12,7 @@ namespace Envoy {
 namespace Config {
 
 template <class ResourceType>
-class GrpcSubscriptionImpl : public Config::Subscription<ResourceType>,
-                             Grpc::AsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
-                             Logger::Loggable<Logger::Id::config> {
+class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
   GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
@@ -36,114 +32,28 @@ public:
                            async_client,
                        Event::Dispatcher& dispatcher,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : async_client_(std::move(async_client)), service_method_(service_method),
-        retry_timer_(dispatcher.createTimer([this]() -> void { establishNewStream(); })),
-        stats_(stats) {
-    request_.mutable_node()->CopyFrom(node);
-  }
-
-  void setRetryTimer() { retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS)); }
-
-  void establishNewStream() {
-    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-    stats_.update_attempt_.inc();
-    stream_ = async_client_->start(service_method_, *this);
-    if (stream_ == nullptr) {
-      ENVOY_LOG(warn, "Unable to establish new stream");
-      handleFailure();
-      return;
-    }
-    sendDiscoveryRequest();
-  }
-
-  void sendDiscoveryRequest() {
-    if (stream_ == nullptr) {
-      ENVOY_LOG(trace, "Unable to sendDiscoveryRequest() on null stream");
-      return;
-    }
-    ENVOY_LOG(trace, "sendDiscoveryRequest: {}", request_.DebugString());
-    stream_->sendMessage(request_, false);
-  }
+      : grpc_mux_(node, std::move(async_client), dispatcher, service_method),
+        grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
              Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
-    ASSERT(callbacks_ == nullptr);
-    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
-                                                                       resources.end());
-    request_.mutable_resource_names()->Swap(&resources_vector);
-    callbacks_ = &callbacks;
-    establishNewStream();
+    // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
+    grpc_mux_subscription_.start(resources, callbacks);
+    grpc_mux_.start();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
-                                                                       resources.end());
-    request_.mutable_resource_names()->Swap(&resources_vector);
-    sendDiscoveryRequest();
-    stats_.update_attempt_.inc();
+    grpc_mux_subscription_.updateResources(resources);
   }
 
-  const std::string versionInfo() const override { return request_.version_info(); }
+  const std::string versionInfo() const override { return grpc_mux_subscription_.versionInfo(); }
 
-  // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-  }
-
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-  }
-
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
-    const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(*message);
-    try {
-      callbacks_->onConfigUpdate(typed_resources);
-      request_.set_version_info(message->version_info());
-      stats_.update_success_.inc();
-      ENVOY_LOG(debug, "gRPC config update accepted: {}", message->DebugString());
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(warn, "gRPC config update rejected: {}", e.what());
-      stats_.update_rejected_.inc();
-      callbacks_->onConfigUpdateFailed(&e);
-    }
-    // This effectively ACK/NACKs the accepted configuration.
-    ENVOY_LOG(debug, "Sending version update: {}", message->version_info());
-    stats_.update_attempt_.inc();
-    request_.set_response_nonce(message->nonce());
-    sendDiscoveryRequest();
-  }
-
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-  }
-
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
-    handleFailure();
-    stream_ = nullptr;
-  }
-
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_DELAY_MS = 5000;
+  GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:
-  void handleFailure() {
-    stats_.update_failure_.inc();
-    callbacks_->onConfigUpdateFailed(nullptr);
-    setRetryTimer();
-  }
-
-  std::unique_ptr<
-      Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
-      async_client_;
-  const Protobuf::MethodDescriptor& service_method_;
-  Event::TimerPtr retry_timer_;
-  Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
-  Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
-  Grpc::AsyncStream<envoy::api::v2::DiscoveryRequest>* stream_{};
-  envoy::api::v2::DiscoveryRequest request_;
-  SubscriptionStats stats_;
+  GrpcMuxImpl grpc_mux_;
+  GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
 };
 
 } // namespace Config

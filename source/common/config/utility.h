@@ -1,19 +1,26 @@
 #pragma once
 
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/singleton.h"
+#include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "api/base.pb.h"
+#include "api/cds.pb.h"
+#include "api/eds.pb.h"
 #include "api/filter/http_connection_manager.pb.h"
+#include "api/lds.pb.h"
+#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -44,7 +51,7 @@ public:
   static Protobuf::RepeatedPtrField<ResourceType>
   getTypedResources(const envoy::api::v2::DiscoveryResponse& response) {
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
-    for (auto& resource : response.resources()) {
+    for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
       resource.UnpackTo(typed_resource);
     }
@@ -190,6 +197,16 @@ public:
 
     return config;
   }
+
+  /**
+   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
+   * a Routeconfiguration, based on the underlying resource type.
+   * TODO(htuch): This is kind of a hack. If we had a better support for resource names as first
+   * class in the API, this would not be necessary.
+   * @param resource google.protobuf.Any v2 API resource.
+   * @return std::string resource name.
+   */
+  static std::string resourceName(const ProtobufWkt::Any& resource);
 };
 
 } // namespace Config

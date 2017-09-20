@@ -120,6 +120,7 @@ def envoy_api_deps(skip_targets):
         "bootstrap",
         "discovery",
         "cds",
+        "discovery",
         "eds",
         "health_check",
         "lds",

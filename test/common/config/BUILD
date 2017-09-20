@@ -9,18 +9,6 @@ load(
 
 envoy_package()
 
-envoy_cc_test_library(
-    name = "ads_subscription_test_harness",
-    srcs = ["ads_subscription_test_harness.h"],
-    external_deps = ["envoy_eds"],
-    deps = [
-        ":subscription_test_harness",
-        "//source/common/config:ads_subscription_lib",
-        "//test/mocks/config:config_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
@@ -45,6 +33,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "grpc_mux_impl_test",
+    srcs = ["grpc_mux_impl_test.cc"],
+    external_deps = [
+        "envoy_discovery",
+        "envoy_eds",
+    ],
+    deps = [
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [
@@ -60,6 +66,7 @@ envoy_cc_test_library(
         ":subscription_test_harness",
         "//source/common/common:hash_lib",
         "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:resources_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -115,7 +122,6 @@ envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
     deps = [
-        ":ads_subscription_test_harness",
         ":filesystem_subscription_test_harness",
         ":grpc_subscription_test_harness",
         ":http_subscription_test_harness",

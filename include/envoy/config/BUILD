@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "ads_interface",
-    hdrs = ["ads.h"],
+    name = "grpc_mux_interface",
+    hdrs = ["grpc_mux.h"],
     deps = [
         "//source/common/protobuf",
     ],

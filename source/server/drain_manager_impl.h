@@ -32,7 +32,7 @@ private:
 
   Instance& server_;
   Event::TimerPtr drain_tick_timer_;
-  std::chrono::seconds drain_time_completed_{};
+  std::atomic<uint32_t> drain_time_completed_{};
   Event::TimerPtr parent_shutdown_timer_;
   std::function<void()> drain_sequence_completion_;
 };

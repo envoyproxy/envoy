@@ -40,6 +40,8 @@ public:
   void waitForRatelimitRequest() {
     fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ratelimit_request_ = fake_ratelimit_connection_->waitForNewStream();
+    pb::lyft::ratelimit::RateLimitRequest request_msg;
+    ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     ratelimit_request_->waitForEndStream(*dispatcher_);
     EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
     EXPECT_STREQ("/pb.lyft.ratelimit.RateLimitService/ShouldRateLimit",
@@ -51,16 +53,6 @@ public:
     auto* entry = expected_request_msg.add_descriptors()->add_entries();
     entry->set_key("destination_cluster");
     entry->set_value("traffic");
-
-    Grpc::Decoder decoder;
-    std::vector<Grpc::Frame> decoded_frames;
-    EXPECT_TRUE(decoder.decode(ratelimit_request_->body(), decoded_frames));
-    EXPECT_EQ(1, decoded_frames.size());
-    pb::lyft::ratelimit::RateLimitRequest request_msg;
-    Buffer::ZeroCopyInputStreamImpl stream(std::move(decoded_frames[0].data_));
-    EXPECT_TRUE(decoded_frames[0].flags_ == Grpc::GRPC_FH_DEFAULT);
-    EXPECT_TRUE(request_msg.ParseFromZeroCopyStream(&stream));
-
     EXPECT_EQ(expected_request_msg.DebugString(), request_msg.DebugString());
   }
 
@@ -89,12 +81,11 @@ public:
   }
 
   void sendRateLimitResponse(pb::lyft::ratelimit::RateLimitResponse_Code code) {
-    ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    ratelimit_request_->startGrpcStream();
     pb::lyft::ratelimit::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
-    auto serialized_response = Grpc::Common::serializeBody(response_msg);
-    ratelimit_request_->encodeData(*serialized_response, false);
-    ratelimit_request_->encodeTrailers(Http::TestHeaderMapImpl{{"grpc-status", "0"}});
+    ratelimit_request_->sendGrpcMessage(response_msg);
+    ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
 
   void cleanup() {

@@ -71,5 +71,6 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )

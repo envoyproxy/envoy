@@ -3,17 +3,20 @@
 namespace Envoy {
 namespace Config {
 
-MockAdsWatch::MockAdsWatch() {}
-MockAdsWatch::~MockAdsWatch() { cancel(); }
+MockGrpcMuxWatch::MockGrpcMuxWatch() {}
+MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 
-MockAdsApi::MockAdsApi() {}
-MockAdsApi::~MockAdsApi() {}
+MockGrpcMux::MockGrpcMux() {}
+MockGrpcMux::~MockGrpcMux() {}
 
-AdsWatchPtr MockAdsApi::subscribe(const std::string& type_url,
-                                  const std::vector<std::string>& resources,
-                                  AdsCallbacks& callbacks) {
-  return AdsWatchPtr(subscribe_(type_url, resources, callbacks));
+GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
+                                       const std::vector<std::string>& resources,
+                                       GrpcMuxCallbacks& callbacks) {
+  return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
 }
+
+MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {}
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
 
 } // namespace Config
 } // namespace Envoy
