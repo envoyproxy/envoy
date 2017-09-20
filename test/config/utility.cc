@@ -153,7 +153,7 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   envoy::api::v2::filter::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
   if (hcm_config.codec_type() == envoy::api::v2::filter::HttpConnectionManager::HTTP2) {
-    uint32_t size =
+    const uint32_t size =
         std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
     auto* options = hcm_config.mutable_http2_protocol_options();
     options->mutable_initial_stream_window_size()->set_value(size);
@@ -221,17 +221,16 @@ void ConfigHelper::storeHttpConnectionManager(
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
   RELEASE_ASSERT(!finalized_);
-  config_modifiers_.push_back(function);
+  config_modifiers_.push_back(std::move(function));
 }
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
-  RELEASE_ASSERT(!finalized_);
-  config_modifiers_.push_back(([&](envoy::api::v2::Bootstrap&) -> void {
+  addConfigModifier([=](envoy::api::v2::Bootstrap&) -> void {
     envoy::api::v2::filter::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
-  }));
+  });
 }
 
 } // namespace Envoy
