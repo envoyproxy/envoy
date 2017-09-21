@@ -200,6 +200,7 @@ public:
 
 private:
   const Http::LowerCaseString header_name_;
+  const bool hash_ip_;
 };
 
 /**
