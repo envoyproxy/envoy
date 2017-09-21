@@ -212,9 +212,11 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents) {
   const std::string out_path = TestEnvironment::temporaryPath(filename);
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_path + ")").c_str()) == 0);
   unlink(out_path.c_str());
   {
     std::ofstream out_file(out_path);
+    RELEASE_ASSERT(!out_file.fail());
     out_file << contents;
   }
   return out_path;
