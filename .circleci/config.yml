@@ -1,0 +1,7 @@
+version: 2
+jobs:
+   build:
+     docker:
+       - image: lyft/envoy-build:b3542cdfe76e7e46c276c781935d339d4ecd0502
+     steps:
+       - checkout
