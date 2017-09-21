@@ -1,7 +1,48 @@
 version: 2
 jobs:
-   build:
+   release:
      docker:
-       - image: lyft/envoy-build:b3542cdfe76e7e46c276c781935d339d4ecd0502
+       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+     resource_class: xlarge
      steps:
        - checkout
+       - run: ci/do_circle_ci.sh bazel.release
+   asan:
+     docker:
+       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+     resource_class: xlarge
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.asan
+   tsan:
+     docker:
+       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+     resource_class: xlarge
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.tsan
+   coverage:
+     docker:
+       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+     resource_class: xlarge
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.coverage
+   docs:
+     docker:
+       - image: circleci/python:2.7
+     resource_class: small
+     steps:
+       - checkout
+       - run: ./docs/build.sh
+       - run: ./docs/publish.sh
+
+workflows:
+  version: 2
+  all:
+    jobs:
+      - release
+      - asan
+      - tsan
+      - coverage
+      - docs

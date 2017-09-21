@@ -2,7 +2,7 @@ workspace(name = "envoy")
 
 local_repository(
     name = "envoy",
-    path = "/source",
+    path = "/root/project", # REVIEW: Can this come from env somehow?
 )
 
 load("//bazel:repositories.bzl", "envoy_dependencies")
