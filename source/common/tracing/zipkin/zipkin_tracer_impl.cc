@@ -109,17 +109,17 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
   } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
-    uint64_t traceId(0);
-    uint64_t spanId(0);
-    uint64_t parentId(0);
-    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16) ||
-        !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16) ||
+    uint64_t trace_id(0);
+    uint64_t span_id(0);
+    uint64_t parent_id(0);
+    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16) ||
+        !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
         (request_headers.XB3ParentSpanId() &&
-         !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16))) {
+         !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parent_id, 16))) {
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    SpanContext context(traceId, spanId, parentId);
+    SpanContext context(trace_id, span_id, parent_id);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
