@@ -237,8 +237,8 @@ def envoy_cc_test_library(name,
         copts = envoy_copts(repository, test = True),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//test/test_common:printers_includes"] + [
-            repository + "//test:local_gtest",
+            envoy_external_dep_path('googletest'),
+            repository + "//test/test_common:printers_includes",
         ],
         tags = tags,
         alwayslink = 1,
