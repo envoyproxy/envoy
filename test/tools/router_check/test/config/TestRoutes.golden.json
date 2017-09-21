@@ -288,5 +288,21 @@
         }
       ]
     }
+  },
+  {
+    "test_name": "CustomHeaderFields",
+    "input": {
+      ":authority": "api.lyft.com",
+      ":path": "/customheaders",
+      ":method": "GET"
+    },
+    "validate": {
+      "custom_header_fields": [
+        {
+          "field": "X-Client-IP",
+          "value": "127.0.0.1"
+        }
+      ]
+    }
   }
 ]

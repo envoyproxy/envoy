@@ -13,12 +13,12 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
-WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const Router::RouteEntry& route_entry,
-                             WsHandlerCallbacks& callbacks,
+WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const AccessLog::RequestInfo& request_info,
+                             const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks)
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
-      route_entry_(route_entry), ws_callbacks_(callbacks) {
+      request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
 
   read_callbacks_ = read_callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
@@ -32,7 +32,7 @@ void WsHandlerImpl::onInitFailure() {
 
 void WsHandlerImpl::onUpstreamHostReady() {
   // path and host rewrites
-  route_entry_.finalizeRequestHeaders(request_headers_);
+  route_entry_.finalizeRequestHeaders(request_headers_, request_info_);
   // for auto host rewrite
   if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
     request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());

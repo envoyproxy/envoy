@@ -75,6 +75,8 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareHeaderField(ToolConfig& tool_config, const std::string& field,
                           const std::string& expected);
+  bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
+                                const std::string& expected);
   /**
    * Compare the expected and acutal route parameter values. Print out match details if details_
    * flag is set.
