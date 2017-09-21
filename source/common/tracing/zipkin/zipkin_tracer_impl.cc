@@ -112,10 +112,11 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     uint64_t traceId(0);
     uint64_t spanId(0);
     uint64_t parentId(0);
-    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16)
-        || !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16)
-        || (request_headers.XB3ParentSpanId() && !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16))) {
-      return nullptr;
+    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), traceId, 16) ||
+        !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), spanId, 16) ||
+        (request_headers.XB3ParentSpanId() &&
+         !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parentId, 16))) {
+      return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
     SpanContext context(traceId, spanId, parentId);
