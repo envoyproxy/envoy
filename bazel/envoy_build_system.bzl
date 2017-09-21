@@ -214,6 +214,8 @@ def envoy_cc_test(name,
             ":" + name + "_lib",
             repository + "//test:main"
         ],
+        # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
+        # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],
         tags = tags + ["coverage_test"],
         local = local,
