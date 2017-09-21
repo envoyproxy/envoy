@@ -29,7 +29,7 @@ Envoy has the following requirements:
 
 In order to compile and run the tests the following is required:
 
-* `googletest <https://github.com/google/googletest>`_ (last tested with e2818c423e5058a02f46ce2e519a82742a8ccac9)
+* `googletest <https://github.com/google/googletest>`_ (last tested with sha 43863938377a9ea1399c0596269e0890b5c5515a)
 
 In order to run code coverage the following is required:
 
