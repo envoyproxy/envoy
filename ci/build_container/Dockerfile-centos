@@ -1,0 +1,9 @@
+FROM centos/devtoolset-6-toolchain-centos7
+
+COPY ./build_and_install_deps.sh ./target_recipes.bzl ./recipe_wrapper.sh ./Makefile ./build_container_common.sh /
+COPY ./build_recipes/*.sh /build_recipes/
+
+COPY ./build_container_centos.sh /
+
+USER root
+RUN cd / && ./build_container_centos.sh
