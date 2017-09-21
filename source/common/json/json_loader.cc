@@ -37,7 +37,7 @@ namespace {
 class Field;
 typedef std::shared_ptr<Field> FieldSharedPtr;
 
-class Field : public Object, public std::enable_shared_from_this<Field> {
+class Field : public Object {
 public:
   void setLineNumberStart(uint64_t line_number) { line_number_start_ = line_number; }
   void setLineNumberEnd(uint64_t line_number) { line_number_end_ = line_number; }
