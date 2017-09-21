@@ -1,6 +1,7 @@
 #include "common/tracing/zipkin/zipkin_tracer_impl.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -104,6 +105,21 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     // Differently, a shared-context span will be created if the current context carries the CS
     // annotation. In this case, we are dealing with an ingress operation. This envoy instance,
     // being at the receiving end, will add the SR annotation to the shared span context.
+
+    new_zipkin_span =
+        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
+  } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
+    uint64_t trace_id(0);
+    uint64_t span_id(0);
+    uint64_t parent_id(0);
+    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16) ||
+        !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
+        (request_headers.XB3ParentSpanId() &&
+         !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parent_id, 16))) {
+      return Tracing::SpanPtr(new Tracing::NullSpan());
+    }
+
+    SpanContext context(trace_id, span_id, parent_id);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
