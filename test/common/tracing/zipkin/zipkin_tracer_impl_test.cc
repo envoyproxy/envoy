@@ -76,7 +76,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 
-  Tracing::MockConfig config_;
+  NiceMock<Tracing::MockConfig> config_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {

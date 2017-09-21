@@ -1364,8 +1364,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
   // Once the limits are turned off can be turned on again.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(1);
-  EXPECT_EQ(1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(100);
+  EXPECT_EQ(100, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
