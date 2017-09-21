@@ -11,13 +11,13 @@ yum install -y java-1.8.0-openjdk-devel unzip which \
 yum clean all
 
 # latest bazel installer
-BAZEL_VERSION=$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |
-                  python -c "import json, sys; print json.load(sys.stdin)['tag_name']")
-BAZEL_INSTALLER=bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
-curl -OL https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/${BAZEL_INSTALLER}
-chmod ug+x ./${BAZEL_INSTALLER}
-./${BAZEL_INSTALLER}
-rm ./${BAZEL_INSTALLER}
+BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |
+                  python -c "import json, sys; print json.load(sys.stdin)['tag_name']")"
+BAZEL_INSTALLER="bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
+curl -OL "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/${BAZEL_INSTALLER}"
+chmod ug+x "./${BAZEL_INSTALLER}"
+"./${BAZEL_INSTALLER}"
+rm "./${BAZEL_INSTALLER}"
 
 # symbolic links for clang
 pushd /opt/llvm-5.0.0/bin
@@ -35,6 +35,7 @@ pushd /usr/lib/llvm-5.0/bin
 ln -s /opt/llvm-5.0.0/bin/llvm-symbolizer .
 popd
 
+# prepend clang to PATH
 echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' >> /opt/app-root/etc/scl_enable
 
 EXPECTED_CXX_VERSION="g++ (GCC) 6.2.1 20160916 (Red Hat 6.2.1-3)" ./build_container_common.sh
