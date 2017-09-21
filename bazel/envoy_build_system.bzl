@@ -189,6 +189,7 @@ def envoy_cc_test(name,
                   external_deps = [],
                   deps = [],
                   tags = [],
+                  args = [],
                   coverage = True,
                   local = False):
     test_lib_tags = []
@@ -213,6 +214,7 @@ def envoy_cc_test(name,
             ":" + name + "_lib",
             repository + "//test:main"
         ],
+        args = args + ["--gmock_default_mock_behavior=2"],
         tags = tags + ["coverage_test"],
         local = local,
     )
@@ -235,8 +237,8 @@ def envoy_cc_test_library(name,
         copts = envoy_copts(repository, test = True),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            envoy_external_dep_path('googletest'),
-            repository + "//test/test_common:printers_includes",
+            repository + "//test/test_common:printers_includes"] + [
+            repository + "//test:local_gtest",
         ],
         tags = tags,
         alwayslink = 1,

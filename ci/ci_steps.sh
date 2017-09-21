@@ -9,7 +9,7 @@ set -e
 travis lint .travis.yml --skip-completion-check
 
 # Where the Envoy build takes place.
-export ENVOY_BUILD_DIR=/tmp/envoy-docker-build
+[[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/tmp/envoy-docker-build
 
 function finish {
   echo "disk space at end of build:"

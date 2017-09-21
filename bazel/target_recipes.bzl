@@ -10,7 +10,6 @@ TARGET_RECIPES = {
     # TODO(htuch): This shouldn't be a build recipe, it's a tooling dependency
     # that is external to Bazel.
     "gcovr": "gcovr",
-    "googletest": "googletest",
     "tcmalloc_and_profiler": "gperftools",
     "http_parser": "http-parser",
     "lightstep": "lightstep",

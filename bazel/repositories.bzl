@@ -107,6 +107,18 @@ def cc_deps(skip_targets):
             actual = "@grpc_httpjson_transcoding//src:transcoding",
         )
 
+def googletest_deps(skip_targets):
+  if 'com_google_googletest' not in skip_targets:
+    native.git_repository(
+        name = "com_google_googletest",
+        remote = REPO_LOCATIONS["googletest"],
+        commit = "43863938377a9ea1399c0596269e0890b5c5515a",
+    )
+    native.bind(
+        name = "googletest",
+        actual = "@com_google_googletest//:gtest",
+    )
+
 def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
@@ -213,3 +225,4 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
     python_deps(skip_targets)
     cc_deps(skip_targets)
     envoy_api_deps(skip_targets)
+    googletest_deps(skip_targets)

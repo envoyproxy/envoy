@@ -73,6 +73,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch("/blahblah", _, _));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 

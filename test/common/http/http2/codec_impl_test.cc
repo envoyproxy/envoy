@@ -413,6 +413,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
       }));
+  EXPECT_CALL(request_decoder2, decodeHeaders_(_, false));
   request_encoder2->encodeHeaders(request_headers, false);
 
   // Add the stream callbacks belatedly.  On creation the stream should have

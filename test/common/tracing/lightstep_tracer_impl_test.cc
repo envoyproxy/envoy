@@ -81,7 +81,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
-  Tracing::MockConfig config_;
+  NiceMock<Tracing::MockConfig> config_;
 };
 
 TEST_F(LightStepDriverTest, InitializeDriver) {

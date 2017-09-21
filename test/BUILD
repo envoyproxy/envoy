@@ -2,11 +2,18 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_library(
+    name = "local_gtest",
+    external_deps = ["googletest"],
+    strip_include_prefix = "googlemock/include",
+)
 
 envoy_cc_test_library(
     name = "main",
