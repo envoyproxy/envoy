@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=release-1.8.0
+VERSION=43863938377a9ea1399c0596269e0890b5c5515a
 
 wget -O googletest-"$VERSION".tar.gz https://github.com/google/googletest/archive/"$VERSION".tar.gz
 tar xf googletest-"$VERSION".tar.gz
