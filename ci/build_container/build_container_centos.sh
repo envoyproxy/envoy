@@ -1,13 +1,16 @@
 #!/bin/bash -e
 
-# llvm-5.0.0 from copr
+# scl devtoolset repository
+yum install -y centos-release-scl
+
+# llvm-5.0.0 repository from copr
 curl -L -o /etc/yum.repos.d/alonid-llvm-5.0.0-epel-7.repo \
   https://copr.fedorainfracloud.org/coprs/alonid/llvm-5.0.0/repo/epel-7/alonid-llvm-5.0.0-epel-7.repo
 
 # dependencies for bazel and build_recipes
 yum install -y java-1.8.0-openjdk-devel unzip which \
-               cmake git golang libtool make patch rsync wget \
-               clang-5.0.0 devtoolset-6-libatomic-devel llvm-5.0.0 python-virtualenv
+               cmake devtoolset-4-gcc-c++ git golang libtool make patch rsync wget \
+               clang-5.0.0 devtoolset-4-libatomic-devel llvm-5.0.0 python-virtualenv
 yum clean all
 
 # latest bazel installer
@@ -23,11 +26,6 @@ rm "./${BAZEL_INSTALLER}"
 pushd /opt/llvm-5.0.0/bin
 ln -s clang++ clang++-5.0
 ln -s clang-format clang-format-5.0
-ln -s /opt/rh/devtoolset-6/root/bin/ld.gold .
-popd
-
-pushd /opt/rh/devtoolset-6/root/usr/lib64
-ln -s /opt/rh/devtoolset-6/root/usr/lib/gcc/x86_64-redhat-linux/6.3.1/libatomic.a .
 popd
 
 mkdir -p /usr/lib/llvm-5.0/bin
@@ -35,7 +33,17 @@ pushd /usr/lib/llvm-5.0/bin
 ln -s /opt/llvm-5.0.0/bin/llvm-symbolizer .
 popd
 
-# prepend clang to PATH
-echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' >> /opt/app-root/etc/scl_enable
+# setup bash env
+echo '. scl_source enable devtoolset-4' > /etc/profile.d/devtoolset-4.sh
+echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' > /etc/profile.d/llvm-5.0.0.sh
 
-EXPECTED_CXX_VERSION="g++ (GCC) 6.2.1 20160916 (Red Hat 6.2.1-3)" ./build_container_common.sh
+# enable devtoolset-4 for current shell
+# disable errexit temporarily, otherwise bash will quit during sourcing
+set +e
+. scl_source enable devtoolset-4
+set -e
+
+EXPECTED_CXX_VERSION="g++ (GCC) 5.3.1 20160406 (Red Hat 5.3.1-6)" ./build_container_common.sh
+
+# googletest install to lib64
+cp -a /thirdparty_build/lib64/* /thirdparty_build/lib
