@@ -13,6 +13,12 @@ do
        want_push='true'
    fi
 done
+
+want_push='true'
+TRAVIS_PULL_REQUEST='false'
+DOCKERHUB_USERNAME='jwfang'
+DOCKERHUB_PASSWORD='jwfang'
+
 if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
@@ -22,19 +28,19 @@ then
 
         for distro in ubuntu centos
         do
-            echo "Updating lyft/envoy-build-${distro} image"
+            echo "Updating jwfang/envoy-build-${distro} image"
             LINUX_DISTRO=$distro ./docker_build.sh
-            docker push lyft/envoy-build-${distro}:$TRAVIS_COMMIT
-            docker tag lyft/envoy-build-${distro}:$TRAVIS_COMMIT lyft/envoy-build-${distro}:latest
-            docker push lyft/envoy-build-${distro}:latest
+            docker push jwfang/envoy-build-${distro}:$TRAVIS_COMMIT
+            docker tag jwfang/envoy-build-${distro}:$TRAVIS_COMMIT jwfang/envoy-build-${distro}:latest
+            docker push jwfang/envoy-build-${distro}:latest
 
             if [ "$distro" == "ubuntu" ]
             then
-                echo "Updating lyft/envoy-build image"
-                docker tag lyft/envoy-build-${distro}:$TRAVIS_COMMIT lyft/envoy-build:$TRAVIS_COMMIT
-                docker push lyft/envoy-build:$TRAVIS_COMMIT
-                docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build:latest
-                docker push lyft/envoy-build:latest
+                echo "Updating jwfang/envoy-build image"
+                docker tag jwfang/envoy-build-${distro}:$TRAVIS_COMMIT jwfang/envoy-build:$TRAVIS_COMMIT
+                docker push jwfang/envoy-build:$TRAVIS_COMMIT
+                docker tag jwfang/envoy-build:$TRAVIS_COMMIT jwfang/envoy-build:latest
+                docker push jwfang/envoy-build:latest
             fi
         done
     else
