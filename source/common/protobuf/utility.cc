@@ -75,4 +75,34 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   MessageUtil::loadFromJson(json, dest);
 }
 
+bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
+  ProtobufWkt::Value::KindCase kind = v1.kind_case();
+  if (kind != v2.kind_case()) {
+    return false;
+  }
+
+  switch (kind) {
+  case ProtobufWkt::Value::kNullValue:
+    return true;
+
+  case ProtobufWkt::Value::kNumberValue:
+    return v1.number_value() == v2.number_value();
+
+  case ProtobufWkt::Value::kStringValue:
+    return v1.string_value() == v2.string_value();
+
+  case ProtobufWkt::Value::kBoolValue:
+    return v1.bool_value() == v2.bool_value();
+
+  case ProtobufWkt::Value::kStructValue:
+    return ProtobufUtil::MessageDifferencer::Equals(v1.struct_value(), v2.struct_value());
+
+  case ProtobufWkt::Value::kListValue:
+    return ProtobufUtil::MessageDifferencer::Equals(v1.list_value(), v2.list_value());
+
+  default:
+    RELEASE_ASSERT(false);
+  }
+}
+
 } // namespace Envoy

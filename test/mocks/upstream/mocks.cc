@@ -61,6 +61,15 @@ MockHost::MockHost() {
 
 MockHost::~MockHost() {}
 
+MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
+  ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
+  ON_CALL(*this, fallbackPolicy()).WillByDefault(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+  ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
+  ON_CALL(*this, subsetKeys()).WillByDefault(ReturnRef(subset_keys_));
+}
+
+MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() {}
+
 MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
@@ -78,6 +87,7 @@ MockClusterInfo::MockClusterInfo()
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
+  ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

@@ -1,5 +1,6 @@
 #include "common/router/config_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -89,6 +90,37 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   return hash;
 }
 
+std::vector<MetadataMatchConstSharedPtr>
+MetadataMatchesImpl::extractMetadataMatches(const MetadataMatchesImpl* parent,
+                                            const ProtobufWkt::Struct& matches) {
+  std::vector<MetadataMatchConstSharedPtr> v;
+  std::unordered_map<std::string, std::size_t> existing;
+
+  if (parent) {
+    for (const auto& it : parent->metadata_matches_) {
+      v.emplace_back(it);
+      existing.emplace(it->name(), v.size());
+    }
+  }
+
+  // Add values from matches, replacing key/values copied from parent.
+  for (const auto it : matches.fields()) {
+    const auto index_it = existing.find(it.first);
+    if (index_it != existing.end()) {
+      v[index_it->second] = std::make_shared<MetadataMatchImpl>(it.first, it.second);
+    } else {
+      v.emplace_back(std::make_shared<MetadataMatchImpl>(it.first, it.second));
+    }
+  }
+
+  std::sort(v.begin(), v.end(),
+            [](const MetadataMatchConstSharedPtr& a, const MetadataMatchConstSharedPtr& b) -> bool {
+              return a->name() < b->name();
+            });
+
+  return v;
+}
+
 DecoratorImpl::DecoratorImpl(const envoy::api::v2::Decorator& decorator)
     : operation_(decorator.operation()) {}
 
@@ -116,6 +148,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_matches_.reset(new MetadataMatchesImpl(nullptr, filter_it->second));
+    }
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent.
@@ -125,9 +165,20 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       const std::string& cluster_name = cluster.name();
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(
-          new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
-                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)));
+
+      MetadataMatchesImplConstPtr cluster_metadata_matches;
+      if (cluster.has_metadata_match()) {
+        const auto filter_it = cluster.metadata_match().filter_metadata().find(
+            Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+          cluster_metadata_matches.reset(
+              new MetadataMatchesImpl(metadata_matches_.get(), filter_it->second));
+        }
+      }
+
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(
+          this, runtime_key_prefix + "." + cluster_name, loader_, cluster_name,
+          PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight), std::move(cluster_metadata_matches)));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }

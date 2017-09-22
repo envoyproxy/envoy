@@ -15,6 +15,8 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -224,6 +226,40 @@ public:
   virtual Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const PURE;
 };
 
+class MetadataMatch {
+public:
+  virtual ~MetadataMatch() {}
+
+  /*
+   * @return const std::string& the name of the metadata key
+   */
+  virtual const std::string& name() const PURE;
+
+  /*
+   * @return const ProtobufWkt::Value& the value for the metadata key
+   */
+  virtual const ProtobufWkt::Value& value() const PURE;
+
+  /*
+   * @return uint64_t a precomputed hash of the value
+   */
+  virtual uint64_t valueHash() const PURE;
+};
+
+typedef std::shared_ptr<const MetadataMatch> MetadataMatchConstSharedPtr;
+
+class MetadataMatches {
+public:
+  virtual ~MetadataMatches() {}
+
+  /*
+   * @return std::vector<MetadataMatchConstSharedPtr>& a vector of
+   * metadata to be matched against upstream endpoints when load
+   * balancing, sorted lexically by name.
+   */
+  virtual const std::vector<MetadataMatchConstSharedPtr>& metadataMatches() const PURE;
+};
+
 /**
  * An individual resolved route entry.
  */
@@ -304,6 +340,8 @@ public:
    * @return bool true if this route should use WebSockets.
    */
   virtual bool useWebSocket() const PURE;
+
+  virtual const MetadataMatches* metadataMatches() const PURE;
 
   /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated

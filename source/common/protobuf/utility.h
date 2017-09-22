@@ -110,4 +110,11 @@ public:
   }
 };
 
+class ValueUtil {
+public:
+  static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+
+  static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+};
+
 } // namespace Envoy
