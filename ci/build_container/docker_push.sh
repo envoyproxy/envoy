@@ -17,13 +17,26 @@ if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
         echo "There are changes in the ci/build_container directory"
-        echo "Updating lyft/envoy-build image"
         cd ci/build_container
-        ./docker_build.sh
-        docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
-        docker push lyft/envoy-build:$TRAVIS_COMMIT
-        docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build:latest
-        docker push lyft/envoy-build:latest
+        docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+
+        for distro in ubuntu centos
+        do
+            echo "Updating lyft/envoy-build-${distro} image"
+            LINUX_DISTRO=$distro ./docker_build.sh
+            docker push lyft/envoy-build-${distro}:$TRAVIS_COMMIT
+            docker tag lyft/envoy-build-${distro}:$TRAVIS_COMMIT lyft/envoy-build-${distro}:latest
+            docker push lyft/envoy-build-${distro}:latest
+
+            if [ "$distro" == "ubuntu" ]
+            then
+                echo "Updating lyft/envoy-build image"
+                docker tag lyft/envoy-build-${distro}:$TRAVIS_COMMIT lyft/envoy-build:$TRAVIS_COMMIT
+                docker push lyft/envoy-build:$TRAVIS_COMMIT
+                docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build:latest
+                docker push lyft/envoy-build:latest
+            fi
+        done
     else
         echo "The ci/build_container directory has not changed"
     fi
