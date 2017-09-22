@@ -26,12 +26,12 @@ The semantics of listener updates are as follows:
 .. code-block:: json
 
   {
-    "cluster": "{...}",
+    "cluster": "...",
     "refresh_delay_ms": "..."
   }
 
 cluster
-  *(required, object)* The name of an upstream :ref:`cluster <config_cluster_manager_cluster>` that
+  *(required, string)* The name of an upstream :ref:`cluster <config_cluster_manager_cluster>` that
   hosts the listener discovery service. The cluster must run a REST service that implements the
   :ref:`LDS HTTP API <config_listeners_lds_api>`. NOTE: This is the *name* of a cluster defined
   in the :ref:`cluster manager <config_cluster_manager>` configuration, not the full definition of
