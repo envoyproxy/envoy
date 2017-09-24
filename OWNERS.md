@@ -8,7 +8,6 @@
 
 # Committers
 
-* Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
@@ -17,4 +16,5 @@
 
 # Emeritus committers
 
+* Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
