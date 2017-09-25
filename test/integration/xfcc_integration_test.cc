@@ -138,32 +138,20 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientCo
                                          {"x-forwarded-client-cert", previous_xfcc.c_str()}};
   }
 
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(std::move(conn)); },
-       [&]() -> void { codec_client_->makeHeaderOnlyRequest(header_map, *response_); },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
-       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
-       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
-       [&]() -> void {
-         if (expected_xfcc.empty()) {
-           EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
-         } else {
-           EXPECT_STREQ(expected_xfcc.c_str(),
-                        upstream_request_->headers().ForwardedClientCert()->value().c_str());
-         }
-         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
-       },
-       [&]() -> void {
-         response_->waitForEndStream();
-         EXPECT_TRUE(upstream_request_->complete());
-       },
-
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+  codec_client_ = makeHttpConnection(std::move(conn));
+  codec_client_->makeHeaderOnlyRequest(header_map, *response_);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_->waitForEndStream(*dispatcher_);
+  if (expected_xfcc.empty()) {
+    EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
+  } else {
+    EXPECT_STREQ(expected_xfcc.c_str(),
+                 upstream_request_->headers().ForwardedClientCert()->value().c_str());
+  }
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response_->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 }
 

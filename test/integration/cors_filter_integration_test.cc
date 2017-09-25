@@ -20,30 +20,21 @@ public:
 protected:
   void testPreflight(Http::TestHeaderMapImpl&& request_headers,
                      Http::TestHeaderMapImpl&& expected_response_headers) {
-    executeActions({
-        [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-        [&]() -> void { codec_client_->makeHeaderOnlyRequest(request_headers, *response_); },
-        [&]() -> void { response_->waitForEndStream(); },
-        [&]() -> void { cleanupUpstreamAndDownstream(); },
-    });
-
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+    response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
     compareHeaders(response_->headers(), expected_response_headers);
   }
 
   void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
                          Http::TestHeaderMapImpl&& expected_response_headers) {
-    executeActions({
-        [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-        [&]() -> void {
-          sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
-        },
-        [&]() -> void { response_->waitForEndStream(); },
-        [&]() -> void { cleanupUpstreamAndDownstream(); },
-    });
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
 
     EXPECT_TRUE(response_->complete());
-
     compareHeaders(response_->headers(), expected_response_headers);
   }
 

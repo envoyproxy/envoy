@@ -73,7 +73,7 @@ class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version);
-  virtual ~HttpIntegrationTest() {}
+  virtual ~HttpIntegrationTest();
 
   void SetUp();
   void TearDown();

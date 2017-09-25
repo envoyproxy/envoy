@@ -29,54 +29,49 @@ TEST_P(ProtoIntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
+  initialize();
 
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       // Request 1.
-       [&]() -> void {
-         codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"}},
-                                            1024, *response_);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-         std::string address =
-             fake_upstream_connection_->connection().remoteAddress().ip()->addressAsString();
-         EXPECT_EQ(address, address_string);
-       },
-       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
-       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Request 1.
+
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     1024, *response_);
+
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  std::string address =
+      fake_upstream_connection_->connection().remoteAddress().ip()->addressAsString();
+  EXPECT_EQ(address, address_string);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_->waitForEndStream(*dispatcher_);
+  // Cleanup both downstream and upstream
+  codec_client_->close();
+  fake_upstream_connection_->close();
+  fake_upstream_connection_->waitForDisconnect();
 }
 
 TEST_P(ProtoIntegrationTest, TestFailedBind) {
   config_helper_.setSourceAddress("8.8.8.8");
 
-  executeActions({[&]() -> void {
-                    // Envoy will create and close some number of connections when trying to bind.
-                    // Make sure they don't cause assertion failures when we ignore them.
-                    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-                  },
-                  [&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-                  [&]() -> void {
-                    // With no ability to successfully bind on an upstream connection Envoy should
-                    // send a 500.
-                    codec_client_->makeHeaderOnlyRequest(
-                        Http::TestHeaderMapImpl{{":method", "GET"},
-                                                {":path", "/test/long/url"},
-                                                {":scheme", "http"},
-                                                {":authority", "host"},
-                                                {"x-forwarded-for", "10.0.0.1"},
-                                                {"x-envoy-upstream-rq-timeout-ms", "1000"}},
-                        *response_);
-                    response_->waitForEndStream();
-                  },
-                  [&]() -> void { cleanupUpstreamAndDownstream(); }});
+  initialize();
+  // Envoy will create and close some number of connections when trying to bind.
+  // Make sure they don't cause assertion failures when we ignore them.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // With no ability to successfully bind on an upstream connection Envoy should
+  // send a 500.
+  codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"x-forwarded-for", "10.0.0.1"},
+                              {"x-envoy-upstream-rq-timeout-ms", "1000"}},
+      *response_);
+  response_->waitForEndStream();
+  cleanupUpstreamAndDownstream();
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
