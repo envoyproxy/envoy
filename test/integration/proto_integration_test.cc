@@ -71,7 +71,6 @@ TEST_P(ProtoIntegrationTest, TestFailedBind) {
                               {"x-envoy-upstream-rq-timeout-ms", "1000"}},
       *response_);
   response_->waitForEndStream();
-  cleanupUpstreamAndDownstream();
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
