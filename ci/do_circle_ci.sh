@@ -7,5 +7,14 @@ set -e
 mv ~/.gitconfig ~/.gitconfig_save
 
 export ENVOY_SRCDIR="$(pwd)"
-export NUM_CPUS=8 # xlarge resource_class
-ci/do_ci.sh $1
+
+# xlarge resource_class.
+# See note: https://circleci.com/docs/2.0/configuration-reference/#resource_class for why we
+# hard code this (basically due to how docker works).
+export NUM_CPUS=8
+
+# Circle does not currently support IPv6 so we don't test it here. We will add and remove Travis
+# when it is supported.
+export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
+
+ci/do_ci.sh "$1"

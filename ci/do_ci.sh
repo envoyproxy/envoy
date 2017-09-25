@@ -88,6 +88,13 @@ elif [[ "$1" == "bazel.dev" ]]; then
   echo "Building and testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
   exit 0
+elif [[ "$1" == "bazel.ipv6_tests" ]]; then
+  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
+  # as possible for basic sanity testing.
+  setup_clang_toolchain
+  echo "Testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
+  exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
   echo "bazel coverage build with tests..."

@@ -1,9 +1,12 @@
+# TODO(mattklein123): See if there is a way to put build SHA into a variable.
+
 version: 2
 jobs:
    release:
      docker:
        - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
      resource_class: xlarge
+     working_directory: /source
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.release
@@ -11,6 +14,7 @@ jobs:
      docker:
        - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
      resource_class: xlarge
+     working_directory: /source
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
@@ -18,6 +22,7 @@ jobs:
      docker:
        - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
      resource_class: xlarge
+     working_directory: /source
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
@@ -25,13 +30,23 @@ jobs:
      docker:
        - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
      resource_class: xlarge
+     working_directory: /source
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.coverage
+   format:
+     docker:
+       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+     resource_class: small
+     working_directory: /source
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh check_format
    docs:
      docker:
        - image: circleci/python:2.7
      resource_class: small
+     working_directory: /source
      steps:
        - checkout
        - run: ./docs/build.sh
@@ -45,4 +60,5 @@ workflows:
       - asan
       - tsan
       - coverage
+      - format
       - docs
