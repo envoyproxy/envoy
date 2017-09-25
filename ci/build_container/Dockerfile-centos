@@ -5,5 +5,4 @@ COPY ./build_recipes/*.sh /build_recipes/
 
 COPY ./build_container_centos.sh /
 
-USER root
-RUN cd / && ./build_container_centos.sh
+RUN ./build_container_centos.sh

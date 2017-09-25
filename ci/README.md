@@ -20,8 +20,13 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 
 # Build image base and compiler versions
 
-The current build image is based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler. We also
-install and use the clang-5.0 compiler for some sanitizing runs.
+Currently there are three build images:
+
+* `lyft/envoy-build` &mdash; alias to `lyft/envoy-build-ubuntu`.
+* `lyft/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler.
+* `lyft/envoy-build-centos` &mdash; based on CentOS 7 which uses the GCC 5.3.1 compiler (devtoolset-4).
+
+We also install and use the clang-5.0 compiler for some sanitizing runs.
 
 # Building and running tests as a developer
 
@@ -31,10 +36,16 @@ An example basic invocation to build a developer version of the Envoy static bin
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
+The build image default to `lyft/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment,
+e.g. to use the `lyft/envoy-build-centos` image you can run:
+
+```bash
+IMAGE_NAME=lyft/envoy-build-centos ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
 can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
-
 
 ```bash
 ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
@@ -60,7 +71,6 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
-
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-5.0.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
@@ -75,18 +85,20 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 # Testing changes to the build image as a developer
 
 While all changes to the build image should eventually be upstreamed, it can be useful to
-test those changes locally before sending out a pull request.  To experiment
+test those changes locally before sending out a pull request. To experiment
 with a local clone of the upstream build image you can make changes to files such as
 build_container.sh locally and then run:
 
 ```bash
+DISTRO=ubuntu
 cd ci/build_container
-TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
+LINUX_DISTRO="${DISTRO}" TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
 cd ../..
-IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
+IMAGE_NAME="lyft/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
 ```
 
-The final call will run against your local copy of the build image.
+This build the Ubuntu based `lyft/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
+To build the CentOS based `lyft/envoy-build-ubuntu-centos` image, change `DISTRO` above to *centos*.
 
 # MacOS Build Flow
 

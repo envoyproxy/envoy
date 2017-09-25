@@ -13,6 +13,7 @@ else
 	USER_GROUP=$(id -g)
 fi
 
+[[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="lyft/envoy-build-ubuntu"
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
@@ -21,4 +22,4 @@ fi
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm -t -i -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
-  -v "$PWD":/source -e NUM_CPUS lyft/envoy-build:"${IMAGE_ID}" /bin/bash -c "cd source && $*"
+  -v "$PWD":/source -e NUM_CPUS "${IMAGE_NAME}":"${IMAGE_ID}" /bin/bash -lc "cd source && $*"
