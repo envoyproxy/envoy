@@ -36,8 +36,8 @@ to find out more about the origin story and design philosophy of Envoy.
   to reach all core Envoy maintainers.
 * [#lyft-envoy](http://webchat.freenode.net/?channels=lyft-envoy): IRC (synced to Gitter).
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [lyft/envoy](https://gitter.im/lyft/envoy): Gitter (most people use Gitter. NOTE: Response to user
-  questions is best effort on Gitter. For a "guaranteed" response please email envoy-users@ per the
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go here: http://envoyslack.cncf.io (NOTE: Response to user
+  questions is best effort on Slack. For a "guaranteed" response please email envoy-users@ per the
   guidance in the following linked thread.).
 
 Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread 
