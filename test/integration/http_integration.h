@@ -76,7 +76,6 @@ public:
   virtual ~HttpIntegrationTest();
 
   void SetUp();
-  void TearDown();
 
 protected:
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.

@@ -144,11 +144,6 @@ void HttpIntegrationTest::SetUp() {
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-void HttpIntegrationTest::TearDown() {
-  test_server_.reset();
-  fake_upstreams_.clear();
-}
-
 void HttpIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
   createUpstreams();
@@ -185,7 +180,11 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                          Network::Address::IpVersion version)
     : BaseIntegrationTest(version), downstream_protocol_(downstream_protocol) {}
 
-HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+HttpIntegrationTest::~HttpIntegrationTest() {
+  cleanupUpstreamAndDownstream();
+  test_server_.reset();
+  fake_upstreams_.clear();
+}
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
