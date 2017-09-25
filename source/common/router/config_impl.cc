@@ -82,7 +82,7 @@ HashPolicyImpl::HashPolicyImpl(
              envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties);
 }
 
-Optional<uint64_t> HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
+Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
                                                 const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
   if (!header_name_.get().empty()) {
@@ -90,11 +90,8 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Network::Address::Instance
     if (header) {
       hash.value(HashUtil::xxHash64(header->value().c_str()));
     }
-  } else if (hash_ip_ && downstream_addr) {
-    const Network::Address::Ip* ip = downstream_addr->ip();
-    if (ip) {
-      hash.value(HashUtil::xxHash64(ip->addressAsString()));
-    }
+  } else if (hash_ip_ && !downstream_addr.empty()) {
+    hash.value(HashUtil::xxHash64(downstream_addr));
   }
   return hash;
 }

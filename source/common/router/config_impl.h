@@ -195,7 +195,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy);
 
   // Router::HashPolicy
-  Optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
+  Optional<uint64_t> generateHash(const std::string& downstream_addr,
                                   const Http::HeaderMap& headers) const override;
 
 private:

@@ -843,13 +843,13 @@ TEST(RouterMatcherTest, HashPolicyHeaders) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(NULL, headers).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(NULL, headers).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -875,23 +875,21 @@ TEST(RouterMatcherTest, HashPolicyIp) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(NULL, headers).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    Network::Address::Ipv4Instance addr("1.2.3.4");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(&addr, headers).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).valid());
   }
   {
-    Network::Address::Ipv4Instance addr("1.2.3.4");
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     uint64_t old_hash =
-        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash(&addr, headers).value();
+        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).value();
     headers.addCopy("foo_header", "bar");
     EXPECT_EQ(
         old_hash,
-        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash(&addr, headers).value());
+        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).value());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");

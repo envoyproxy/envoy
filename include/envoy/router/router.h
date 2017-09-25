@@ -219,7 +219,7 @@ public:
    *         A hash value might not be returned if for example the specified HTTP header does not
    *         exist.
    */
-  virtual Optional<uint64_t> generateHash(const Network::Address::Instance* downstream_address,
+  virtual Optional<uint64_t> generateHash(const std::string& downstream_address,
                                           const Http::HeaderMap& headers) const PURE;
 };
 
