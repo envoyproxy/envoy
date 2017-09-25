@@ -13,7 +13,7 @@ do
        want_push='true'
    fi
 done
-if [ -n "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
+if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
         echo "There are changes in the ci/build_container directory"

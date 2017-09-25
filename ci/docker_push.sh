@@ -13,7 +13,7 @@ do
        want_push='true'
    fi
 done
-if [ -n "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
+if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
 then
    docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
