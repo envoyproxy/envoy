@@ -2444,7 +2444,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-  const std::string downstream_addr = ("127.0.0.1");
+  const std::string downstream_addr = "127.0.0.1";
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
