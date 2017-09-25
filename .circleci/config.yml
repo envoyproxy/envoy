@@ -63,6 +63,7 @@ jobs:
      steps:
        - checkout
        - run: docs/build.sh
+       - add_ssh_keys
        - run: docs/publish.sh
 
 workflows:
