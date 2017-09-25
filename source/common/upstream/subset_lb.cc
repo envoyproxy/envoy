@@ -375,6 +375,8 @@ LoadBalancer* SubsetLoadBalancer::newLoadBalancer(const SubsetPtr& subset) {
   case LoadBalancerType::OriginalDst:
     RELEASE_ASSERT(false);
   }
+
+  NOT_REACHED;
 }
 
 // Find the index in which the original HostSet's hostsPerZone vector
