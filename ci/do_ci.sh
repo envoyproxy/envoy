@@ -93,6 +93,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # as possible for basic sanity testing.
   setup_clang_toolchain
   echo "Testing..."
+  cd "${ENVOY_CI_DIR}"
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then

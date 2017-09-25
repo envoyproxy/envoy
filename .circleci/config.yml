@@ -46,7 +46,6 @@ jobs:
      docker:
        - image: circleci/python:2.7
      resource_class: small
-     working_directory: /source
      steps:
        - checkout
        - run: ./docs/build.sh
