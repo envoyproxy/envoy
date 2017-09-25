@@ -7,8 +7,8 @@ set -e
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
-
-export ENVOY_SRCDIR=/source
+[ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
+echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 
 function setup_gcc_toolchain() {
   export CC=gcc
@@ -34,8 +34,8 @@ export PYTHONUSERBASE="${FAKE_HOME}"
 export BUILD_DIR=/build
 if [[ ! -d "${BUILD_DIR}" ]]
 then
-  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
-  exit 1
+  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
+  mkdir -p "${BUILD_DIR}"
 fi
 export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
@@ -59,13 +59,13 @@ export USER=bazel
 export TEST_TMPDIR=/build/tmp
 export BAZEL="bazel"
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-BAZEL_OPTIONS="--package_path %workspace%:/source"
+BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --jobs=${NUM_CPUS} --show_task_finish"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
-  --cache_test_results=no --test_output=all"
+  --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
 ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt

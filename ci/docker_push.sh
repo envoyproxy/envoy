@@ -8,12 +8,12 @@ set -e
 want_push='false'
 for branch in "master"
 do
-   if [ "$TRAVIS_BRANCH" == "$branch" ]
+   if [ "$CIRCLE_BRANCH" == "$branch" ]
    then
        want_push='true'
    fi
 done
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
+if [ -n "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
 then
    docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"

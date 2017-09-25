@@ -6,7 +6,7 @@ DOCS_DIR=generated/docs
 PUBLISH_DIR=../envoy-docs
 BUILD_SHA=`git rev-parse HEAD`
 
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
+if [ -n "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
 then
   # .publishdocskey.enc is an encoded ssh key used to push to our gh-pages branch.
   # travis encrypted the key, and set up two secret variables to decrypt the key:
