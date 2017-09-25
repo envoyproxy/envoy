@@ -802,8 +802,10 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   }
 }
 
-static const envoy::api::v2::RouteConfiguration baseHashPolicyRouteConfig() {
-  std::string json = R"EOF(
+class RouterMatcherHashPolicyTest : public testing::Test {
+public:
+  RouterMatcherHashPolicyTest() {
+    std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -823,20 +825,22 @@ static const envoy::api::v2::RouteConfiguration baseHashPolicyRouteConfig() {
   ]
 }
   )EOF";
-  return parseRouteConfigurationFromJson(json);
-}
+    route_config_ = parseRouteConfigurationFromJson(json);
+  }
 
-TEST(RouterMatcherTest, HashPolicyHeaders) {
+  envoy::api::v2::RouteConfiguration route_config_;
+};
+
+TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  auto routeConfig = baseHashPolicyRouteConfig();
-  routeConfig.mutable_virtual_hosts(0)
+  route_config_.mutable_virtual_hosts(0)
       ->mutable_routes(0)
       ->mutable_route()
       ->add_hash_policy()
       ->mutable_header()
       ->set_header_name("foo_header");
-  ConfigImpl config(routeConfig, runtime, cm, true);
+  ConfigImpl config(route_config_, runtime, cm, true);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -858,17 +862,16 @@ TEST(RouterMatcherTest, HashPolicyHeaders) {
   }
 }
 
-TEST(RouterMatcherTest, HashPolicyIp) {
+TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  auto routeConfig = baseHashPolicyRouteConfig();
-  routeConfig.mutable_virtual_hosts(0)
+  route_config_.mutable_virtual_hosts(0)
       ->mutable_routes(0)
       ->mutable_route()
       ->add_hash_policy()
       ->mutable_connection_properties()
       ->set_source_ip(true);
-  ConfigImpl config(routeConfig, runtime, cm, true);
+  ConfigImpl config(route_config_, runtime, cm, true);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -884,12 +887,17 @@ TEST(RouterMatcherTest, HashPolicyIp) {
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    uint64_t old_hash =
-        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).value();
+    uint64_t old_hash = config.route(headers, 0)
+                            ->routeEntry()
+                            ->hashPolicy()
+                            ->generateHash("1.2.3.4", headers)
+                            .value();
     headers.addCopy("foo_header", "bar");
-    EXPECT_EQ(
-        old_hash,
-        config.route(headers, 0)->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).value());
+    EXPECT_EQ(old_hash, config.route(headers, 0)
+                            ->routeEntry()
+                            ->hashPolicy()
+                            ->generateHash("1.2.3.4", headers)
+                            .value());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
