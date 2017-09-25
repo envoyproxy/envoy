@@ -22,7 +22,6 @@ Settings
 --------
 
 Settings on a route take precedence over settings on the virtual host.
-Both the route and the virtual host need to set enabled to true.
 
 .. code-block:: json
 
@@ -47,20 +46,20 @@ allow_origin
   Wildcard "\*" will allow any origin.
 
 allow_methods
-  *(optional, string)* The content for the access-control-allow-methods header.
+  *(optional, string)* The content for the *access-control-allow-methods* header.
   Comma separated list of HTTP methods.
 
 allow_headers
-  *(optional, string)* The content for the access-control-allow-headers header.
+  *(optional, string)* The content for the *access-control-allow-headers* header.
   Comma separated list of HTTP headers.
 
 allow_credentials
   *(optional, boolean)* Whether the resource allows credentials.
 
 expose_headers
-  *(optional, string)* The content for the access-control-expose-headers header.
+  *(optional, string)* The content for the *access-control-expose-headers* header.
   Comma separated list of HTTP headers.
 
 max_age
-  *(optional, string)* The content for the access-control-max-age header.
+  *(optional, string)* The content for the *access-control-max-age* header.
   Value in seconds for how long the response to the preflight request can be cached.
