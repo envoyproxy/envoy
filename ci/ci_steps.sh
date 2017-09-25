@@ -29,9 +29,9 @@ then
   exit 0
 elif [ "$TEST_TYPE" == "build_image" ]
 then
-  # The script builds lyft/envoy-build and pushes that image when ci/build_container
+  # The script builds lyft/envoy-build-* and pushes that image when ci/build_container
   # has changed on a push to master.
-  echo "lyft/envoy-build pushing..."
+  echo "lyft/envoy-build-* pushing..."
   ./ci/build_container/docker_push.sh
 else
   docker run -t -i -v "$ENVOY_BUILD_DIR":/build -v $TRAVIS_BUILD_DIR:/source \

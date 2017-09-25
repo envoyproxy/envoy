@@ -62,6 +62,19 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
                  "required": ["field", "value"],
                  "maxProperties": 2
                 }
+              },
+              "custom_header_fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {"type": "string"},
+                    "value": {"type": "string"}
+                  },
+                 "additionalProperties": false,
+                 "required": ["field", "value"],
+                 "maxProperties": 2
+                }
               }
             },
             "minProperties": 1,
