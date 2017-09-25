@@ -915,6 +915,51 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  auto route = route_config_.mutable_virtual_hosts(0)
+      ->mutable_routes(0)
+      ->mutable_route();
+  route->add_hash_policy()
+      ->mutable_header()
+      ->set_header_name("foo_header");
+  route->add_hash_policy()
+      ->mutable_connection_properties()
+      ->set_source_ip(true);
+  ConfigImpl config(route_config_, runtime, cm, true);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  uint64_t hash_h, hash_ip, hash_both;
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("foo_header", "bar");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    hash_h = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    hash_ip = route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value();
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    headers.addCopy("foo_header", "bar");
+    hash_both = route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value();
+  }
+  EXPECT_NE(hash_ip, hash_h);
+  EXPECT_NE(hash_ip, hash_both);
+  EXPECT_NE(hash_h, hash_both);
+}
+
+
 TEST(RouteMatcherTest, ClusterHeader) {
   std::string json = R"EOF(
 {
