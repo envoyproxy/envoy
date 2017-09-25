@@ -864,6 +864,59 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashCookie) {
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  route_config_.mutable_virtual_hosts(0)
+      ->mutable_routes(0)
+      ->mutable_route()
+      ->add_hash_policy()
+      ->mutable_cookie()
+      ->set_name("hash");
+  ConfigImpl config(route_config_, runtime, cm, true);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("Cookie", "choco=late; su=gar");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("Cookie", "choco=late; hash=brown");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    uint64_t hash_1, hash_2;
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+      headers.addCopy("Cookie", "hash=brown");
+      Router::RouteConstSharedPtr route = config.route(headers, 0);
+      hash_1 = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+    }
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+      headers.addCopy("Cookie", "hash=green");
+      Router::RouteConstSharedPtr route = config.route(headers, 0);
+      hash_2 = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+    }
+    EXPECT_NE(hash_1, hash_2);
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
+  }
+}
+
 TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;

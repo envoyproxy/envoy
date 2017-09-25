@@ -87,6 +87,23 @@ private:
   const Http::LowerCaseString header_name_;
 };
 
+class CookieHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  CookieHashMethod(const std::string& key) : key_(key) {}
+
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+    Optional<uint64_t> hash;
+    std::string value = Http::Utility::parseCookieValue(headers, key_);
+    if (!value.empty()) {
+      hash.value(HashUtil::xxHash64(value));
+    }
+    return hash;
+  }
+
+private:
+  const std::string key_;
+};
+
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   Optional<uint64_t> evaluate(const std::string& downstream_addr,
@@ -108,6 +125,9 @@ HashPolicyImpl::HashPolicyImpl(
     switch (hash_policy.policy_specifier_case()) {
     case envoy::api::v2::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
+      break;
+    case envoy::api::v2::RouteAction::HashPolicy::kCookie:
+      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name()));
       break;
     case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
