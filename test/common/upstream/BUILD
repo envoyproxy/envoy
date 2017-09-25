@@ -201,7 +201,7 @@ envoy_cc_test(
     }),
     deps = [
         ":utility_lib",
-	"//include/envoy/router:router_interface",
+        "//include/envoy/router:router_interface",
         "//source/common/network:utility_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_includes",
