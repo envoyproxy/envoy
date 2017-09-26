@@ -748,13 +748,9 @@ TEST_F(Http1ServerConnectionImplTest, TestCodecHeaderLimits) {
     buffer = Buffer::OwnedImpl(long_string);
     codec_->dispatch(buffer);
   }
-  try {
-    buffer = Buffer::OwnedImpl(long_string);
-    codec_->dispatch(buffer);
-  } catch (const Envoy::EnvoyException& ex) {
-    exception_reason = ex.what();
-  }
-  ASSERT_EQ("http/1.1 protocol error: HPE_HEADER_OVERFLOW", exception_reason);
+  buffer = Buffer::OwnedImpl(long_string);
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                            "http/1.1 protocol error: HPE_HEADER_OVERFLOW");
 }
 
 } // namespace Http1
