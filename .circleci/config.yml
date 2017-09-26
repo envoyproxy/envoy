@@ -1,10 +1,11 @@
 # TODO(mattklein123): See if there is a way to put build SHA into a variable.
+# In the meantime, it's required to edit the SHA in this file as well as envoy_build_sha.sh.
 
 version: 2
 jobs:
    release:
      docker:
-       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+       - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -14,7 +15,7 @@ jobs:
        - run: ci/docker_push.sh
    asan:
      docker:
-       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+       - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -22,7 +23,7 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.asan
    tsan:
      docker:
-       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+       - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -30,7 +31,7 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.tsan
    coverage:
      docker:
-       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+       - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -39,7 +40,7 @@ jobs:
        - run: ci/coverage_publish.sh
    format:
      docker:
-       - image: lyft/envoy-build:ab104133504dca0384d919c3d9cbe323d5ac2ef4
+       - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
      resource_class: small
      working_directory: /source
      steps:
