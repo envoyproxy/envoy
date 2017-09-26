@@ -31,12 +31,12 @@ then
    docker tag lyft/envoy:latest lyft/envoy:"$CIRCLE_SHA1"
    docker push lyft/envoy:"$CIRCLE_SHA1"
 
-   docker build -f ./Dockerfile-envoy-alpine -t lyft/envoy-alpine:latest .
+   docker build -f ci/Dockerfile-envoy-alpine -t lyft/envoy-alpine:latest .
    docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine:latest
 
-   docker build -f ./Dockerfile-envoy-alpine-debug -t lyft/envoy-alpine-debug:latest .
+   docker build -f ci/Dockerfile-envoy-alpine-debug -t lyft/envoy-alpine-debug:latest .
    docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine-debug:latest
