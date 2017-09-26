@@ -9,7 +9,7 @@ if [ "${CIRCLECI}" != "true" ]; then
 fi
 
 # available for master builds and PRs from originating repository (not forks)
-if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
+if [ -z "$CIRCLE_PULL_REQUEST" ]
 then
   echo "Uploading coverage report..."
   
