@@ -50,6 +50,7 @@ public:
   MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
   MOCK_METHOD0(logLevel, spdlog::level::level_enum());
+  MOCK_METHOD0(logPath, const std::string&());
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
@@ -63,6 +64,7 @@ public:
   std::string service_cluster_name_;
   std::string service_node_name_;
   std::string service_zone_name_;
+  std::string log_path_;
 };
 
 class MockAdmin : public Admin {

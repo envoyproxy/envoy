@@ -122,6 +122,10 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
+class ServerInstanceImplDeathTest : public ServerInstanceImplTest {
+  void TearDown() override {}
+};
+
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -155,5 +159,33 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+TEST_P(ServerInstanceImplTest, LogToFile) {
+  const std::string path =
+      TestEnvironment::temporaryPath("ServerInstanceImplTest_LogToFile_Test.log");
+  options_.log_path_ = path;
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  initialize(std::string());
+  EXPECT_TRUE(server_->api().fileExists(path));
+
+  GET_MISC_LOGGER().set_level(spdlog::level::info);
+  ENVOY_LOG_MISC(warn, "LogToFile test string");
+  Logger::Registry::getSink()->flush();
+  std::string log = server_->api().fileReadToEnd(path);
+  EXPECT_GT(log.size(), 0);
+  EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
+
+  // Test that critical messages get immediately flushed
+  ENVOY_LOG_MISC(critical, "LogToFile second test string");
+  log = server_->api().fileReadToEnd(path);
+  EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
+}
+
+TEST_P(ServerInstanceImplDeathTest, LogToFileError) {
+  options_.log_path_ = "/this/path/does/not/exist";
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_DEATH(initialize(std::string()), ".*Failed to open log-file.*");
+}
 } // namespace Server
 } // namespace Envoy

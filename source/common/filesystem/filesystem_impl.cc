@@ -67,7 +67,7 @@ ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, OsSysCalls& os_sys_calls, Stats::Store& stats_store,
                    std::chrono::milliseconds flush_interval_msec)
-    : path_(path), flush_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
+    : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notify_one();
         flush_timer_->enableTimer(flush_interval_msec_);
@@ -123,37 +123,43 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   //            will never block network workers, but does mean that only a single flush thread can
   //            actually flush to disk. In the future it would be nice if we did away with the cross
   //            process lock or had multiple locks.
-  std::unique_lock<Thread::BasicLockable> lock(flush_lock_);
-  for (Buffer::RawSlice& slice : slices) {
-    ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
-    ASSERT(rc == static_cast<ssize_t>(slice.len_));
-    UNREFERENCED_PARAMETER(rc);
-    stats_.write_completed_.inc();
+  {
+    std::lock_guard<Thread::BasicLockable> lock(file_lock_);
+    for (Buffer::RawSlice& slice : slices) {
+      ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
+      ASSERT(rc == static_cast<ssize_t>(slice.len_));
+      UNREFERENCED_PARAMETER(rc);
+      stats_.write_completed_.inc();
+    }
   }
-  lock.unlock();
 
   stats_.write_total_buffered_.sub(buffer.length());
   buffer.drain(buffer.length());
 }
 
 void FileImpl::flushThreadFunc() {
-  std::unique_lock<std::mutex> lock(write_lock_);
 
   while (true) {
-    // flush_event_ can be woken up either by large enough flush_buffer or by timer.
-    // In case it was timer, flush_buffer_ can be empty.
-    while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
-      flush_event_.wait(lock);
-    }
+    std::unique_lock<std::mutex> flush_lock;
 
-    if (flush_thread_exit_) {
-      return;
-    }
+    {
+      std::unique_lock<std::mutex> write_lock(write_lock_);
 
-    ASSERT(flush_buffer_.length() > 0);
-    about_to_write_buffer_.move(flush_buffer_);
-    ASSERT(flush_buffer_.length() == 0);
-    lock.unlock();
+      // flush_event_ can be woken up either by large enough flush_buffer or by timer.
+      // In case it was timer, flush_buffer_ can be empty.
+      while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
+        flush_event_.wait(write_lock);
+      }
+
+      if (flush_thread_exit_) {
+        return;
+      }
+
+      flush_lock = std::unique_lock<std::mutex>(flush_lock_);
+      ASSERT(flush_buffer_.length() > 0);
+      about_to_write_buffer_.move(flush_buffer_);
+      ASSERT(flush_buffer_.length() == 0);
+    }
 
     // if we failed to open file before (-1 == fd_), then simply ignore
     if (fd_ != -1) {
@@ -169,13 +175,35 @@ void FileImpl::flushThreadFunc() {
         stats_.reopen_failed_.inc();
       }
     }
-
-    lock.lock();
   }
 }
 
+void FileImpl::flush() {
+  std::unique_lock<std::mutex> flush_buffer_lock;
+
+  {
+    std::lock_guard<std::mutex> write_lock(write_lock_);
+
+    // flush_lock_ must be held while checking this or else it is
+    // possible that flushThreadFunc() has already moved data from
+    // flush_buffer_ to about_to_write_buffer_, has unlocked write_lock_,
+    // but has not yet completed doWrite().  This would allow flush() to
+    // return before the pending data has actually been written to disk.
+    flush_buffer_lock = std::unique_lock<std::mutex>(flush_lock_);
+
+    if (flush_buffer_.length() == 0) {
+      return;
+    }
+
+    about_to_write_buffer_.move(flush_buffer_);
+    ASSERT(flush_buffer_.length() == 0);
+  }
+
+  doWrite(about_to_write_buffer_);
+}
+
 void FileImpl::write(const std::string& data) {
-  std::unique_lock<std::mutex> lock(write_lock_);
+  std::lock_guard<std::mutex> lock(write_lock_);
 
   if (flush_thread_ == nullptr) {
     createFlushStructures();
