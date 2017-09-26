@@ -4,8 +4,12 @@
 # Travis logs.
 set -e
 
+if [ "${CIRCLECI}" != "true" ]; then
+  exit 0
+fi
+
 # available for master builds and PRs from originating repository (not forks)
-if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
+if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
 then
   echo "Uploading coverage report..."
   
