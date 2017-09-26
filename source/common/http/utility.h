@@ -58,6 +58,14 @@ public:
   static std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
   /**
+   * Check whether a Set-Cookie header for the given cookie name exists
+   * @param headers supplies the headers to search for the cookie
+   * @param key the name of the cookie to search for
+   * @return bool true if the cookie is set, false otherwise
+   */
+  static bool hasSetCookie(const HeaderMap& headers, const std::string& key);
+
+  /**
    * Get the response status from the response headers.
    * @param headers supplies the headers to get the status from.
    * @return uint64_t the response code or throws an exception if the headers are invalid.

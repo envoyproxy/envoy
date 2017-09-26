@@ -210,6 +210,27 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
+TEST(HttpUtility, TestHasSetCookie) {
+  TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
+                            {"set-cookie", "somekey=somevalue"},
+                            {"set-cookie", "abc=def; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+                            {"set-cookie", "key2=value2; Secure"}};
+
+  EXPECT_TRUE(Utility::hasSetCookie(headers, "abc"));
+  EXPECT_TRUE(Utility::hasSetCookie(headers, "somekey"));
+  EXPECT_FALSE(Utility::hasSetCookie(headers, "ghi"));
+}
+
+TEST(HttpUtility, TestHasSetCookieBadValues) {
+  TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
+                            {"set-cookie", "somekey =somevalue"},
+                            {"set-cookie", "abc"},
+                            {"set-cookie", "key2=value2; Secure"}};
+
+  EXPECT_FALSE(Utility::hasSetCookie(headers, "abc"));
+  EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
+}
+
 TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;

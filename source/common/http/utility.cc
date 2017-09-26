@@ -121,6 +121,41 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
   return state.ret_;
 }
 
+bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
+
+  struct State {
+    std::string key_;
+    bool ret_;
+  };
+
+  State state;
+  state.key_ = key;
+  state.ret_ = false;
+
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        // Find the set-cookie headers in the request
+        if (header.key() == Http::Headers::get().SetCookie.get().c_str()) {
+          const std::string value{header.value().c_str()};
+          size_t equals_index = value.find('=');
+
+          if (equals_index == std::string::npos) {
+            // The cookie is malformed if it does not have an `=`.
+            return;
+          }
+          std::string k = value.substr(0, equals_index);
+          State* state = static_cast<State*>(context);
+          // If the key matches, parse the value from the rest of the cookie string.
+          if (k == state->key_) {
+            state->ret_ = true;
+          }
+        }
+      },
+      &state);
+
+  return state.ret_;
+}
+
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
