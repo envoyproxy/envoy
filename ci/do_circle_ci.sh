@@ -17,4 +17,16 @@ export NUM_CPUS=8
 # when it is supported.
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
 
+# Circle runs entirely within docker so everything should just use /build directly.
+export ENVOY_BUILD_DIR=/build
+
+function finish {
+  echo "disk space at end of build:"
+  df -h
+}
+trap finish EXIT
+
+echo "disk space at beginning of build:"
+df -h
+
 ci/do_ci.sh "$1"
