@@ -551,7 +551,6 @@ private:
     Stats::TimespanPtr request_timer_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;
-    std::string downstream_address_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};

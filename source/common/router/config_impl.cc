@@ -121,6 +121,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
+      request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
@@ -183,24 +184,16 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+void RouteEntryImplBase::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
-    headers.addReference(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
-    headers.addReference(to_add.first, to_add.second);
-  }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       vhost_.globalRouteConfig().requestHeadersToAdd()) {
-    headers.addReference(to_add.first, to_add.second);
-  }
-
+  request_headers_parser_->evaluateRequestHeaders(headers, request_info);
+  vhost_.requestHeaderParser().evaluateRequestHeaders(headers, request_info);
+  vhost_.globalRouteConfig().requestHeaderParser().evaluateRequestHeaders(headers, request_info);
   if (host_rewrite_.empty()) {
     return;
   }
-
   headers.Host()->value(host_rewrite_);
 }
 
@@ -372,8 +365,9 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PrefixRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, prefix_);
 }
@@ -391,8 +385,9 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void PathRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, path_);
 }
@@ -431,8 +426,9 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader),
       regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers);
+void RegexRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   const Http::HeaderString& path = headers.Path()->value();
   const char* query_string_start = Http::Utility::findQueryStringStart(path);
@@ -457,7 +453,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
-      global_route_config_(global_route_config) {
+      global_route_config_(global_route_config),
+      request_headers_parser_(RequestHeaderParser::parse(virtual_host.request_headers_to_add())) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -681,6 +678,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
     request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
                                        header_value_option.header().value()});
   }
+  request_headers_parser_ = RequestHeaderParser::parse(config.request_headers_to_add());
 }
 
 } // namespace Router

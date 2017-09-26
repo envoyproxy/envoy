@@ -63,6 +63,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
+  const std::string& getDownstreamAddress() const override { return downstream_address_; };
+
   Protocol protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -74,6 +76,7 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
+  std::string downstream_address_;
 };
 
 } // namespace AccessLog

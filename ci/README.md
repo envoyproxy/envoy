@@ -81,7 +81,7 @@ build_container.sh locally and then run:
 
 ```bash
 cd ci/build_container
-TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
+CIRCLE_SHA1=my_tag ./docker_build.sh  # Wait patiently for quite some time
 cd ../..
 IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
 ```
