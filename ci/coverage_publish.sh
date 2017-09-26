@@ -13,6 +13,7 @@ if [ -z "$CIRCLE_PULL_REQUEST" ]
 then
   echo "Uploading coverage report..."
   
+  [[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/build
   COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/coverage.html"
 
   if [ ! -f "${COVERAGE_FILE}" ]; then
