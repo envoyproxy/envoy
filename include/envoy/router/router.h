@@ -216,14 +216,23 @@ public:
   virtual ~HashPolicy() {}
 
   /**
+   * A callback used for requesting that a random cookie be set with the given
+   * lifetime
+   */
+  typedef std::function<std::string(const std::string& key, long ttl_sec)> AddCookieCallback;
+
+  /**
    * @param downstream_address contains the address of the connected client host, or an
    * empty string if the request is initiated from within this host
    * @param headers stores the HTTP headers for the stream
+   * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
+   * host
    * @return Optional<uint64_t> an optional hash value to route on. A hash value might not be
    * returned if for example the specified HTTP header does not exist.
    */
   virtual Optional<uint64_t> generateHash(const std::string& downstream_address,
-                                          const Http::HeaderMap& headers) const PURE;
+                                          const Http::HeaderMap& headers,
+                                          AddCookieCallback add_cookie) const PURE;
 };
 
 /**

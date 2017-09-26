@@ -806,7 +806,7 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
 
 class RouterMatcherHashPolicyTest : public testing::Test {
 public:
-  RouterMatcherHashPolicyTest() {
+  RouterMatcherHashPolicyTest() : add_cookie_nop_([](const std::string&, long) { return ""; }) {
     std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -831,6 +831,7 @@ public:
   }
 
   envoy::api::v2::RouteConfiguration route_config_;
+  HashPolicy::AddCookieCallback add_cookie_nop_;
 };
 
 TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
@@ -849,13 +850,15 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_TRUE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -880,19 +883,22 @@ TEST_F(RouterMatcherHashPolicyTest, HashCookie) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; hash=brown");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_TRUE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     uint64_t hash_1, hash_2;
@@ -900,13 +906,15 @@ TEST_F(RouterMatcherHashPolicyTest, HashCookie) {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       headers.addCopy("Cookie", "hash=brown");
       Router::RouteConstSharedPtr route = config.route(headers, 0);
-      hash_1 = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+      hash_1 =
+          route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).value();
     }
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       headers.addCopy("Cookie", "hash=green");
       Router::RouteConstSharedPtr route = config.route(headers, 0);
-      hash_2 = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+      hash_2 =
+          route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).value();
     }
     EXPECT_NE(hash_1, hash_2);
   }
@@ -933,32 +941,36 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).valid());
+    EXPECT_TRUE(route->routeEntry()
+                    ->hashPolicy()
+                    ->generateHash("1.2.3.4", headers, add_cookie_nop_)
+                    .valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     uint64_t old_hash = config.route(headers, 0)
                             ->routeEntry()
                             ->hashPolicy()
-                            ->generateHash("1.2.3.4", headers)
+                            ->generateHash("1.2.3.4", headers, add_cookie_nop_)
                             .value();
     headers.addCopy("foo_header", "bar");
     EXPECT_EQ(old_hash, config.route(headers, 0)
                             ->routeEntry()
                             ->hashPolicy()
-                            ->generateHash("1.2.3.4", headers)
+                            ->generateHash("1.2.3.4", headers, add_cookie_nop_)
                             .value());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     const auto hash_policy = config.route(headers, 0)->routeEntry()->hashPolicy();
-    const uint64_t hash_1 = hash_policy->generateHash("1.2.3.4", headers).value();
-    const uint64_t hash_2 = hash_policy->generateHash("4.3.2.1", headers).value();
+    const uint64_t hash_1 = hash_policy->generateHash("1.2.3.4", headers, add_cookie_nop_).value();
+    const uint64_t hash_2 = hash_policy->generateHash("4.3.2.1", headers, add_cookie_nop_).value();
     EXPECT_NE(hash_1, hash_2);
   }
   {
@@ -982,32 +994,41 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    hash_h = route->routeEntry()->hashPolicy()->generateHash("", headers).value();
+    hash_h = route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).value();
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    hash_ip = route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value();
+    hash_ip = route->routeEntry()
+                  ->hashPolicy()
+                  ->generateHash("4.2.1.3", headers, add_cookie_nop_)
+                  .value();
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
     headers.addCopy("foo_header", "bar");
-    hash_both = route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value();
+    hash_both = route->routeEntry()
+                    ->hashPolicy()
+                    ->generateHash("4.2.1.3", headers, add_cookie_nop_)
+                    .value();
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
     headers.addCopy("foo_header", "bar");
     // stability
-    EXPECT_EQ(hash_both,
-              route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value());
+    EXPECT_EQ(hash_both, route->routeEntry()
+                             ->hashPolicy()
+                             ->generateHash("4.2.1.3", headers, add_cookie_nop_)
+                             .value());
   }
   EXPECT_NE(hash_ip, hash_h);
   EXPECT_NE(hash_ip, hash_both);

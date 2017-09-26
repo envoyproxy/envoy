@@ -73,7 +73,8 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
@@ -91,7 +92,8 @@ class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
   CookieHashMethod(const std::string& key) : key_(key) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
     if (!value.empty()) {
@@ -106,8 +108,8 @@ private:
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  Optional<uint64_t> evaluate(const std::string& downstream_addr,
-                              const Http::HeaderMap&) const override {
+  Optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
       hash.value(HashUtil::xxHash64(downstream_addr));
@@ -142,10 +144,11 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers) const {
+                                                const Http::HeaderMap& headers,
+                                                const AddCookieCallback add_cookie) const {
   Optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
+    Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
     if (new_hash.valid()) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy

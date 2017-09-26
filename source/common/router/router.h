@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -129,13 +130,22 @@ public:
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
-        return hash_policy->generateHash(callbacks_->downstreamAddress(), *downstream_headers_);
+        return hash_policy->generateHash(callbacks_->downstreamAddress(), *downstream_headers_,
+                                         [this](const std::string& key, long max_age) {
+                                           return addDownstreamSetCookie(key, max_age);
+                                         });
       }
     }
     return {};
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
+  }
+
+  std::string addDownstreamSetCookie(const std::string& key, int max_age) {
+    const std::string value = config_.random_.uuid();
+    downstream_set_cookies_.emplace_back(key, value, max_age);
+    return value;
   }
 
 protected:
@@ -264,6 +274,7 @@ private:
   UpstreamRequestPtr upstream_request_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
+  std::list<std::tuple<std::string, std::string, int>> downstream_set_cookies_;
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   bool stream_destroyed_{};

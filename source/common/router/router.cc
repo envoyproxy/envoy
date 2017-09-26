@@ -520,6 +520,21 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
       upstream_request_->upstream_host_->canary();
   chargeUpstreamCode(*headers, upstream_request_->upstream_host_);
 
+  // Append routing cookies
+  for (auto& cookie : downstream_set_cookies_) {
+    const std::string& key = std::get<0>(cookie);
+    const std::string& value = std::get<1>(cookie);
+    const int max_age = std::get<2>(cookie);
+
+    // Don't overwrite a cookie if it's already set by the upstream host
+    if (Http::Utility::hasSetCookie(*headers, key)) {
+      continue;
+    }
+
+    headers->addReferenceKey(Http::Headers::get().SetCookie,
+                             fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age));
+  }
+
   downstream_response_started_ = true;
   if (end_stream) {
     onUpstreamComplete();

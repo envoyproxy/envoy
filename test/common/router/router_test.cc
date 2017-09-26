@@ -145,7 +145,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Return(Optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
       .WillOnce(
@@ -169,7 +169,7 @@ TEST_F(RouterTest, HashPolicy) {
 TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Return(Optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, &router_))
       .WillOnce(
@@ -187,6 +187,165 @@ TEST_F(RouterTest, HashPolicyNoHash) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, AddCookie) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return &cancellable_;
+      }));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(10UL, context->hashKey().value());
+            return &cm_.conn_pool_;
+          }));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+                           const HashPolicy::AddCookieCallback add_cookie) {
+        add_cookie("foo", 1337);
+        return Optional<uint64_t>(10);
+      }));
+
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("bar"));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
+        EXPECT_STREQ(headers.get(Http::Headers::get().SetCookie)->value().c_str(),
+                     "foo=\"bar\"; Max-Age=1337");
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  // When the router filter gets reset we should cancel the pool request.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, AddCookieNoDuplicate) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return &cancellable_;
+      }));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(10UL, context->hashKey().value());
+            return &cm_.conn_pool_;
+          }));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+                           const HashPolicy::AddCookieCallback add_cookie) {
+        // this should be ignored
+        add_cookie("foo", 1337);
+        return Optional<uint64_t>(10);
+      }));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
+        EXPECT_STREQ(headers.get(Http::Headers::get().SetCookie)->value().c_str(), "foo=baz");
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"}, {"set-cookie", "foo=baz"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  // When the router filter gets reset we should cancel the pool request.
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, AddMultipleCookies) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return &cancellable_;
+      }));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(10UL, context->hashKey().value());
+            return &cm_.conn_pool_;
+          }));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+                           const HashPolicy::AddCookieCallback add_cookie) {
+        add_cookie("choco", 15);
+        add_cookie("foo", 1337);
+        return Optional<uint64_t>(10);
+      }));
+
+  EXPECT_CALL(random_, uuid()).Times(2).WillOnce(Return("late")).WillOnce(Return("bar"));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
+        std::list<std::string> expected_cookies{
+            "foo=\"bar\"; Max-Age=1337",
+            "choco=\"late\"; Max-Age=15",
+        };
+        PrintTo(headers, &std::cerr);
+        headers.iterate(
+            [](const Http::HeaderEntry& header, void* context) {
+              auto expected = static_cast<std::list<std::string>*>(context);
+              if (header.key().c_str() == Http::Headers::get().SetCookie.get().c_str()) {
+                auto loc = std::find(expected->begin(), expected->end(),
+                                     std::string{header.value().c_str()});
+                EXPECT_NE(loc, expected->end());
+                expected->erase(loc);
+              }
+            },
+            &expected_cookies);
+        EXPECT_TRUE(expected_cookies.empty());
+        EXPECT_EQ(expected_cookies.size(), 0);
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
 }
 
