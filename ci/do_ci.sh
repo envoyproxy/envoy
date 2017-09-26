@@ -63,7 +63,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/coverage:coverage_tests \
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$1" == "bazel.tsan" ]]; then
