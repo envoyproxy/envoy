@@ -51,27 +51,27 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
-  if (!options.logPath().empty()) {
-    try {
-      Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
-    } catch (const EnvoyException& e) {
-      throw EnvoyException(
-          fmt::format("Failed to open log-file '{}'.  e.what(): {}", options.logPath(), e.what()));
-    }
-  }
-
-  failHealthcheck(false);
-
-  uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
-  }
-  server_stats_.version_.set(version_int);
-
-  restarter_.initialize(*dispatcher_, *this);
-  drain_manager_ = component_factory.createDrainManager(*this);
-
   try {
+    if (!options.logPath().empty()) {
+      try {
+        Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
+      } catch (const EnvoyException& e) {
+        throw EnvoyException(fmt::format("Failed to open log-file '{}'.  e.what(): {}",
+                                         options.logPath(), e.what()));
+      }
+    }
+
+    failHealthcheck(false);
+
+    uint64_t version_int;
+    if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+    }
+    server_stats_.version_.set(version_int);
+
+    restarter_.initialize(*dispatcher_, *this);
+    drain_manager_ = component_factory.createDrainManager(*this);
+
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),

@@ -185,7 +185,7 @@ TEST_P(ServerInstanceImplDeathTest, LogToFileError) {
   options_.log_path_ = "/this/path/does/not/exist";
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_THROW(initialize(std::string()), EnvoyException);
+  EXPECT_DEATH(initialize(std::string()), ".*Failed to open log-file.*");
 }
 } // namespace Server
 } // namespace Envoy
