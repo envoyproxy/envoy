@@ -104,6 +104,6 @@ To build the CentOS based `lyft/envoy-build-ubuntu-centos` image, change `DISTRO
 
 The MacOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the CircleCI MacOS image. The dependencies are cached and are not
-re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
+which is pre-installed on the CircleCI MacOS image. The dependencies are cached are re-installed
+n every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy.
