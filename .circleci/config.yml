@@ -13,6 +13,8 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.release
        - setup_remote_docker
        - run: ci/docker_push.sh
+       - deploy:
+           command: ci/docker_tag.sh
    asan:
      docker:
        - image: lyft/envoy-build:7480d2a53726b6389380d741f8a7e7b74a990133
@@ -79,7 +81,10 @@ workflows:
   version: 2
   all:
     jobs:
-      - release
+      - release:
+          filters:
+            tags:
+              only: /^v.*/
       - asan
       - tsan
       - coverage
