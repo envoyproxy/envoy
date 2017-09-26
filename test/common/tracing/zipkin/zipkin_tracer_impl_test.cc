@@ -76,7 +76,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 
-  Tracing::MockConfig config_;
+  NiceMock<Tracing::MockConfig> config_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
@@ -343,6 +343,88 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ(1ULL, zipkin_zipkin_span3.binaryAnnotations().size());
   EXPECT_EQ("key3", zipkin_zipkin_span3.binaryAnnotations()[0].key());
   EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
+}
+
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromOtSpanContextHeaderTest) {
+  setupValidDriver();
+
+  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string context =
+      trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
+
+  request_headers_.insertOtSpanContext().value(context);
+
+  // New span will have an SR annotation - so its span and parent ids will be
+  // the same as the supplied span context (i.e. shared context)
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+
+  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
+}
+
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
+  setupValidDriver();
+
+  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+
+  request_headers_.insertXB3TraceId().value(trace_id);
+  request_headers_.insertXB3SpanId().value(span_id);
+  request_headers_.insertXB3ParentSpanId().value(parent_id);
+
+  // New span will have an SR annotation - so its span and parent ids will be
+  // the same as the supplied span context (i.e. shared context)
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+
+  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
+}
+
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
+  setupValidDriver();
+
+  request_headers_.insertXB3TraceId().value(std::string("xyz"));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
+}
+
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
+  setupValidDriver();
+
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3SpanId().value(std::string("xyz"));
+  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
+}
+
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
+  setupValidDriver();
+
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3ParentSpanId().value(std::string("xyz"));
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
 }
 } // namespace Zipkin
 } // namespace Envoy

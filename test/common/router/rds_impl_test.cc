@@ -522,6 +522,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
   route_configs.Add();
   route_configs.Add();
+  EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_THROW_WITH_MESSAGE(provider_impl.onConfigUpdate(route_configs), EnvoyException,
                             "Unexpected RDS resource length: 2");
 }

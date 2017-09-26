@@ -35,6 +35,10 @@ if [[ "$1" == "bazel.release" ]]; then
   bazel_release_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+  # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  echo "Copying for image build..."
+  mkdir -p build_release
+  cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy ./build_release
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_gcc_toolchain
@@ -87,6 +91,14 @@ elif [[ "$1" == "bazel.dev" ]]; then
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   echo "Building and testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
+  exit 0
+elif [[ "$1" == "bazel.ipv6_tests" ]]; then
+  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
+  # as possible for basic sanity testing.
+  setup_clang_toolchain
+  echo "Testing..."
+  cd "${ENVOY_CI_DIR}"
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain

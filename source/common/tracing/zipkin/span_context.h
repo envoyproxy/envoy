@@ -20,6 +20,17 @@ public:
   SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false) {}
 
   /**
+   * Constructor that creates a context object from the supplied trace, span
+   * and parent ids.
+   *
+   * @param trace_id The trace id.
+   * @param id The span id.
+   * @param parent_id The parent id.
+   */
+  SpanContext(const uint64_t trace_id, const uint64_t id, const uint64_t parent_id)
+      : trace_id_(trace_id), id_(id), parent_id_(parent_id), is_initialized_(true) {}
+
+  /**
    * Constructor that creates a context object from the given Zipkin span object.
    *
    * @param span The Zipkin span used to initialize a SpanContext object.

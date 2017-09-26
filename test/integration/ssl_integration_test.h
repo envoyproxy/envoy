@@ -15,34 +15,11 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Ssl {
 
-class MockRuntimeIntegrationTestServer : public IntegrationTestServer {
-public:
-  static IntegrationTestServerPtr create(const std::string& config_path,
-                                         Network::Address::IpVersion version) {
-    IntegrationTestServerPtr server{new MockRuntimeIntegrationTestServer(config_path)};
-    server->start(version);
-    return server;
-  }
-
-  // Server::ComponentFactory
-  Runtime::LoaderPtr createRuntime(Server::Instance&, Server::Configuration::Initial&) override {
-    runtime_ = new NiceMock<Runtime::MockLoader>();
-    return Runtime::LoaderPtr{runtime_};
-  }
-
-  Runtime::MockLoader* runtime_;
-
-private:
-  MockRuntimeIntegrationTestServer(const std::string& config_path)
-      : IntegrationTestServer(config_path) {}
-};
-
 class SslIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SslIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  // Use old style configuration for now.
   void initialize() override;
 
   void TearDown() override;

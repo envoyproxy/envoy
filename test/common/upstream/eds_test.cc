@@ -42,7 +42,7 @@ protected:
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::api::v2::Cluster eds_cluster_;
-  MockClusterManager cm_;
+  NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;

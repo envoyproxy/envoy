@@ -39,7 +39,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
-  Tracing::MockConfig config;
+  NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // ==============
@@ -227,7 +227,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   // Test finishing a span containing a CS annotation
   // ==============
 
-  Tracing::MockConfig config;
+  NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Creates a root-span with a CS annotation

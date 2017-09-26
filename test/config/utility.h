@@ -54,6 +54,9 @@ public:
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::api::v2::filter::HttpConnectionManager::CodecType type);
 
+  // Add the default SSL configuration.
+  void addSslConfig();
+
   // Allows callers to do their own modification to |bootstrap_| which will be
   // applied just before ports are modified in finalize().
   void addConfigModifier(ConfigModifierFunction function);

@@ -22,21 +22,12 @@ namespace Envoy {
 namespace Ssl {
 
 void SslIntegrationTest::initialize() {
-  BaseIntegrationTest::initialize();
+  config_helper_.addSslConfig();
+  HttpIntegrationTest::initialize();
 
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new ContextManagerImpl(*runtime_));
-  upstream_ssl_ctx_ = createUpstreamSslContext();
-  fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
-  registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-  fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
-  registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-  test_server_ = MockRuntimeIntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute("test/config/integration/server_ssl.json", port_map_,
-                                               version_),
-      version_);
+
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslContext(false, false, *context_manager_);
   client_ssl_ctx_alpn_ = createClientSslContext(true, false, *context_manager_);
@@ -183,15 +174,15 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 }
 
 TEST_P(SslIntegrationTest, AltAlpn) {
+  // Write the runtime file to turn alt_alpn on.
+  TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
+  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+    // Configure the runtime directory.
+    bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime"));
+  });
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(true, false);
   };
-  initialize();
-  // Connect with ALPN, but we should end up using HTTP/1.
-  MockRuntimeIntegrationTestServer* server =
-      dynamic_cast<MockRuntimeIntegrationTestServer*>(test_server_.get());
-  ON_CALL(server->runtime_->snapshot_, featureEnabled("ssl.alt_alpn", 0))
-      .WillByDefault(Return(true));
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
 }

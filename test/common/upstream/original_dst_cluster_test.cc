@@ -51,7 +51,7 @@ public:
   OriginalDstClusterTest() : cleanup_timer_(new Event::MockTimer(&dispatcher_)) {}
 
   void setup(const std::string& json) {
-    MockClusterManager cm;
+    NiceMock<MockClusterManager> cm;
     cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
                                           ssl_context_manager_, cm, dispatcher_, false));
     cluster_->addMemberUpdateCb(

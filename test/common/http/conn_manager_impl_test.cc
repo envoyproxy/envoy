@@ -692,7 +692,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
       .WillByDefault(Return(true));
 
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
-              finalizeRequestHeaders(_));
+              finalizeRequestHeaders(_, _));
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
       .WillOnce(Return(false));
   // TODO (rshriram) figure out how to test the auto host rewrite. Need handle over headers.
@@ -1364,8 +1364,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
   // Once the limits are turned off can be turned on again.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(1);
-  EXPECT_EQ(1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(100);
+  EXPECT_EQ(100, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {

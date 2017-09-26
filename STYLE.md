@@ -55,8 +55,8 @@
 * If a method that must be defined outside the `test` directory is intended to be called only
   from test code then it should have a name that ends in `ForTest()` such as `aMethodForTest()`.
   In most cases tests can and should be structured so this is not necessary.
-* Tests should be free of mock warnings.  Prefer the use of NiceMock to avoid logging warnings for
-  unexpected mock calls or StrictMock to enforce test failure for unexpected warnings.
+* Tests default to StrictMock so will fail if hitting unexpected warnings.  Feel free to use
+  NiceMock for mocks whose behavior is not the focus of a test.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 

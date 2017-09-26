@@ -201,6 +201,31 @@ void ConfigHelper::setClientCodec(envoy::api::v2::filter::HttpConnectionManager:
   storeHttpConnectionManager(hcm_config);
 }
 
+void ConfigHelper::addSslConfig() {
+  RELEASE_ASSERT(!finalized_);
+
+  auto* filter_chain =
+      bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+
+  auto* common_tls_context = filter_chain->mutable_tls_context()->mutable_common_tls_context();
+  common_tls_context->add_alpn_protocols("h2");
+  common_tls_context->add_alpn_protocols("http/1.1");
+  common_tls_context->mutable_deprecated_v1()->set_alt_alpn_protocols("http/1.1");
+
+  auto* validation_context = common_tls_context->mutable_validation_context();
+  validation_context->mutable_trusted_ca()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  validation_context->add_verify_certificate_hash("9E:D6:53:36:49:26:9C:69:4F:71:7E:87:29:A1:C8:B5:"
+                                                  "50:06:FD:51:01:3C:0E:0D:42:94:91:6E:00:D7:EA:"
+                                                  "04");
+
+  auto* tls_certificate = common_tls_context->add_tls_certificates();
+  tls_certificate->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+  tls_certificate->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+}
+
 void ConfigHelper::loadHttpConnectionManager(envoy::api::v2::filter::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);

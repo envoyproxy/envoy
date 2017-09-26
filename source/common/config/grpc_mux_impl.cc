@@ -1,5 +1,7 @@
 #include "common/config/grpc_mux_impl.h"
 
+#include <unordered_set>
+
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
