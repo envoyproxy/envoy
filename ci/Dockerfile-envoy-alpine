@@ -1,0 +1,3 @@
+FROM frolvlad/alpine-glibc
+
+ADD build_release_stripped/envoy /usr/local/bin/envoy
