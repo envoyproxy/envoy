@@ -122,6 +122,10 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
+class ServerInstanceImplDeathTest : public ServerInstanceImplTest {
+  void TearDown() override {}
+};
+
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -177,5 +181,11 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 
+TEST_P(ServerInstanceImplDeathTest, LogToFileError) {
+  options_.log_path_ = "/this/path/does/not/exist";
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_THROW(initialize(std::string()), EnvoyException);
+}
 } // namespace Server
 } // namespace Envoy

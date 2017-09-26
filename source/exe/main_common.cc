@@ -39,6 +39,7 @@ public:
 } // namespace Server
 
 int main_common(OptionsImpl& options) {
+  int ret = 0;
 #ifdef ENVOY_HOT_RESTART
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
@@ -73,15 +74,20 @@ int main_common(OptionsImpl& options) {
 
   ares_library_init(ARES_LIB_INIT_ALL);
 
-  Logger::Registry::initialize(options.logLevel(), log_lock);
-  DefaultTestHooks default_test_hooks;
-  ThreadLocal::InstanceImpl tls;
-  Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
-  Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
-                              access_log_lock, component_factory, tls);
-  server.run();
+  try {
+    Logger::Registry::initialize(options.logLevel(), log_lock);
+    DefaultTestHooks default_test_hooks;
+    ThreadLocal::InstanceImpl tls;
+    Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
+    Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
+                                access_log_lock, component_factory, tls);
+    server.run();
+  } catch (const EnvoyException& e) {
+    std::cerr << "main() caught exception: " << e.what() << std::endl;
+    ret = 1;
+  }
   ares_library_cleanup();
-  return 0;
+  return ret;
 }
 
 } // namespace Envoy
