@@ -216,11 +216,11 @@ public:
   virtual ~HashPolicy() {}
 
   /**
-   * @return Optional<uint64_t> an optional hash value to route on.
    * @param downstream_address contains the address of the connected client host, or an
-   * empty string if the request is initiated from within this host, and
+   * empty string if the request is initiated from within this host
    * @param headers stores the HTTP headers for the stream
-   * A hash value might not be returned if for example the specified HTTP header does not exist.
+   * @return Optional<uint64_t> an optional hash value to route on. A hash value might not be
+   * returned if for example the specified HTTP header does not exist.
    */
   virtual Optional<uint64_t> generateHash(const std::string& downstream_address,
                                           const Http::HeaderMap& headers) const PURE;
