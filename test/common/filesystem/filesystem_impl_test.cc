@@ -112,6 +112,63 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   }
 }
 
+TEST(FileSystemImpl, flushToLogFileOnDemand) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
+
+  Thread::MutexBasicLockable mutex;
+  Stats::IsolatedStoreImpl stats_store;
+  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+
+  EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
+  Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
+                            std::chrono::milliseconds(40));
+
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(os_sys_calls, write_(_, _, _))
+      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
+        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
+        EXPECT_EQ("test", written);
+        EXPECT_EQ(5, fd);
+
+        return num_bytes;
+      }));
+
+  file.write("test");
+
+  {
+    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    EXPECT_EQ(0, os_sys_calls.num_writes_);
+  }
+
+  file.flush();
+  {
+    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    EXPECT_EQ(1, os_sys_calls.num_writes_);
+  }
+
+  EXPECT_CALL(os_sys_calls, write_(_, _, _))
+      .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
+        std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
+        EXPECT_EQ("test2", written);
+        EXPECT_EQ(5, fd);
+
+        return num_bytes;
+      }));
+
+  // make sure timer is re-enabled on callback call
+  file.write("test2");
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+  timer->callback_();
+
+  {
+    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    while (os_sys_calls.num_writes_ != 2) {
+      os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
+    }
+  }
+}
+
 TEST(FileSystemImpl, reopenFile) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);

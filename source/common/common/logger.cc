@@ -18,6 +18,16 @@ Logger::Logger(const std::string& name) {
   logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
   logger_->set_pattern("[%Y-%m-%d %T.%e][%t][%l][%n] %v");
   logger_->set_level(spdlog::level::trace);
+
+  // Ensure that critical errors, especially ASSERT/PANIC, get flushed
+  logger_->flush_on(spdlog::level::critical);
+}
+
+void LockingStderrOrFileSink::logToStdErr() { log_file_.reset(); }
+
+void LockingStderrOrFileSink::logToFile(const std::string& log_path,
+                                        AccessLog::AccessLogManager& log_manager) {
+  log_file_ = log_manager.createAccessLog(log_path);
 }
 
 std::vector<Logger>& Registry::allLoggers() {
@@ -26,14 +36,26 @@ std::vector<Logger>& Registry::allLoggers() {
   return *all_loggers;
 }
 
-void LockingStderrSink::log(const spdlog::details::log_msg& msg) {
-  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
-  std::cerr << msg.formatted.str();
+void LockingStderrOrFileSink::log(const spdlog::details::log_msg& msg) {
+  if (log_file_) {
+    // Logfiles have internal locking to ensure serial, non-interleaved
+    // writes, so no additional locking needed here.
+    log_file_->write(msg.formatted.str());
+  } else {
+    Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+    std::cerr << msg.formatted.str();
+  }
 }
 
-void LockingStderrSink::flush() {
-  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
-  std::cerr << std::flush;
+void LockingStderrOrFileSink::flush() {
+  if (log_file_) {
+    // Logfiles have internal locking to ensure serial, non-interleaved
+    // writes, so no additional locking needed here.
+    log_file_->flush();
+  } else {
+    Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+    std::cerr << std::flush;
+  }
 }
 
 spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }

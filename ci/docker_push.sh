@@ -28,17 +28,17 @@ then
    docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
    docker push lyft/envoy:latest
-   docker tag lyft/envoy:latest lyft/envoy:$CIRCLE_SHA1
-   docker push lyft/envoy:$CIRCLE_SHA1
-   docker rm $(docker ps -a -q) || true
-   docker rmi $(docker images -a -q) || true
+   docker tag lyft/envoy:latest lyft/envoy:"$CIRCLE_SHA1"
+   docker push lyft/envoy:"$CIRCLE_SHA1"
 
-   make -C ci/build_alpine_container
-   docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:$CIRCLE_SHA1
-   docker push lyft/envoy-alpine:$CIRCLE_SHA1
+   docker build -f ci/Dockerfile-envoy-alpine -t lyft/envoy-alpine:latest .
+   docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:"$CIRCLE_SHA1"
+   docker push lyft/envoy-alpine:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine:latest
-   docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:$CIRCLE_SHA1
-   docker push lyft/envoy-alpine-debug:$CIRCLE_SHA1
+
+   docker build -f ci/Dockerfile-envoy-alpine-debug -t lyft/envoy-alpine-debug:latest .
+   docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
+   docker push lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
    docker push lyft/envoy-alpine-debug:latest
 
    # This script tests the docker examples.

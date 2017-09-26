@@ -40,6 +40,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
+  TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
+                                        cmd);
   TCLAP::ValueArg<uint64_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
                                           "uint64_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
@@ -106,6 +108,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   concurrency_ = concurrency.getValue();
   config_path_ = config_path.getValue();
   admin_address_path_ = admin_address_path.getValue();
+  log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();
