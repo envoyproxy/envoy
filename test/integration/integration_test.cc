@@ -32,17 +32,16 @@ TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(IntegrationTest, ConnectionClose) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
-  executeActions({[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-                  [&]() -> void {
-                    codec_client_->makeHeaderOnlyRequest(
-                        Http::TestHeaderMapImpl{{":method", "GET"},
-                                                {":path", "/healthcheck"},
-                                                {":authority", "host"},
-                                                {"connection", "close"}},
-                        *response_);
-                  },
-                  [&]() -> void { response_->waitForEndStream(); },
-                  [&]() -> void { codec_client_->waitForDisconnect(); }});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/healthcheck"},
+                                                               {":authority", "host"},
+                                                               {"connection", "close"}},
+                                       *response_);
+  response_->waitForEndStream();
+  codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
@@ -118,43 +117,27 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: { deprecated_v1: true } }");
   config_helper_.setBufferLimits(1024, 1024);
 
-  IntegrationCodecClientPtr codec_client;
-  FakeHttpConnectionPtr fake_upstream_connection;
-  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  FakeStreamPtr request;
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http")); },
-                  [&]() -> void {
-                    Http::StreamEncoder* request_encoder;
-                    request_encoder = &codec_client->startRequest(
-                        Http::TestHeaderMapImpl{{":method", "POST"},
-                                                {":path", "/test/long/url"},
-                                                {":scheme", "http"},
-                                                {":authority", "host"},
-                                                {"content-type", "application/grpc"},
-                                                {"x-envoy-retry-grpc-on", "cancelled"}},
-                        *response);
-                    codec_client->sendData(*request_encoder, 1024, true);
-                  },
-                  [&]() -> void {
-                    fake_upstream_connection =
-                        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-                  },
-                  [&]() -> void { request = fake_upstream_connection->waitForNewStream(); },
-                  [&]() -> void { request->waitForEndStream(*dispatcher_); },
-                  [&]() -> void {
-                    request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-                    // Make sure the headers are received before the body is sent.
-                    request->encodeData(1024 * 65, false);
-                  },
-                  [&]() -> void {
-                    response->waitForEndStream();
-                    EXPECT_TRUE(response->complete());
-                    EXPECT_STREQ("500", response->headers().Status()->value().c_str());
-                  },
-                  // Cleanup both downstream and upstream
-                  [&]() -> void { codec_client->close(); },
-                  [&]() -> void { fake_upstream_connection->close(); },
-                  [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"content-type", "application/grpc"},
+                              {"x-envoy-retry-grpc-on", "cancelled"}},
+      *response_);
+  waitForNextUpstreamRequest();
+
+  // Send the overly large response.  Because the grpc_http1_bridge filter buffers and buffer
+  // limits are sent, this will be translated into a 500 from Envoy.
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024 * 65, false);
+
+  response_->waitForEndStream();
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -204,6 +187,7 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   config_helper_.setDefaultHostAndRoute("*", "/asd");
   // Enable websockets for the path /websocket/test
   config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  initialize();
 
   // WebSocket upgrade, send some data and disconnect downstream
   IntegrationTcpClientPtr tcp_client;
@@ -212,35 +196,35 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
                                       "Upgrade\r\nUpgrade: websocket\r\n\r\n";
   const std::string upgrade_resp_str =
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  executeActions({
-      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
-      // Send websocket upgrade request
-      // The request path gets rewritten from /websocket/test to /websocket.
-      // The size of headers received by the destination is 225 bytes.
-      [&]() -> void { tcp_client->write(upgrade_req_str); },
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(225); },
-      // Accept websocket upgrade request
-      [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
-      [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
-      // Standard TCP proxy semantics post upgrade
-      [&]() -> void { tcp_client->write("hello"); },
-      // datalen = 225 + strlen(hello)
-      [&]() -> void { fake_upstream_connection->waitForData(230); },
-      [&]() -> void { fake_upstream_connection->write("world"); },
-      [&]() -> void { tcp_client->waitForData(upgrade_resp_str + "world"); },
-      [&]() -> void { tcp_client->write("bye!"); },
-      // downstream disconnect
-      [&]() -> void { tcp_client->close(); },
-      // datalen = 225 + strlen(hello) + strlen(bye!)
-      [&]() -> void { fake_upstream_connection->waitForData(234); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-  });
+
+  tcp_client = makeTcpConnection(lookupPort("http"));
+  // Send websocket upgrade request
+  // The request path gets rewritten from /websocket/test to /websocket.
+  // The size of headers received by the destination is 225 bytes.
+  tcp_client->write(upgrade_req_str);
+  fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(225);
+  // Accept websocket upgrade request
+  fake_upstream_connection->write(upgrade_resp_str);
+  tcp_client->waitForData(upgrade_resp_str);
+  // Standard TCP proxy semantics post upgrade
+  tcp_client->write("hello");
+  // datalen = 225 + strlen(hello)
+  fake_upstream_connection->waitForData(230);
+  fake_upstream_connection->write("world");
+  tcp_client->waitForData(upgrade_resp_str + "world");
+  tcp_client->write("bye!");
+  // downstream disconnect
+  tcp_client->close();
+  // datalen = 225 + strlen(hello) + strlen(bye!)
+  fake_upstream_connection->waitForData(234);
+  fake_upstream_connection->waitForDisconnect();
 }
 
 TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   config_helper_.setDefaultHostAndRoute("*", "/asd");
   config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  initialize();
 
   // WebSocket upgrade, send some data and disconnect upstream
   IntegrationTcpClientPtr tcp_client;
@@ -249,26 +233,25 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
                                       "Upgrade\r\nUpgrade: websocket\r\n\r\n";
   const std::string upgrade_resp_str =
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  executeActions(
-      {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("http")); },
-       // Send websocket upgrade request
-       [&]() -> void { tcp_client->write(upgrade_req_str); },
-       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-       // The request path gets rewritten from /websocket/test to /websocket.
-       // The size of headers received by the destination is 225 bytes.
-       [&]() -> void { fake_upstream_connection->waitForData(225); },
-       // Accept websocket upgrade request
-       [&]() -> void { fake_upstream_connection->write(upgrade_resp_str); },
-       [&]() -> void { tcp_client->waitForData(upgrade_resp_str); },
-       // Standard TCP proxy semantics post upgrade
-       [&]() -> void { tcp_client->write("hello"); },
-       // datalen = 225 + strlen(hello)
-       [&]() -> void { fake_upstream_connection->waitForData(230); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
-       // upstream disconnect
-       [&]() -> void { fake_upstream_connection->close(); },
-       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-       [&]() -> void { tcp_client->waitForDisconnect(); }});
+  tcp_client = makeTcpConnection(lookupPort("http"));
+  // Send websocket upgrade request
+  tcp_client->write(upgrade_req_str);
+  fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  // The request path gets rewritten from /websocket/test to /websocket.
+  // The size of headers received by the destination is 225 bytes.
+  fake_upstream_connection->waitForData(225);
+  // Accept websocket upgrade request
+  fake_upstream_connection->write(upgrade_resp_str);
+  tcp_client->waitForData(upgrade_resp_str);
+  // Standard TCP proxy semantics post upgrade
+  tcp_client->write("hello");
+  // datalen = 225 + strlen(hello)
+  fake_upstream_connection->waitForData(230);
+  fake_upstream_connection->write("world");
+  // upstream disconnect
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForDisconnect();
 
   EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
 }

@@ -93,56 +93,37 @@ TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
+// Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       // Start request
-       [&]() -> void {
-         request_encoder_ =
-             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response_);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
-       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
-       // Send some data
-       [&]() -> void {
-         codec_client_->sendData(*request_encoder_, bytes, false);
+  // Start the request.
+  request_encoder_ =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"}},
+                                   *response_);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream();
 
-       },
-       [&]() -> void { upstream_request_->waitForData(*dispatcher_, bytes); },
+  // Send part of the request body and ensure it is received upstream.
+  codec_client_->sendData(*request_encoder_, bytes, false);
+  upstream_request_->waitForData(*dispatcher_, bytes);
 
-       // Start response
-       [&]() -> void {
-         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request_->encodeData(bytes, false);
-       },
-       [&]() -> void { response_->waitForBodyData(bytes); },
+  // Start sending the response and ensure it is received downstream.
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(bytes, false);
+  response_->waitForBodyData(bytes);
 
-       // Finish request
-       [&]() -> void {
-         codec_client_->sendTrailers(*request_encoder_,
-                                     Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  // Finish the request.
+  codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  upstream_request_->waitForEndStream(*dispatcher_);
 
-       },
-       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
-
-       // Finish response
-       [&]() -> void {
-         upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{{"trailer", "bar"}});
-       },
-       [&]() -> void { response_->waitForEndStream(); },
-
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
-
+  // Finish the response.
+  upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{{"trailer", "bar"}});
+  response_->waitForEndStream();
   EXPECT_TRUE(response_->complete());
 }
 
@@ -154,53 +135,35 @@ TEST_P(Http2UpstreamIntegrationTest, LargeBidirectionalStreamingWithBufferLimits
 }
 
 TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       // Start request
-       [&]() -> void {
-         request_encoder_ =
-             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response_);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
-       [&]() -> void { upstream_request_ = fake_upstream_connection_->waitForNewStream(); },
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
-       // Send some data
-       [&]() -> void {
-         codec_client_->sendData(*request_encoder_, 1024, false);
+  // Start sending the request.
+  request_encoder_ =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"}},
+                                   *response_);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream();
 
-       },
-       [&]() -> void { upstream_request_->waitForData(*dispatcher_, 1024); },
+  // Send some request data.
+  codec_client_->sendData(*request_encoder_, 1024, false);
+  upstream_request_->waitForData(*dispatcher_, 1024);
 
-       // Start response
-       [&]() -> void {
-         upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request_->encodeData(1024, false);
-       },
-       [&]() -> void { response_->waitForBodyData(1024); },
+  // Start sending the response.
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024, false);
+  response_->waitForBodyData(1024);
 
-       // Finish request
-       [&]() -> void {
-         codec_client_->sendTrailers(*request_encoder_,
-                                     Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  // Finish sending therequest.
+  codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
+  upstream_request_->waitForEndStream(*dispatcher_);
 
-       },
-       [&]() -> void { upstream_request_->waitForEndStream(*dispatcher_); },
-
-       // Reset
-       [&]() -> void { upstream_request_->encodeResetStream(); },
-       [&]() -> void { response_->waitForReset(); },
-
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
-
+  // Reset the stream.
+  upstream_request_->encodeResetStream();
+  response_->waitForReset();
   EXPECT_FALSE(response_->complete());
 }
 
@@ -208,87 +171,59 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                        uint32_t request2_bytes,
                                                        uint32_t response1_bytes,
                                                        uint32_t response2_bytes) {
-  Http::StreamEncoder* encoder1;
-  Http::StreamEncoder* encoder2;
   IntegrationStreamDecoderPtr response1(new IntegrationStreamDecoder(*dispatcher_));
   IntegrationStreamDecoderPtr response2(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       // Start request 1
-       [&]() -> void {
-         encoder1 =
-             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response1);
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-       },
-       [&]() -> void { upstream_request1 = fake_upstream_connection_->waitForNewStream(); },
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
-       // Start request 2
-       [&]() -> void {
-         encoder2 =
-             &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response2);
-       },
-       [&]() -> void { upstream_request2 = fake_upstream_connection_->waitForNewStream(); },
+  // Start request 1
+  Http::StreamEncoder* encoder1 =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"}},
+                                   *response1);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request1 = fake_upstream_connection_->waitForNewStream();
 
-       // Finish request 1
-       [&]() -> void {
-         codec_client_->sendData(*encoder1, request1_bytes, true);
+  // Start request 2
+  Http::StreamEncoder* encoder2 =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"}},
+                                   *response2);
+  upstream_request2 = fake_upstream_connection_->waitForNewStream();
 
-       },
-       [&]() -> void { upstream_request1->waitForEndStream(*dispatcher_); },
+  // Finish request 1
+  codec_client_->sendData(*encoder1, request1_bytes, true);
+  upstream_request1->waitForEndStream(*dispatcher_);
 
-       // Finish request 2
-       [&]() -> void {
-         codec_client_->sendData(*encoder2, request2_bytes, true);
+  // Finish request 2
+  codec_client_->sendData(*encoder2, request2_bytes, true);
+  upstream_request2->waitForEndStream(*dispatcher_);
 
-       },
-       [&]() -> void { upstream_request2->waitForEndStream(*dispatcher_); },
+  // Respond to request 2
+  upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request2->encodeData(response2_bytes, true);
+  response2->waitForEndStream();
+  EXPECT_TRUE(upstream_request2->complete());
+  EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ(response2_bytes, response2->body().size());
 
-       // Respond request 2
-       [&]() -> void {
-         upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request2->encodeData(response2_bytes, true);
-       },
-       [&]() -> void {
-         response2->waitForEndStream();
-         EXPECT_TRUE(upstream_request2->complete());
-         EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
-
-         EXPECT_TRUE(response2->complete());
-         EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
-         EXPECT_EQ(response2_bytes, response2->body().size());
-       },
-
-       // Respond request 1
-       [&]() -> void {
-         upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-         upstream_request1->encodeData(response1_bytes, true);
-       },
-       [&]() -> void {
-         response1->waitForEndStream();
-         EXPECT_TRUE(upstream_request1->complete());
-         EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
-
-         EXPECT_TRUE(response1->complete());
-         EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
-         EXPECT_EQ(response1_bytes, response1->body().size());
-       },
-
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+  // Respond to request 1
+  upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request1->encodeData(response1_bytes, true);
+  response1->waitForEndStream();
+  EXPECT_TRUE(upstream_request1->complete());
+  EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ(response1_bytes, response1->body().size());
 }
 
 TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
@@ -306,58 +241,44 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   std::vector<Http::StreamEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       [&]() -> void {
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           responses.push_back(
-               IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
-           encoders.push_back(
-               &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"}},
-                                            *responses[i]));
-           codec_client_->sendData(*encoders[i], request_bytes, true);
-         }
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           // As data and streams are interwoven, make sure waitForNewStream()
-           // ignores incoming data and waits for actual stream establishment.
-           upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(true));
-         }
-       },
-       [&]() -> void {
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           upstream_requests[i]->waitForEndStream(*dispatcher_);
-           if (i % 2 == 0) {
-             upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}},
-                                                 false);
-             upstream_requests[i]->encodeData(rand.random() % (1024 * 2), true);
-           } else {
-             upstream_requests[i]->encodeResetStream();
-           }
-         }
-       },
-       [&]() -> void {
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           responses[i]->waitForEndStream();
-           if (i % 2 == 0) {
-             EXPECT_TRUE(upstream_requests[i]->complete());
-             EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
+  initialize();
 
-             EXPECT_TRUE(responses[i]->complete());
-             EXPECT_STREQ("200", responses[i]->headers().Status()->value().c_str());
-           }
-         }
-       },
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
+    encoders.push_back(
+        &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     *responses[i]));
+    codec_client_->sendData(*encoders[i], request_bytes, true);
+  }
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    // As data and streams are interwoven, make sure waitForNewStream()
+    // ignores incoming data and waits for actual stream establishment.
+    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(true));
+  }
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests[i]->waitForEndStream(*dispatcher_);
+    if (i % 2 == 0) {
+      upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+      upstream_requests[i]->encodeData(rand.random() % (1024 * 2), true);
+    } else {
+      upstream_requests[i]->encodeResetStream();
+    }
+  }
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    responses[i]->waitForEndStream();
+    if (i % 2 == 0) {
+      EXPECT_TRUE(upstream_requests[i]->complete());
+      EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
 
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+      EXPECT_TRUE(responses[i]->complete());
+      EXPECT_STREQ("200", responses[i]->headers().Status()->value().c_str());
+    }
+  }
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
@@ -376,54 +297,43 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   std::vector<Http::StreamEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
-  executeActions(
-      {[&]() -> void { codec_client_ = makeHttpConnection(lookupPort("http")); },
-       [&]() -> void {
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           responses.push_back(
-               IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
-           encoders.push_back(
-               &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                    {":path", "/test/long/url"},
-                                                                    {":scheme", "http"},
-                                                                    {":authority", "host"}},
-                                            *responses[i]));
-           // Reset a few streams to test how reset and watermark interact.
-           if (i % 15 == 0) {
-             codec_client_->sendReset(*encoders[i]);
-           } else {
-             codec_client_->sendData(*encoders[i], 0, true);
-           }
-         }
-       },
-       [&]() -> void {
-         fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           upstream_requests.push_back(fake_upstream_connection_->waitForNewStream());
-         }
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           if (i % 15 != 0) {
-             upstream_requests[i]->waitForEndStream(*dispatcher_);
-             upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}},
-                                                 false);
-             upstream_requests[i]->encodeData(100, false);
-           }
-         }
-         // Close the connection.
-         fake_upstream_connection_->close();
-       },
-       [&]() -> void {
-         // Ensure the streams are all reset successfully.
-         for (uint32_t i = 0; i < num_requests; ++i) {
-           if (i % 15 != 0) {
-             responses[i]->waitForReset();
-           }
-         }
-       },
-
-       // Cleanup both downstream and upstream
-       [&]() -> void { codec_client_->close(); },
-       [&]() -> void { fake_upstream_connection_->waitForDisconnect(); }});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
+    encoders.push_back(
+        &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     *responses[i]));
+    // Reset a few streams to test how reset and watermark interact.
+    if (i % 15 == 0) {
+      codec_client_->sendReset(*encoders[i]);
+    } else {
+      codec_client_->sendData(*encoders[i], 0, true);
+    }
+  }
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream());
+  }
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    if (i % 15 != 0) {
+      upstream_requests[i]->waitForEndStream(*dispatcher_);
+      upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+      upstream_requests[i]->encodeData(100, false);
+    }
+  }
+  // Close the connection.
+  fake_upstream_connection_->close();
+  fake_upstream_connection_->waitForDisconnect();
+  // Ensure the streams are all reset successfully.
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    if (i % 15 != 0) {
+      responses[i]->waitForReset();
+    }
+  }
 }
 
 } // namespace Envoy

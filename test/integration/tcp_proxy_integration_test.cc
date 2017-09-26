@@ -22,19 +22,14 @@ INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  FakeRawConnectionPtr fake_rest_connection;
-  executeActions({
-      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-      [&]() -> void { tcp_client->write("hello"); },
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(5); },
-      [&]() -> void { fake_upstream_connection->write("world"); },
-      [&]() -> void { fake_upstream_connection->close(); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-      [&]() -> void { tcp_client->waitForDisconnect(); },
-  });
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(5);
+  fake_upstream_connection->write("world");
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForDisconnect();
 
   EXPECT_EQ("world", tcp_client->data());
 }
@@ -42,38 +37,28 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
 // Test proxying data in both directions, and that all data is flushed properly
 // when the client disconnects.
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  FakeRawConnectionPtr fake_rest_connection;
-  executeActions({
-      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
-      [&]() -> void { tcp_client->write("hello"); },
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(5); },
-      [&]() -> void { fake_upstream_connection->write("world"); },
-      [&]() -> void { tcp_client->waitForData("world"); },
-      [&]() -> void { tcp_client->write("hello"); },
-      [&]() -> void { tcp_client->close(); },
-      [&]() -> void { fake_upstream_connection->waitForData(10); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-  });
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(5);
+  fake_upstream_connection->write("world");
+  tcp_client->waitForData("world");
+  tcp_client->write("hello");
+  tcp_client->close();
+  fake_upstream_connection->waitForData(10);
+  fake_upstream_connection->waitForDisconnect();
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
-  IntegrationTcpClientPtr tcp_client;
-  FakeRawConnectionPtr fake_upstream_connection;
-  FakeRawConnectionPtr fake_rest_connection;
   std::string data(1024 * 16, 'a');
-  executeActions({
-      [&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy_with_write_limits")); },
-      [&]() -> void { tcp_client->write(data); },
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(data.size()); },
-      [&]() -> void { fake_upstream_connection->write(data); },
-      [&]() -> void { tcp_client->waitForData(data); },
-      [&]() -> void { tcp_client->close(); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-  });
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy_with_write_limits"));
+  tcp_client->write(data);
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection();
+  fake_upstream_connection->waitForData(data.size());
+  fake_upstream_connection->write(data);
+  tcp_client->waitForData(data);
+  tcp_client->close();
+  fake_upstream_connection->waitForDisconnect();
 
   uint32_t upstream_pauses =
       test_server_
@@ -108,62 +93,56 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   Ssl::ClientContextPtr context;
   ConnectionStatusCallbacks connect_callbacks;
   MockWatermarkBuffer* client_write_buffer;
-  executeActions({
-      // Set up the mock buffer factory so the newly created SSL client will have a mock write
-      // buffer.  This allows us to track the bytes actually written to the socket.
-      [&]() -> void {
-        EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
-            .Times(1)
-            .WillOnce(Invoke([&](std::function<void()> below_low,
-                                 std::function<void()> above_high) -> Buffer::Instance* {
-              client_write_buffer = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
-              ON_CALL(*client_write_buffer, move(_))
-                  .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-              ON_CALL(*client_write_buffer, drain(_))
-                  .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-              return client_write_buffer;
-            }));
-        // Set up the SSl client.
-        Network::Address::InstanceConstSharedPtr address =
-            Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
-        context = Ssl::createClientSslContext(false, false, *context_manager);
-        ssl_client = dispatcher_->createSslClientConnection(
-            *context, address, Network::Address::InstanceConstSharedPtr());
-      },
-      // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
-      // filter so there will be no pause waiting on auth data.
-      [&]() -> void {
-        ssl_client->addConnectionCallbacks(connect_callbacks);
-        ssl_client->connect();
-        while (!connect_callbacks.connected()) {
-          dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-        }
-      },
-      // Ship some data upstream.
-      [&]() -> void {
-        Buffer::OwnedImpl buffer(data_to_send_upstream);
-        ssl_client->write(buffer);
-        while (client_write_buffer->bytes_drained() != data_to_send_upstream.size()) {
-          dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-        }
-      },
-      // Make sure the data makes it upstream.
-      [&]() -> void { fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection(); },
-      [&]() -> void { fake_upstream_connection->waitForData(data_to_send_upstream.size()); },
-      // Now send data downstream and make sure it arrives.
-      [&]() -> void {
-        std::shared_ptr<WaitForPayloadReader> payload_reader(
-            new WaitForPayloadReader(*dispatcher_));
-        ssl_client->addReadFilter(payload_reader);
-        fake_upstream_connection->write(data_to_send_downstream);
-        payload_reader->set_data_to_wait_for(data_to_send_downstream);
-        ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
-      },
-      // Clean up.
-      [&]() -> void { ssl_client->close(Network::ConnectionCloseType::NoFlush); },
-      [&]() -> void { fake_upstream_connection->close(); },
-      [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-  });
+  // Set up the mock buffer factory so the newly created SSL client will have a mock write
+  // buffer.  This allows us to track the bytes actually written to the socket.
+
+  EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](std::function<void()> below_low,
+                           std::function<void()> above_high) -> Buffer::Instance* {
+        client_write_buffer = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
+      }));
+  // Set up the SSl client.
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
+  context = Ssl::createClientSslContext(false, false, *context_manager);
+  ssl_client = dispatcher_->createSslClientConnection(*context, address,
+                                                      Network::Address::InstanceConstSharedPtr());
+
+  // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // filter so there will be no pause waiting on auth data.
+
+  ssl_client->addConnectionCallbacks(connect_callbacks);
+  ssl_client->connect();
+  while (!connect_callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // Ship some data upstream.
+
+  Buffer::OwnedImpl buffer(data_to_send_upstream);
+  ssl_client->write(buffer);
+  while (client_write_buffer->bytes_drained() != data_to_send_upstream.size()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // Make sure the data makes it upstream.
+  fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection();
+  fake_upstream_connection->waitForData(data_to_send_upstream.size());
+  // Now send data downstream and make sure it arrives.
+
+  std::shared_ptr<WaitForPayloadReader> payload_reader(new WaitForPayloadReader(*dispatcher_));
+  ssl_client->addReadFilter(payload_reader);
+  fake_upstream_connection->write(data_to_send_downstream);
+  payload_reader->set_data_to_wait_for(data_to_send_downstream);
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+  // Clean up.
+  ssl_client->close(Network::ConnectionCloseType::NoFlush);
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
 }
 
 TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { sendAndReceiveTlsData("hello", "world"); }

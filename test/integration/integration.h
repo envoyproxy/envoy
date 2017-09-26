@@ -118,17 +118,6 @@ public:
     initialized_ = true;
   }
 
-  /**
-   * Integration tests are composed of a sequence of actions which are run via this routine.
-   */
-  void executeActions(std::list<std::function<void()>> actions) {
-    if (!initialized_) {
-      initialize();
-    }
-    for (const std::function<void()>& action : actions) {
-      action();
-    }
-  }
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
   // Test-wide port map.
