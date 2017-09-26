@@ -60,16 +60,16 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flushCounter(const std::string& name, uint64_t delta) {
-  tls_->getTyped<Writer>().writeCounter(name, delta);
+void UdpStatsdSink::flushCounter(const Metric& counter, uint64_t delta) {
+  tls_->getTyped<Writer>().writeCounter(counter.name(), delta);
 }
 
-void UdpStatsdSink::flushGauge(const std::string& name, uint64_t value) {
-  tls_->getTyped<Writer>().writeGauge(name, value);
+void UdpStatsdSink::flushGauge(const Metric& gauge, uint64_t value) {
+  tls_->getTyped<Writer>().writeGauge(gauge.name(), value);
 }
 
-void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) {
-  tls_->getTyped<Writer>().writeTimer(name, ms);
+void UdpStatsdSink::onTimespanComplete(const Metric& timer, std::chrono::milliseconds ms) {
+  tls_->getTyped<Writer>().writeTimer(timer.name(), ms);
 }
 
 char TcpStatsdSink::STAT_PREFIX[] = "envoy.";

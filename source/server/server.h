@@ -19,6 +19,7 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -154,17 +155,19 @@ public:
 private:
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+                  ComponentFactory& component_factory, uint64_t version_int);
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
+  void initializeStatsTags(const envoy::api::v2::Bootstrap& bootstrap);
 
   Options& options_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  ServerStats server_stats_;
+  std::vector<Stats::TagExtractorPtr> tag_extractors_;
+  std::unique_ptr<ServerStats> server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

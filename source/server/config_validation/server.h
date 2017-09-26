@@ -113,9 +113,11 @@ public:
 private:
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
+  void initializeStatsTags(const envoy::api::v2::Bootstrap& bootstrap);
 
   Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
+  std::vector<Stats::TagExtractorPtr> tag_extractors_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

@@ -22,6 +22,7 @@ using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -120,8 +121,10 @@ public:
 
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   expectClientCreate();
-  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_connect_ms", _));
-  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_length_ms", _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverTimingToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverTimingToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
 
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));

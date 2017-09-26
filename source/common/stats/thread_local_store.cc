@@ -86,6 +86,14 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+std::vector<Tag> ThreadLocalStoreImpl::getTagsForName(std::string& tag_extracted_name) {
+  std::vector<Tag> tags;
+  for (TagExtractor& tag_extractor : tag_extractors_) {
+    tag_extractor.updateTags(tag_extracted_name, tags);
+  }
+  return tags;
+}
+
 void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
@@ -134,7 +142,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    central_ref.reset(new CounterImpl(alloc.data_, alloc.free_));
+    std::string tag_extracted_name = final_name;
+    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    central_ref.reset(
+        new CounterImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   // If we have a TLS location to store or allocation into, do it.
@@ -146,7 +157,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   return *central_ref;
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string& name,
+void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Metric& histogram,
                                                               uint64_t value) {
   // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
   // This is because the sinks may end up trying to create new connections via the thread local
@@ -157,22 +168,20 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string&
     return;
   }
 
-  const std::string final_name = prefix_ + name;
   for (Sink& sink : parent_.timer_sinks_) {
-    sink.onHistogramComplete(final_name, value);
+    sink.onHistogramComplete(histogram, value);
   }
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverTimingToSinks(const std::string& name,
+void ThreadLocalStoreImpl::ScopeImpl::deliverTimingToSinks(const Metric& timer,
                                                            std::chrono::milliseconds ms) {
   // See comment in deliverHistogramToSinks() for why we guard this.
   if (parent_.shutting_down_) {
     return;
   }
 
-  const std::string final_name = prefix_ + name;
   for (Sink& sink : parent_.timer_sinks_) {
-    sink.onTimespanComplete(final_name, ms);
+    sink.onTimespanComplete(timer, ms);
   }
 }
 
@@ -193,7 +202,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    central_ref.reset(new GaugeImpl(alloc.data_, alloc.free_));
+    std::string tag_extracted_name = final_name;
+    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    central_ref.reset(
+        new GaugeImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {
@@ -219,7 +231,39 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   TimerSharedPtr& central_ref = central_cache_.timers_[final_name];
   if (!central_ref) {
-    central_ref.reset(new TimerImpl(final_name, parent_));
+    std::string tag_extracted_name = final_name;
+    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    central_ref.reset(
+        new TimerImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+  }
+
+  if (tls_ref) {
+    *tls_ref = central_ref;
+  }
+
+  return *central_ref;
+}
+
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
+  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+  // share this code so I'm leaving it largely duplicated for now.
+  std::string final_name = prefix_ + name;
+  HistogramSharedPtr* tls_ref = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
+  }
+
+  if (tls_ref && *tls_ref) {
+    return **tls_ref;
+  }
+
+  std::unique_lock<std::mutex> lock(parent_.lock_);
+  HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  if (!central_ref) {
+    std::string tag_extracted_name = final_name;
+    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    central_ref.reset(
+        new HistogramImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {

@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
@@ -19,21 +20,56 @@ class Instance;
 
 namespace Stats {
 
+struct Tag {
+  std::string name_;
+  std::string value_;
+};
+
+class TagExtractor {
+public:
+  virtual ~TagExtractor() {}
+
+  /**
+   * Identifier for this tag.
+   */
+  virtual std::string name() const PURE;
+
+  /**
+   * Updates the tag extracted name and the set of tags by extracting the tag represented by this
+   * TagExtractor. If the tag is not represented in the current tag_extracted_name, nothing will be
+   * modified.
+   * @param[in,out] tag_extracted_name name from which the tag will be removed if found to be
+   * represented in the name.
+   * @param[in,out] tags list of tags updated with the tag name and value if found in the
+   * tag_extracted_name.
+   */
+  virtual void updateTags(std::string& tag_extracted_name, std::vector<Tag>& tags) const PURE;
+};
+
+typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
+
+class Metric {
+public:
+  virtual ~Metric() {}
+  virtual std::string name() const PURE;
+  virtual const std::vector<Tag>& tags() const PURE;
+  virtual const std::string& tagExtractedName() const PURE;
+};
+
 /**
  * An always incrementing counter with latching capability. Each increment is added both to a
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter {
+class Counter : public Metric {
 public:
   virtual ~Counter() {}
   virtual void add(uint64_t amount) PURE;
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
-  virtual std::string name() PURE;
   virtual void reset() PURE;
-  virtual bool used() PURE;
-  virtual uint64_t value() PURE;
+  virtual bool used() const PURE;
+  virtual uint64_t value() const PURE;
 };
 
 typedef std::shared_ptr<Counter> CounterSharedPtr;
@@ -41,18 +77,17 @@ typedef std::shared_ptr<Counter> CounterSharedPtr;
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge {
+class Gauge : public Metric {
 public:
   virtual ~Gauge() {}
 
   virtual void add(uint64_t amount) PURE;
   virtual void dec() PURE;
   virtual void inc() PURE;
-  virtual std::string name() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
-  virtual bool used() PURE;
-  virtual uint64_t value() PURE;
+  virtual bool used() const PURE;
+  virtual uint64_t value() const PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
@@ -83,15 +118,24 @@ typedef std::unique_ptr<Timespan> TimespanPtr;
 /**
  * A timer that can capture timespans.
  */
-class Timer {
+class Timer : public Metric {
 public:
   virtual ~Timer() {}
 
   virtual TimespanPtr allocateSpan() PURE;
-  virtual std::string name() PURE;
+  virtual void recordDuration(std::chrono::milliseconds ms) PURE;
 };
 
 typedef std::shared_ptr<Timer> TimerSharedPtr;
+
+class Histogram : public Metric {
+public:
+  virtual ~Histogram() {}
+
+  virtual void recordValue(uint64_t value) PURE;
+};
+
+typedef std::shared_ptr<Histogram> HistogramSharedPtr;
 
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
@@ -109,12 +153,12 @@ public:
   /**
    * Flush a counter delta.
    */
-  virtual void flushCounter(const std::string& name, uint64_t delta) PURE;
+  virtual void flushCounter(const Metric& counter, uint64_t delta) PURE;
 
   /**
    * Flush a gauge value.
    */
-  virtual void flushGauge(const std::string& name, uint64_t value) PURE;
+  virtual void flushGauge(const Metric& gauge, uint64_t value) PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of
@@ -125,12 +169,12 @@ public:
   /**
    * Flush a histogram value.
    */
-  virtual void onHistogramComplete(const std::string& name, uint64_t value) PURE;
+  virtual void onHistogramComplete(const Metric& histogram, uint64_t value) PURE;
 
   /**
    * Flush a timespan value.
    */
-  virtual void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) PURE;
+  virtual void onTimespanComplete(const Metric& timespan, std::chrono::milliseconds ms) PURE;
 };
 
 typedef std::unique_ptr<Sink> SinkPtr;
@@ -157,12 +201,12 @@ public:
   /**
    * Deliver an individual histogram value to all registered sinks.
    */
-  virtual void deliverHistogramToSinks(const std::string& name, uint64_t value) PURE;
+  virtual void deliverHistogramToSinks(const Metric& histogram, uint64_t value) PURE;
 
   /**
    * Deliver an individual timespan completion to all registered sinks.
    */
-  virtual void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) PURE;
+  virtual void deliverTimingToSinks(const Metric& timer, std::chrono::milliseconds ms) PURE;
 
   /**
    * @return a counter within the scope's namespace.
@@ -178,6 +222,11 @@ public:
    * @return a timer within the scope's namespace.
    */
   virtual Timer& timer(const std::string& name) PURE;
+
+  /**
+   * @return a histogram within the scope's namespace.
+   */
+  virtual Histogram& histogram(const std::string& name) PURE;
 };
 
 /**
@@ -196,6 +245,8 @@ public:
   virtual std::list<GaugeSharedPtr> gauges() const PURE;
 };
 
+typedef std::unique_ptr<Store> StorePtr;
+
 /**
  * The root of the stat store.
  */
@@ -205,6 +256,11 @@ public:
    * Add a sink that is used for stat flushing.
    */
   virtual void addSink(Sink& sink) PURE;
+
+  /**
+   * Add an extractor to extract a portion of stats names as a tag.
+   */
+  virtual void addTagExtractor(TagExtractor& tag_extractor) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

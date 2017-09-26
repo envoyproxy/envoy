@@ -18,6 +18,7 @@ envoy_cc_test(
     name = "statsd_test",
     srcs = ["statsd_test.cc"],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:statsd_lib",
@@ -27,6 +28,7 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
@@ -39,6 +41,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:statsd_lib",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

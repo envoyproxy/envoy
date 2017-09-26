@@ -46,14 +46,14 @@ public:
 
   // Stats::Sink
   void beginFlush() override {}
-  void flushCounter(const std::string& name, uint64_t delta) override;
-  void flushGauge(const std::string& name, uint64_t value) override;
+  void flushCounter(const Metric& counter, uint64_t delta) override;
+  void flushGauge(const Metric& gauge, uint64_t value) override;
   void endFlush() override {}
-  void onHistogramComplete(const std::string& name, uint64_t value) override {
+  void onHistogramComplete(const Metric& histogram, uint64_t value) override {
     // For statsd histograms are just timers.
-    onTimespanComplete(name, std::chrono::milliseconds(value));
+    onTimespanComplete(histogram, std::chrono::milliseconds(value));
   }
-  void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) override;
+  void onTimespanComplete(const Metric& timer, std::chrono::milliseconds ms) override;
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
 
@@ -74,23 +74,23 @@ public:
   // Stats::Sink
   void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
 
-  void flushCounter(const std::string& name, uint64_t delta) override {
-    tls_->getTyped<TlsSink>().flushCounter(name, delta);
+  void flushCounter(const Metric& counter, uint64_t delta) override {
+    tls_->getTyped<TlsSink>().flushCounter(counter.name(), delta);
   }
 
-  void flushGauge(const std::string& name, uint64_t value) override {
-    tls_->getTyped<TlsSink>().flushGauge(name, value);
+  void flushGauge(const Metric& gauge, uint64_t value) override {
+    tls_->getTyped<TlsSink>().flushGauge(gauge.name(), value);
   }
 
   void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 
-  void onHistogramComplete(const std::string& name, uint64_t value) override {
+  void onHistogramComplete(const Metric& histogram, uint64_t value) override {
     // For statsd histograms are just timers.
-    onTimespanComplete(name, std::chrono::milliseconds(value));
+    onTimespanComplete(histogram, std::chrono::milliseconds(value));
   }
 
-  void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms) override {
-    tls_->getTyped<TlsSink>().onTimespanComplete(name, ms);
+  void onTimespanComplete(const Metric& timer, std::chrono::milliseconds ms) override {
+    tls_->getTyped<TlsSink>().onTimespanComplete(timer.name(), ms);
   }
 
 private:

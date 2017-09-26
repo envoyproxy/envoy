@@ -73,6 +73,9 @@ void ValidationInstance::initialize(Options& options,
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
     Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
+
+  initializeStatsTags(bootstrap);
+
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(
@@ -102,6 +105,32 @@ void ValidationInstance::shutdown() {
   thread_local_.shutdownGlobalThreading();
   config_->clusterManager().shutdown();
   thread_local_.shutdownThread();
+}
+
+void ValidationInstance::initializeStatsTags(const envoy::api::v2::Bootstrap& bootstrap) {
+  // Ensure no tag names are repeated.
+  std::unordered_set<std::string> names;
+  auto add_tag = [&names, this](const std::string& name, const std::string& regex) {
+    if (!names.emplace(name).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
+    }
+
+    tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(name, regex));
+  };
+
+  // Add defaults.
+  if (!bootstrap.stats_config().has_use_all_default_tags() ||
+      bootstrap.stats_config().use_all_default_tags().value()) {
+    for (const std::pair<std::string, std::string>& default_tag :
+         Config::TagNames::get().regex_map_) {
+      add_tag(default_tag.first, default_tag.second);
+    }
+  }
+
+  // Add custom tags.
+  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
+    add_tag(tag_specifier.tag_name(), tag_specifier.regex());
+  }
 }
 
 } // namespace Server
