@@ -902,8 +902,8 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     const auto hash_policy = config.route(headers, 0)->routeEntry()->hashPolicy();
-    uint64_t hash_1 = hash_policy->generateHash("1.2.3.4", headers).value();
-    uint64_t hash_2 = hash_policy->generateHash("4.3.2.1", headers).value();
+    const uint64_t hash_1 = hash_policy->generateHash("1.2.3.4", headers).value();
+    const uint64_t hash_2 = hash_policy->generateHash("4.3.2.1", headers).value();
     EXPECT_NE(hash_1, hash_2);
   }
   {
