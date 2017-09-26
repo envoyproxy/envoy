@@ -143,7 +143,8 @@ private:
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&) const override {}
+    void finalizeRequestHeaders(Http::HeaderMap&,
+                                const Http::AccessLog::RequestInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;

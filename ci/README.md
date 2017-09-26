@@ -92,7 +92,7 @@ build_container.sh locally and then run:
 ```bash
 DISTRO=ubuntu
 cd ci/build_container
-LINUX_DISTRO="${DISTRO}" TRAVIS_COMMIT=my_tag ./docker_build.sh  # Wait patiently for quite some time
+LINUX_DISTRO="${DISTRO}" CIRCLE_SHA1=my_tag ./docker_build.sh  # Wait patiently for quite some time
 cd ../..
 IMAGE_NAME="lyft/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
 ```
