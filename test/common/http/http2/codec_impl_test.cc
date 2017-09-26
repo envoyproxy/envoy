@@ -648,6 +648,20 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
+// For issue #1421 regression test that Envoy's H2 codec applies header limits early.
+TEST_P(Http2CodecImplTest, TestCodecHeaderLimits) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string long_string = std::string(1024, 'q');
+  for (int i = 0; i < 63; ++i) {
+    request_headers.addCopy(fmt::format("{}", i), long_string);
+  }
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_));
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
