@@ -36,7 +36,7 @@ An example basic invocation to build a developer version of the Envoy static bin
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-The build image default to `lyft/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment,
+The build image defaults to `lyft/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment,
 e.g. to use the `lyft/envoy-build-centos` image you can run:
 
 ```bash
