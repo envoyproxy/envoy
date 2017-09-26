@@ -327,6 +327,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   }
   // Close the connection.
   fake_upstream_connection_->close();
+  fake_upstream_connection_->waitForDisconnect();
   // Ensure the streams are all reset successfully.
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {
