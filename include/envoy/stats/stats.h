@@ -20,6 +20,9 @@ class Instance;
 
 namespace Stats {
 
+/**
+ * General representation of a tag.
+ */
 struct Tag {
   std::string name_;
   std::string value_;
@@ -48,11 +51,25 @@ public:
 
 typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
 
+/**
+ * General interface for all stats objects.
+ */
 class Metric {
 public:
   virtual ~Metric() {}
+  /**
+   * Returns the full name of the Metric.
+   */
   virtual std::string name() const PURE;
+
+  /**
+   * Returns a vector of configurable tags to identify this Metric.
+   */
   virtual const std::vector<Tag>& tags() const PURE;
+
+  /**
+   * Returns the name of the Metric with the portions designated as tags removed.
+   */
   virtual const std::string& tagExtractedName() const PURE;
 };
 
@@ -128,6 +145,9 @@ public:
 
 typedef std::shared_ptr<Timer> TimerSharedPtr;
 
+/**
+ * A histogram that captures values one at a time.
+ */
 class Histogram : public Metric {
 public:
   virtual ~Histogram() {}
