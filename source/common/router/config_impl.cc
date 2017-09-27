@@ -115,7 +115,8 @@ HashPolicyImpl::HashPolicyImpl(
       }
       break;
     default:
-      ASSERT(false);
+      throw EnvoyException(
+          fmt::format("Unsupported hash policy {}", hash_policy.policy_specifier_case()));
     }
   }
 }
