@@ -918,15 +918,9 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
 TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  auto route = route_config_.mutable_virtual_hosts(0)
-      ->mutable_routes(0)
-      ->mutable_route();
-  route->add_hash_policy()
-      ->mutable_header()
-      ->set_header_name("foo_header");
-  route->add_hash_policy()
-      ->mutable_connection_properties()
-      ->set_source_ip(true);
+  auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
+  route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
   ConfigImpl config(route_config_, runtime, cm, true);
 
   EXPECT_FALSE(config.usesRuntime());
@@ -958,7 +952,6 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   EXPECT_NE(hash_ip, hash_both);
   EXPECT_NE(hash_h, hash_both);
 }
-
 
 TEST(RouteMatcherTest, ClusterHeader) {
   std::string json = R"EOF(
