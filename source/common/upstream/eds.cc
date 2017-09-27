@@ -58,12 +58,11 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                      cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    const std::string& zone = locality_lb_endpoint.locality().zone();
-
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       new_hosts.emplace_back(new HostImpl(
           info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()),
-          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(), zone));
+          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
+          locality_lb_endpoint.locality()));
     }
   }
 
@@ -80,7 +79,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       std::map<std::string, std::vector<HostSharedPtr>> hosts_per_zone;
 
       for (const HostSharedPtr& host : *current_hosts_copy) {
-        hosts_per_zone[host->zone()].push_back(host);
+        hosts_per_zone[host->locality().zone()].push_back(host);
       }
 
       // Populate per_zone hosts only if upstream cluster has hosts in the same zone.

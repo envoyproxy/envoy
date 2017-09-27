@@ -84,9 +84,10 @@ public:
   virtual const HostStats& stats() const PURE;
 
   /**
-   * @return the "zone" of the host (deployment specific). Empty is unknown.
+   * @return the locality of the host (deployment specific). This will be the default instance if
+   *         unknown.
    */
-  virtual const std::string& zone() const PURE;
+  virtual const envoy::api::v2::Locality& locality() const PURE;
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
