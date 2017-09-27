@@ -71,20 +71,27 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
 
 HashPolicyImpl::HashPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy)
-    : header_name_(hash_policy[0].header().header_name()) {
+    : header_name_(hash_policy[0].header().header_name()),
+      hash_ip_(hash_policy[0].connection_properties().source_ip()) {
   // TODO(htuch): Add support for multiple hash policies, #1422.
   ASSERT(hash_policy.size() == 1);
-  // TODO(htuch): Add support for cookie and source IP hash policies, #1295 and
-  // #1296.
+  // TODO(htuch): Add support for cookie hash policies, #1295
   ASSERT(hash_policy[0].policy_specifier_case() ==
-         envoy::api::v2::RouteAction::HashPolicy::kHeader);
+             envoy::api::v2::RouteAction::HashPolicy::kHeader ||
+         hash_policy[0].policy_specifier_case() ==
+             envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties);
 }
 
-Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) const {
+Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
+                                                const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
-  const Http::HeaderEntry* header = headers.get(header_name_);
-  if (header) {
-    hash.value(HashUtil::xxHash64(header->value().c_str()));
+  if (!header_name_.get().empty()) {
+    const Http::HeaderEntry* header = headers.get(header_name_);
+    if (header) {
+      hash.value(HashUtil::xxHash64(header->value().c_str()));
+    }
+  } else if (hash_ip_ && !downstream_addr.empty()) {
+    hash.value(HashUtil::xxHash64(downstream_addr));
   }
   return hash;
 }

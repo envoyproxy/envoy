@@ -129,7 +129,7 @@ public:
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
-        return hash_policy->generateHash(*downstream_headers_);
+        return hash_policy->generateHash(callbacks_->downstreamAddress(), *downstream_headers_);
       }
     }
     return {};

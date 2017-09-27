@@ -8,6 +8,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -803,8 +804,10 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   }
 }
 
-TEST(RouterMatcherTest, HashPolicy) {
-  std::string json = R"EOF(
+class RouterMatcherHashPolicyTest : public testing::Test {
+public:
+  RouterMatcherHashPolicyTest() {
+    std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -813,10 +816,7 @@ TEST(RouterMatcherTest, HashPolicy) {
       "routes": [
         {
           "prefix": "/foo",
-          "cluster": "foo",
-          "hash_policy": {
-            "header_name": "foo_header"
-          }
+          "cluster": "foo"
         },
         {
           "prefix": "/bar",
@@ -827,23 +827,86 @@ TEST(RouterMatcherTest, HashPolicy) {
   ]
 }
   )EOF";
+    route_config_ = parseRouteConfigurationFromJson(json);
+  }
 
+  envoy::api::v2::RouteConfiguration route_config_;
+};
+
+TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+  route_config_.mutable_virtual_hosts(0)
+      ->mutable_routes(0)
+      ->mutable_route()
+      ->add_hash_policy()
+      ->mutable_header()
+      ->set_header_name("foo_header");
+  ConfigImpl config(route_config_, runtime, cm, true);
 
   EXPECT_FALSE(config.usesRuntime());
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config.route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
+  }
+}
+
+TEST_F(RouterMatcherHashPolicyTest, HashIp) {
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  route_config_.mutable_virtual_hosts(0)
+      ->mutable_routes(0)
+      ->mutable_route()
+      ->add_hash_policy()
+      ->mutable_connection_properties()
+      ->set_source_ip(true);
+  ConfigImpl config(route_config_, runtime, cm, true);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers).valid());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    uint64_t old_hash = config.route(headers, 0)
+                            ->routeEntry()
+                            ->hashPolicy()
+                            ->generateHash("1.2.3.4", headers)
+                            .value();
+    headers.addCopy("foo_header", "bar");
+    EXPECT_EQ(old_hash, config.route(headers, 0)
+                            ->routeEntry()
+                            ->hashPolicy()
+                            ->generateHash("1.2.3.4", headers)
+                            .value());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    const auto hash_policy = config.route(headers, 0)->routeEntry()->hashPolicy();
+    const uint64_t hash_1 = hash_policy->generateHash("1.2.3.4", headers).value();
+    const uint64_t hash_2 = hash_policy->generateHash("4.3.2.1", headers).value();
+    EXPECT_NE(hash_1, hash_2);
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
