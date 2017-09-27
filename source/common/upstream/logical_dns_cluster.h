@@ -50,7 +50,8 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, envoy::api::v2::Metadata::default_instance(), 1, ""),
+        : HostImpl(cluster, hostname, address, envoy::api::v2::Metadata::default_instance(), 1,
+                   envoy::api::v2::Locality()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -79,7 +80,9 @@ private:
     const HostStats& stats() const override { return logical_host_->stats(); }
     const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-    const std::string& zone() const override { return EMPTY_STRING; }
+    const envoy::api::v2::Locality& locality() const override {
+      return envoy::api::v2::Locality().default_instance();
+    }
 
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;

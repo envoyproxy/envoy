@@ -41,7 +41,8 @@ public:
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRefOfCopy(local_info_.zoneName()));
+    ON_CALL(*cm_.conn_pool_.host_, locality())
+        .WillByDefault(ReturnRefOfCopy(envoy::api::v2::Locality()));
   }
 
   void expectSuccess(uint64_t code) {
