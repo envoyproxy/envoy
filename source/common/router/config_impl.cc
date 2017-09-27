@@ -69,29 +69,69 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   runtime_key_ = config.request_mirror_policy().runtime_key();
 }
 
+class HeaderHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
+
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+    Optional<uint64_t> hash;
+
+    const Http::HeaderEntry* header = headers.get(header_name_);
+    if (header) {
+      hash.value(HashUtil::xxHash64(header->value().c_str()));
+    }
+    return hash;
+  }
+
+private:
+  const Http::LowerCaseString header_name_;
+};
+
+class IpHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  Optional<uint64_t> evaluate(const std::string& downstream_addr,
+                              const Http::HeaderMap&) const override {
+    Optional<uint64_t> hash;
+    if (!downstream_addr.empty()) {
+      hash.value(HashUtil::xxHash64(downstream_addr));
+    }
+    return hash;
+  }
+};
+
 HashPolicyImpl::HashPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy)
-    : header_name_(hash_policy[0].header().header_name()),
-      hash_ip_(hash_policy[0].connection_properties().source_ip()) {
-  // TODO(htuch): Add support for multiple hash policies, #1422.
-  ASSERT(hash_policy.size() == 1);
+    const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policies) {
   // TODO(htuch): Add support for cookie hash policies, #1295
-  ASSERT(hash_policy[0].policy_specifier_case() ==
-             envoy::api::v2::RouteAction::HashPolicy::kHeader ||
-         hash_policy[0].policy_specifier_case() ==
-             envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties);
+  hash_impls_.reserve(hash_policies.size());
+
+  for (auto& hash_policy : hash_policies) {
+    switch (hash_policy.policy_specifier_case()) {
+    case envoy::api::v2::RouteAction::HashPolicy::kHeader:
+      hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
+      break;
+    case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
+      if (hash_policy.connection_properties().source_ip()) {
+        hash_impls_.emplace_back(new IpHashMethod());
+      }
+      break;
+    default:
+      throw EnvoyException(
+          fmt::format("Unsupported hash policy {}", hash_policy.policy_specifier_case()));
+    }
+  }
 }
 
 Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
                                                 const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
-  if (!header_name_.get().empty()) {
-    const Http::HeaderEntry* header = headers.get(header_name_);
-    if (header) {
-      hash.value(HashUtil::xxHash64(header->value().c_str()));
+  for (const HashMethodPtr& hash_impl : hash_impls_) {
+    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
+    if (new_hash.valid()) {
+      // Rotating the old value prevents duplicate hash rules from cancelling each other out
+      // and preserves all of the entropy
+      uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      hash.value(old_value ^ new_hash.value());
     }
-  } else if (hash_ip_ && !downstream_addr.empty()) {
-    hash.value(HashUtil::xxHash64(downstream_addr));
   }
   return hash;
 }
