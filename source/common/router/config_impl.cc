@@ -127,8 +127,10 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_ad
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
     if (new_hash.valid()) {
-      hash.value(hash.valid() ? (((hash.value() << 1) | (hash.value() >> 63)) ^ new_hash.value())
-                              : new_hash.value());
+      // Rotating the old value prevents duplicate hash rules from cancelling each other out
+      // and preserves all of the entropy
+      uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      hash.value(old_value ^ new_hash.value());
     }
   }
   return hash;
