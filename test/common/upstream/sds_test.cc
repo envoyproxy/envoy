@@ -161,7 +161,7 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   HostSharedPtr canary_host = findHost("10.0.16.43");
   EXPECT_TRUE(canary_host->canary());
-  EXPECT_EQ("us-east-1d", canary_host->zone());
+  EXPECT_EQ("us-east-1d", canary_host->locality().zone());
   EXPECT_EQ(40U, canary_host->weight());
   EXPECT_EQ(90UL, cluster_->info()->stats().max_host_weight_.value());
 
@@ -181,7 +181,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(canary_host, findHost("10.0.16.43"));
   EXPECT_TRUE(canary_host->canary());
-  EXPECT_EQ("us-east-1d", canary_host->zone());
+  EXPECT_EQ("us-east-1d", canary_host->locality().zone());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());

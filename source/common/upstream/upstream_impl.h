@@ -51,13 +51,15 @@ class HostDescriptionImpl : virtual public HostDescription {
 public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr dest_address,
-                      const envoy::api::v2::Metadata& metadata, const std::string& zone)
+                      const envoy::api::v2::Metadata& metadata,
+                      const envoy::api::v2::Locality& locality)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(metadata),
-        zone_(zone), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
+        metadata_(metadata), locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
+                                                                        POOL_GAUGE(stats_store_))} {
+  }
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -84,7 +86,7 @@ public:
   const HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::string& zone() const override { return zone_; }
+  const envoy::api::v2::Locality& locality() const override { return locality_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -92,7 +94,7 @@ protected:
   Network::Address::InstanceConstSharedPtr address_;
   const bool canary_;
   const envoy::api::v2::Metadata metadata_;
-  const std::string zone_;
+  const envoy::api::v2::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
@@ -109,8 +111,8 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::Metadata& metadata, uint32_t initial_weight,
-           const std::string& zone)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, zone), used_(true) {
+           const envoy::api::v2::Locality& locality)
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality), used_(true) {
     weight(initial_weight);
   }
 
