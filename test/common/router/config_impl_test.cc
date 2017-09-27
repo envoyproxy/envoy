@@ -948,9 +948,40 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
     headers.addCopy("foo_header", "bar");
     hash_both = route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value();
   }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
+    headers.addCopy("foo_header", "bar");
+    // stability
+    EXPECT_EQ(hash_both,
+              route->routeEntry()->hashPolicy()->generateHash("4.2.1.3", headers).value());
+  }
   EXPECT_NE(hash_ip, hash_h);
   EXPECT_NE(hash_ip, hash_both);
   EXPECT_NE(hash_h, hash_both);
+}
+
+TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  {
+    auto hash_policy = route_config_.mutable_virtual_hosts(0)
+                           ->mutable_routes(0)
+                           ->mutable_route()
+                           ->add_hash_policy();
+    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+              hash_policy->policy_specifier_case());
+    EXPECT_THROW({ ConfigImpl config(route_config_, runtime, cm, true); }, EnvoyException);
+  }
+  {
+    auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
+    route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
+    auto hash_policy = route->add_hash_policy();
+    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+              hash_policy->policy_specifier_case());
+    EXPECT_THROW({ ConfigImpl config(route_config_, runtime, cm, true); }, EnvoyException);
+  }
 }
 
 TEST(RouteMatcherTest, ClusterHeader) {
