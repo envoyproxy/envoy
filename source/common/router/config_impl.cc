@@ -73,8 +73,6 @@ class HeaderHashImpl : public HashPolicyImpl::HashImpl {
 public:
   HeaderHashImpl(const std::string& header_name) : header_name_(header_name) {}
 
-  ~HeaderHashImpl() override {}
-
   Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
     Optional<uint64_t> hash;
 
@@ -91,10 +89,6 @@ private:
 
 class IpHashImpl : public HashPolicyImpl::HashImpl {
 public:
-  IpHashImpl() {}
-
-  ~IpHashImpl() override {}
-
   Optional<uint64_t> evaluate(const std::string& downstream_addr,
                               const Http::HeaderMap&) const override {
     Optional<uint64_t> hash;
