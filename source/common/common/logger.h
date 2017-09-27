@@ -222,6 +222,6 @@ protected:
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
 
-// TODO(danielhochman): macro(s) for simple logging of structures that support iteration
+// TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 } // namespace Envoy
