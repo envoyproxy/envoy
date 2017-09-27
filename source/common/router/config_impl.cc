@@ -127,7 +127,8 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_ad
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
     if (new_hash.valid()) {
-      hash.value(hash.valid() ? (hash.value() ^ new_hash.value()) : new_hash.value());
+      hash.value(hash.valid() ? (((hash.value() << 1) | (hash.value() >> 63)) ^ new_hash.value())
+                              : new_hash.value());
     }
   }
   return hash;
