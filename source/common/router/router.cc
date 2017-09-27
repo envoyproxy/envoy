@@ -106,7 +106,8 @@ const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr 
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
+                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                bool dropped) {
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -147,14 +148,28 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
       Http::CodeUtility::chargeResponseStat(info);
     }
+
+    if (upstream_host) {
+      const uint64_t response_code = Http::Utility::getResponseStatus(info.response_headers_);
+      if (dropped) {
+        upstream_host->stats().rq_dropped_.inc();
+      } else if (response_code == 200) {
+        // TODO(htuch): When Envoy has first class support for gRPC on the data plane, we should
+        // consider interpreting grpc-status here to drive success/errror stats.
+        upstream_host->stats().rq_success_.inc();
+      } else {
+        upstream_host->stats().rq_error_.inc();
+      }
+    }
   }
 }
 
 void Filter::chargeUpstreamCode(Http::Code code,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
+                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                bool dropped) {
   Http::HeaderMapImpl fake_response_headers{
       {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
-  chargeUpstreamCode(fake_response_headers, upstream_host);
+  chargeUpstreamCode(fake_response_headers, upstream_host, dropped);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
@@ -214,7 +229,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
-    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
+    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
     Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
                                   "maintenance mode");
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
@@ -277,7 +292,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
+  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
                                 "no healthy upstream");
 }
@@ -452,7 +467,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    chargeUpstreamCode(code, upstream_host);
+    chargeUpstreamCode(code, upstream_host,
+                       reset_reason.valid() &&
+                           reset_reason.value() == Http::StreamResetReason::Overflow);
     Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
   }
 }
@@ -518,7 +535,7 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   upstream_request_->upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       upstream_request_->upstream_host_->canary();
-  chargeUpstreamCode(*headers, upstream_request_->upstream_host_);
+  chargeUpstreamCode(*headers, upstream_request_->upstream_host_, false);
 
   downstream_response_started_ = true;
   if (end_stream) {

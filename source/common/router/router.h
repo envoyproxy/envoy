@@ -228,8 +228,9 @@ private:
 
   static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                          Upstream::HostDescriptionConstSharedPtr upstream_host);
-  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host);
+                          Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
+                          bool dropped);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
