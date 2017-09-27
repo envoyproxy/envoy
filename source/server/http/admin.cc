@@ -164,8 +164,12 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
                                Upstream::HostUtility::healthFlagsToString(*host)));
       response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
                                host->address()->asString(), host->weight()));
+      response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
+                               host->address()->asString(), host->locality().region()));
       response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->zone()));
+                               host->address()->asString(), host->locality().zone()));
+      response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
+                               host->address()->asString(), host->locality().sub_zone()));
       response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                host->address()->asString(), host->canary()));
       response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),

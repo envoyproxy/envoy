@@ -23,8 +23,11 @@ namespace Upstream {
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
+  envoy::api::v2::Locality locality;
+  locality.set_zone(zone);
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                                    envoy::api::v2::Metadata::default_instance(), weight, zone)};
+                                    envoy::api::v2::Metadata::default_instance(), weight,
+                                    locality)};
 }
 
 /**
@@ -67,7 +70,7 @@ public:
     std::map<std::string, uint32_t> hits;
     for (uint32_t i = 0; i < total_number_of_requests; ++i) {
       HostSharedPtr from_host = selectOriginatingHost(*originating_hosts);
-      uint32_t from_zone = atoi(from_host->zone().c_str());
+      uint32_t from_zone = atoi(from_host->locality().zone().c_str());
 
       // Populate host set for upstream cluster.
       HostListsSharedPtr per_zone_upstream(new std::vector<std::vector<HostSharedPtr>>());
