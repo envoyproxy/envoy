@@ -75,7 +75,7 @@ inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSha
                                                              const std::string& url) {
   return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
       cluster, "", Network::Utility::resolveUrl(url), envoy::api::v2::Metadata::default_instance(),
-      envoy::api::v2::Locality())};
+      envoy::api::v2::Locality().default_instance())};
 }
 
 } // namespace

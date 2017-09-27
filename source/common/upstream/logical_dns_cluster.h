@@ -51,7 +51,7 @@ private:
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
         : HostImpl(cluster, hostname, address, envoy::api::v2::Metadata::default_instance(), 1,
-                   envoy::api::v2::Locality()),
+                   envoy::api::v2::Locality().default_instance()),
           parent_(parent) {}
 
     // Upstream::Host
