@@ -347,12 +347,14 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   // Verify that server sent list with 2 acceptable client certificate CA names.
   Ssl::ConnectionImpl* ssl_connection =
       dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
-  SSL_set_cert_cb(ssl_connection->rawSslForTest(), [](SSL* ssl, void*) -> int {
-    STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
-    EXPECT_NE(nullptr, list);
-    EXPECT_EQ(2U, sk_X509_NAME_num(list));
-    return 1;
-  }, nullptr);
+  SSL_set_cert_cb(ssl_connection->rawSslForTest(),
+                  [](SSL* ssl, void*) -> int {
+                    STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
+                    EXPECT_NE(nullptr, list);
+                    EXPECT_EQ(2U, sk_X509_NAME_num(list));
+                    return 1;
+                  },
+                  nullptr);
 
   client_connection->connect();
 
@@ -420,8 +422,8 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
   EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn)
-                           -> void { server_connection = std::move(conn); }));
+      .WillOnce(Invoke(
+          [&](Network::ConnectionPtr& conn) -> void { server_connection = std::move(conn); }));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -839,15 +841,15 @@ public:
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _))
         .Times(2)
-        .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high)
-                             -> Buffer::Instance* {
-                               client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
-                               return client_write_buffer;
-                             }))
-        .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high)
-                                   -> Buffer::Instance* {
-                                     return new Buffer::WatermarkBuffer(below_low, above_high);
-                                   }));
+        .WillOnce(Invoke([&](std::function<void()> below_low,
+                             std::function<void()> above_high) -> Buffer::Instance* {
+          client_write_buffer = new MockWatermarkBuffer(below_low, above_high);
+          return client_write_buffer;
+        }))
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high);
+        }));
 
     initialize(read_buffer_limit);
 
@@ -874,11 +876,10 @@ public:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
-    EXPECT_CALL(*client_write_buffer, drain(_))
-        .WillOnce(Invoke([&](uint64_t n) -> void {
-          client_write_buffer->baseDrain(n);
-          dispatcher_->exit();
-        }));
+    EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
+      client_write_buffer->baseDrain(n);
+      dispatcher_->exit();
+    }));
     client_connection_->write(buffer_to_write);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);

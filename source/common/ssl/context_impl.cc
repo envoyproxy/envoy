@@ -379,8 +379,8 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     SSL_CTX_set_alpn_select_cb(ctx_.get(),
                                [](SSL*, const unsigned char** out, unsigned char* outlen,
                                   const unsigned char* in, unsigned int inlen, void* arg) -> int {
-                                 return static_cast<ServerContextImpl*>(arg)
-                                     ->alpnSelectCallback(out, outlen, in, inlen);
+                                 return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
+                                     out, outlen, in, inlen);
                                },
                                this);
   }
@@ -410,14 +410,15 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
       pos += dst_key.hmac_key.size();
       ASSERT(src_key.begin() + pos == src_key.end());
     }
-    SSL_CTX_set_tlsext_ticket_key_cb(ctx_.get(), [](SSL* ssl, uint8_t* key_name, uint8_t* iv,
-                                                    EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
-                                                    int encrypt) -> int {
-      ContextImpl* context_impl =
-          static_cast<ContextImpl*>(SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), ssl_context_index_));
-      return dynamic_cast<ServerContextImpl*>(context_impl)
-          ->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
-    });
+    SSL_CTX_set_tlsext_ticket_key_cb(
+        ctx_.get(),
+        [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
+           int encrypt) -> int {
+          ContextImpl* context_impl = static_cast<ContextImpl*>(
+              SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), ssl_context_index_));
+          return dynamic_cast<ServerContextImpl*>(context_impl)
+              ->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+        });
   }
 
   uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
