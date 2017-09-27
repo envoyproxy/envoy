@@ -144,7 +144,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
       .WillOnce(Return(Optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
       .WillOnce(
@@ -168,7 +168,7 @@ TEST_F(RouterTest, HashPolicy) {
 TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
       .WillOnce(Return(Optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, &router_))
       .WillOnce(
