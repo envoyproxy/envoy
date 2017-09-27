@@ -146,8 +146,9 @@ private:
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
-        : parent_(parent), conn_pool_(pool), calling_encode_headers_(false),
-          upstream_canary_(false), encode_complete_(false), encode_trailers_(false) {}
+        : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
+          calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
+          encode_trailers_(false) {}
 
     ~UpstreamRequest();
 
@@ -205,6 +206,7 @@ private:
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
+    bool grpc_rq_success_deferred_;
     Event::TimerPtr per_try_timeout_;
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
     Http::StreamEncoder* request_encoder_{};
@@ -263,6 +265,7 @@ private:
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
+  bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;

@@ -6,6 +6,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -16,6 +17,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -153,11 +155,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
       const uint64_t response_code = Http::Utility::getResponseStatus(info.response_headers_);
       if (dropped) {
         upstream_host->stats().rq_dropped_.inc();
-      } else if (response_code == 200) {
-        // TODO(htuch): When Envoy has first class support for gRPC on the data plane, we should
-        // consider interpreting grpc-status here to drive success/errror stats.
-        upstream_host->stats().rq_success_.inc();
-      } else {
+      } else if (Http::CodeUtility::is5xx(response_code)) {
         upstream_host->stats().rq_error_.inc();
       }
     }
@@ -276,6 +274,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Host());
   ASSERT(headers.Path());
 
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  grpc_request_ = content_type != nullptr &&
+                  Http::Headers::get().ContentTypeValues.Grpc == content_type->value().c_str();
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
@@ -450,6 +451,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
     callbacks_->resetStream();
+    if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
   } else {
     Http::Code code;
     const char* body;
@@ -536,6 +540,16 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       upstream_request_->upstream_host_->canary();
   chargeUpstreamCode(*headers, upstream_request_->upstream_host_, false);
+  // We need to defer gRPC success until after we have processed
+  // grpc-status in the trailers.
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  if (!Http::CodeUtility::is5xx(response_code)) {
+    if (grpc_request_ && !end_stream) {
+      upstream_request_->grpc_rq_success_deferred_ = true;
+    } else {
+      upstream_request_->upstream_host_->stats().rq_success_.inc();
+    }
+  }
 
   downstream_response_started_ = true;
   if (end_stream) {
@@ -548,6 +562,10 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     onUpstreamComplete();
+    // gRPC request termination without trailers is an error.
+    if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
   }
 
   callbacks_->encodeData(data, end_stream);
@@ -556,6 +574,15 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   onUpstreamComplete();
   callbacks_->encodeTrailers(std::move(trailers));
+  if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+    Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
+    if (grpc_status.valid() && grpc_status.value() != Grpc::Status::GrpcStatus::Internal &&
+        grpc_status.value() != Grpc::Status::GrpcStatus::Unavailable) {
+      upstream_request_->upstream_host_->stats().rq_success_.inc();
+    } else {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
+  }
 }
 
 void Filter::onUpstreamComplete() {
