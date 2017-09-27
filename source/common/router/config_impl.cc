@@ -90,13 +90,18 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key) : key_(key) {}
+  CookieHashMethod(const std::string& key, long ttl_seconds) : key_(key), ttl_(ttl_seconds) {}
 
   Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback) const override {
+                              const HashPolicy::AddCookieCallback add_cookie) const override {
     Optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
-    if (!value.empty()) {
+
+    if (value.empty() && ttl_ != 0) {
+      value = add_cookie(key_, ttl_);
+      hash.value(HashUtil::xxHash64(value));
+
+    } else if (!value.empty()) {
       hash.value(HashUtil::xxHash64(value));
     }
     return hash;
@@ -104,6 +109,7 @@ public:
 
 private:
   const std::string key_;
+  const long ttl_;
 };
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
@@ -129,7 +135,8 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
     case envoy::api::v2::RouteAction::HashPolicy::kCookie:
-      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name()));
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
       break;
     case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
