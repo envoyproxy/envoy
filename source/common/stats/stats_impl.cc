@@ -42,14 +42,18 @@ void TagExtractorImpl::updateTags(std::string& tag_extracted_name, std::vector<T
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(tag_extracted_name, match, regex_) && match.size() > 1) {
-    auto& remove_subexpr = match[1];
-    auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
-    tag_extracted_name = std::string(match.prefix().first, remove_subexpr.first)
-                             .append(remove_subexpr.second, match.suffix().second);
-    Tag tag;
+    const auto& remove_subexpr = match[1];
+    const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
+
+    tags.emplace_back();
+    Tag& tag = tags.back();
     tag.name_ = name_;
     tag.value_ = value_subexpr.str();
-    tags.push_back(tag);
+
+    // This call invalidates match and all derived objects because they contain references to
+    // tag_extracted_name.
+    tag_extracted_name = std::string(match.prefix().first, remove_subexpr.first)
+                             .append(remove_subexpr.second, match.suffix().second);
   }
 }
 
