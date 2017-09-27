@@ -69,9 +69,9 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   runtime_key_ = config.request_mirror_policy().runtime_key();
 }
 
-class HeaderHashImpl : public HashPolicyImpl::HashImpl {
+class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  HeaderHashImpl(const std::string& header_name) : header_name_(header_name) {}
+  HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
   Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
     Optional<uint64_t> hash;
@@ -87,7 +87,7 @@ private:
   Http::LowerCaseString header_name_;
 };
 
-class IpHashImpl : public HashPolicyImpl::HashImpl {
+class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   Optional<uint64_t> evaluate(const std::string& downstream_addr,
                               const Http::HeaderMap&) const override {
@@ -107,11 +107,11 @@ HashPolicyImpl::HashPolicyImpl(
   for (auto& hash_policy : hash_policies) {
     switch (hash_policy.policy_specifier_case()) {
     case envoy::api::v2::RouteAction::HashPolicy::kHeader:
-      hash_impls_.emplace_back(new HeaderHashImpl(hash_policy.header().header_name()));
+      hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
     case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
-        hash_impls_.emplace_back(new IpHashImpl());
+        hash_impls_.emplace_back(new IpHashMethod());
       }
       break;
     default:
@@ -123,7 +123,7 @@ HashPolicyImpl::HashPolicyImpl(
 Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
                                                 const Http::HeaderMap& headers) const {
   Optional<uint64_t> hash;
-  for (const HashImplPtr& hash_impl : hash_impls_) {
+  for (const HashMethodPtr& hash_impl : hash_impls_) {
     Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
     if (new_hash.valid()) {
       hash.value(hash.valid() ? (hash.value() ^ new_hash.value()) : new_hash.value());

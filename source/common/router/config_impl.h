@@ -201,17 +201,17 @@ public:
   Optional<uint64_t> generateHash(const std::string& downstream_addr,
                                   const Http::HeaderMap& headers) const override;
 
-  class HashImpl {
+  class HashMethod {
   public:
-    virtual ~HashImpl() {}
+    virtual ~HashMethod() {}
     virtual Optional<uint64_t> evaluate(const std::string& downstream_addr,
                                         const Http::HeaderMap& headers) const PURE;
   };
 
-  typedef std::unique_ptr<HashImpl> HashImplPtr;
+  typedef std::unique_ptr<HashMethod> HashMethodPtr;
 
 private:
-  std::vector<HashImplPtr> hash_impls_;
+  std::vector<HashMethodPtr> hash_impls_;
 };
 
 /**
