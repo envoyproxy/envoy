@@ -78,6 +78,11 @@ public:
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
+  ChildProcessPtr runProcess(const std::vector<std::string>& args,
+                             ProcessTerminationCb cb) override {
+    return ChildProcessPtr{runProcess_(args, cb)};
+  }
+
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD2(createClientConnection_,
@@ -107,6 +112,8 @@ public:
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
+  MOCK_METHOD2(runProcess_,
+               ChildProcess*(const std::vector<std::string>& args, ProcessTerminationCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
@@ -144,6 +151,31 @@ public:
 
   MOCK_METHOD1(activate, void(uint32_t events));
   MOCK_METHOD1(setEnabled, void(uint32_t events));
+};
+
+class MockOsSysCalls : public OsSysCalls {
+public:
+  MockOsSysCalls();
+  ~MockOsSysCalls();
+
+  int execvp(const char* file, char* const argv[]) override;
+
+  MOCK_METHOD0(fork, pid_t());
+  MOCK_METHOD2(execvp_, int(const char* file, const std::vector<const char*>& args));
+  MOCK_METHOD3(waitpid, pid_t(pid_t pid, OsSysCalls::WaitpidStatus& status, int options));
+  MOCK_METHOD2(kill, int(pid_t pid, int sig));
+  MOCK_METHOD1(_exit, void(int status));
+  MOCK_METHOD2(open, int(const char* pathname, int flags));
+  MOCK_METHOD2(dup2, int(int oldfd, int newfd));
+  MOCK_METHOD1(close, int(int fd));
+};
+
+class MockChildProcess : public ChildProcess {
+public:
+  MockChildProcess();
+  ~MockChildProcess();
+
+  MOCK_METHOD0(destructor, void());
 };
 
 } // namespace Event

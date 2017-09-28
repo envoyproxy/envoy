@@ -18,6 +18,61 @@ namespace Envoy {
 namespace Event {
 
 /**
+ * Class to manage child processes and termination signals.
+ */
+class ChildManager {
+public:
+  ChildManager(OsSysCallsPtr syscalls);
+
+  /**
+   * fork() and exec() the specified process with args.  Associate the child pid with
+   * the callback so the caller will be notified of termination.
+   *
+   * @see Dispatcher::runProcess() for parameters.
+   */
+  ChildProcessPtr run(const std::vector<std::string>& args, ProcessTerminationCb&& cb);
+
+  /**
+   * Tell the manager that a SIGCHLD was received and that it should ask the operating
+   * system which PID had an event.
+   */
+  void onSigChld();
+
+  /**
+   * Returns true iff pid is currently being watched for termination.
+   */
+  bool watched(pid_t pid) const { return processes_.find(pid) != processes_.end(); }
+
+  /**
+   * Returns the number of pids being watched.
+   */
+  size_t numWatched() const { return processes_.size(); }
+
+private:
+  /**
+   * Implementation of ChildProcess which causes a child process to be sent
+   * SIGTERM when it's destructor is called, unless the process already
+   * terminated.
+   */
+  struct ChildProcessImpl : public ChildProcess {
+    ChildProcessImpl(ChildManager& parent, pid_t pid) : parent_(parent), pid_(pid) {}
+    virtual ~ChildProcessImpl() { parent_.remove(pid_, this); }
+
+    ChildManager& parent_;
+    const pid_t pid_;
+  };
+
+  /**
+   * Remove pid from the set of watched processes and send the process
+   * SIGTERM if it is still running.
+   */
+  void remove(pid_t pid, ChildProcessImpl* cancellation);
+
+  OsSysCallsPtr syscalls_;
+  std::unordered_map<pid_t, std::pair<ProcessTerminationCb, ChildProcessImpl*>> processes_;
+};
+
+/**
  * libevent implementation of Event::Dispatcher.
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
@@ -57,6 +112,8 @@ public:
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
+  ChildProcessPtr runProcess(const std::vector<std::string>& args,
+                             ProcessTerminationCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
@@ -83,6 +140,8 @@ private:
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
   bool deferred_deleting_{};
+  ChildManager child_manager_;
+  Event::SignalEventPtr sigchld_;
 };
 
 } // namespace Event

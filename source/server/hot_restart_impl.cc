@@ -136,7 +136,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
-  int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+  int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
   sockaddr_un address = createDomainSocketAddress(id);
   int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (rc != 0) {

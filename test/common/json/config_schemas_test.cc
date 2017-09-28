@@ -22,7 +22,7 @@ std::vector<std::string> generateTestInputs() {
 
   std::string test_path = TestEnvironment::temporaryDirectory() + "/config_schemas_test";
   auto file_list = TestUtility::listFiles(test_path, false);
-  EXPECT_EQ(17, file_list.size());
+  EXPECT_EQ(19, file_list.size());
   return file_list;
 }
 
@@ -43,6 +43,8 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
     schema = Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA;
   } else if (schema_name == "CLUSTER_SCHEMA") {
     schema = Schema::CLUSTER_SCHEMA;
+  } else if (schema_name == "CLUSTER_HEALTH_CHECK_SCHEMA") {
+    schema = Schema::CLUSTER_HEALTH_CHECK_SCHEMA;
   } else if (schema_name == "TOP_LEVEL_CONFIG_SCHEMA") {
     schema = Schema::TOP_LEVEL_CONFIG_SCHEMA;
   } else {

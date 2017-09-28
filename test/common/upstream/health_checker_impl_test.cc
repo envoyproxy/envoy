@@ -25,6 +25,7 @@
 #include "gtest/gtest.h"
 
 using testing::DoAll;
+using testing::ElementsAreArray;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -32,6 +33,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrEq;
 using testing::WithArg;
 using testing::_;
 
@@ -1068,6 +1070,176 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
+class ShellCommandHealthCheckerImplTest : public testing::Test {
+public:
+  ShellCommandHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
+
+  void setupData() {
+    std::string json = R"EOF(
+    {
+      "type": "shell_command",
+      "timeout_ms": 1000,
+      "interval_ms": 1000,
+      "unhealthy_threshold": 1,
+      "healthy_threshold": 1,
+      "command": ["/path/to/command", "--address", "{address}", "--ip", "{ip}", "--port", "{port}", "--hostname", "{hostname}", "--formatted", "{ip}_{port}"]
+    }
+    )EOF";
+
+    health_checker_.reset(new ShellCommandHealthCheckerImpl(
+        *cluster_, parseHealthCheckFromJson(json), dispatcher_, runtime_, random_));
+  }
+
+  void expectSessionCreate() {
+    interval_timer_ = new Event::MockTimer(&dispatcher_);
+    timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  }
+
+  std::shared_ptr<MockCluster> cluster_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<ShellCommandHealthCheckerImpl> health_checker_;
+  Event::MockTimer* timeout_timer_{};
+  Event::MockTimer* interval_timer_{};
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+};
+
+TEST_F(ShellCommandHealthCheckerImplTest, ArgSubstitution) {
+  setupData();
+  cluster_->hosts_ = {
+      makeNamedTestHost(cluster_->info_, "hostname.test.com", "tcp://127.0.0.1:80")};
+  const std::string expected_args[] = {
+      "/path/to/command",  "--address",   "127.0.0.1:80", "--ip",
+      "127.0.0.1",         "--port",      "80",           "--hostname",
+      "hostname.test.com", "--formatted", "127.0.0.1_80"};
+  EXPECT_CALL(dispatcher_, runProcess_(ElementsAreArray(expected_args), _));
+  health_checker_->start();
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, ArgSubstitutionNoHostname) {
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  const testing::Matcher<std::string> expected_args[] = {
+      StrEq("/path/to/command"), _, _, _, _, _, _, StrEq("--hostname"), StrEq("127.0.0.1"), _, _};
+  EXPECT_CALL(dispatcher_, runProcess_(ElementsAreArray(expected_args), _));
+  health_checker_->start();
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, ArgSubstitutionIpv6) {
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://[1::2]:80")};
+  const testing::Matcher<std::string> expected_args[] = {StrEq("/path/to/command"),
+                                                         StrEq("--address"),
+                                                         StrEq("[1::2]:80"),
+                                                         StrEq("--ip"),
+                                                         StrEq("1::2"),
+                                                         _,
+                                                         _,
+                                                         _,
+                                                         _,
+                                                         _,
+                                                         _};
+  EXPECT_CALL(dispatcher_, runProcess_(ElementsAreArray(expected_args), _));
+  health_checker_->start();
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, ArgSubstitutionNonIp) {
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "unix:///path/to/uds")};
+  const testing::Matcher<std::string> expected_args[] = {StrEq("/path/to/command"),
+                                                         StrEq("--address"),
+                                                         StrEq("/path/to/uds"),
+                                                         StrEq("--ip"),
+                                                         StrEq(""),
+                                                         StrEq("--port"),
+                                                         StrEq("0"),
+                                                         StrEq("--hostname"),
+                                                         StrEq(""),
+                                                         _,
+                                                         _};
+  EXPECT_CALL(dispatcher_, runProcess_(ElementsAreArray(expected_args), _));
+  health_checker_->start();
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, Success) {
+  InSequence s;
+
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  std::function<void(bool)> cb;
+  Event::MockChildProcess* child = new Event::MockChildProcess;
+  expectSessionCreate();
+  EXPECT_CALL(dispatcher_, runProcess_(_, _)).WillOnce(DoAll(SaveArg<1>(&cb), Return(child)));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*child, destructor());
+  cb(true);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, Failure) {
+  InSequence s;
+
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  std::function<void(bool)> cb;
+  Event::MockChildProcess* child = new Event::MockChildProcess;
+  expectSessionCreate();
+  EXPECT_CALL(dispatcher_, runProcess_(_, _)).WillOnce(DoAll(SaveArg<1>(&cb), Return(child)));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*child, destructor());
+  cb(false);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->hosts_[0]->healthy());
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, Timeout) {
+  InSequence s;
+
+  setupData();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  std::function<void(bool)> cb;
+  Event::MockChildProcess* child = new Event::MockChildProcess;
+  expectSessionCreate();
+  EXPECT_CALL(dispatcher_, runProcess_(_, _)).WillOnce(DoAll(SaveArg<1>(&cb), Return(child)));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*child, destructor());
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  timeout_timer_->callback_();
+  EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->hosts_[0]->healthy());
+}
+
+TEST_F(ShellCommandHealthCheckerImplTest, AddRemove) {
+  InSequence s;
+
+  setupData();
+  health_checker_->start();
+
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  std::function<void(bool)> cb;
+  Event::MockChildProcess* child = new Event::MockChildProcess;
+  expectSessionCreate();
+  EXPECT_CALL(dispatcher_, runProcess_(_, _)).WillOnce(DoAll(SaveArg<1>(&cb), Return(child)));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  cluster_->runCallbacks({cluster_->hosts_.back()}, {});
+
+  std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
+  cluster_->hosts_.clear();
+  EXPECT_CALL(*child, destructor());
+  cluster_->runCallbacks({}, removed);
 }
 
 } // namespace

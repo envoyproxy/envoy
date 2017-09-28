@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : inotify_fd_(inotify_init1(IN_NONBLOCK)),
+    : inotify_fd_(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)),
       inotify_event_(dispatcher.createFileEvent(inotify_fd_,
                                                 [this](uint32_t events) -> void {
                                                   ASSERT(events == Event::FileReadyType::Read);

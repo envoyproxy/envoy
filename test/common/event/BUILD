@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 

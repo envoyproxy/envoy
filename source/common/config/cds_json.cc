@@ -40,6 +40,11 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
       const std::string hex_string = entry->getString("binary");
       tcp_health_check->mutable_receive()->Add()->set_text(hex_string);
     }
+  } else if (hc_type == "shell_command") {
+    auto* shell_command_health_check = health_check.mutable_shell_command_health_check();
+    for (const std::string& str : json_health_check.getStringArray("command")) {
+      shell_command_health_check->add_command(str);
+    }
   } else {
     ASSERT(hc_type == "redis");
     health_check.mutable_redis_health_check();
