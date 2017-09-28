@@ -5,7 +5,6 @@
 #  This script builds Envoy with the Coverity Scan Built Tool.
 #
 #  It expects the following environment variables to be set:
-#    COVERITY_SCAN_DIR   - set to the directory where the Coverity Scan Build Tool resides.
 #    COVERITY_TOKEN      - set to the user's Coverity Scan project token.
 #    COVERITY_USER_EMAIL - set to the email address used with the Coverity account.
 #                          defaults to the local git config user.email.
@@ -16,19 +15,23 @@ set -e
 . ./ci/envoy_build_sha.sh
 
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+mkdir -p ${ENVOY_DOCKER_BUILD_DIR}
+
 TEST_TYPE="bazel.coverity"
 COVERITY_USER_EMAIL=${COVERITY_USER_EMAIL:-$(git config user.email)}
 COVERITY_OUTPUT_FILE="${ENVOY_DOCKER_BUILD_DIR}"/envoy/source/exe/envoy-coverity-output.tgz
 
-if [ -z "$COVERITY_SCAN_DIR" ]
+if [ -n "$COVERITY_TOKEN" ]
 then
-  echo "Error: COVERITY_SCAN_DIR environment variable not set."
-  echo "Unable to locate Coverity Scan."
-  echo "Install Coverity Scan Build Tool and set COVERITY_SCAN_DIR."
-  echo "https://scan.coverity.com/download"
-  exit 1
+  pushd ${ENVOY_DOCKER_BUILD_DIR}
+  rm -rf cov-analysis
+  wget https://scan.coverity.com/download/linux64 --post-data "token=${COVERITY_TOKEN}&project=Envoy+Proxy" -O coverity_tool.tgz
+  tar xvf coverity_tool.tgz
+  mv cov-analysis-linux* cov-analysis
+  popd
 else
-  export COVERITY_MOUNT="-v ${COVERITY_SCAN_DIR}:/coverity"
+  echo "ERROR: COVERITY_TOKEN is required to download and run Coverity Scan."
+  exit 1
 fi
 
 ci/run_envoy_docker.sh "ci/do_ci.sh ${TEST_TYPE}"

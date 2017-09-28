@@ -18,10 +18,8 @@ fi
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
-# COVERITY_MOUNT is set by ci/do_coverity_local.sh
-[[ -z "${COVERITY_MOUNT}" ]] && COVERITY_MOUNT=
 
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run --rm -t -i -u "${USER}":"${USER_GROUP}" ${COVERITY_MOUNT} -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
+docker run --rm -t -i -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
   -v "$PWD":/source -e NUM_CPUS "${IMAGE_NAME}":"${IMAGE_ID}" /bin/bash -lc "cd source && $*"

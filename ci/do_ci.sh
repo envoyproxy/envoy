@@ -40,13 +40,13 @@ function bazel_debug_binary_build() {
 function bazel_coverity_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
-  cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel --batch build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
+  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel --batch build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
     -c opt //source/exe:envoy-static.stamped
   # tar up the coverity results
-  tar czvf envoy-coverity-output.tgz "${ENVOY_BUILD_DIR}"/cov-int
+  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz "${ENVOY_BUILD_DIR}"/cov-int
   # Copy the Coverity results somwherethat we can access outside of the container.
   cp -f \
-     "${ENVOY_CI_DIR}"/envoy-coverity-output.tgz \
+     "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
 }
 
@@ -136,7 +136,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
   setup_gcc_toolchain
-  setup_coverity_toolchain
   echo "bazel Coverity Scan build"
   bazel_coverity_release_binary_build
   exit 0
