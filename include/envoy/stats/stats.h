@@ -41,12 +41,13 @@ public:
    * Updates the tag extracted name and the set of tags by extracting the tag represented by this
    * TagExtractor. If the tag is not represented in the current tag_extracted_name, nothing will be
    * modified.
-   * @param[in,out] tag_extracted_name name from which the tag will be removed if found to be
+   * @param tag_extracted_name name from which the tag will be removed if found to be
    * represented in the name.
-   * @param[in,out] tags list of tags updated with the tag name and value if found in the
+   * @param tags list of tags updated with the tag name and value if found in the
    * tag_extracted_name.
+   * @returns modified tag_extracted_name with the tag removed.
    */
-  virtual void updateTags(std::string& tag_extracted_name, std::vector<Tag>& tags) const PURE;
+  virtual std::string updateTags(const std::string& tag_extracted_name, std::vector<Tag>& tags) const PURE;
 };
 
 typedef std::unique_ptr<TagExtractor> TagExtractorPtr;

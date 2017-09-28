@@ -62,9 +62,9 @@ TEST(StatsIsolatedStoreImplTest, All) {
 
 TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
-  std::string tag_extracted_name = "cluster.test_cluster.upstream_cx_total";
+  std::string name = "cluster.test_cluster.upstream_cx_total";
   std::vector<Tag> tags;
-  tag_extractor.updateTags(tag_extracted_name, tags);
+  std::string tag_extracted_name = tag_extractor.updateTags(name, tags);
   EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("test_cluster", tags.at(0).value_);
@@ -73,9 +73,9 @@ TEST(TagExtractorTest, TwoSubexpressions) {
 
 TEST(TagExtractorTest, SingleSubexpression) {
   TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
-  std::string tag_extracted_name = "listener.80.downstream_cx_total";
+  std::string name = "listener.80.downstream_cx_total";
   std::vector<Tag> tags;
-  tag_extractor.updateTags(tag_extracted_name, tags);
+  std::string tag_extracted_name = tag_extractor.updateTags(name, tags);
   EXPECT_EQ("listener.downstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("80.", tags.at(0).value_);
@@ -96,7 +96,7 @@ public:
     std::string tag_extracted_name = stat_name;
     std::vector<Tag> tags;
     for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
-      tag_extractor->updateTags(tag_extracted_name, tags);
+      tag_extracted_name = tag_extractor->updateTags(tag_extracted_name, tags);
     }
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
@@ -112,7 +112,7 @@ public:
     std::string rev_tag_extracted_name = stat_name;
     std::vector<Tag> rev_tags;
     for (auto it = tag_extractors_.rbegin(); it != tag_extractors_.rend(); ++it) {
-      (*it)->updateTags(rev_tag_extracted_name, rev_tags);
+      rev_tag_extracted_name = (*it)->updateTags(rev_tag_extracted_name, rev_tags);
     }
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);

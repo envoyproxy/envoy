@@ -34,7 +34,7 @@ public:
 
   TagExtractorImpl(const std::string& name, const std::string& regex);
   std::string name() const override { return name_; }
-  void updateTags(std::string& tag_extracted_name, std::vector<Tag>& tags) const override;
+  std::string updateTags(const std::string& tag_extracted_name, std::vector<Tag>& tags) const override;
 
 private:
   std::string name_;

@@ -86,12 +86,12 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
-std::vector<Tag> ThreadLocalStoreImpl::getTagsForName(std::string& tag_extracted_name) {
-  std::vector<Tag> tags;
+std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag> &tags) {
+  std::string tag_extracted_name = name;
   for (const TagExtractor& tag_extractor : tag_extractors_) {
-    tag_extractor.updateTags(tag_extracted_name, tags);
+    tag_extracted_name = tag_extractor.updateTags(tag_extracted_name, tags);
   }
-  return tags;
+  return tag_extracted_name;
 }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
@@ -142,8 +142,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    std::string tag_extracted_name = final_name;
-    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
         new CounterImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
@@ -202,8 +202,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    std::string tag_extracted_name = final_name;
-    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
         new GaugeImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
@@ -231,8 +231,8 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   TimerSharedPtr& central_ref = central_cache_.timers_[final_name];
   if (!central_ref) {
-    std::string tag_extracted_name = final_name;
-    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
         new TimerImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
   }
@@ -260,8 +260,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
   if (!central_ref) {
-    std::string tag_extracted_name = final_name;
-    std::vector<Tag> tags = parent_.getTagsForName(tag_extracted_name);
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
         new HistogramImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
   }
