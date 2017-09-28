@@ -142,7 +142,15 @@ public:
     return callbacks_->connection();
   }
 
-  std::string addDownstreamSetCookie(const std::string& key, int max_age) {
+  /**
+   * Set a random cookie with the name @param key and TTL @param max_age to be
+   * sent to the downstream host.
+   * @return std::string the value of the new cookie
+   *
+   * marked const so it can be called from hashKey(), and because all mutated
+   * state is only visible when calling onUpstreamHeaders()
+   */
+  std::string addDownstreamSetCookie(const std::string& key, int max_age) const {
     const std::string value = config_.random_.uuid();
     downstream_set_cookies_.emplace_back(key, value, max_age);
     return value;
@@ -274,10 +282,14 @@ private:
   UpstreamRequestPtr upstream_request_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  std::list<std::tuple<std::string, std::string, int>> downstream_set_cookies_;
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   bool stream_destroyed_{};
+
+  // list of cookies to add to upstream headers
+  // 'mutable' is safe because this is only read in onUpstreamHeaders(), which
+  // is not const
+  mutable std::list<std::tuple<std::string, std::string, int>> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
