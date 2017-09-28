@@ -31,9 +31,6 @@ function setup_coverity_toolchain() {
     exit 1
   fi
   export PATH=$PATH:${COVERITY_DIR}/bin
-  # TODO remove this
-  echo `which cov-build`
-  ls $COVERITY_DIR
   echo "$COVERITY_DIR toolchain configured"
 }
 
