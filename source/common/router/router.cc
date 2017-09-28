@@ -151,11 +151,14 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
       Http::CodeUtility::chargeResponseStat(info);
     }
 
+    ENVOY_LOG_MISC(debug, "HTD charge");
     if (upstream_host) {
+    ENVOY_LOG_MISC(debug, "HTD chargeA");
       const uint64_t response_code = Http::Utility::getResponseStatus(info.response_headers_);
       if (dropped) {
         upstream_host->stats().rq_dropped_.inc();
       } else if (Http::CodeUtility::is5xx(response_code)) {
+    ENVOY_LOG_MISC(debug, "HTD chargeB");
         upstream_host->stats().rq_error_.inc();
       }
     }
@@ -423,6 +426,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
   }
 
+  ENVOY_LOG_MISC(debug, "HTD 0");
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -438,6 +442,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     RetryStatus retry_status =
         retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
+      if (upstream_host) {
+        upstream_host->stats().rq_error_.inc();
+      }
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
@@ -446,15 +453,18 @@ void Filter::onUpstreamReset(UpstreamResetType type,
 
   // This will destroy any created retry timers.
   cleanup();
+  ENVOY_LOG_MISC(debug, "HTD A");
 
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
+  ENVOY_LOG_MISC(debug, "HTD B");
     callbacks_->resetStream();
     if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
     }
   } else {
+  ENVOY_LOG_MISC(debug, "HTD C");
     Http::Code code;
     const char* body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
@@ -471,9 +481,15 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
+    ENVOY_LOG_MISC(debug, "HTD code is {}", static_cast<uint64_t>(code));
     chargeUpstreamCode(code, upstream_host,
                        reset_reason.valid() &&
                            reset_reason.value() == Http::StreamResetReason::Overflow);
+    // If we had non-5xx but still have been reset by backend or timeout, we
+    // treat this as an error.
+    if (!Http::CodeUtility::is5xx(enumToInt(code))) {
+      upstream_host->stats().rq_error_.inc();
+    }
     Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
   }
 }
@@ -512,10 +528,12 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   if (retry_state_) {
     RetryStatus retry_status = retry_state_->shouldRetry(
         headers.get(), Optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
+    const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeUtility::chargeBasicResponseStat(
           cluster_->statsScope(), "retry.",
           static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
+      upstream_host->stats().rq_error_.inc();
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
