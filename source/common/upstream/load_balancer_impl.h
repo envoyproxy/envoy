@@ -7,6 +7,8 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "api/cds.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -131,6 +133,42 @@ public:
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+};
+
+class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
+public:
+  LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
+      : enabled_(subset_config.subset_keys_size() != 0),
+        fallback_policy_(subset_config.fallback_policy()),
+        default_subset_(subset_config.default_subset()) {
+    for (auto subset : subset_config.subset_keys()) {
+      if (subset.keys_size() > 0) {
+        std::vector<std::string> v;
+        for (auto key : subset.keys()) {
+          v.push_back(key);
+        }
+
+        std::sort(v.begin(), v.end());
+        subset_keys_.push_back(v);
+      }
+    }
+  }
+
+  bool isEnabled() const override { return enabled_; }
+
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+
+  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
+
+  const std::vector<std::vector<std::string>>& subsetKeys() const override { return subset_keys_; }
+
+private:
+  bool enabled_;
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  ProtobufWkt::Struct default_subset_;
+  std::vector<std::vector<std::string>> subset_keys_;
 };
 
 } // namespace Upstream

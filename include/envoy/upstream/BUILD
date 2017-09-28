@@ -54,12 +54,19 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_interface",
     hdrs = ["load_balancer.h"],
-    deps = [":upstream_interface"],
+    deps = [
+        ":upstream_interface",
+        "//include/envoy/router:router_interface",
+    ],
 )
 
 envoy_cc_library(
     name = "load_balancer_type_interface",
     hdrs = ["load_balancer_type.h"],
+    external_deps = ["envoy_cds"],
+    deps = [
+        "//source/common/protobuf",
+    ],
 )
 
 envoy_cc_library(

@@ -214,6 +214,41 @@ private:
   std::vector<HashMethodPtr> hash_impls_;
 };
 
+class MetadataMatchImpl : public MetadataMatch {
+public:
+  MetadataMatchImpl(const std::string& name, const ProtobufWkt::Value& value)
+      : name_(name), value_(value), value_hash_(ValueUtil::hash(value)) {}
+
+  const std::string& name() const override { return name_; }
+  const ProtobufWkt::Value& value() const override { return value_; }
+  uint64_t valueHash() const override { return value_hash_; }
+
+private:
+  std::string name_;
+  ProtobufWkt::Value value_;
+  uint64_t value_hash_;
+};
+
+class MetadataMatchesImpl : public MetadataMatches {
+public:
+  MetadataMatchesImpl(const MetadataMatchesImpl* parent,
+                      const ProtobufWkt::Struct& metadata_matches)
+      : metadata_matches_(extractMetadataMatches(parent, metadata_matches)){};
+
+  const std::vector<MetadataMatchConstSharedPtr>& metadataMatches() const override {
+    return metadata_matches_;
+  }
+
+private:
+  static std::vector<MetadataMatchConstSharedPtr>
+  extractMetadataMatches(const MetadataMatchesImpl* parent,
+                         const ProtobufWkt::Struct& metadata_matches);
+
+  const std::vector<MetadataMatchConstSharedPtr> metadata_matches_;
+};
+
+typedef std::unique_ptr<const MetadataMatchesImpl> MetadataMatchesImplConstPtr;
+
 /**
  * Implementation of Decorator that reads from the proto route decorator.
  */
@@ -255,6 +290,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const Http::AccessLog::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+  const MetadataMatches* metadataMatches() const override { return metadata_matches_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
@@ -315,7 +351,7 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
-
+    const MetadataMatches* metadataMatches() const override { return parent_->metadataMatches(); }
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);
     }
@@ -345,17 +381,25 @@ private:
    * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
    * one or more weighted cluster objects, where each object has a back pointer to the parent
    * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
-   * parent, with the exception of clusterName and routeEntry.
+   * parent, with the exception of clusterName, routeEntry, and metadataMatches.
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
-                         Runtime::Loader& loader, const std::string& name, uint64_t weight)
+                         Runtime::Loader& loader, const std::string& name, uint64_t weight,
+                         MetadataMatchesImplConstPtr cluster_metadata_matches)
         : DynamicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
-          cluster_weight_(weight) {}
+          cluster_weight_(weight), cluster_metadata_matches_(std::move(cluster_metadata_matches)) {}
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
+
+    const MetadataMatches* metadataMatches() const override {
+      if (cluster_metadata_matches_) {
+        return cluster_metadata_matches_.get();
+      }
+      return DynamicRouteEntry::metadataMatches();
     }
 
     static const uint64_t MAX_CLUSTER_WEIGHT;
@@ -364,6 +408,7 @@ private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
+    MetadataMatchesImplConstPtr cluster_metadata_matches_;
   };
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
@@ -397,6 +442,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  MetadataMatchesImplConstPtr metadata_matches_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 

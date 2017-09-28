@@ -134,6 +134,12 @@ public:
     }
     return {};
   }
+  const Router::MetadataMatches* metadataMatches() const override {
+    if (route_entry_) {
+      return route_entry_->metadataMatches();
+    }
+    return nullptr;
+  }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }

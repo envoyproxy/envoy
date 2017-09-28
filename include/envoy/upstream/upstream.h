@@ -338,6 +338,8 @@ public:
    * @return a source address to bind to or nullptr if no bind need occur.
    */
   virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+
+  virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
