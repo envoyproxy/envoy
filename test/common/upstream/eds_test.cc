@@ -167,5 +167,42 @@ TEST_F(EdsTest, EndpointMetadata) {
   EXPECT_TRUE(hosts[1]->canary());
 }
 
+// Validate that onConfigUpdate() updates the endpoint locality.
+TEST_F(EdsTest, EndpointLocality) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment->add_endpoints();
+  auto* locality = endpoints->mutable_locality();
+  locality->set_region("oceania");
+  locality->set_zone("hello");
+  locality->set_sub_zone("world");
+
+  endpoints->add_lb_endpoints()
+      ->mutable_endpoint()
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("1.2.3.4");
+  endpoints->add_lb_endpoints()
+      ->mutable_endpoint()
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("2.3.4.5");
+
+  bool initialized = false;
+  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_TRUE(initialized);
+
+  const auto& hosts = cluster_->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy

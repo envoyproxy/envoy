@@ -36,9 +36,9 @@ public:
   virtual void drainParentListeners() PURE;
 
   /**
-   * Retrieve a listening socket on the specified port from the parent process. The socket will be
-   * duplicated across process boundaries.
-   * @param port supplies the port of the socket to duplicate.
+   * Retrieve a listening socket on the specified address from the parent process. The socket will
+   * be duplicated across process boundaries.
+   * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
   virtual int duplicateParentListenSocket(const std::string& address) PURE;

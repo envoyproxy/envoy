@@ -104,7 +104,7 @@ Filter::~Filter() {
 }
 
 const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
-  return upstream_host ? upstream_host->zone() : EMPTY_STRING;
+  return upstream_host ? upstream_host->locality().zone() : EMPTY_STRING;
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
