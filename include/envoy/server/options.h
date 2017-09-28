@@ -80,6 +80,11 @@ public:
   virtual spdlog::level::level_enum logLevel() PURE;
 
   /**
+   * @return const std::string& the log file path.
+   */
+  virtual const std::string& logPath() PURE;
+
+  /**
    * @return the number of seconds that envoy will wait before shutting down the parent envoy during
    *         a host restart. Generally this will be longer than the drainTime() option.
    */

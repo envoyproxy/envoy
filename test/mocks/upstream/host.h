@@ -82,7 +82,7 @@ public:
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
-  MOCK_CONST_METHOD0(zone, const std::string&());
+  MOCK_CONST_METHOD0(locality, const envoy::api::v2::Locality&());
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -137,7 +137,7 @@ public:
   MOCK_METHOD1(weight, void(uint32_t new_weight));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(used, void(bool new_used));
-  MOCK_CONST_METHOD0(zone, const std::string&());
+  MOCK_CONST_METHOD0(locality, const envoy::api::v2::Locality&());
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;

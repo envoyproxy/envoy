@@ -25,6 +25,7 @@ public:
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return drain_time_; }
   spdlog::level::level_enum logLevel() override { return log_level_; }
+  const std::string& logPath() override { return log_path_; }
   std::chrono::seconds parentShutdownTime() override { return parent_shutdown_time_; }
   uint64_t restartEpoch() override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -40,6 +41,7 @@ private:
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
   std::string service_node_;

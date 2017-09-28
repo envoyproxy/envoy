@@ -102,6 +102,8 @@ To build the CentOS based `lyft/envoy-build-ubuntu-centos` image, change `DISTRO
 
 # MacOS Build Flow
 
-The MacOS builds are hosted on [CircleCI](https://circleci.com/gh/turbinelabs/envoy) and managed by [TurbineLabs](https://turbinelabs.io/), whom did the initial MacOS port. In order to make possible this integration without granting full repo control, a custom webhook handles arbitrating PR events that in turn initiate builds on CircleCI.
-
-![MacOS flow](macosflow.png)
+The MacOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
+Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
+which is pre-installed on the CircleCI MacOS image. The dependencies are cached are re-installed
+on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
+build and test Envoy.

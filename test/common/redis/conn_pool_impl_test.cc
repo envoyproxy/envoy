@@ -106,7 +106,6 @@ TEST_F(RedisClientImplTest, Basic) {
   RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
-  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -120,6 +119,7 @@ TEST_F(RedisClientImplTest, Basic) {
     InSequence s;
     RespValuePtr response1(new RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
     callbacks_->onRespValue(std::move(response1));
 
@@ -152,7 +152,6 @@ TEST_F(RedisClientImplTest, Cancel) {
   RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
-  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -164,6 +163,7 @@ TEST_F(RedisClientImplTest, Cancel) {
 
     RespValuePtr response1(new RespValue());
     EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
     callbacks_->onRespValue(std::move(response1));
 

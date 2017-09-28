@@ -56,9 +56,12 @@ public:
     stats_.update_attempt_.inc();
     version_info_ = version_info;
     ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources", type_url_, resources.size());
+
+#ifndef NVLOG
     for (const auto resource : typed_resources) {
       ENVOY_LOG(debug, "- {}", resource.DebugString());
     }
+#endif
   }
 
   void onConfigUpdateFailed(const EnvoyException* e) override {

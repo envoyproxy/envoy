@@ -51,6 +51,11 @@ public:
    * Reopen the file.
    */
   virtual void reopen() PURE;
+
+  /**
+   * Synchronously flush all pending data to disk.
+   */
+  virtual void flush() PURE;
 };
 
 typedef std::shared_ptr<File> FileSharedPtr;

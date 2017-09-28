@@ -54,9 +54,10 @@ public:
                 ShadowWriterPtr{shadow_writer_}, true),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
+    upstream_locality_.set_zone("to_az");
 
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
+    ON_CALL(*cm_.conn_pool_.host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void expectResponseTimerCreate() {
@@ -71,7 +72,7 @@ public:
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
-  std::string upstream_zone_{"to_az"};
+  envoy::api::v2::Locality upstream_locality_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -144,7 +145,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
       .WillOnce(Return(Optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
       .WillOnce(
@@ -168,7 +169,7 @@ TEST_F(RouterTest, HashPolicy) {
 TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _))
       .WillOnce(Return(Optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, &router_))
       .WillOnce(

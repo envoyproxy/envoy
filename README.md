@@ -9,7 +9,7 @@ Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNC
 
 ## Documentation
 
-* [Offical documentation](https://envoyproxy.github.io).
+* [Official documentation](https://envoyproxy.github.io).
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy.
