@@ -1,7 +1,7 @@
-diff --git a/../../bazel/tools/cpp/cc_configure.bzl b/./cc_configure.bzl
-index 79fb8ba65..6ffed9ba3 100644
+diff --git a/../../bazel/tools/cpp/cc_configure.bzl b/cc_configure.bzl
+index 9d6d29fc8..3d0c9e551 100644
 --- a/../../bazel/tools/cpp/cc_configure.bzl
-+++ b/./cc_configure.bzl
++++ b/cc_configure.bzl
 @@ -1,3 +1,11 @@
 +# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
 +# local modifications to deal with known issues in Bazel 0.5.2:
@@ -9,12 +9,12 @@ index 79fb8ba65..6ffed9ba3 100644
 +# * https://github.com/bazelbuild/bazel/issues/2840
 +# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 +#
-+# See cc_configure.bzl.diff for the changes made in this fork.
++# See cc_configure.bzl.diff for the changes made in this fork against bazel release 0.6.0.
 +
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
  # Licensed under the Apache License, Version 2.0 (the "License");
-@@ -13,23 +21,18 @@
+@@ -13,25 +21,20 @@
  # limitations under the License.
  """Rules for configuring the C++ toolchain (experimental)."""
  
@@ -29,6 +29,8 @@ index 79fb8ba65..6ffed9ba3 100644
  
  def _impl(repository_ctx):
 +  repository_ctx.file("tools/cpp/empty.cc", "int main() {}")
+   repository_ctx.symlink(
+       Label("@bazel_tools//tools/cpp:dummy_toolchain.bzl"), "dummy_toolchain.bzl")
    cpu_value = get_cpu_value(repository_ctx)
    if cpu_value == "freebsd":
 -    # This is defaulting to the static crosstool, we should eventually
@@ -45,7 +47,12 @@ index 79fb8ba65..6ffed9ba3 100644
    elif cpu_value == "darwin":
      configure_osx_toolchain(repository_ctx)
    else:
-@@ -55,6 +58,7 @@ cc_autoconf = repository_rule(
+@@ -53,15 +56,15 @@ cc_autoconf = repository_rule(
+         "BAZEL_VC",
+         "BAZEL_VS",
+         "CC",
+-        "CC_CONFIGURE_DEBUG",
+         "CC_TOOLCHAIN_NAME",
          "CPLUS_INCLUDE_PATH",
          "CUDA_COMPUTE_CAPABILITIES",
          "CUDA_PATH",
@@ -53,3 +60,8 @@ index 79fb8ba65..6ffed9ba3 100644
          "HOMEBREW_RUBY_PATH",
          "NO_WHOLE_ARCHIVE_OPTION",
          "USE_DYNAMIC_CRT",
+-        "USE_MSVC_WRAPPER",
++        "NO_MSVC_WRAPPER",
+         "SYSTEMROOT",
+         "VS90COMNTOOLS",
+         "VS100COMNTOOLS",
