@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 namespace Envoy {
+
 /**
  * Contains an optional value. Like boost::optional and std::optional (not included in C++11).
  */
@@ -61,7 +62,8 @@ public:
   }
 
 private:
-  T value_;
+  T value_{};
   bool valid_{};
 };
+
 } // namespace Envoy
