@@ -52,6 +52,12 @@ public:
   static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status);
 
   /**
+   * @param grpc_status gRPC status from grpc-status header.
+   * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
+   */
+  static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
+
+  /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.

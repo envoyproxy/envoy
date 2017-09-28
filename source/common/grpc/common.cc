@@ -112,6 +112,65 @@ Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
   }
 }
 
+uint64_t Common::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
+  switch (grpc_status) {
+  case Status::GrpcStatus::Ok:
+    return 200;
+  case Status::GrpcStatus::Canceled:
+    // Client closed request.
+    return 499;
+  case Status::GrpcStatus::Unknown:
+    // Internal server error.
+    return 500;
+  case Status::GrpcStatus::InvalidArgument:
+    // Bad request.
+    return 400;
+  case Status::GrpcStatus::DeadlineExceeded:
+    // Gateway Time-out.
+    return 504;
+  case Status::GrpcStatus::NotFound:
+    // Not found.
+    return 404;
+  case Status::GrpcStatus::AlreadyExists:
+    // Conflict.
+    return 409;
+  case Status::GrpcStatus::PermissionDenied:
+    // Forbidden.
+    return 403;
+  case Status::GrpcStatus::ResourceExhausted:
+    //  Too many requests.
+    return 429;
+  case Status::GrpcStatus::FailedPrecondition:
+    // Bad request.
+    return 400;
+  case Status::GrpcStatus::Aborted:
+    // Conflict.
+    return 409;
+  case Status::GrpcStatus::OutOfRange:
+    // Bad request.
+    return 400;
+  case Status::GrpcStatus::Unimplemented:
+    // Not implemented.
+    return 501;
+  case Status::GrpcStatus::Internal:
+    // Internal server error.
+    return 500;
+  case Status::GrpcStatus::Unavailable:
+    // Service unavailable.
+    return 503;
+  case Status::GrpcStatus::DataLoss:
+    // Internal server error.
+    return 500;
+  case Status::GrpcStatus::Unauthenticated:
+    // Unauthorized.
+    return 401;
+  case Status::GrpcStatus::InvalidCode:
+  default:
+    // Internal server error.
+    return 500;
+  }
+}
+
 Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.

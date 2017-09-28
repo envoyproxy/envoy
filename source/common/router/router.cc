@@ -151,14 +151,11 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
       Http::CodeUtility::chargeResponseStat(info);
     }
 
-    ENVOY_LOG_MISC(debug, "HTD charge");
     if (upstream_host) {
-    ENVOY_LOG_MISC(debug, "HTD chargeA");
       const uint64_t response_code = Http::Utility::getResponseStatus(info.response_headers_);
       if (dropped) {
         upstream_host->stats().rq_dropped_.inc();
       } else if (Http::CodeUtility::is5xx(response_code)) {
-    ENVOY_LOG_MISC(debug, "HTD chargeB");
         upstream_host->stats().rq_error_.inc();
       }
     }
@@ -426,7 +423,6 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
   }
 
-  ENVOY_LOG_MISC(debug, "HTD 0");
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -451,20 +447,18 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     }
   }
 
-  // This will destroy any created retry timers.
-  cleanup();
-  ENVOY_LOG_MISC(debug, "HTD A");
-
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
-  ENVOY_LOG_MISC(debug, "HTD B");
-    callbacks_->resetStream();
     if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
     }
+    // This will destroy any created retry timers.
+    cleanup();
+    callbacks_->resetStream();
   } else {
-  ENVOY_LOG_MISC(debug, "HTD C");
+    // This will destroy any created retry timers.
+    cleanup();
     Http::Code code;
     const char* body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
@@ -481,7 +475,6 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    ENVOY_LOG_MISC(debug, "HTD code is {}", static_cast<uint64_t>(code));
     chargeUpstreamCode(code, upstream_host,
                        reset_reason.valid() &&
                            reset_reason.value() == Http::StreamResetReason::Overflow);
@@ -562,8 +555,18 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // grpc-status in the trailers.
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   if (!Http::CodeUtility::is5xx(response_code)) {
-    if (grpc_request_ && !end_stream) {
-      upstream_request_->grpc_rq_success_deferred_ = true;
+    if (grpc_request_) {
+      if (end_stream) {
+        Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
+        if (grpc_status.valid() &&
+            !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+          upstream_request_->upstream_host_->stats().rq_success_.inc();
+        } else {
+          upstream_request_->upstream_host_->stats().rq_error_.inc();
+        }
+      } else {
+        upstream_request_->grpc_rq_success_deferred_ = true;
+      }
     } else {
       upstream_request_->upstream_host_->stats().rq_success_.inc();
     }
@@ -579,28 +582,28 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
-    onUpstreamComplete();
     // gRPC request termination without trailers is an error.
     if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
     }
+    onUpstreamComplete();
   }
 
   callbacks_->encodeData(data, end_stream);
 }
 
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
-  onUpstreamComplete();
-  callbacks_->encodeTrailers(std::move(trailers));
   if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
     Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
-    if (grpc_status.valid() && grpc_status.value() != Grpc::Status::GrpcStatus::Internal &&
-        grpc_status.value() != Grpc::Status::GrpcStatus::Unavailable) {
+    if (grpc_status.valid() &&
+        !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request_->upstream_host_->stats().rq_success_.inc();
     } else {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
     }
   }
+  onUpstreamComplete();
+  callbacks_->encodeTrailers(std::move(trailers));
 }
 
 void Filter::onUpstreamComplete() {
