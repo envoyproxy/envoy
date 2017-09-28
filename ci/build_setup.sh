@@ -23,6 +23,21 @@ function setup_clang_toolchain() {
   echo "$CC/$CXX toolchain configured"
 }
 
+function setup_coverity_toolchain() {
+  export COVERITY_DIR=/coverity
+  if [[ ! -d "${COVERITY_DIR}" ]]
+  then
+    echo "${COVERITY_DIR} mount missing - did you forget -v <something>:${COVERITY_DIR}?"
+    exit 1
+  fi
+  export PATH=$PATH:${COVERITY_DIR}/bin
+  # TODO remove this
+  echo `which cov-build`
+  ls $COVERITY_DIR
+  echo "$COVERITY_DIR toolchain configured"
+}
+
+
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
 # Docker image gets confused as it has no passwd entry when running non-root
 # unless we do this.
