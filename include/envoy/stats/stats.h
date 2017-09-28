@@ -280,7 +280,7 @@ public:
   /**
    * Add an extractor to extract a portion of stats names as a tag.
    */
-  virtual void addTagExtractor(TagExtractor& tag_extractor) PURE;
+  virtual void addTagExtractor(const TagExtractor& tag_extractor) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

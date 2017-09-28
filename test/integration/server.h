@@ -177,7 +177,7 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
-  void addTagExtractor(TagExtractor&) override {}
+  void addTagExtractor(const TagExtractor&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
 
