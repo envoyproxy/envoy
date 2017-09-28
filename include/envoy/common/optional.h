@@ -6,6 +6,7 @@ namespace Envoy {
 
 /**
  * Contains an optional value. Like boost::optional and std::optional (not included in C++11).
+ * TODO: Replace with https://github.com/abseil/abseil-cpp/blob/master/absl/types/optional.h
  */
 template <typename T> class Optional {
 public:
