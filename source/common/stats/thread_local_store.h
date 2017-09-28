@@ -116,7 +116,7 @@ private:
     RawStatDataAllocator& free_;
   };
 
-  std::string getTagsForName(const std::string& name, std::vector<Tag> &tags);
+  std::string getTagsForName(const std::string& name, std::vector<Tag>& tags);
   void clearScopeFromCaches(ScopeImpl* scope);
   void releaseScopeCrossThread(ScopeImpl* scope);
   SafeAllocData safeAlloc(const std::string& name);

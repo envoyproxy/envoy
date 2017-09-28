@@ -38,7 +38,8 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
   }
 }
 
-std::string TagExtractorImpl::updateTags(const std::string& tag_extracted_name, std::vector<Tag>& tags) const {
+std::string TagExtractorImpl::updateTags(const std::string& tag_extracted_name,
+                                         std::vector<Tag>& tags) const {
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(tag_extracted_name, match, regex_) && match.size() > 1) {
@@ -53,7 +54,7 @@ std::string TagExtractorImpl::updateTags(const std::string& tag_extracted_name, 
     // This call invalidates match and all derived objects because they contain references to
     // tag_extracted_name.
     return std::string(match.prefix().first, remove_subexpr.first)
-                             .append(remove_subexpr.second, match.suffix().second);
+        .append(remove_subexpr.second, match.suffix().second);
   }
   return tag_extracted_name;
 }

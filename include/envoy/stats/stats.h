@@ -47,7 +47,8 @@ public:
    * tag_extracted_name.
    * @returns modified tag_extracted_name with the tag removed.
    */
-  virtual std::string updateTags(const std::string& tag_extracted_name, std::vector<Tag>& tags) const PURE;
+  virtual std::string updateTags(const std::string& tag_extracted_name,
+                                 std::vector<Tag>& tags) const PURE;
 };
 
 typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
