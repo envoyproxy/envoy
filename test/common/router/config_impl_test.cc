@@ -807,7 +807,8 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
 
 class RouterMatcherHashPolicyTest : public testing::Test {
 public:
-  RouterMatcherHashPolicyTest() : add_cookie_nop_([](const std::string&, long) { return ""; }) {
+  RouterMatcherHashPolicyTest()
+      : add_cookie_nop_([](const std::string&, std::chrono::seconds) { return ""; }) {
     std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -939,8 +940,9 @@ TEST_F(RouterMatcherHashPolicyTest, HashCookieTtlSet) {
   ConfigImpl config(route_config_, runtime, cm, true);
 
   MockFunction<std::string(const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name, long ttl) -> std::string {
-    return mock_cookie_cb.Call(name, ttl);
+  auto add_cookie = [&mock_cookie_cb](const std::string& name,
+                                      std::chrono::seconds ttl) -> std::string {
+    return mock_cookie_cb.Call(name, ttl.count());
   };
 
   EXPECT_FALSE(config.usesRuntime());

@@ -90,14 +90,14 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, long ttl_seconds) : key_(key), ttl_(ttl_seconds) {}
+  CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
 
   Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
                               const HashPolicy::AddCookieCallback add_cookie) const override {
     Optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
-    if (value.empty() && ttl_ != 0) {
+    if (value.empty() && ttl_ != std::chrono::seconds(0)) {
       value = add_cookie(key_, ttl_);
       hash.value(HashUtil::xxHash64(value));
 
@@ -109,7 +109,7 @@ public:
 
 private:
   const std::string key_;
-  const long ttl_;
+  const std::chrono::seconds ttl_;
 };
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {

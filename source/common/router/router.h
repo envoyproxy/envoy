@@ -130,10 +130,11 @@ public:
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
-        return hash_policy->generateHash(callbacks_->downstreamAddress(), *downstream_headers_,
-                                         [this](const std::string& key, long max_age) {
-                                           return addDownstreamSetCookie(key, max_age);
-                                         });
+        return hash_policy->generateHash(
+            callbacks_->downstreamAddress(), *downstream_headers_,
+            [this](const std::string& key, std::chrono::seconds max_age) {
+              return addDownstreamSetCookie(key, max_age);
+            });
       }
     }
     return {};
@@ -150,9 +151,9 @@ public:
    * marked const so it can be called from hashKey(), and because all mutated
    * state is only visible when calling onUpstreamHeaders()
    */
-  std::string addDownstreamSetCookie(const std::string& key, int max_age) const {
+  std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) const {
     const std::string value = config_.random_.uuid();
-    downstream_set_cookies_.emplace_back(key, value, max_age);
+    downstream_set_cookies_.emplace_back(key, value, max_age.count());
     return value;
   }
 
@@ -289,7 +290,7 @@ private:
   // list of cookies to add to upstream headers
   // 'mutable' is safe because this is only read in onUpstreamHeaders(), which
   // is not const
-  mutable std::list<std::tuple<std::string, std::string, int>> downstream_set_cookies_;
+  mutable std::list<std::tuple<std::string, std::string, long>> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

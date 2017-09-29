@@ -219,7 +219,8 @@ public:
    * A callback used for requesting that a random cookie be set with the given
    * lifetime
    */
-  typedef std::function<std::string(const std::string& key, long ttl_sec)> AddCookieCallback;
+  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+      AddCookieCallback;
 
   /**
    * @param downstream_address contains the address of the connected client host, or an
