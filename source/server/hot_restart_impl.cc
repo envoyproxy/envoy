@@ -110,11 +110,15 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
   for (Stats::RawStatData& data : shmem_.stats_slots_) {
+    if (data.initialized() && data.matches(name)) {
+      data.ref_count_++;
+      return &data;
+    }
+  }
+
+  for (Stats::RawStatData& data : shmem_.stats_slots_) {
     if (!data.initialized()) {
       data.initialize(name);
-      return &data;
-    } else if (data.matches(name)) {
-      data.ref_count_++;
       return &data;
     }
   }
