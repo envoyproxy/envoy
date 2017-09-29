@@ -118,8 +118,6 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
       {Status::GrpcStatus::DataLoss, 500},
       {Status::GrpcStatus::Unauthenticated, 401},
       {Status::GrpcStatus::InvalidCode, 500},
-      {Status::GrpcStatus(-1337), 500},
-      {Status::GrpcStatus(1337), 500},
   };
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, Common::grpcToHttpStatus(test_case.first));
