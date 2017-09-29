@@ -526,11 +526,6 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     const std::string& value = std::get<1>(cookie);
     const int max_age = std::get<2>(cookie);
 
-    // Don't overwrite a cookie if it's already set by the upstream host
-    if (Http::Utility::hasSetCookie(*headers, key)) {
-      continue;
-    }
-
     headers->addReferenceKey(Http::Headers::get().SetCookie,
                              fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age));
   }
