@@ -55,14 +55,18 @@ void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFl
 
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
+
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
   connection_->write(encoder_buffer_);
 
-  // Only boost the op timeout if we are not already connected. Otherwise, we are governed by
-  // the connect timeout and the timer will be reset when/if connection occurs. This allows a
-  // relatively long connection spin up time for example if TLS is being used.
-  if (connected_) {
+  // Only boost the op timeout if:
+  // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer
+  //   will be reset when/if connection occurs. This allows a relatively long connection spin up
+  //   time for example if TLS is being used.
+  // - This is the first request on the pipeline. Otherwise the timeout would effectively start on
+  //   the last operation.
+  if (connected_ && pending_requests_.size() == 1) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
@@ -137,10 +141,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   pending_requests_.pop_front();
 
-  // We boost the op timeout every time we pipeline a new op. However, if there are no remaining
-  // ops in the pipeline we need to disable the timer.
+  // If there are no remaining ops in the pipeline we need to disable the timer.
+  // Otherwise we boost the timer since we are receiving responses and there are more to flush out.
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
+  } else {
+    connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
   host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));

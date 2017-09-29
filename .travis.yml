@@ -1,4 +1,4 @@
-language: minimal
+language: shell
 sudo: required
 
 services:
