@@ -8,7 +8,7 @@
 #include "common/common/byte_order.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-
+#include <endian.h>
 #include "fmt/format.h"
 
 namespace Envoy {
