@@ -52,21 +52,21 @@ A host with metadata like `{a=1, b=2, x=3}` is included in two subsets (`{a=1, b
 {`x=3`}). The same keys may appear in multiple selector entries: it is feasible to have both an
 `{a=1, b=2}` subset and an `{a=1}` subset.
 
-On update, the SLB divides the hosts added into the appropriate subset(s) and triggers udpate
+On update, the SLB divides the hosts added into the appropriate subset(s) and triggers update
 events on the filtered host sets. The SLB also manages the optional "local HostSet" used for
 zone-aware routing.
 
 The CDS configuration for the subset selectors is meant to allow future extension. For example:
 
-1. selecting endpoint metadata keys by a prefix or other string matching algorithm
-2. using a list-typed metadata value to allow a single endpoint to have multiple values for a
-   metadata key
+1. Selecting endpoint metadata keys by a prefix or other string matching algorithm, or
+2. Using a list-typed metadata value to allow a single endpoint to have multiple values for a
+   metadata key.
 
 Subsets are stored in a trie-like fashion. Keys in the selectors are lexically sorted. An
-`LbSubsetMap` is an `unordered_map` is of string keys to `ValueSubsetMap`. `ValueSubsetMap` is an
+`LbSubsetMap` is an `unordered_map` of string keys to `ValueSubsetMap`. `ValueSubsetMap` is an
 `unordered_map` of (wrapped, see below) `ProtobufWkt::Value` to `LbSubsetEntry`. The
-`LbSubsetEntry` may contain an `LbSubetMap` of additional keys or a `Subset`. `Subset` encapsulates
-the filtered `Upstream::HostSet` and `Upstream::LoadBalancer` for a subset.
+`LbSubsetEntry` may contain an `LbSubsetMap` of additional keys or a `Subset`. `Subset`
+encapsulates the filtered `Upstream::HostSet` and `Upstream::LoadBalancer` for a subset.
 
 `ProtobufWkt::Value` is wrapped to provide a cached hash value for the value. Currently,
 `ProtobufWkt::Value` is hashed by first encoding the value as a string and then hashing the
@@ -97,8 +97,8 @@ Given a sequence of N metadata keys and values (previously sorted lexically by k
       If not found, exit the loop.
    3. Assign the `LbSubsetEntry`'s `LbSubsetMap` to `subsets`. (It may be empty.)
    4. If this is the last key-value pair, assign the `LbSubsetEntry` to `entry`.
-3. If `entry` has been set has a `Subset` value, we found a matching subset, delegate balancing to
-   the subset's load balancer.
+3. If `entry` has been set and has a `Subset` value, we found a matching subset, delegate balancing
+   to the subset's load balancer.
 4. Otherwise, execute the fallback policy.
 
 N.B. `O(N)` complexity presumes that the delegate load balancer executes in constant time.
