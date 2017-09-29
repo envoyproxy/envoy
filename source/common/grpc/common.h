@@ -27,6 +27,12 @@ public:
 class Common {
 public:
   /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is gRPC.
+   */
+  static bool hasGrpcContentType(const Http::HeaderMap& headers);
+
+  /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
    * @return Optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid status
@@ -129,8 +135,6 @@ public:
    * @return qualified_name prefixed with typeUrlPrefix + "/".
    */
   static std::string typeUrl(const std::string& qualified_name);
-
-  static const std::string GRPC_CONTENT_TYPE;
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

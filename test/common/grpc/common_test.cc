@@ -98,5 +98,22 @@ TEST(GrpcCommonTest, resolveServiceAndMethod) {
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
 }
 
+TEST(GrpcCommonTest, hasGrpcContentType) {
+  {
+    Http::TestHeaderMapImpl headers{};
+    EXPECT_FALSE(Common::hasGrpcContentType(headers));
+  }
+  auto isGrpcContentType = [](const std::string& s) {
+    Http::TestHeaderMapImpl headers{{"content-type", s}};
+    return Common::hasGrpcContentType(headers);
+  };
+  EXPECT_FALSE(isGrpcContentType(""));
+  EXPECT_FALSE(isGrpcContentType("application/text"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc+foo"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-web"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
+}
+
 } // namespace Grpc
 } // namespace Envoy

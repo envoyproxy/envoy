@@ -22,7 +22,31 @@
 namespace Envoy {
 namespace Grpc {
 
-const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
+bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  if (content_type == nullptr) {
+    return false;
+  }
+  // Fail fast if this is not gRPC.
+  if (!StringUtil::startsWith(content_type->value().c_str(),
+                              Http::Headers::get().ContentTypeValues.Grpc)) {
+    return false;
+  }
+  // Exact match with application/grpc. This and the above case are likely the
+  // two most common encountered.
+  if (Http::Headers::get().ContentTypeValues.Grpc == content_type->value().c_str()) {
+    return true;
+  }
+  // Prefix match with application/grpc+. It's not sufficient to rely on the an
+  // applicatin/grpc prefix match, since there are related content types such as
+  // application/grpc-web.
+  if (StringUtil::startsWith(content_type->value().c_str(),
+                             Http::Headers::get().ContentTypeValues.Grpc + "+")) {
+    return true;
+  }
+  // This must be something like application/grpc-web.
+  return false;
+}
 
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
                         const std::string& grpc_service, const std::string& grpc_method,
@@ -205,7 +229,8 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
   message->headers().insertHost().value(upstream_cluster);
-  message->headers().insertContentType().value().setReference(Common::GRPC_CONTENT_TYPE);
+  message->headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Grpc);
   message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
   return message;

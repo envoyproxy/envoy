@@ -278,9 +278,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Host());
   ASSERT(headers.Path());
 
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  grpc_request_ = content_type != nullptr &&
-                  Http::Headers::get().ContentTypeValues.Grpc == content_type->value().c_str();
+  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
