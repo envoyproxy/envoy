@@ -75,8 +75,11 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(fake_stats_, "listener."), POOL_GAUGE_PREFIX(fake_stats_, "listener."),
-                                                 POOL_TIMER_PREFIX(fake_stats_, "listener."))}, "listener.", fake_stats_}{
+        listener_stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(fake_stats_, "listener."),
+                                                 POOL_GAUGE_PREFIX(fake_stats_, "listener."),
+                                                 POOL_TIMER_PREFIX(fake_stats_, "listener."))},
+                        "listener.",
+                        fake_stats_} {
     tracing_config_.reset(new TracingConnectionManagerConfig(
         {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
 
@@ -767,6 +770,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
+  EXPECT_EQ(1U, listener_stats_.named_.downstream_rq_3xx_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {

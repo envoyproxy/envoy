@@ -78,7 +78,7 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
-  Http::ConnectionManagerStats& listenerStats() override { return stats_; }
+  Http::ConnectionManagerStats& listenerStats() override { return listener_stats_; }
 
 private:
   /**

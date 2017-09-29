@@ -15,6 +15,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -359,7 +360,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
            false}},
-      listener_stats_(Http::ConnectionManagerImpl::generateStats("admin", server_.stats())){
+      listener_stats_(Http::ConnectionManagerImpl::generateStats(EMPTY_STRING, server_.stats())) {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);

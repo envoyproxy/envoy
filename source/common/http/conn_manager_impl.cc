@@ -57,7 +57,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()) {}
+      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
+      listener_stats_(config_.listenerStats()) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
