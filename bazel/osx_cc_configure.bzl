@@ -1,8 +1,9 @@
 # This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
-# local modifications to deal with known issues in Bazel 0.5.2:
+# local modifications to deal with known issues in Bazel 0.6.0:
 #
 # * https://github.com/bazelbuild/bazel/issues/2840
 # * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
+# * https://github.com/bazelbuild/bazel/issues/3838
 #
 # See osx_cc_configure.bzl.diff for the changes made in this fork.
 
@@ -86,9 +87,6 @@ def configure_osx_toolchain(repository_ctx):
     repository_ctx.symlink(
         Label("@bazel_tools//tools/osx/crosstool:wrapped_clang_pp.tpl"),
         "wrapped_clang_pp")
-    repository_ctx.symlink(
-        Label("//bazel/osx/crosstool:wrapped_strip.tpl"),
-        "wrapped_strip")
     repository_ctx.symlink(
         Label("//bazel/osx/crosstool:BUILD.tpl"),
         "BUILD")
