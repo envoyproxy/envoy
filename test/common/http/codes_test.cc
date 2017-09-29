@@ -27,11 +27,9 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    TestHeaderMapImpl headers{{":status", std::to_string(code)}};
-
     CodeUtility::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        "prefix.", headers, internal_request,
-        request_vhost_name, request_vcluster_name, from_az,   to_az,   canary};
+        global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
+        request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
 
     CodeUtility::chargeResponseStat(info);
   }

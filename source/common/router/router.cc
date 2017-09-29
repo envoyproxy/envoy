@@ -107,9 +107,13 @@ const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr 
   return upstream_host ? upstream_host->locality().zone() : EMPTY_STRING;
 }
 
-void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
+void Filter::chargeUpstreamCode(uint64_t response_status_code,
+                                const Http::HeaderMap& response_headers,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
+  // Passing the response_status_code explicitly is an optimization to avoid
+  // multiple calls to slow Http::Utility::getResponseStatus.
+  ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -125,7 +129,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
-                                             response_headers,
+                                             response_status_code,
                                              internal_request,
                                              route_entry_->virtualHost().name(),
                                              request_vcluster_ ? request_vcluster_->name()
@@ -140,7 +144,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
       Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                                cluster_->statsScope(),
                                                alt_stat_prefix_,
-                                               response_headers,
+                                               response_status_code,
                                                internal_request,
                                                EMPTY_STRING,
                                                EMPTY_STRING,
@@ -152,10 +156,9 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     }
 
     if (upstream_host) {
-      const uint64_t response_code = Http::Utility::getResponseStatus(info.response_headers_);
       if (dropped) {
         upstream_host->stats().rq_dropped_.inc();
-      } else if (Http::CodeUtility::is5xx(response_code)) {
+      } else if (Http::CodeUtility::is5xx(response_status_code)) {
         upstream_host->stats().rq_error_.inc();
       }
     }
@@ -165,9 +168,10 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
+  const uint64_t response_status_code = enumToInt(code);
   Http::HeaderMapImpl fake_response_headers{
-      {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
-  chargeUpstreamCode(fake_response_headers, upstream_host, dropped);
+      {Http::Headers::get().Status, std::to_string(response_status_code)}};
+  chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
@@ -550,10 +554,10 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   upstream_request_->upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       upstream_request_->upstream_host_->canary();
-  chargeUpstreamCode(*headers, upstream_request_->upstream_host_, false);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  chargeUpstreamCode(response_code, *headers, upstream_request_->upstream_host_, false);
   // We need to defer gRPC success until after we have processed
   // grpc-status in the trailers.
-  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   if (!Http::CodeUtility::is5xx(response_code)) {
     if (grpc_request_) {
       if (end_stream) {
