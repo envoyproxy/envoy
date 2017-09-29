@@ -19,23 +19,22 @@ namespace Envoy {
 namespace Ssl {
 
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
-int ContextImpl::ssl_context_index_ = -1;
+
+int ContextImpl::sslContextIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_context_index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_context_index >= 0);
+    return ssl_context_index;
+  }());
+}
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
 
-  if (ssl_context_index_ < 0) {
-    ssl_context_index_ = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    if (ssl_context_index_ < 0) {
-      throw EnvoyException("Failed to allocate SSL ex index");
-    }
-  }
-
-  if (SSL_CTX_set_ex_data(ctx_.get(), ssl_context_index_, this) != 1) {
-    throw EnvoyException("Failed to SSL_CTX_set_ex_data");
-  }
+  int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
+  RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     throw EnvoyException(
@@ -404,10 +403,10 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
 
       std::copy_n(src_key.begin(), dst_key.name.size(), dst_key.name.begin());
       size_t pos = dst_key.name.size();
-      std::copy_n(src_key.begin() + pos, dst_key.aes_key.size(), dst_key.aes_key.begin());
-      pos += dst_key.aes_key.size();
       std::copy_n(src_key.begin() + pos, dst_key.hmac_key.size(), dst_key.hmac_key.begin());
       pos += dst_key.hmac_key.size();
+      std::copy_n(src_key.begin() + pos, dst_key.aes_key.size(), dst_key.aes_key.begin());
+      pos += dst_key.aes_key.size();
       ASSERT(src_key.begin() + pos == src_key.end());
     }
     SSL_CTX_set_tlsext_ticket_key_cb(
@@ -415,32 +414,48 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
         [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
            int encrypt) -> int {
           ContextImpl* context_impl = static_cast<ContextImpl*>(
-              SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), ssl_context_index_));
+              SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
           return dynamic_cast<ServerContextImpl*>(context_impl)
               ->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
         });
   }
 
+  // Hash all the settings that affect whether the server will allow/accept
+  // the client connection.  This ensures that the client is always validated against
+  // the correct settings, even if session resumption across different listeners
+  // is enabled.
   uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
   unsigned session_context_len = 0;
+  EVP_MD_CTX md;
+  int rc = EVP_DigestInit(&md, EVP_sha256());
+  RELEASE_ASSERT(rc == 1);
+
+  // Include SERVER_SESSION_ID_CONTEXT so that if all the other verify-settings are unset
+  // we have a deterministic value.
+  rc = EVP_DigestUpdate(&md, &SERVER_SESSION_ID_CONTEXT, sizeof(SERVER_SESSION_ID_CONTEXT));
+  RELEASE_ASSERT(rc == 1);
+
   if (ca_cert_ != nullptr) {
-    // If there is a CA cert, only allow resuming in a context with the same
-    // CA cert.  This ensures that the client is always validated against
-    // the correct CA cert, even if session resumption across different listeners
-    // is enabled.
-    int ret = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
-    if (ret != 1) {
-      throw EnvoyException("Failed to hash ca_cert");
-    }
-  } else {
-    memcpy(session_context_buf, &SERVER_SESSION_ID_CONTEXT, sizeof(SERVER_SESSION_ID_CONTEXT));
-    session_context_len = sizeof(SERVER_SESSION_ID_CONTEXT);
+    rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
+    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    RELEASE_ASSERT(rc == 1);
   }
 
-  int ret = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
-  if (ret != 1) {
-    throw EnvoyException("Failed to set session id context");
+  for (const std::string& name : verify_subject_alt_name_list_) {
+    rc = EVP_DigestUpdate(&md, name.data(), name.size());
+    RELEASE_ASSERT(rc == 1);
   }
+
+  rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
+                        verify_certificate_hash_.size() *
+                            sizeof(decltype(verify_certificate_hash_)::value_type));
+  RELEASE_ASSERT(rc == 1);
+
+  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1);
+  rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
@@ -451,21 +466,21 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   if (encrypt == 1) {
     // Encrypt
     RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
-    const SessionTicketKey& enc_key = session_ticket_keys_.front();
+    const SessionTicketKey& key = session_ticket_keys_.front();
 
-    RELEASE_ASSERT(enc_key.name.size() == SSL_TICKET_KEY_NAME_LEN);
-    std::copy_n(enc_key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
+    static_assert(std::tuple_size<decltype(key.name)>::value == SSL_TICKET_KEY_NAME_LEN,
+                  "Expected key.name length");
+    std::copy_n(key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
 
-    if (!RAND_bytes(iv, EVP_CIPHER_iv_length(cipher))) {
+    int got_rand_bytes = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
+    RELEASE_ASSERT(got_rand_bytes);
+
+    RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
+    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
       return -1;
     }
 
-    ASSERT(enc_key.aes_key.size() == EVP_CIPHER_key_length(cipher));
-    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, enc_key.aes_key.data(), iv)) {
-      return -1;
-    }
-
-    if (!HMAC_Init_ex(hmac_ctx, enc_key.hmac_key.data(), enc_key.hmac_key.size(), hmac, nullptr)) {
+    if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
       return -1;
     }
 
@@ -474,13 +489,14 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
     // Decrypt
     bool is_enc_key = true; // first element is the encryption key
     for (const SessionTicketKey& key : session_ticket_keys_) {
-      RELEASE_ASSERT(key.name.size() == SSL_TICKET_KEY_NAME_LEN);
+      static_assert(std::tuple_size<decltype(key.name)>::value == SSL_TICKET_KEY_NAME_LEN,
+                    "Expected key.name length");
       if (std::equal(key.name.begin(), key.name.end(), key_name)) {
         if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
           return 0;
         }
 
-        ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
+        RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
         if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
           return 0;
         }

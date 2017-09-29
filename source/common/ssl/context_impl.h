@@ -87,10 +87,9 @@ protected:
 
   /**
    * The global SSL-library index used for storing a pointer to the context
-   * in the SSL instance, for retrieval in callbacks.  This is initialized
-   * when the first ContextImpl is instantiated, and is read-only after that.
+   * in the SSL instance, for retrieval in callbacks.
    */
-  static int ssl_context_index_;
+  static int sslContextIndex();
 
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
   int verifyCertificate(X509* cert);
@@ -153,8 +152,8 @@ private:
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
   struct SessionTicketKey {
     std::array<uint8_t, SSL_TICKET_KEY_NAME_LEN> name;
-    std::array<uint8_t, 32> aes_key;
-    std::array<uint8_t, 32> hmac_key;
+    std::array<uint8_t, SHA256_DIGEST_LENGTH> hmac_key;
+    std::array<uint8_t, 256 / 8> aes_key;
   };
   std::vector<SessionTicketKey> session_ticket_keys_;
 };
