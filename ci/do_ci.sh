@@ -121,6 +121,10 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   rsync -av "${ENVOY_BUILD_DIR}"/bazel-envoy/generated/coverage/ "${ENVOY_COVERAGE_DIR}"
   exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
+  # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
+  # build when compiled with Clang 5. Revisit when Coverity Scan explicitly
+  # supports Clang 5. Until this issue is resolved, run Coverity Scan with
+  # the GCC toolchain.
   setup_gcc_toolchain
   echo "bazel Coverity Scan build"
   echo "Building..."
@@ -129,7 +133,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
     -c opt //source/exe:envoy-static.stamped
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz "${ENVOY_BUILD_DIR}"/cov-int
-  # Copy the Coverity results somwhere that we can access outside of the container.
+  # Copy the Coverity results somewhere that we can access outside of the container.
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
