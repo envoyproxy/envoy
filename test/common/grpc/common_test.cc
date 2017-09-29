@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Grpc {
 
-TEST(GrpcCommonTest, getGrpcStatus) {
+TEST(GrpcCommonTest, GetGrpcStatus) {
   Http::TestHeaderMapImpl ok_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
@@ -27,7 +27,7 @@ TEST(GrpcCommonTest, getGrpcStatus) {
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
 }
 
-TEST(GrpcCommonTest, getGrpcMessage) {
+TEST(GrpcCommonTest, GetGrpcMessage) {
   Http::TestHeaderMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));
 
@@ -38,7 +38,7 @@ TEST(GrpcCommonTest, getGrpcMessage) {
   EXPECT_EQ("", Common::getGrpcMessage(empty_error_trailers));
 }
 
-TEST(GrpcCommonTest, chargeStats) {
+TEST(GrpcCommonTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
   Common::chargeStat(cluster, "service", "method", true);
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
@@ -68,7 +68,7 @@ TEST(GrpcCommonTest, chargeStats) {
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.total").value());
 }
 
-TEST(GrpcCommonTest, prepareHeaders) {
+TEST(GrpcCommonTest, PrepareHeaders) {
   Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name");
 
   EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
@@ -77,7 +77,7 @@ TEST(GrpcCommonTest, prepareHeaders) {
   EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 }
 
-TEST(GrpcCommonTest, resolveServiceAndMethod) {
+TEST(GrpcCommonTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
   Http::HeaderMapImpl headers;
@@ -96,6 +96,51 @@ TEST(GrpcCommonTest, resolveServiceAndMethod) {
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
   path.value(std::string("/service_name/"));
   EXPECT_FALSE(Common::resolveServiceAndMethod(&path, &service, &method));
+}
+
+TEST(GrpcCommonTest, GrpcToHttpStatus) {
+  const std::vector<std::pair<Status::GrpcStatus, uint64_t>> test_set = {
+      {Status::GrpcStatus::Ok, 200},
+      {Status::GrpcStatus::Canceled, 499},
+      {Status::GrpcStatus::Unknown, 500},
+      {Status::GrpcStatus::InvalidArgument, 400},
+      {Status::GrpcStatus::DeadlineExceeded, 504},
+      {Status::GrpcStatus::NotFound, 404},
+      {Status::GrpcStatus::AlreadyExists, 409},
+      {Status::GrpcStatus::PermissionDenied, 403},
+      {Status::GrpcStatus::ResourceExhausted, 429},
+      {Status::GrpcStatus::FailedPrecondition, 400},
+      {Status::GrpcStatus::Aborted, 409},
+      {Status::GrpcStatus::OutOfRange, 400},
+      {Status::GrpcStatus::Unimplemented, 501},
+      {Status::GrpcStatus::Internal, 500},
+      {Status::GrpcStatus::Unavailable, 503},
+      {Status::GrpcStatus::DataLoss, 500},
+      {Status::GrpcStatus::Unauthenticated, 401},
+      {Status::GrpcStatus::InvalidCode, 500},
+  };
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, Common::grpcToHttpStatus(test_case.first));
+  }
+}
+
+TEST(GrpcCommonTest, HasGrpcContentType) {
+  {
+    Http::TestHeaderMapImpl headers{};
+    EXPECT_FALSE(Common::hasGrpcContentType(headers));
+  }
+  auto isGrpcContentType = [](const std::string& s) {
+    Http::TestHeaderMapImpl headers{{"content-type", s}};
+    return Common::hasGrpcContentType(headers);
+  };
+  EXPECT_FALSE(isGrpcContentType(""));
+  EXPECT_FALSE(isGrpcContentType("application/text"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc+"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc+foo"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-web"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
 } // namespace Grpc
