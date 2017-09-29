@@ -480,8 +480,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     chargeUpstreamCode(code, upstream_host,
                        reset_reason.valid() &&
                            reset_reason.value() == Http::StreamResetReason::Overflow);
-    // If we had non-5xx but still have been reset by backend or timeout, we
-    // treat this as an error.
+    // If we had non-5xx but still have been reset by backend or timeout before
+    // starting response, we treat this as an error.
     if (!Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
@@ -507,6 +507,26 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   }
 
   throw std::invalid_argument("Unknown reset_reason");
+}
+
+void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  // We need to defer gRPC success until after we have processed grpc-status in
+  // the trailers.
+  if (grpc_request_) {
+    if (end_stream) {
+      Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+      if (grpc_status.valid() &&
+          !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+        upstream_request_->upstream_host_->stats().rq_success_.inc();
+      } else {
+        upstream_request_->upstream_host_->stats().rq_error_.inc();
+      }
+    } else {
+      upstream_request_->grpc_rq_success_deferred_ = true;
+    }
+  } else {
+    upstream_request_->upstream_host_->stats().rq_success_.inc();
+  }
 }
 
 void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -554,24 +574,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
       upstream_request_->upstream_host_->canary();
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   chargeUpstreamCode(response_code, *headers, upstream_request_->upstream_host_, false);
-  // We need to defer gRPC success until after we have processed
-  // grpc-status in the trailers.
   if (!Http::CodeUtility::is5xx(response_code)) {
-    if (grpc_request_) {
-      if (end_stream) {
-        Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
-        if (grpc_status.valid() &&
-            !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
-          upstream_request_->upstream_host_->stats().rq_success_.inc();
-        } else {
-          upstream_request_->upstream_host_->stats().rq_error_.inc();
-        }
-      } else {
-        upstream_request_->grpc_rq_success_deferred_ = true;
-      }
-    } else {
-      upstream_request_->upstream_host_->stats().rq_success_.inc();
-    }
+    handleNon5xxResponseHeaders(*headers, end_stream);
   }
 
   downstream_response_started_ = true;
@@ -585,7 +589,7 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     // gRPC request termination without trailers is an error.
-    if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+    if (upstream_request_->grpc_rq_success_deferred_) {
       upstream_request_->upstream_host_->stats().rq_error_.inc();
     }
     onUpstreamComplete();
@@ -595,7 +599,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
-  if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+  if (upstream_request_->grpc_rq_success_deferred_) {
     Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status.valid() &&
         !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
