@@ -90,7 +90,7 @@ TEST_F(CodeUtilityTest, Canary) {
 }
 
 TEST_F(CodeUtilityTest, All) {
-  std::vector<std::pair<Code, std::string>> testSet = {
+  const std::vector<std::pair<Code, std::string>> test_set = {
       std::make_pair(Code::Continue, "Continue"),
       std::make_pair(Code::OK, "OK"),
       std::make_pair(Code::Created, "Created"),
@@ -149,8 +149,8 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required"),
       std::make_pair(static_cast<Code>(600), "Unknown")};
 
-  for (const auto& testCase : testSet) {
-    EXPECT_EQ(testCase.second, CodeUtility::toString(testCase.first));
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, CodeUtility::toString(test_case.first));
   }
 
   EXPECT_EQ(std::string("Unknown"), CodeUtility::toString(static_cast<Code>(600)));
