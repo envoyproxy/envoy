@@ -138,7 +138,9 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType(""));
   EXPECT_FALSE(isGrpcContentType("application/text"));
   EXPECT_TRUE(isGrpcContentType("application/grpc"));
+  EXPECT_TRUE(isGrpcContentType("application/grpc+"));
   EXPECT_TRUE(isGrpcContentType("application/grpc+foo"));
+  EXPECT_FALSE(isGrpcContentType("application/grpc-"));
   EXPECT_FALSE(isGrpcContentType("application/grpc-web"));
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }

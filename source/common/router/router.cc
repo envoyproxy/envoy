@@ -481,7 +481,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
                        reset_reason.valid() &&
                            reset_reason.value() == Http::StreamResetReason::Overflow);
     // If we had non-5xx but still have been reset by backend or timeout before
-    // starting response, we treat this as an error.
+    // starting response, we treat this as an error. We only get non-5xx when
+    // timeout_response_code_ is used for code above, where this member can
+    // assume values such as 204 (NoContent).
     if (!Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
@@ -543,6 +545,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   if (retry_state_) {
     RetryStatus retry_status = retry_state_->shouldRetry(
         headers.get(), Optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
+    // Capture upstream_host since setupRetry() in the following line will clear
+    // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeUtility::chargeBasicResponseStat(

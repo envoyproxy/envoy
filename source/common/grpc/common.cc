@@ -34,14 +34,14 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   }
   // Exact match with application/grpc. This and the above case are likely the
   // two most common encountered.
-  if (Http::Headers::get().ContentTypeValues.Grpc == content_type->value().c_str()) {
+  if (content_type->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str()) {
     return true;
   }
   // Prefix match with application/grpc+. It's not sufficient to rely on the an
-  // applicatin/grpc prefix match, since there are related content types such as
+  // application/grpc prefix match, since there are related content types such as
   // application/grpc-web.
-  if (StringUtil::startsWith(content_type->value().c_str(),
-                             Http::Headers::get().ContentTypeValues.Grpc + "+")) {
+  if (content_type->value().size() > Http::Headers::get().ContentTypeValues.Grpc.size() &&
+      content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+') {
     return true;
   }
   // This must be something like application/grpc-web.
