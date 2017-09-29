@@ -24,14 +24,19 @@ namespace Server {
  */
 class SharedMemory {
 public:
-  static std::string version();
+  static void configure(size_t max_num_stats, size_t max_stat_name_len);
+  static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
+  std::string version();
 
 private:
   struct Flags {
     static const uint64_t INITIALIZING = 0x1;
   };
 
-  SharedMemory() {}
+  // Due to the flexible-array-length of stats_slots_, c-style allocation
+  // and initialization are neccessary.
+  SharedMemory() = delete;
+  ~SharedMemory() = delete;
 
   /**
    * Initialize the shared memory segment, depending on whether we should be the first running
@@ -48,12 +53,16 @@ private:
 
   uint64_t size_;
   uint64_t version_;
+  uint64_t num_stats_;
+  uint64_t entry_size_;
   std::atomic<uint64_t> flags_;
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
   pthread_mutex_t stat_lock_;
   pthread_mutex_t init_lock_;
-  std::array<Stats::RawStatData, 16384> stats_slots_;
+  alignas(Stats::RawStatData) uint8_t
+      stats_slots_[]; // array of Stats::RawStatData, which has a flexible-array-length member
+                      // so non-fixed size
 
   friend class HotRestartImpl;
 };

@@ -1,9 +1,7 @@
 #include "server/hot_restart_impl.h"
 
 #include <signal.h>
-#include <sys/mman.h>
 #include <sys/prctl.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 
@@ -25,11 +23,14 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 8;
+const uint64_t SharedMemory::VERSION = 9;
 
 SharedMemory& SharedMemory::initialize(Options& options, Api::OsSysCalls& os_sys_calls) {
+  const uint64_t entry_size = Stats::RawStatData::size();
+  const uint64_t total_size = sizeof(SharedMemory) + (entry_size * options.maxStats());
+
   int flags = O_RDWR;
-  std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
+  const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
     flags |= O_CREAT | O_EXCL;
 
@@ -44,26 +45,35 @@ SharedMemory& SharedMemory::initialize(Options& options, Api::OsSysCalls& os_sys
   }
 
   if (options.restartEpoch() == 0) {
-    int rc = os_sys_calls.ftruncate(shmem_fd, sizeof(SharedMemory));
+    int rc = os_sys_calls.ftruncate(shmem_fd, total_size);
     RELEASE_ASSERT(rc != -1);
     UNREFERENCED_PARAMETER(rc);
   }
 
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(os_sys_calls.mmap(
-      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
+      os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
   RELEASE_ASSERT(shmem != MAP_FAILED);
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(shmem)) == 0);
 
   if (options.restartEpoch() == 0) {
-    shmem->size_ = sizeof(SharedMemory);
+    shmem->size_ = total_size;
     shmem->version_ = VERSION;
+    shmem->num_stats_ = options.maxStats();
+    shmem->entry_size_ = entry_size;
     shmem->initializeMutex(shmem->log_lock_);
     shmem->initializeMutex(shmem->access_log_lock_);
     shmem->initializeMutex(shmem->stat_lock_);
     shmem->initializeMutex(shmem->init_lock_);
   } else {
-    RELEASE_ASSERT(shmem->size_ == sizeof(SharedMemory));
+    RELEASE_ASSERT(shmem->size_ == total_size);
     RELEASE_ASSERT(shmem->version_ == VERSION);
+    RELEASE_ASSERT(shmem->num_stats_ == options.maxStats());
+    RELEASE_ASSERT(shmem->entry_size_ == entry_size);
   }
+
+  // Stats::RawStatData must be naturally aligned for atomics to work properly.
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_slots_) % alignof(Stats::RawStatData)) ==
+                 0);
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -86,7 +96,12 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeof(SharedMemory)); }
+std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len) {
+  return fmt::format("{}.{}.{}.{}", VERSION, sizeof(SharedMemory), max_num_stats,
+                     max_stat_name_len);
+}
+
+std::string SharedMemory::version() { return version(num_stats_, Stats::RawStatData::size()); }
 
 HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
     : options_(options), shmem_(SharedMemory::initialize(options, os_sys_calls)),
@@ -110,12 +125,14 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Stats::RawStatData* unused = nullptr;
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-  for (Stats::RawStatData& data : shmem_.stats_slots_) {
-    if (!data.initialized()) {
-      unused = &data;
-    } else if (data.matches(name)) {
-      data.ref_count_++;
-      return &data;
+  for (uint64_t i = 0; i < shmem_.num_stats_; i++) {
+    const size_t offset = shmem_.entry_size_ * i;
+    Stats::RawStatData* data = reinterpret_cast<Stats::RawStatData*>(shmem_.stats_slots_ + offset);
+    if (!data->initialized()) {
+      unused = data;
+    } else if (data->matches(name)) {
+      data->ref_count_++;
+      return data;
     }
   }
 
@@ -135,7 +152,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
     return;
   }
 
-  memset(&data, 0, sizeof(Stats::RawStatData));
+  memset(&data, 0, Stats::RawStatData::size());
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls) {
@@ -153,8 +170,8 @@ int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls)
 }
 
 sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
-  // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
-  // stats up it will kill the oldest parent.
+  // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the
+  // third stats up it will kill the oldest parent.
   const uint64_t MAX_CONCURRENT_PROCESSES = 3;
   id = id % MAX_CONCURRENT_PROCESSES;
 
@@ -195,20 +212,18 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
 }
 
 void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
-  // There exists a race condition during hot restart involving fetching parent stats. It looks like
-  // this:
-  // 1) There currently exist 2 Envoy processes (draining has not completed): P0 and P1.
-  // 2) New process (P2) comes up and passes the INITIALIZING check.
-  // 3) P2 proceeds to the parent admin shutdown phase.
-  // 4) This races with P1 fetching parent stats from P0.
-  // 5) Calling receiveTypedRpc() below picks up the wrong message.
+  // There exists a race condition during hot restart involving fetching parent stats. It looks
+  // like this: 1) There currently exist 2 Envoy processes (draining has not completed): P0 and
+  // P1. 2) New process (P2) comes up and passes the INITIALIZING check. 3) P2 proceeds to the
+  // parent admin shutdown phase. 4) This races with P1 fetching parent stats from P0. 5) Calling
+  // receiveTypedRpc() below picks up the wrong message.
   //
-  // There are not any great solutions to this problem. We could potentially guard this using flags,
-  // but this is a legitimate race condition even under normal restart conditions, so exiting P2
-  // with an error is not great. We could also rework all of this code so that P0<->P1 and P1<->P2
-  // communication occur over different socket pairs. This could work, but is a large change. We
-  // could also potentially use connection oriented sockets and accept connections from our child,
-  // and connect to our parent, but again, this becomes complicated.
+  // There are not any great solutions to this problem. We could potentially guard this using
+  // flags, but this is a legitimate race condition even under normal restart conditions, so
+  // exiting P2 with an error is not great. We could also rework all of this code so that P0<->P1
+  // and P1<->P2 communication occur over different socket pairs. This could work, but is a large
+  // change. We could also potentially use connection oriented sockets and accept connections from
+  // our child, and connect to our parent, but again, this becomes complicated.
   //
   // Instead, we guard this condition with a lock. However, to avoid deadlock, we must try_lock()
   // in this path, since this call runs in the same thread as the event loop that is receiving
@@ -438,7 +453,7 @@ void HotRestartImpl::terminateParent() {
 
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
-std::string HotRestartImpl::version() { return SharedMemory::version(); }
+std::string HotRestartImpl::version() { return shmem_.version(); }
 
 } // namespace Server
 } // namespace Envoy

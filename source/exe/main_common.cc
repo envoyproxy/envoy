@@ -40,6 +40,8 @@ public:
 } // namespace Server
 
 int main_common(OptionsImpl& options) {
+  Stats::RawStatData::configure(options);
+
 #ifdef ENVOY_HOT_RESTART
   Api::OsSysCallsImpl os_sys_calls_impl;
   std::unique_ptr<Server::HotRestartImpl> restarter;

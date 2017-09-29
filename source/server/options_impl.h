@@ -14,7 +14,9 @@ namespace Envoy {
  */
 class OptionsImpl : public Server::Options {
 public:
-  OptionsImpl(int argc, char** argv, const std::string& hot_restart_version,
+  typedef std::function<std::string(uint64_t, uint64_t)> HotRestartVersionCB;
+
+  OptionsImpl(int argc, char** argv, const HotRestartVersionCB& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
   // Server::Options
@@ -33,6 +35,8 @@ public:
   const std::string& serviceClusterName() override { return service_cluster_; }
   const std::string& serviceNodeName() override { return service_node_; }
   const std::string& serviceZone() override { return service_zone_; }
+  uint64_t maxStats() override { return max_stats_; }
+  uint64_t maxStatNameLength() override { return max_stat_name_length_; }
 
 private:
   uint64_t base_id_;
@@ -50,5 +54,7 @@ private:
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
+  uint64_t max_stats_;
+  uint64_t max_stat_name_length_;
 };
 } // namespace Envoy

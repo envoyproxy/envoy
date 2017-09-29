@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/common/c_smart_ptr.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
@@ -31,10 +32,9 @@ public:
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
-    std::unique_ptr<RawStatData>& stat_ref = stats_[name];
+    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
     if (!stat_ref) {
-      stat_ref.reset(new RawStatData());
-      memset(stat_ref.get(), 0, sizeof(RawStatData));
+      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
       stat_ref->initialize(name);
     } else {
       stat_ref->ref_count_++;
@@ -59,7 +59,8 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::unique_ptr<RawStatData>> stats_;
+  static void freeAdapter(RawStatData* data) { ::free(data); }
+  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
 };
 
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {

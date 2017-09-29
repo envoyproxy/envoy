@@ -12,8 +12,16 @@
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
+#ifndef ENVOY_DEFAULT_MAX_STATS
+#define ENVOY_DEFAULT_MAX_STATS 16384
+#endif
+
+#ifndef ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH
+#define ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH 127
+#endif
+
 namespace Envoy {
-OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_version,
+OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCB& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = "Log levels: ";
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
@@ -64,6 +72,13 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                     "One of 'serve' (default; validate configs and then serve "
                                     "traffic normally) or 'validate' (validate configs and exit).",
                                     false, "serve", "string", cmd);
+  TCLAP::ValueArg<uint64_t> max_stats("", "max-stats",
+                                      "Maximum number of stats guages and counters "
+                                      "that can be allocated in shared memory.",
+                                      false, ENVOY_DEFAULT_MAX_STATS, "uint64_t", cmd);
+  TCLAP::ValueArg<uint64_t> max_stat_name_len("", "max-stat-name-len",
+                                              "Maximum name length for a stat", false,
+                                              ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH, "uint64_t", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -73,7 +88,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   }
 
   if (hot_restart_version_option.getValue()) {
-    std::cerr << hot_restart_version;
+    std::cerr << hot_restart_version_cb(max_stats.getValue(), max_stat_name_len.getValue());
     exit(0);
   }
 
@@ -116,5 +131,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
+  max_stats_ = max_stats.getValue();
+  max_stat_name_length_ = max_stat_name_len.getValue();
 }
 } // namespace Envoy

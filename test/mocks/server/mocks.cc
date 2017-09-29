@@ -25,6 +25,8 @@ MockOptions::MockOptions(const std::string& config_path)
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
   ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
+  ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
+  ON_CALL(*this, maxStatNameLength()).WillByDefault(Return(64));
 }
 MockOptions::~MockOptions() {}
 
