@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -197,7 +198,7 @@ struct Http2Settings {
   // initial value from HTTP/2 spec, same as NGHTTP2_DEFAULT_HEADER_TABLE_SIZE from nghttp2
   static const uint32_t DEFAULT_HPACK_TABLE_SIZE = (1 << 12);
   // no maximum from HTTP/2 spec, use unsigned 32-bit maximum
-  static const uint32_t MAX_HPACK_TABLE_SIZE = 0xFFFFFFFF;
+  static const uint32_t MAX_HPACK_TABLE_SIZE = std::numeric_limits<uint32_t>::max();
 
   // TODO(jwfang): make this 0, the HTTP/2 spec minimum
   static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
