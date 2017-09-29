@@ -291,8 +291,8 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string key_;
-    uint64_t default_;
+    std::string key_{};
+    uint64_t default_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
