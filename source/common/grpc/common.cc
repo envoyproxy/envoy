@@ -113,6 +113,7 @@ Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
 }
 
 uint64_t Common::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
+  // From https://cloud.google.com/apis/design/errors#handling_errors.
   switch (grpc_status) {
   case Status::GrpcStatus::Ok:
     return 200;
