@@ -2,6 +2,12 @@
 
 set -e
 
+# TODO(zuercher): Xcode 9 seems to need this or else boringssl doesn't compile
+if [[ `uname` == "Darwin" ]];
+then
+    export CPPFLAGS="$CPPFLAGS -D_DARWIN_C_SOURCE"
+fi
+
 COMMIT=14308731e5446a73ac2258688a9688b524483cb6  # chromium-61.0.3163.81
 
 git clone https://boringssl.googlesource.com/boringssl
