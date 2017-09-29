@@ -4,7 +4,7 @@
 # * https://github.com/bazelbuild/bazel/issues/2840
 # * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 #
-# See cc_configure.bzl.diff for the changes made in this fork.
+# See cc_configure.bzl.diff for the changes made in this fork against bazel release 0.6.0.
 
 # Copyright 2016 The Bazel Authors. All rights reserved.
 #
@@ -27,6 +27,8 @@ load("//bazel:lib_cc_configure.bzl", "get_cpu_value")
 
 def _impl(repository_ctx):
   repository_ctx.file("tools/cpp/empty.cc", "int main() {}")
+  repository_ctx.symlink(
+      Label("@bazel_tools//tools/cpp:dummy_toolchain.bzl"), "dummy_toolchain.bzl")
   cpu_value = get_cpu_value(repository_ctx)
   if cpu_value == "freebsd":
     fail("freebsd support needs to be added to the Envoy Bazel cc_configure.bzl fork")
