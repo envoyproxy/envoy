@@ -70,7 +70,6 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
 
   std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
-
     try {
       Json::ObjectSharedPtr json_body = Json::Factory::loadFromString(body);
       chargeTablePartitionIdStats(*json_body);

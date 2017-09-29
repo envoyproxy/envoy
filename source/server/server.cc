@@ -392,8 +392,9 @@ void InstanceImpl::initializeStatsTags(const envoy::api::v2::Bootstrap& bootstra
     }
 
     tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(name, regex));
-    stats_store_.addTagExtractor(*tag_extractors_.back());
   };
+
+  stats_store_.setTagExtractors(tag_extractors_);
 
   // Add defaults.
   if (!bootstrap.stats_config().has_use_all_default_tags() ||

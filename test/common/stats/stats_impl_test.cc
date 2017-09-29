@@ -84,9 +84,11 @@ TEST(TagExtractorTest, SingleSubexpression) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester(std::vector<std::string>&& names) {
-    for (std::string& name : names) {
-      tag_extractors_.emplace_back(TagExtractorImpl::createTagExtractor(name, ""));
+  DefaultTagRegexTester() {
+    const auto& tag_names = Config::TagNames::get();
+
+    for (const std::pair<std::string, std::string>& name_and_regex : tag_names.regex_map_) {
+      tag_extractors_.emplace_back(TagExtractorImpl::createTagExtractor(name_and_regex.first, ""));
     }
   }
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
@@ -128,31 +130,10 @@ public:
 };
 
 TEST(TagExtractorTest, DefaultTagExtractors) {
-  const auto tag_names = Config::TagNames::get();
+  const auto& tag_names = Config::TagNames::get();
 
   // General cluster name
-  DefaultTagRegexTester regex_tester({tag_names.CLUSTER_NAME,
-                                      tag_names.LISTENER_PORT,
-                                      tag_names.HTTP_CONN_MANAGER_PREFIX,
-                                      tag_names.HTTP_USER_AGENT,
-                                      tag_names.SSL_CIPHER,
-                                      tag_names.CLIENTSSL_PREFIX,
-                                      tag_names.MONGO_PREFIX,
-                                      tag_names.MONGO_CMD,
-                                      tag_names.MONGO_COLLECTION,
-                                      tag_names.MONGO_CALLSITE,
-                                      tag_names.RATELIMIT_PREFIX,
-                                      tag_names.TCP_PREFIX,
-                                      tag_names.FAULT_DOWNSTREAM_CLUSTER,
-                                      tag_names.DYNAMO_OPERATION,
-                                      tag_names.DYNAMO_TABLE,
-                                      tag_names.DYNAMO_PARTITION_ID,
-                                      tag_names.GRPC_BRIDGE_SERVICE,
-                                      tag_names.GRPC_BRIDGE_METHOD,
-                                      tag_names.VIRTUAL_HOST,
-                                      tag_names.VIRTUAL_CLUSTER,
-                                      tag_names.RESPONSE_CODE,
-                                      tag_names.RESPONSE_CODE_CLASS});
+  DefaultTagRegexTester regex_tester;
 
   // Cluster name
   Tag cluster_tag;

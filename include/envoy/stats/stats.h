@@ -41,14 +41,12 @@ public:
    * Updates the tag extracted name and the set of tags by extracting the tag represented by this
    * TagExtractor. If the tag is not represented in the current tag_extracted_name, nothing will be
    * modified.
-   * @param tag_extracted_name name from which the tag will be removed if found to be
-   * represented in the name.
+   * @param name name from which the tag will be removed if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the
-   * tag_extracted_name.
+   * name.
    * @returns modified tag_extracted_name with the tag removed.
    */
-  virtual std::string updateTags(const std::string& tag_extracted_name,
-                                 std::vector<Tag>& tags) const PURE;
+  virtual std::string updateTags(const std::string& name, std::vector<Tag>& tags) const PURE;
 };
 
 typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
@@ -282,7 +280,7 @@ public:
   /**
    * Add an extractor to extract a portion of stats names as a tag.
    */
-  virtual void addTagExtractor(const TagExtractor& tag_extractor) PURE;
+  virtual void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractor) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have
