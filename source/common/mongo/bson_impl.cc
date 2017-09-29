@@ -1,6 +1,7 @@
 #include "common/mongo/bson_impl.h"
 
 #include <cstdint>
+#include <endian.h>
 #include <sstream>
 #include <string>
 
@@ -8,7 +9,7 @@
 #include "common/common/byte_order.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include <endian.h>
+
 #include "fmt/format.h"
 
 namespace Envoy {
