@@ -253,6 +253,11 @@ public:
    * @return tracing config.
    */
   virtual const TracingConnectionManagerConfig* tracingConfig() PURE;
+
+  /**
+   * @return ConnectionManagerStats& the listener stats to write to.
+   */
+  virtual ConnectionManagerStats& listenerStats() PURE;
 };
 
 /**
@@ -603,6 +608,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
+  ConnectionManagerStats& listener_stats_;
 };
 
 } // Http

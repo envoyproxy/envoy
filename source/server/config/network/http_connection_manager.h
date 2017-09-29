@@ -92,6 +92,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
+  Http::ConnectionManagerStats& listenerStats() override { return listener_stats_; }
 
   static const std::string DEFAULT_SERVER_STRING;
 
@@ -119,6 +120,7 @@ private:
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
+  Http::ConnectionManagerStats listener_stats_;
 };
 
 } // namespace Configuration

@@ -45,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:empty_string",
         "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
