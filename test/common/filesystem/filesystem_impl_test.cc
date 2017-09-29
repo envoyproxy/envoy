@@ -133,7 +133,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
       .WillOnce(Invoke([](int, const void*, size_t num_bytes) -> ssize_t { return num_bytes; }));
   file.write("prime-it");
   file.flush();
-  unsigned expected_writes = 1;
+  uint32_t expected_writes = 1;
   {
     std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
     EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
