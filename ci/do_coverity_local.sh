@@ -15,15 +15,15 @@ set -e
 . ./ci/envoy_build_sha.sh
 
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
-mkdir -p ${ENVOY_DOCKER_BUILD_DIR}
+mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 TEST_TYPE="bazel.coverity"
-COVERITY_USER_EMAIL=${COVERITY_USER_EMAIL:-$(git config user.email)}
+COVERITY_USER_EMAIL="${COVERITY_USER_EMAIL:-$(git config user.email)}"
 COVERITY_OUTPUT_FILE="${ENVOY_DOCKER_BUILD_DIR}"/envoy/source/exe/envoy-coverity-output.tgz
 
-if [ -n "$COVERITY_TOKEN" ]
+if [ -n "${COVERITY_TOKEN}" ]
 then
-  pushd ${ENVOY_DOCKER_BUILD_DIR}
+  pushd "${ENVOY_DOCKER_BUILD_DIR}"
   rm -rf cov-analysis
   wget https://scan.coverity.com/download/linux64 --post-data "token=${COVERITY_TOKEN}&project=Envoy+Proxy" -O coverity_tool.tgz
   tar xvf coverity_tool.tgz
@@ -36,11 +36,8 @@ fi
 
 ci/run_envoy_docker.sh "ci/do_ci.sh ${TEST_TYPE}"
 
-if [ -z "$COVERITY_TOKEN" ]
-then
-  echo "COVERITY_TOKEN environment variable not set."
-  echo "Manually submit build result to https://scan.coverity.com/projects/envoy-proxy/builds/new."
-elif [[ $(find "${COVERITY_OUTPUT_FILE}" -type f -size +256M 2>/dev/null) ]]
+# Check the artifact size as an approximation for determining if the scan tool was successful.
+if [[ $(find "${COVERITY_OUTPUT_FILE}" -type f -size +256M 2>/dev/null) ]]
 then
   echo "Uploading Coverity Scan build"
   curl \
@@ -50,7 +47,6 @@ then
     --form version="${ENVOY_BUILD_SHA}" \
     --form description="Envoy Proxy Build ${ENVOY_BUILD_SHA}" \
     https://scan.coverity.com/builds?project=Envoy+Proxy
-
 else
   echo "Coverity Scan output file appears to be too small."
   echo "Not submitting build for analysis."
