@@ -78,6 +78,7 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:os_sys_calls_impl_lib",
         "//source/server/config_validation:server_lib",
     ],
 )

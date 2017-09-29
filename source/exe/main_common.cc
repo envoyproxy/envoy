@@ -16,6 +16,7 @@
 
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
+#include "server/os_sys_calls_impl.h"
 #endif
 
 #include "ares.h"
@@ -40,9 +41,10 @@ public:
 
 int main_common(OptionsImpl& options) {
 #ifdef ENVOY_HOT_RESTART
+  Server::OsSysCallsImpl os_sys_calls_impl;
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
-    restarter.reset(new Server::HotRestartImpl(options));
+    restarter.reset(new Server::HotRestartImpl(options, os_sys_calls_impl));
   } catch (Envoy::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;

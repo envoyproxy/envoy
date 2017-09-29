@@ -200,6 +200,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "os_sys_calls_impl_lib",
+    srcs = envoy_select_hot_restart(["os_sys_calls_impl.cc"]),
+    hdrs = envoy_select_hot_restart(["os_sys_calls_impl.h"]),
+    deps = [
+        "//include/envoy/server:hot_restart_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],

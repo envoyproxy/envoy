@@ -27,7 +27,7 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 8;
 
-SharedMemory& SharedMemory::initialize(Options& options) {
+SharedMemory& SharedMemory::initialize(Options& options, OsSysCalls& os_sys_calls) {
   int flags = O_RDWR;
   std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
@@ -35,22 +35,22 @@ SharedMemory& SharedMemory::initialize(Options& options) {
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
     // is a clean restart this should then allow the shm_open() call below to succeed.
-    shm_unlink(shmem_name.c_str());
+    os_sys_calls.shm_unlink(shmem_name.c_str());
   }
 
-  int shmem_fd = shm_open(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+  int shmem_fd = os_sys_calls.shm_open(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (shmem_fd == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
   }
 
   if (options.restartEpoch() == 0) {
-    int rc = ftruncate(shmem_fd, sizeof(SharedMemory));
+    int rc = os_sys_calls.ftruncate(shmem_fd, sizeof(SharedMemory));
     RELEASE_ASSERT(rc != -1);
     UNREFERENCED_PARAMETER(rc);
   }
 
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
-      mmap(nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(os_sys_calls.mmap(
+      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
   RELEASE_ASSERT(shmem != MAP_FAILED);
 
   if (options.restartEpoch() == 0) {
@@ -88,10 +88,10 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
 
 std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeof(SharedMemory)); }
 
-HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
-      init_lock_(shmem_.init_lock_) {
+HotRestartImpl::HotRestartImpl(Options& options, OsSysCalls& os_sys_calls)
+    : options_(options), shmem_(SharedMemory::initialize(options, os_sys_calls)),
+      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
+      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
 
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));

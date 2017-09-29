@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/mman.h> // for mode_t
+
 #include <cstdint>
 #include <string>
 
@@ -10,6 +12,16 @@ namespace Envoy {
 namespace Server {
 
 class Instance;
+
+class OsSysCalls {
+public:
+  virtual ~OsSysCalls(){};
+
+  virtual int shm_open(const char* name, int oflag, mode_t mode) PURE;
+  virtual int shm_unlink(const char* name) PURE;
+  virtual int ftruncate(int fd, off_t length) PURE;
+  virtual void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) PURE;
+};
 
 /**
  * Abstracts functionality required to "hot" (live) restart the server including code and
