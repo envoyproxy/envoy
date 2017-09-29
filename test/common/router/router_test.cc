@@ -22,6 +22,7 @@
 
 using testing::AtLeast;
 using testing::Invoke;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -212,19 +213,18 @@ TEST_F(RouterTest, AddCookie) {
             return &cm_.conn_pool_;
           }));
 
+  std::string cookie_value;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
-        add_cookie("foo", std::chrono::seconds(1337));
+        cookie_value = add_cookie("foo", std::chrono::seconds(1337));
         return Optional<uint64_t>(10);
       }));
 
-  EXPECT_CALL(random_, uuid()).WillOnce(Return("bar"));
-
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_STREQ(headers.get(Http::Headers::get().SetCookie)->value().c_str(),
-                     "foo=\"bar\"; Max-Age=1337");
+        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().c_str()},
+                  "foo=\"" + cookie_value + "\"; Max-Age=1337");
       }));
   expectResponseTimerCreate();
 
@@ -307,11 +307,12 @@ TEST_F(RouterTest, AddMultipleCookies) {
             return &cm_.conn_pool_;
           }));
 
+  std::string choco_c, foo_c;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
-        add_cookie("choco", std::chrono::seconds(15));
-        add_cookie("foo", std::chrono::seconds(1337));
+        choco_c = add_cookie("choco", std::chrono::seconds(15));
+        foo_c = add_cookie("foo", std::chrono::seconds(1337));
         return Optional<uint64_t>(10);
       }));
 
@@ -319,24 +320,18 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        std::list<std::string> expected_cookies{
-            "foo=\"bar\"; Max-Age=1337",
-            "choco=\"late\"; Max-Age=15",
-        };
-        PrintTo(headers, &std::cerr);
+        MockFunction<void(const std::string&)> cb;
+        EXPECT_CALL(cb, Call("foo=\"" + foo_c + "\"; Max-Age=1337"));
+        EXPECT_CALL(cb, Call("choco=\"" + choco_c + "\"; Max-Age=15"));
+
         headers.iterate(
             [](const Http::HeaderEntry& header, void* context) {
-              auto expected = static_cast<std::list<std::string>*>(context);
               if (header.key().c_str() == Http::Headers::get().SetCookie.get().c_str()) {
-                auto loc = std::find(expected->begin(), expected->end(),
-                                     std::string{header.value().c_str()});
-                EXPECT_NE(loc, expected->end());
-                expected->erase(loc);
+                static_cast<MockFunction<void(const std::string&)>*>(context)->Call(
+                    std::string(header.value().c_str()));
               }
             },
-            &expected_cookies);
-        EXPECT_TRUE(expected_cookies.empty());
-        EXPECT_EQ(expected_cookies.size(), 0);
+            &cb);
       }));
   expectResponseTimerCreate();
 

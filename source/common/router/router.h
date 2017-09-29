@@ -16,6 +16,8 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/hash.h"
+#include "common/common/hex.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -144,17 +146,29 @@ public:
   }
 
   /**
-   * Set a random cookie with the name @param key and TTL @param max_age to be
-   * sent to the downstream host.
+   * Set a pseudo-random cookie with the name @param key and TTL @param max_age
+   * to be sent to the downstream host.
    * @return std::string the value of the new cookie
    *
    * marked const so it can be called from hashKey(), and because all mutated
    * state is only visible when calling onUpstreamHeaders()
    */
   std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) const {
-    const std::string value = config_.random_.uuid();
-    downstream_set_cookies_.emplace_back(key, value, max_age.count());
-    return value;
+    // The cookie value should be the same per connection so that if multiple
+    // streams race on the same path, they all receive the same cookie.
+    std::string value;
+    const Network::Connection* conn = callbacks_->connection();
+    if (conn) {
+      value = conn->remoteAddress().asString() + conn->localAddress().asString();
+    }
+    if (value.empty()) {
+      // Fall back to random if necessary
+      value = config_.random_.uuid();
+    }
+
+    const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
+    downstream_set_cookies_.emplace_back(key, cookie_value, max_age.count());
+    return cookie_value;
   }
 
 protected:
