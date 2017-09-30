@@ -104,6 +104,7 @@ Filter::~Filter() {
 }
 
 const std::string Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+  // TODO(PiotrSikora): Switch back to std::string& when string == std::string.
   return upstream_host ? upstream_host->locality().zone() : "";
 }
 
