@@ -79,7 +79,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, decodingBuffer()).WillByDefault(Return(buffer_.get()));
+  ON_CALL(*this, decodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 
   ON_CALL(*this, addDownstreamWatermarkCallbacks(_))
       .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
@@ -96,7 +96,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, encodingBuffer()).WillByDefault(Return(buffer_.get()));
+  ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}

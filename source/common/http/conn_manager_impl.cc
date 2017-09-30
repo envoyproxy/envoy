@@ -644,11 +644,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::DecodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -818,11 +819,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters

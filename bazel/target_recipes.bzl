@@ -24,4 +24,5 @@ TARGET_RECIPES = {
     "xxhash": "xxhash",
     "yaml_cpp": "yaml-cpp",
     "zlib": "zlib",
+    "luajit": "luajit",
 }

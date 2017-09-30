@@ -115,6 +115,8 @@ public:
   const std::string ROUTER = "envoy.router";
   // Health checking filter
   const std::string HEALTH_CHECK = "envoy.health_check";
+  // Lua filter
+  const std::string LUA = "envoy.lua";
 
   // Converts names from v1 to v2
   const V1Converter v1_converter_;

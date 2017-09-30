@@ -156,3 +156,10 @@ cc_library(
         "thirdparty_build/include/zlib.h",
     ],
 )
+
+cc_library(
+    name = "luajit",
+    srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
+    hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
+    includes = ["thirdparty_build/include"],
+)
