@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/server/hot_restart.h"
 
 namespace Envoy {
