@@ -219,7 +219,7 @@ Given these `envoy::api::v2::Route` entries:
     },
     "route": {
       "weighted_clusters": {
-        clusters: [
+        "clusters": [
           {
             "name": "c1",
             "weight": 90,
