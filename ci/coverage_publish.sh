@@ -17,7 +17,7 @@ fi
 
 # Generate a tar for artifact upload from every build.
 COVERAGE_DIR="$(dirname "${COVERAGE_FILE}")"
-tar -zcf "${ENVOY_BUILD_DIR}"/envoy/generated/coverage_tar/coverage.tar.gz "${COVERAGE_DIR}"
+#tar -zcf "${ENVOY_BUILD_DIR}"/envoy/generated/coverage_tar/coverage.tar.gz "${COVERAGE_DIR}"
 
 # available for master builds and PRs from originating repository (not forks)
 if [ -z "$CIRCLE_PULL_REQUEST" ]

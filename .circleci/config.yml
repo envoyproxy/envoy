@@ -40,7 +40,7 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.coverage
        - run: ci/coverage_publish.sh
        - store_artifacts:
-           path: /build/envoy/generated/coverage_tar/coverage.tar.gz
+           path: /build/envoy/generated/coverage
    format:
      docker:
        - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
