@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/filesystem/filesystem.h"
 
 namespace Envoy {
@@ -25,7 +26,7 @@ public:
   std::string fileReadToEnd(const std::string& path) override;
 
 private:
-  Filesystem::OsSysCallsPtr os_sys_calls_;
+  OsSysCallsPtr os_sys_calls_;
   std::chrono::milliseconds file_flush_interval_msec_;
 };
 

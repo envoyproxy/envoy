@@ -26,7 +26,7 @@ public:
     Stats::Scope& global_scope_;
     Stats::Scope& cluster_scope_;
     const std::string& prefix_;
-    const HeaderMap& response_headers_;
+    uint64_t response_status_code_;
     bool internal_request_;
     const std::string& request_vhost_name_;
     const std::string& request_vcluster_name_;

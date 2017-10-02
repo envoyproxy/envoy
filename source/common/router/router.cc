@@ -6,6 +6,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -16,6 +17,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -101,12 +103,18 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
-  return upstream_host ? upstream_host->locality().zone() : EMPTY_STRING;
+const std::string Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+  // TODO(PiotrSikora): Switch back to std::string& when string == std::string.
+  return upstream_host ? upstream_host->locality().zone() : "";
 }
 
-void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
+void Filter::chargeUpstreamCode(uint64_t response_status_code,
+                                const Http::HeaderMap& response_headers,
+                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                bool dropped) {
+  // Passing the response_status_code explicitly is an optimization to avoid
+  // multiple calls to slow Http::Utility::getResponseStatus.
+  ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -122,7 +130,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
-                                             response_headers,
+                                             response_status_code,
                                              internal_request,
                                              route_entry_->virtualHost().name(),
                                              request_vcluster_ ? request_vcluster_->name()
@@ -137,7 +145,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
       Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                                cluster_->statsScope(),
                                                alt_stat_prefix_,
-                                               response_headers,
+                                               response_status_code,
                                                internal_request,
                                                EMPTY_STRING,
                                                EMPTY_STRING,
@@ -147,14 +155,24 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
       Http::CodeUtility::chargeResponseStat(info);
     }
+
+    if (upstream_host) {
+      if (dropped) {
+        upstream_host->stats().rq_dropped_.inc();
+      } else if (Http::CodeUtility::is5xx(response_status_code)) {
+        upstream_host->stats().rq_error_.inc();
+      }
+    }
   }
 }
 
 void Filter::chargeUpstreamCode(Http::Code code,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
+                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                bool dropped) {
+  const uint64_t response_status_code = enumToInt(code);
   Http::HeaderMapImpl fake_response_headers{
-      {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
-  chargeUpstreamCode(fake_response_headers, upstream_host);
+      {Http::Headers::get().Status, std::to_string(response_status_code)}};
+  chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
@@ -214,7 +232,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
-    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
+    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
     Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
                                   "maintenance mode");
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
@@ -261,6 +279,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Host());
   ASSERT(headers.Path());
 
+  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
@@ -277,7 +296,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
+  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
                                 "no healthy upstream");
 }
@@ -422,20 +441,27 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     RetryStatus retry_status =
         retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
+      if (upstream_host) {
+        upstream_host->stats().rq_error_.inc();
+      }
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     }
   }
 
-  // This will destroy any created retry timers.
-  cleanup();
-
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
+    if (upstream_request_ != nullptr && upstream_request_->grpc_rq_success_deferred_) {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
+    // This will destroy any created retry timers.
+    cleanup();
     callbacks_->resetStream();
   } else {
+    // This will destroy any created retry timers.
+    cleanup();
     Http::Code code;
     const char* body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
@@ -452,7 +478,16 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    chargeUpstreamCode(code, upstream_host);
+    chargeUpstreamCode(code, upstream_host,
+                       reset_reason.valid() &&
+                           reset_reason.value() == Http::StreamResetReason::Overflow);
+    // If we had non-5xx but still have been reset by backend or timeout before
+    // starting response, we treat this as an error. We only get non-5xx when
+    // timeout_response_code_ is used for code above, where this member can
+    // assume values such as 204 (NoContent).
+    if (!Http::CodeUtility::is5xx(enumToInt(code))) {
+      upstream_host->stats().rq_error_.inc();
+    }
     Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
   }
 }
@@ -477,6 +512,26 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   throw std::invalid_argument("Unknown reset_reason");
 }
 
+void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  // We need to defer gRPC success until after we have processed grpc-status in
+  // the trailers.
+  if (grpc_request_) {
+    if (end_stream) {
+      Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+      if (grpc_status.valid() &&
+          !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+        upstream_request_->upstream_host_->stats().rq_success_.inc();
+      } else {
+        upstream_request_->upstream_host_->stats().rq_error_.inc();
+      }
+    } else {
+      upstream_request_->grpc_rq_success_deferred_ = true;
+    }
+  } else {
+    upstream_request_->upstream_host_->stats().rq_success_.inc();
+  }
+}
+
 void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
   ASSERT(!downstream_response_started_);
@@ -491,10 +546,14 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   if (retry_state_) {
     RetryStatus retry_status = retry_state_->shouldRetry(
         headers.get(), Optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
+    // Capture upstream_host since setupRetry() in the following line will clear
+    // upstream_request_.
+    const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeUtility::chargeBasicResponseStat(
           cluster_->statsScope(), "retry.",
           static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
+      upstream_host->stats().rq_error_.inc();
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
@@ -518,7 +577,11 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   upstream_request_->upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       upstream_request_->upstream_host_->canary();
-  chargeUpstreamCode(*headers, upstream_request_->upstream_host_);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  chargeUpstreamCode(response_code, *headers, upstream_request_->upstream_host_, false);
+  if (!Http::CodeUtility::is5xx(response_code)) {
+    handleNon5xxResponseHeaders(*headers, end_stream);
+  }
 
   downstream_response_started_ = true;
   if (end_stream) {
@@ -530,6 +593,10 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
+    // gRPC request termination without trailers is an error.
+    if (upstream_request_->grpc_rq_success_deferred_) {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
     onUpstreamComplete();
   }
 
@@ -537,6 +604,15 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
+  if (upstream_request_->grpc_rq_success_deferred_) {
+    Optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
+    if (grpc_status.valid() &&
+        !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+      upstream_request_->upstream_host_->stats().rq_success_.inc();
+    } else {
+      upstream_request_->upstream_host_->stats().rq_error_.inc();
+    }
+  }
   onUpstreamComplete();
   callbacks_->encodeTrailers(std::move(trailers));
 }
