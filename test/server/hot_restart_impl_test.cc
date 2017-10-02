@@ -16,16 +16,16 @@ namespace Server {
 TEST(HotRestartImplTest, alloc) {
   MockOsSysCalls os_sys_calls;
   NiceMock<MockOptions> options;
-  CSmartPtr<void, ::free> buffer;
+  std::vector<uint8_t> buffer;
 
   EXPECT_CALL(os_sys_calls, shm_unlink(_));
   EXPECT_CALL(os_sys_calls, shm_open(_, _, _));
   EXPECT_CALL(os_sys_calls, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([&buffer](off_t size) {
-    buffer = calloc(size, 1);
+    buffer.resize(size);
     return 0;
   })));
   EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([&buffer]() {
-    return buffer.get();
+    return buffer.data();
   }));
 
   HotRestartImpl hot_restart1(options, os_sys_calls);
@@ -37,7 +37,7 @@ TEST(HotRestartImplTest, alloc) {
 
   EXPECT_CALL(options, restartEpoch()).WillRepeatedly(Return(1));
   EXPECT_CALL(os_sys_calls, shm_open(_, _, _));
-  EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer.get()));
+  EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer.data()));
   HotRestartImpl hot_restart2(options, os_sys_calls);
   Stats::RawStatData* stat3 = hot_restart2.alloc("stat2");
   EXPECT_EQ(stat2, stat3);
