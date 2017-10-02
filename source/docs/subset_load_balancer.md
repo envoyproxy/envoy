@@ -86,7 +86,8 @@ context and load balancer use the same ordering. Sorting of the `LoadBalancerCon
 currently handled by `Router::RouteEntryImplBase`.
 
 Given a sequence of N metadata keys and values (previously sorted lexically by key) from
-`LoadBalancerContext`, we can look up the appropriate subset in `O(N)` time as follows:
+`LoadBalancerContext`, we can look up the appropriate subset in `O(N)` time as follows. It may be
+helpful to look at the [diagram](#diagram) provided in the example.
 
 1. Initialize `subsets` to refer to the root `LbSubsetMap` and `entry` to point at a null
    `LbSubsetEntryPtr`.
@@ -107,15 +108,17 @@ N.B. `O(N)` complexity presumes that the delegate load balancer executes in cons
 
 Assume a set of hosts from EDS with the following metadata, assigned to a single cluster.
 
-Endpoint | stage | version | type
----------|-------|---------|-------
-e1       | prod  | 1.0     | std
-e2       | prod  | 1.0     | std
-e3       | prod  | 1.1     | std
-e4       | prod  | 1.1     | std
-e5       | prod  | 1.0     | bigmem
-e6       | prod  | 1.1     | bigmem
-e7       | dev   | 1.2-pre | std
+Endpoint | stage | version | type   | xlarge
+---------|-------|---------|--------|-------
+e1       | prod  | 1.0     | std    | true
+e2       | prod  | 1.0     | std    |
+e3       | prod  | 1.1     | std    | true
+e4       | prod  | 1.1     | std    |
+e5       | prod  | 1.0     | bigmem |
+e6       | prod  | 1.1     | bigmem |
+e7       | dev   | 1.2-pre | std    |
+
+Note: Only e1 and e3 have the "xlarge" metadata key.
 
 Given this CDS `envoy::api::v2::Cluster`:
 
@@ -133,7 +136,8 @@ Given this CDS `envoy::api::v2::Cluster`:
     "subset_selectors": [
       { "keys": [ "stage", "type" ] },
       { "keys": [ "stage", "version" ] },
-      { "keys": [ "version" ] }
+      { "keys": [ "version" ] },
+      { "keys": [ "xlarge", "version" ] },
     ]
   }
 }
@@ -150,10 +154,16 @@ The following subsets are created:
 `version=1.0` (e1, e2, e5)
 `version=1.1` (e3, e4, e6)
 `version=1.2-pre` (e7)
+`version=1.0, xlarge=true` (e1, e3)
 
 In addition, a default subset is created:
 
 `stage=prod, type=std, version=1.0` (e1, e2)
+
+After loading this configuration, the SLB's `LbSubsetMap` looks like this:
+
+<a name="diagram"></a>
+![LbSubsetMap Diagram](subset_load_balancer_diagram.svg)
 
 Given these `envoy::api::v2::Route` entries:
 
