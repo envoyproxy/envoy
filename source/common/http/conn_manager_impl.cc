@@ -50,7 +50,7 @@ ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const 
 
 ConnectionManagerListenerStats
 ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
-  return {{CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))}, prefix, scope};
+  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,

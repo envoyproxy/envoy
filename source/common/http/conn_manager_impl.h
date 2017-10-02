@@ -142,14 +142,8 @@ typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManager
 /**
  * Wrapper struct for connection manager listener stats. @see stats_macros.h
  */
-struct ConnectionManagerListenerNamedStats {
-  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 struct ConnectionManagerListenerStats {
-  ConnectionManagerListenerNamedStats named_;
-  std::string prefix_;
-  Stats::Scope& scope_;
+  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
