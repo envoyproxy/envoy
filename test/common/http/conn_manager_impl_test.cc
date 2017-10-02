@@ -75,10 +75,8 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(fake_stats_, "listener."),
-                                                 POOL_GAUGE_PREFIX(fake_stats_, "listener."),
-                                                 POOL_TIMER_PREFIX(fake_stats_, "listener."))},
-                        "listener.",
+        listener_stats_{{CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(fake_stats_, "http.fake."))},
+                        "http.fake.",
                         fake_stats_} {
     tracing_config_.reset(new TracingConnectionManagerConfig(
         {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
@@ -239,7 +237,7 @@ public:
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
-  ConnectionManagerStats& listenerStats() override { return listener_stats_; }
+  ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -273,7 +271,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   uint32_t initial_buffer_limit_{};
   bool streaming_filter_{false};
-  ConnectionManagerStats listener_stats_;
+  ConnectionManagerListenerStats listener_stats_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;

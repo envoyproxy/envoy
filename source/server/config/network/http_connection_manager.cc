@@ -12,7 +12,6 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/access_log/access_log_impl.h"
@@ -125,8 +124,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
-      date_provider_(date_provider), listener_stats_(Http::ConnectionManagerImpl::generateStats(
-                                         EMPTY_STRING, context_.listenerScope())) {
+      date_provider_(date_provider),
+      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(
+          stats_prefix_, context_.listenerScope())) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,

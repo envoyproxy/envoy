@@ -75,7 +75,7 @@ namespace Http {
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(downstream_rq_non_ws_on_ws_route)                                                        \
-  COUNTER(downstream_rq_too_large)                                                              \
+  COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
@@ -127,6 +127,30 @@ struct TracingConnectionManagerConfig {
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
+
+/**
+ * Connection manager per listener stats. @see stats_macros.h
+ */
+// clang-format off
+#define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
+  COUNTER(downstream_rq_2xx)                                                                       \
+  COUNTER(downstream_rq_3xx)                                                                       \
+  COUNTER(downstream_rq_4xx)                                                                       \
+  COUNTER(downstream_rq_5xx)
+// clang-format on
+
+/**
+ * Wrapper struct for connection manager listener stats. @see stats_macros.h
+ */
+struct ConnectionManagerListenerNamedStats {
+  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+struct ConnectionManagerListenerStats {
+  ConnectionManagerListenerNamedStats named_;
+  std::string prefix_;
+  Stats::Scope& scope_;
+};
 
 /**
  * Configuration for how to forward client certs.
@@ -255,9 +279,9 @@ public:
   virtual const TracingConnectionManagerConfig* tracingConfig() PURE;
 
   /**
-   * @return ConnectionManagerStats& the listener stats to write to.
+   * @return ConnectionManagerListenerStats& the stats to write to.
    */
-  virtual ConnectionManagerStats& listenerStats() PURE;
+  virtual ConnectionManagerListenerStats& listenerStats() PURE;
 };
 
 /**
@@ -281,6 +305,8 @@ public:
                                                             Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
+  static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
+                                                              Stats::Scope& scope);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -608,7 +634,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   WebSocket::WsHandlerImplPtr ws_connection_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
-  ConnectionManagerStats& listener_stats_;
+  ConnectionManagerListenerStats& listener_stats_;
 };
 
 } // Http

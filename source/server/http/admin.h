@@ -78,7 +78,7 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
-  Http::ConnectionManagerStats& listenerStats() override { return listener_stats_; }
+  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
 
 private:
   /**
@@ -144,7 +144,7 @@ private:
   Optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  Http::ConnectionManagerStats listener_stats_;
+  Http::ConnectionManagerListenerStats listener_stats_;
 };
 
 /**

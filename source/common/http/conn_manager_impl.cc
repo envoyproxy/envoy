@@ -48,6 +48,11 @@ ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const 
   return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
 }
 
+ConnectionManagerListenerStats
+ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
+  return {{CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))}, prefix, scope};
+}
+
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
@@ -346,7 +351,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
-  connection_manager_.listener_stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
     connection_manager_.stats_.named_.downstream_rq_http2_total_.inc();
