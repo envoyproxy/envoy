@@ -64,9 +64,6 @@ MockListener::MockListener() {
 }
 MockListener::~MockListener() {}
 
-MockOsSysCalls::MockOsSysCalls() {}
-MockOsSysCalls::~MockOsSysCalls() {}
-
 MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}
 

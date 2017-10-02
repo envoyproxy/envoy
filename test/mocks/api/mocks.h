@@ -46,6 +46,10 @@ public:
 
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
+  MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));
+  MOCK_METHOD1(shmUnlink, int(const char*));
+  MOCK_METHOD2(ftruncate, int(int fd, off_t length));
+  MOCK_METHOD6(mmap, void*(void* addr, size_t length, int prot, int flags, int fd, off_t offset));
 
   size_t num_writes_;
   size_t num_open_;

@@ -15,8 +15,8 @@
 #include "server/test_hooks.h"
 
 #ifdef ENVOY_HOT_RESTART
+#include "common/api/os_sys_calls_impl.h"
 #include "server/hot_restart_impl.h"
-#include "server/os_sys_calls_impl.h"
 #endif
 
 #include "ares.h"
@@ -41,7 +41,7 @@ public:
 
 int main_common(OptionsImpl& options) {
 #ifdef ENVOY_HOT_RESTART
-  Server::OsSysCallsImpl os_sys_calls_impl;
+  Api::OsSysCallsImpl os_sys_calls_impl;
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
     restarter.reset(new Server::HotRestartImpl(options, os_sys_calls_impl));

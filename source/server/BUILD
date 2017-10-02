@@ -105,6 +105,7 @@ envoy_cc_library(
     srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
     hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
     deps = [
+        "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/server:hot_restart_interface",
@@ -196,15 +197,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "os_sys_calls_impl_lib",
-    srcs = envoy_select_hot_restart(["os_sys_calls_impl.cc"]),
-    hdrs = envoy_select_hot_restart(["os_sys_calls_impl.h"]),
-    deps = [
-        "//include/envoy/server:hot_restart_interface",
     ],
 )
 

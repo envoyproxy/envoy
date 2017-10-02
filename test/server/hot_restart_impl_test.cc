@@ -1,5 +1,6 @@
 #include "server/hot_restart_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gtest/gtest.h"
@@ -14,7 +15,7 @@ namespace Envoy {
 namespace Server {
 
 TEST(HotRestartImplTest, alloc) {
-  MockOsSysCalls os_sys_calls;
+  Api::MockOsSysCalls os_sys_calls;
   NiceMock<MockOptions> options;
   std::vector<uint8_t> buffer;
 
