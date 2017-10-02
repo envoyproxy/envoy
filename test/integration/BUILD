@@ -41,7 +41,6 @@ envoy_cc_test(
         "//test/config/integration:server_http2.json",
         "//test/config/integration:server_http2_upstream.json",
         "//test/config/integration:server_proxy_proto.json",
-        "//test/config/integration:server_ratelimit.json",
         "//test/config/integration:server_ssl.json",
         "//test/config/integration:server_uds.json",
         "//test/config/integration:server_xfcc.json",
@@ -324,7 +323,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ratelimit_integration_test",
     srcs = ["ratelimit_integration_test.cc"],
-    data = ["//test/config/integration:server_ratelimit.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",

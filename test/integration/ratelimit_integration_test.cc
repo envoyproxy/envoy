@@ -16,16 +16,37 @@ public:
   RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_ratelimit.json", {"http"});
+    HttpIntegrationTest::SetUp();
+    initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
+  }
+
+  void initialize() override {
+    config_helper_.addFilter(
+        "{ name: envoy.rate_limit, config: { deprecated_v1: true, value: { domain: "
+        "some_domain, timeout_ms: 500 } } }");
+    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+      bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
+      auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ratelimit_cluster->set_name("ratelimit");
+      ratelimit_cluster->mutable_http2_protocol_options();
+    });
+    config_helper_.addConfigModifier([](envoy::api::v2::filter::HttpConnectionManager& hcm) {
+      auto* rate_limit = hcm.mutable_route_config()
+                             ->mutable_virtual_hosts(0)
+                             ->mutable_routes(0)
+                             ->mutable_route()
+                             ->add_rate_limits();
+      rate_limit->add_actions()->mutable_destination_cluster();
+    });
+    named_ports_ = {"http"};
+    HttpIntegrationTest::initialize();
   }
 
   void initiateClientConnection() {
@@ -52,7 +73,7 @@ public:
     expected_request_msg.set_domain("some_domain");
     auto* entry = expected_request_msg.add_descriptors()->add_entries();
     entry->set_key("destination_cluster");
-    entry->set_value("traffic");
+    entry->set_value("cluster_0");
     EXPECT_EQ(expected_request_msg.DebugString(), request_msg.DebugString());
   }
 
@@ -117,9 +138,9 @@ TEST_P(RatelimitIntegrationTest, Ok) {
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
-  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.ok")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.over_limit"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.error"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimit) {
@@ -129,9 +150,9 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   waitForFailedUpstreamResponse(429);
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.ok"));
-  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.error"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 
 TEST_P(RatelimitIntegrationTest, Error) {
@@ -142,9 +163,9 @@ TEST_P(RatelimitIntegrationTest, Error) {
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.ok"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.traffic.ratelimit.over_limit"));
-  EXPECT_EQ(1, test_server_->counter("cluster.traffic.ratelimit.error")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {

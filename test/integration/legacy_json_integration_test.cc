@@ -69,10 +69,6 @@ TEST_P(LegacyJsonIntegrationTest, TestServerGrpcJsonTranscoder) {
   createTestServer("test/config/integration/server_grpc_json_transcoder.json", {"http"});
 }
 
-TEST_P(LegacyJsonIntegrationTest, TestServerRatelimit) {
-  createTestServer("test/config/integration/server_ratelimit.json", {"http"});
-}
-
 INSTANTIATE_TEST_CASE_P(IpVersions, LegacyJsonIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 } // namespace Envoy
