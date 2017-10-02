@@ -277,6 +277,7 @@ envoy_cc_library(
     deps = [
         ":json_utility_lib",
         ":resources_lib",
+        ":well_known_names",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -290,11 +291,13 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 
 envoy_cc_library(
     name = "well_known_names",
+    srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
     deps = ["//source/common/common:singleton"],
 )

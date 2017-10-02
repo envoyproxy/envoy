@@ -153,6 +153,8 @@ envoy_cc_test(
     external_deps = ["envoy_eds"],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/config:well_known_names",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
