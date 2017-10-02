@@ -9,11 +9,11 @@ namespace Server {
 // These are in a separate compilation unit so that the tests don't need to link against -lrt for
 // the definitions of these functions.
 
-int OsSysCallsImpl::shm_open(const char* name, int oflag, mode_t mode) {
+int OsSysCallsImpl::shmOpen(const char* name, int oflag, mode_t mode) {
   return ::shm_open(name, oflag, mode);
 }
 
-int OsSysCallsImpl::shm_unlink(const char* name) { return ::shm_unlink(name); }
+int OsSysCallsImpl::shmUnlink(const char* name) { return ::shm_unlink(name); }
 
 int OsSysCallsImpl::ftruncate(int fd, off_t length) { return ::ftruncate(fd, length); }
 

@@ -35,10 +35,10 @@ SharedMemory& SharedMemory::initialize(Options& options, OsSysCalls& os_sys_call
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
     // is a clean restart this should then allow the shm_open() call below to succeed.
-    os_sys_calls.shm_unlink(shmem_name.c_str());
+    os_sys_calls.shmUnlink(shmem_name.c_str());
   }
 
-  int shmem_fd = os_sys_calls.shm_open(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+  int shmem_fd = os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (shmem_fd == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
   }

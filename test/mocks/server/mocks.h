@@ -193,8 +193,8 @@ public:
   MockOsSysCalls();
   ~MockOsSysCalls();
 
-  MOCK_METHOD3(shm_open, int(const char*, int, mode_t));
-  MOCK_METHOD1(shm_unlink, int(const char*));
+  MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));
+  MOCK_METHOD1(shmUnlink, int(const char*));
   MOCK_METHOD2(ftruncate, int(int fd, off_t length));
   MOCK_METHOD6(mmap, void*(void* addr, size_t length, int prot, int flags, int fd, off_t offset));
 };

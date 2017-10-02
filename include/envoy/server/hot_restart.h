@@ -17,9 +17,24 @@ class OsSysCalls {
 public:
   virtual ~OsSysCalls(){};
 
-  virtual int shm_open(const char* name, int oflag, mode_t mode) PURE;
-  virtual int shm_unlink(const char* name) PURE;
+  /**
+   * @see shm_open (man 3 shm_open)
+   */
+  virtual int shmOpen(const char* name, int oflag, mode_t mode) PURE;
+
+  /**
+   * @see shm_unlink (man 3 shm_unlink)
+   */
+  virtual int shmUnlink(const char* name) PURE;
+
+  /**
+   * @see man 2 ftruncate
+   */
   virtual int ftruncate(int fd, off_t length) PURE;
+
+  /**
+   * @see man 2 mmap
+   */
   virtual void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) PURE;
 };
 
