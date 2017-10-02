@@ -262,7 +262,7 @@ TEST(HostImplTest, HostCluster) {
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
   EXPECT_EQ("", host->hostname());
   EXPECT_FALSE(host->canary());
-  EXPECT_EQ("", host->zone());
+  EXPECT_EQ("", host->locality().zone());
 }
 
 TEST(HostImplTest, Weight) {
@@ -281,18 +281,24 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(100U, host->weight());
 }
 
-TEST(HostImplTest, HostameCanaryAndZone) {
+TEST(HostImplTest, HostameCanaryAndLocality) {
   MockCluster cluster;
   envoy::api::v2::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
+  envoy::api::v2::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                metadata, 1, "hello");
+                metadata, 1, locality);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
-  EXPECT_EQ("hello", host.zone());
+  EXPECT_EQ("oceania", host.locality().region());
+  EXPECT_EQ("hello", host.locality().zone());
+  EXPECT_EQ("world", host.locality().sub_zone());
 }
 
 TEST(StaticClusterImplTest, EmptyHostname) {

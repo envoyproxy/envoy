@@ -125,6 +125,20 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
                             std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
+
+  // The first write to a given file will start the flush thread, which can flush
+  // immediately (race on whether it will or not).  So do a write and flush to
+  // get that state out of the way, then test that small writes don't trigger a flush.
+  EXPECT_CALL(os_sys_calls, write_(_, _, _))
+      .WillOnce(Invoke([](int, const void*, size_t num_bytes) -> ssize_t { return num_bytes; }));
+  file.write("prime-it");
+  file.flush();
+  uint32_t expected_writes = 1;
+  {
+    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
+  }
+
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
         std::string written = std::string(reinterpret_cast<const char*>(buffer), num_bytes);
@@ -138,13 +152,14 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
 
   {
     std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
-    EXPECT_EQ(0, os_sys_calls.num_writes_);
+    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
   file.flush();
+  expected_writes++;
   {
     std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
-    EXPECT_EQ(1, os_sys_calls.num_writes_);
+    EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
@@ -160,10 +175,11 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   file.write("test2");
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
   timer->callback_();
+  expected_writes++;
 
   {
     std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
-    while (os_sys_calls.num_writes_ != 2) {
+    while (os_sys_calls.num_writes_ != expected_writes) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
   }

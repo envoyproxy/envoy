@@ -201,9 +201,17 @@ public:
   Optional<uint64_t> generateHash(const std::string& downstream_addr,
                                   const Http::HeaderMap& headers) const override;
 
+  class HashMethod {
+  public:
+    virtual ~HashMethod() {}
+    virtual Optional<uint64_t> evaluate(const std::string& downstream_addr,
+                                        const Http::HeaderMap& headers) const PURE;
+  };
+
+  typedef std::unique_ptr<HashMethod> HashMethodPtr;
+
 private:
-  const Http::LowerCaseString header_name_;
-  const bool hash_ip_;
+  std::vector<HashMethodPtr> hash_impls_;
 };
 
 /**
@@ -283,8 +291,8 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string key_;
-    uint64_t default_;
+    std::string key_{};
+    uint64_t default_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {

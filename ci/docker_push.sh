@@ -13,7 +13,7 @@ do
        want_push='true'
    fi
 done
-if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
+if [ -z "$CIRCLE_PULL_REQUEST" ] && [ -z "$CIRCLE_TAG" ] && [ "$want_push" == "true" ]
 then
    # TODO(mattklein123): Currently we are doing this push in the context of the release job which
    # happens inside of our build image. We should switch to using Circle caching so each of these
