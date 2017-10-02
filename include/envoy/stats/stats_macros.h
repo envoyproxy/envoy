@@ -39,4 +39,5 @@ namespace Envoy {
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
 #define POOL_TIMER(POOL) POOL_TIMER_PREFIX(POOL, "")
+
 } // Envoy
