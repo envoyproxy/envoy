@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Property;
 using testing::_;
 
 namespace Envoy {
@@ -181,17 +182,32 @@ TEST(CodeUtilityResponseTimingTest, All) {
       true,         true,          "vhost_name", "req_vcluster_name",
       "from_az",    "to_az"};
 
+  EXPECT_CALL(cluster_scope, timer("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks("prefix.canary.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.internal.upstream_rq_time",
-                                                  std::chrono::milliseconds(5)));
-  EXPECT_CALL(global_store,
-              deliverTimingToSinks("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
+              deliverTimingToSinks(Property(&Stats::Metric::name, "prefix.upstream_rq_time"),
                                    std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time",
-                                                  std::chrono::milliseconds(5)));
+
+  EXPECT_CALL(cluster_scope, timer("prefix.canary.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              deliverTimingToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"),
+                                   std::chrono::milliseconds(5)));
+
+  EXPECT_CALL(cluster_scope, timer("prefix.internal.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope, deliverTimingToSinks(
+                                 Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"),
+                                 std::chrono::milliseconds(5)));
+  EXPECT_CALL(global_store, timer("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+  EXPECT_CALL(
+      global_store,
+      deliverTimingToSinks(Property(&Stats::Metric::name,
+                                    "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
+                           std::chrono::milliseconds(5)));
+
+  EXPECT_CALL(cluster_scope, timer("prefix.zone.from_az.to_az.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              deliverTimingToSinks(
+                  Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"),
+                  std::chrono::milliseconds(5)));
   CodeUtility::chargeResponseTiming(info);
 }
 

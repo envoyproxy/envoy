@@ -53,14 +53,17 @@ public:
   // Stats::Scope
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
-  void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
-    return default_scope_->deliverHistogramToSinks(name, value);
+  void deliverHistogramToSinks(const Metric& histogram, uint64_t value) override {
+    return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override {
-    return default_scope_->deliverTimingToSinks(name, ms);
+  void deliverTimingToSinks(const Metric& timer, std::chrono::milliseconds ms) override {
+    return default_scope_->deliverTimingToSinks(timer, ms);
   }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
   Timer& timer(const std::string& name) override { return default_scope_->timer(name); }
+  Histogram& histogram(const std::string& name) override {
+    return default_scope_->histogram(name);
+  };
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override;
@@ -77,6 +80,7 @@ private:
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
     std::unordered_map<std::string, TimerSharedPtr> timers_;
+    std::unordered_map<std::string, HistogramSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public Scope {
@@ -89,10 +93,11 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(prefix_ + name);
     }
-    void deliverHistogramToSinks(const std::string& name, uint64_t value) override;
-    void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override;
+    void deliverHistogramToSinks(const Metric& histogram, uint64_t value) override;
+    void deliverTimingToSinks(const Metric& timer, std::chrono::milliseconds ms) override;
     Gauge& gauge(const std::string& name) override;
     Timer& timer(const std::string& name) override;
+    Histogram& histogram(const std::string& name) override;
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;

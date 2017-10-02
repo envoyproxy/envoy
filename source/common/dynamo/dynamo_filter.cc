@@ -181,14 +181,16 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
                            std::to_string(status)))
       .inc();
 
-  scope_.deliverTimingToSinks(
-      fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity), latency);
-  scope_.deliverTimingToSinks(
-      fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity, group_string),
-      latency);
-  scope_.deliverTimingToSinks(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type,
-                                          entity, std::to_string(status)),
-                              latency);
+  scope_.timer(fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity))
+      .recordDuration(latency);
+  scope_
+      .timer(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
+                         group_string))
+      .recordDuration(latency);
+  scope_
+      .timer(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
+                         std::to_string(status)))
+      .recordDuration(latency);
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {

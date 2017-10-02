@@ -100,14 +100,14 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
-  void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
+  void deliverHistogramToSinks(const Metric& histogram, uint64_t value) override {
     std::unique_lock<std::mutex> lock(lock_);
-    wrapped_scope_->deliverHistogramToSinks(name, value);
+    wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) override {
+  void deliverTimingToSinks(const Metric& timer, std::chrono::milliseconds ms) override {
     std::unique_lock<std::mutex> lock(lock_);
-    wrapped_scope_->deliverTimingToSinks(name, ms);
+    wrapped_scope_->deliverTimingToSinks(timer, ms);
   }
 
   Counter& counter(const std::string& name) override {
@@ -123,6 +123,11 @@ public:
   Timer& timer(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return wrapped_scope_->timer(name);
+  }
+
+  Histogram& histogram(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return wrapped_scope_->histogram(name);
   }
 
 private:
@@ -145,8 +150,8 @@ public:
     std::unique_lock<std::mutex> lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
-  void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-  void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+  void deliverHistogramToSinks(const Metric&, uint64_t) override {}
+  void deliverTimingToSinks(const Metric&, std::chrono::milliseconds) override {}
   Gauge& gauge(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauge(name);
@@ -154,6 +159,10 @@ public:
   Timer& timer(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.timer(name);
+  }
+  Histogram& histogram(const std::string& name) override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return store_.histogram(name);
   }
 
   // Stats::Store

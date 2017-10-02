@@ -80,10 +80,12 @@ public:
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
-  std::string name() override { return data_.name_; }
   void reset() override { data_.value_ = 0; }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  uint64_t value() override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
+
+  // Stats::Metric
+  std::string name() const override { return data_.name_; }
 
 private:
   RawStatData& data_;
@@ -105,7 +107,6 @@ public:
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
-  virtual std::string name() override { return data_.name_; }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= RawStatData::Flags::Used;
@@ -115,8 +116,11 @@ public:
     ASSERT(used());
     data_.value_ -= amount;
   }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  virtual uint64_t value() override { return data_.value_; }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+
+  // Stats::Metric
+  virtual std::string name() const override { return data_.name_; }
 
 private:
   RawStatData& data_;
@@ -132,7 +136,10 @@ public:
 
   // Stats::Timer
   TimespanPtr allocateSpan() override { return TimespanPtr{new TimespanImpl(*this)}; }
-  std::string name() override { return name_; }
+  void recordDuration(std::chrono::milliseconds ma) override;
+
+  // Stats::Metric
+  std::string name() const override { return name_; }
 
 private:
   /**
@@ -150,6 +157,25 @@ private:
     TimerImpl& parent_;
     MonotonicTime start_;
   };
+
+  std::string name_;
+  Store& parent_;
+
+/**
+ * Histogram implementation for the heap.
+ */
+class HistogramImpl : public Histogram {
+public:
+  HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                std::vector<Tag>&& tags)
+      : name_(name), parent_(parent), tag_extracted_name_(std::move(tag_extracted_name)),
+        tags_(std::move(tags)) {}
+
+  // Stats::Histogram
+  void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
+
+  // Stats::Metric
+  std::string name() const override { return name_; }
 
   std::string name_;
   Store& parent_;
@@ -214,16 +240,20 @@ public:
         }),
         timers_(
             [this](const std::string& name) -> TimerImpl* { return new TimerImpl(name, *this); }) {}
+        histograms_([this](const std::string& name) -> HistogramImpl* {
+          return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());
+        }) {}
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }
-  void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-  void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+  void deliverHistogramToSinks(const Metric&, uint64_t) override {}
+  void deliverTimingToSinks(const Metric&, std::chrono::milliseconds) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
   Timer& timer(const std::string& name) override { return timers_.get(name); }
+  Histogram& histogram(const std::string& name) override { return histograms_.get(name); }
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
@@ -238,11 +268,14 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return ScopePtr{new ScopeImpl(parent_, prefix_ + name)};
     }
-    void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-    void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+    void deliverHistogramToSinks(const Metric&, uint64_t) override {}
+    void deliverTimingToSinks(const Metric&, std::chrono::milliseconds) override {}
     Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
     Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
     Timer& timer(const std::string& name) override { return parent_.timer(prefix_ + name); }
+    Histogram& histogram(const std::string& name) override {
+      return parent_.histogram(prefix_ + name);
+    }
 
     IsolatedStoreImpl& parent_;
     const std::string prefix_;
@@ -252,6 +285,7 @@ private:
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
   IsolatedStatsCache<Timer, TimerImpl> timers_;
+  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
 };
 
 } // namespace Stats

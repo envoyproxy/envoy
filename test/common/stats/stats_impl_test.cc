@@ -25,11 +25,15 @@ TEST(StatsIsolatedStoreImplTest, All) {
   Timer& t2 = scope1->timer("t2");
   EXPECT_EQ("t1", t1.name());
   EXPECT_EQ("scope1.t2", t2.name());
+  t1.recordDuration(std::chrono::milliseconds(200));
+  t2.recordDuration(std::chrono::milliseconds(200));
 
-  store.deliverHistogramToSinks("h", 100);
-  store.deliverTimingToSinks("t", std::chrono::milliseconds(200));
-  scope1->deliverHistogramToSinks("h", 100);
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store.histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  h1.recordValue(100);
+  h2.recordValue(100);
 
   ScopePtr scope2 = scope1->createScope("foo.");
   EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
