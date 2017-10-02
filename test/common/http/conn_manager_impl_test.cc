@@ -336,7 +336,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   conn_manager_->onData(fake_input);
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
-  EXPECT_EQ(1U, listener_stats_.named_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
@@ -767,7 +767,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
-  EXPECT_EQ(1U, listener_stats_.named_.downstream_rq_3xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_3xx_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {

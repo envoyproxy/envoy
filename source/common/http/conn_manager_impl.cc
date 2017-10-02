@@ -407,16 +407,16 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
 
   if (CodeUtility::is2xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_2xx_.inc();
-    connection_manager_.listener_stats_.named_.downstream_rq_2xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_2xx_.inc();
   } else if (CodeUtility::is3xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_3xx_.inc();
-    connection_manager_.listener_stats_.named_.downstream_rq_3xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_3xx_.inc();
   } else if (CodeUtility::is4xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_4xx_.inc();
-    connection_manager_.listener_stats_.named_.downstream_rq_4xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_4xx_.inc();
   } else if (CodeUtility::is5xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_5xx_.inc();
-    connection_manager_.listener_stats_.named_.downstream_rq_5xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_5xx_.inc();
   }
 }
 
