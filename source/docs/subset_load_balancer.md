@@ -175,7 +175,7 @@ Given these `envoy::api::v2::Route` entries:
       "headers": [
         {
           "name": "x-custom-version",
-          "value": "1.2-pre"
+          "value": "pre-release"
         }
       ]
     },
@@ -197,7 +197,7 @@ Given these `envoy::api::v2::Route` entries:
       "headers": [
         {
           "name": "x-hardware-test",
-          "value": "bigmem"
+          "value": "memory"
         }
       ]
     },
@@ -258,12 +258,12 @@ Given these `envoy::api::v2::Route` entries:
 
 The following headers may then be used to select subsets:
 
-`x-custom-version: 1.2-pre` causes requests to be routed e7. This is an example of routing requests
-to a developer launched instance for pre-release testing. If the e7 upstream leaves the cluster,
-the subset is removed and further requests with this header are routed to the default subset
-(containing e1 and e2).
+`x-custom-version: pre-release` causes requests to be routed e7. This is an example of routing
+requests to a developer launched instance for pre-release testing. If the e7 upstream leaves the
+cluster, the subset is removed and further requests with this header are routed to the default
+subset (containing e1 and e2).
 
-`x-hardware-test: bigmem` causes requests to be load balanced over the e5 and e6 endpoints. This is
+`x-hardware-test: memory` causes requests to be load balanced over the e5 and e6 endpoints. This is
 an example of routing requests to upstreams running on a particular class of hardware, perhaps for
 load testing. If the bigmem hosts are removed from service, further requests with this header are
 routed to the default subset.
