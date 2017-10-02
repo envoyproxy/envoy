@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
@@ -46,14 +47,6 @@ bool directoryExists(const std::string& path);
  */
 std::string fileReadToEnd(const std::string& path);
 
-class OsSysCallsImpl : public OsSysCalls {
-public:
-  // Filesystem::OsSysCalls
-  int open(const std::string& full_path, int flags, int mode) override;
-  ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
-  int close(int fd) override;
-};
-
 /**
  * This is a file implementation geared for writing out access logs. It turn out that in certain
  * cases even if a standard file is opened with O_NONBLOCK, the kernel can still block when writing.
@@ -64,7 +57,7 @@ public:
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           OsSysCalls& osSysCalls, Stats::Store& stats_store,
+           Api::OsSysCalls& osSysCalls, Stats::Store& stats_store,
            std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
@@ -123,7 +116,7 @@ private:
                                             // continue to fill. This buffer is then used for the
                                             // final write to disk.
   Event::TimerPtr flush_timer_;
-  OsSysCalls& os_sys_calls_;
+  Api::OsSysCalls& os_sys_calls_;
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
