@@ -175,6 +175,23 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
+void Filter::sendLocalReply(Http::Code code, const std::string& body, bool overloaded) {
+  // This is a customized version of send local reply that allows us to set the overloaded
+  // header.
+  Http::Utility::sendLocalReply(
+      [&](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (overloaded) {
+          headers->insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+        }
+
+        callbacks_->encodeHeaders(std::move(headers), end_stream);
+      },
+      [&](Buffer::Instance& data, bool end_stream) -> void {
+        callbacks_->encodeData(data, end_stream);
+      },
+      stream_destroyed_, code, body);
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
@@ -233,8 +250,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
-                                  "maintenance mode");
+    sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode", true);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -478,9 +494,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    chargeUpstreamCode(code, upstream_host,
-                       reset_reason.valid() &&
-                           reset_reason.value() == Http::StreamResetReason::Overflow);
+    const bool dropped =
+        reset_reason.valid() && reset_reason.value() == Http::StreamResetReason::Overflow;
+    chargeUpstreamCode(code, upstream_host, dropped);
     // If we had non-5xx but still have been reset by backend or timeout before
     // starting response, we treat this as an error. We only get non-5xx when
     // timeout_response_code_ is used for code above, where this member can
@@ -488,7 +504,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (!Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, code, body);
+    sendLocalReply(code, body, dropped);
   }
 }
 

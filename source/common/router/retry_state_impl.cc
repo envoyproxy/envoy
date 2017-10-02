@@ -143,10 +143,6 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
     return RetryStatus::No;
   }
 
-  if (!runtime_.snapshot().featureEnabled("upstream.use_retry", 100)) {
-    return RetryStatus::No;
-  }
-
   retries_remaining_--;
   if (!wouldRetry(response_headers, reset_reason)) {
     return RetryStatus::No;
@@ -155,6 +151,10 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;
+  }
+
+  if (!runtime_.snapshot().featureEnabled("upstream.use_retry", 100)) {
+    return RetryStatus::No;
   }
 
   ASSERT(!callback_);
@@ -167,6 +167,16 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
                                 const Optional<Http::StreamResetReason>& reset_reason) {
+  // We never retry if the overloaded header is set.
+  if (response_headers && response_headers->EnvoyOverloaded() != nullptr) {
+    return false;
+  }
+
+  // we never retry if the reset reason is overflow.
+  if (reset_reason.valid() && reset_reason.value() == Http::StreamResetReason::Overflow) {
+    return false;
+  }
+
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
     // wouldRetry() is passed null headers when there was an upstream reset. Currently we count an
     // upstream reset as a "5xx" (since it will result in one). We may eventually split this out
