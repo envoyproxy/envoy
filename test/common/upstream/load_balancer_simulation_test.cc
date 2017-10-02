@@ -82,8 +82,8 @@ public:
 
         per_zone_upstream->push_back((*upstream_per_zone_hosts)[zone]);
       }
-      cluster_.hosts_per_zone_ = *per_zone_upstream;
-      cluster_.healthy_hosts_per_zone_ = *per_zone_upstream;
+      cluster_.hosts_per_locality_ = *per_zone_upstream;
+      cluster_.healthy_hosts_per_locality_ = *per_zone_upstream;
 
       // Populate host set for originating cluster.
       HostListsSharedPtr per_zone_local(new std::vector<std::vector<HostSharedPtr>>());

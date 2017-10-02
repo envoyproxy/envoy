@@ -205,8 +205,8 @@ private:
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
-                                        HostListsConstSharedPtr hosts_per_zone,
-                                        HostListsConstSharedPtr healthy_hosts_per_zone,
+                                        HostListsConstSharedPtr hosts_per_locality,
+                                        HostListsConstSharedPtr healthy_hosts_per_locality,
                                         const std::vector<HostSharedPtr>& hosts_added,
                                         const std::vector<HostSharedPtr>& hosts_removed,
                                         ThreadLocal::Slot& tls);

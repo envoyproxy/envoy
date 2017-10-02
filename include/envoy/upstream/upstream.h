@@ -156,18 +156,18 @@ public:
   virtual const std::vector<HostSharedPtr>& healthyHosts() const PURE;
 
   /**
-   * @return hosts per zone, index 0 is dedicated to local zone hosts.
-   * If there are no hosts in local zone for upstream cluster hostPerZone() will @return
+   * @return hosts per locality, index 0 is dedicated to local locality hosts.
+   * If there are no hosts in local locality for upstream cluster hosstPerLocality() will @return
    * empty vector.
    *
-   * Note, that we sort zones in alphabetical order starting from index 1.
+   * Note, that we sort localities in lexicographic order starting from index 1.
    */
-  virtual const std::vector<std::vector<HostSharedPtr>>& hostsPerZone() const PURE;
+  virtual const std::vector<std::vector<HostSharedPtr>>& hostsPerLocality() const PURE;
 
   /**
-   * @return same as hostsPerZone but only contains healthy hosts.
+   * @return same as hostsPerLocality but only contains healthy hosts.
    */
-  virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const PURE;
+  virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const PURE;
 };
 
 /**

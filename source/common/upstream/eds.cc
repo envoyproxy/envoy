@@ -72,30 +72,31 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
     ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(), hosts().size());
-    HostListsSharedPtr per_zone(new std::vector<std::vector<HostSharedPtr>>());
+    HostListsSharedPtr per_locality(new std::vector<std::vector<HostSharedPtr>>());
 
-    // If local zone name is not defined then skip populating per zone hosts.
-    if (!local_info_.zoneName().empty()) {
-      std::map<std::string, std::vector<HostSharedPtr>> hosts_per_zone;
+    // If local locality is not defined then skip populating per locality hosts.
+    const Locality local_locality(local_info_.node().locality());
+    if (!local_locality.empty()) {
+      std::map<Locality, std::vector<HostSharedPtr>> hosts_per_locality;
 
       for (const HostSharedPtr& host : *current_hosts_copy) {
-        hosts_per_zone[host->locality().zone()].push_back(host);
+        hosts_per_locality[Locality(host->locality())].push_back(host);
       }
 
-      // Populate per_zone hosts only if upstream cluster has hosts in the same zone.
-      if (hosts_per_zone.find(local_info_.zoneName()) != hosts_per_zone.end()) {
-        per_zone->push_back(hosts_per_zone[local_info_.zoneName()]);
+      // Populate per_locality hosts only if upstream cluster has hosts in the same locality.
+      if (hosts_per_locality.find(local_locality) != hosts_per_locality.end()) {
+        per_locality->push_back(hosts_per_locality[local_locality]);
 
-        for (auto& entry : hosts_per_zone) {
-          if (local_info_.zoneName() != entry.first) {
-            per_zone->push_back(entry.second);
+        for (auto& entry : hosts_per_locality) {
+          if (local_locality != entry.first) {
+            per_locality->push_back(entry.second);
           }
         }
       }
     }
 
-    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_zone,
-                createHealthyHostLists(*per_zone), hosts_added, hosts_removed);
+    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_locality,
+                createHealthyHostLists(*per_locality), hosts_added, hosts_removed);
 
     if (initialize_callback_ && health_checker_ && pending_health_checks_ == 0) {
       pending_health_checks_ = hosts().size();
