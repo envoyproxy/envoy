@@ -29,19 +29,29 @@ TEST(HotRestartImplTest, alloc) {
     return buffer.data();
   }));
 
+  // Test we match the correct stat with empty-slots before, after, or both.
   HotRestartImpl hot_restart1(options, os_sys_calls);
   hot_restart1.drainParentListeners();
   Stats::RawStatData* stat1 = hot_restart1.alloc("stat1");
   Stats::RawStatData* stat2 = hot_restart1.alloc("stat2");
-  hot_restart1.free(*stat1);
-  stat1 = nullptr;
+  Stats::RawStatData* stat3 = hot_restart1.alloc("stat3");
+  Stats::RawStatData* stat4 = hot_restart1.alloc("stat4");
+  Stats::RawStatData* stat5 = hot_restart1.alloc("stat5");
+  hot_restart1.free(*stat2);
+  hot_restart1.free(*stat4);
+  stat2 = nullptr;
+  stat4 = nullptr;
 
   EXPECT_CALL(options, restartEpoch()).WillRepeatedly(Return(1));
   EXPECT_CALL(os_sys_calls, shmOpen(_, _, _));
   EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer.data()));
   HotRestartImpl hot_restart2(options, os_sys_calls);
-  Stats::RawStatData* stat3 = hot_restart2.alloc("stat2");
-  EXPECT_EQ(stat2, stat3);
+  Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
+  Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
+  Stats::RawStatData* stat5_prime = hot_restart2.alloc("stat5");
+  EXPECT_EQ(stat1, stat1_prime);
+  EXPECT_EQ(stat3, stat3_prime);
+  EXPECT_EQ(stat5, stat5_prime);
 }
 
 } // namespace Server
