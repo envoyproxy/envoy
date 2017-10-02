@@ -108,19 +108,20 @@ HotRestartImpl::HotRestartImpl(Options& options, OsSysCalls& os_sys_calls)
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
+  Stats::RawStatData* unused = nullptr;
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
   for (Stats::RawStatData& data : shmem_.stats_slots_) {
-    if (data.initialized() && data.matches(name)) {
+    if (!data.initialized()) {
+      unused = &data;
+    } else if (data.matches(name)) {
       data.ref_count_++;
       return &data;
     }
   }
 
-  for (Stats::RawStatData& data : shmem_.stats_slots_) {
-    if (!data.initialized()) {
-      data.initialize(name);
-      return &data;
-    }
+  if (unused != nullptr) {
+    unused->initialize(name);
+    return unused;
   }
 
   return nullptr;
