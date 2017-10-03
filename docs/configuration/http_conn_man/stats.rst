@@ -68,3 +68,19 @@ the following statistics:
    downstream_cx_total, Counter, Total connections
    downstream_cx_destroy_remote_active_rq, Counter, Total connections destroyed remotely with 1+ active requests
    downstream_rq_total, Counter, Total requests
+
+
+Per listener statistics
+-----------------------
+
+Additional per listener statistics are rooted at *listener.<address>.http.<stat_prefix>.* with the
+following statistics:
+
+ .. csv-table::
+    :header: Name, Type, Description
+    :widths: 1, 1, 2
+
+    downstream_rq_2xx, Counter, Total 2xx responses
+    downstream_rq_3xx, Counter, Total 3xx responses
+    downstream_rq_4xx, Counter, Total 4xx responses
+    downstream_rq_5xx, Counter, Total 5xx responses

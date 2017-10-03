@@ -131,6 +131,7 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}
