@@ -9,7 +9,6 @@ Redis :ref:`architecture overview <arch_overview_redis>`.
 
   {
     "name": "redis_proxy",
-    "type": "read",
     "config": {
       "cluster_name": "...",
       "conn_pool": "{...}",
