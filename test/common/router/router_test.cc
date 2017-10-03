@@ -180,8 +180,10 @@ TEST_F(RouterTest, PoolFailureOverflow) {
         return nullptr;
       }));
 
-  Http::TestHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "57"}, {"content-type", "text/plain"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "503"},
+                                           {"content-length", "57"},
+                                           {"content-type", "text/plain"},
+                                           {"x-envoy-overloaded", "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
@@ -283,8 +285,10 @@ TEST_F(RouterTest, NoHost) {
 TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "503"},
+                                           {"content-length", "16"},
+                                           {"content-type", "text/plain"},
+                                           {"x-envoy-overloaded", "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,

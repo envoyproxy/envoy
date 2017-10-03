@@ -1,5 +1,7 @@
 #include "common/mongo/bson_impl.h"
 
+#include <endian.h>
+
 #include <cstdint>
 #include <sstream>
 #include <string>

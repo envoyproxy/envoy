@@ -225,6 +225,17 @@ for the next health check interval. The host can become healthy again via standa
 checks. See the :ref:`health checking overview <arch_overview_health_checking>` for more
 information.
 
+.. _config_http_filters_router_x-envoy-overloaded:
+
+x-envoy-overloaded
+^^^^^^^^^^^^^^^^^^
+
+If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
+looked at, only its presence. Additionally, Envoy will set this header on the downstream response
+if a request was dropped due to either :ref:`maintenance mode
+<config_http_filters_router_runtime_maintenance_mode>` or upstream :ref:`circuit breaking
+<arch_overview_circuit_break>`.
+
 .. _config_http_filters_router_stats:
 
 Statistics

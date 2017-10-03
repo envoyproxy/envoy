@@ -256,6 +256,7 @@ private:
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
+  void sendLocalReply(Http::Code code, const std::string& body, bool overloaded);
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
