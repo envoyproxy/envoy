@@ -136,8 +136,8 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   EXPECT_EQ(0UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   // No downstream connection => no host.
   {
@@ -194,8 +194,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   EXPECT_EQ(0UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   EXPECT_CALL(membership_updated_, ready());
 
@@ -219,8 +219,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   EXPECT_EQ(host, cluster_->hosts()[0]);
   EXPECT_EQ(local_address, *cluster_->hosts()[0]->address());
@@ -277,8 +277,8 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   EXPECT_EQ(0UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   // Host gets the local address of the downstream connection.
 
@@ -313,8 +313,8 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   EXPECT_EQ(2UL, cluster_->hosts().size());
   EXPECT_EQ(2UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   EXPECT_EQ(host1, cluster_->hosts()[0]);
   EXPECT_EQ(local_address1, *cluster_->hosts()[0]->address());
@@ -361,8 +361,8 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
   EXPECT_EQ(0UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality().size());
 
   EXPECT_CALL(membership_updated_, ready());
 

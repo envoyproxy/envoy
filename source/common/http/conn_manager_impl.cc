@@ -48,6 +48,11 @@ ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const 
   return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(scope, prefix + "tracing."))};
 }
 
+ConnectionManagerListenerStats
+ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::Scope& scope) {
+  return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+}
+
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
@@ -57,7 +62,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager) {}
+      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
+      listener_stats_(config_.listenerStats()) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -401,12 +407,16 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
 
   if (CodeUtility::is2xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_2xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_2xx_.inc();
   } else if (CodeUtility::is3xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_3xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_3xx_.inc();
   } else if (CodeUtility::is4xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_4xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_4xx_.inc();
   } else if (CodeUtility::is5xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_5xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_5xx_.inc();
   }
 }
 

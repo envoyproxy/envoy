@@ -148,8 +148,8 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
     }
     )EOF";
 
-  local_info_.cluster_name_ = "";
-  local_info_.node_name_ = "";
+  local_info_.node_.set_cluster("");
+  local_info_.node_.set_id("");
   EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
                                                runtime_, cm_, store_, "foo.", init_manager_,
                                                *route_config_provider_manager_),
