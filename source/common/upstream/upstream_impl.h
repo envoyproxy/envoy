@@ -35,8 +35,8 @@
 namespace Envoy {
 namespace Upstream {
 
-// Wrapper around envoy::api::v2::Locality to make it easier to compare and construct literals (for
-// tests).
+// Wrapper around envoy::api::v2::Locality to make it easier to compare for ordering in std::map and
+// in tests to construct literals.
 class Locality : public std::tuple<std::string, std::string, std::string> {
 public:
   Locality(const std::string& region, const std::string& zone, const std::string& sub_zone)
