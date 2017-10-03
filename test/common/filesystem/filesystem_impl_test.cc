@@ -1,11 +1,13 @@
 #include <chrono>
 #include <string>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
@@ -28,7 +30,7 @@ TEST(FileSystemImpl, BadFile) {
   Event::MockDispatcher dispatcher;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
-  Filesystem::OsSysCallsImpl os_sys_calls;
+  Api::OsSysCallsImpl os_sys_calls;
   EXPECT_CALL(dispatcher, createTimer_(_));
   EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, os_sys_calls, store,
                                     std::chrono::milliseconds(10000)),
@@ -65,7 +67,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
 
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
   Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
@@ -118,7 +120,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
 
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
   Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
@@ -191,7 +193,7 @@ TEST(FileSystemImpl, reopenFile) {
 
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
 
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
@@ -251,7 +253,7 @@ TEST(FilesystemImpl, reopenThrows) {
 
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillRepeatedly(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
@@ -298,7 +300,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
   NiceMock<Event::MockDispatcher> dispatcher;
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Filesystem::MockOsSysCalls> os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
 
   Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
                             std::chrono::milliseconds(40));

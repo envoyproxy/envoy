@@ -75,6 +75,7 @@ envoy_cc_library(
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",

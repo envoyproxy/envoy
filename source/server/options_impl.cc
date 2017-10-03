@@ -24,9 +24,9 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   log_levels_string += "\n[trace] and [debug] are only available on debug builds";
 
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
-  TCLAP::ValueArg<uint64_t> base_id(
+  TCLAP::ValueArg<uint32_t> base_id(
       "", "base-id", "base ID so that multiple envoys can run on the same host if needed", false, 0,
-      "uint64_t", cmd);
+      "uint32_t", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
@@ -42,8 +42,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                          cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
-  TCLAP::ValueArg<uint64_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
-                                          "uint64_t", cmd);
+  TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
+                                          "uint32_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
                                               "hot restart compatability version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
@@ -52,14 +52,14 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                             cmd);
   TCLAP::ValueArg<std::string> service_zone("", "service-zone", "Zone name", false, "", "string",
                                             cmd);
-  TCLAP::ValueArg<uint64_t> file_flush_interval_msec("", "file-flush-interval-msec",
+  TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
-                                                     10000, "uint64_t", cmd);
-  TCLAP::ValueArg<uint64_t> drain_time_s("", "drain-time-s", "Hot restart drain time in seconds",
-                                         false, 600, "uint64_t", cmd);
-  TCLAP::ValueArg<uint64_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
+                                                     10000, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s", "Hot restart drain time in seconds",
+                                         false, 600, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
-                                                   false, 900, "uint64_t", cmd);
+                                                   false, 900, "uint32_t", cmd);
   TCLAP::ValueArg<std::string> mode("", "mode",
                                     "One of 'serve' (default; validate configs and then serve "
                                     "traffic normally) or 'validate' (validate configs and exit).",

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
 
@@ -36,7 +37,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(Options& options);
+  static SharedMemory& initialize(Options& options, Api::OsSysCalls& os_sys_calls);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -106,7 +107,7 @@ class HotRestartImpl : public HotRestart,
                        public Stats::RawStatDataAllocator,
                        Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Options& options);
+  HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls);
 
   Thread::BasicLockable& logLock() { return log_lock_; }
   Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
