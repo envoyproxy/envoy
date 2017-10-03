@@ -23,8 +23,8 @@ public:
 
   void createUpstreams() override;
 
-  void sendMultipleRequests(int request_bytes,
-                                std::function<void(IntegrationStreamDecoder&)> cb);
+  void sendMultipleRequests(int request_bytes, Http::TestHeaderMapImpl headers,
+                            std::function<void(IntegrationStreamDecoder&)> cb);
 
   std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
   const int num_upstreams_ = 5;

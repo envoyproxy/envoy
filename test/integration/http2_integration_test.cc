@@ -13,9 +13,7 @@
 
 #include "gtest/gtest.h"
 
-
 using ::testing::MatchesRegex;
-
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
@@ -291,7 +289,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
-    int request_bytes, std::function<void(IntegrationStreamDecoder&)> cb) {
+    int request_bytes, Http::TestHeaderMapImpl headers,
+    std::function<void(IntegrationStreamDecoder&)> cb) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
   std::vector<Http::StreamEncoder*> encoders;
@@ -303,12 +302,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
     responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
-    encoders.push_back(
-        &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"}},
-                                     *responses[i]));
+    encoders.push_back(&codec_client_->startRequest(headers, *responses[i]));
     codec_client_->sendData(*encoders[i], request_bytes, true);
   }
 
@@ -338,7 +332,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
   }
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoTtl) {
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
   config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
     auto* hash_policy = hcm.mutable_route_config()
                             ->mutable_virtual_hosts(0)
@@ -350,15 +344,22 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoTtl) {
   });
 
   std::set<std::string> served_by;
-  sendMultipleRequests(1024, [&](IntegrationStreamDecoder& response) {
-    EXPECT_STREQ("200", response.headers().Status()->value().c_str());
-    EXPECT_FALSE(response.headers().get(Http::Headers::get().SetCookie) != nullptr);
-    served_by.insert(response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
-  });
+  sendMultipleRequests(
+      1024,
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
+        served_by.insert(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+      });
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithTtlSet) {
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithTtlSet) {
   config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
     auto* hash_policy = hcm.mutable_route_config()
                             ->mutable_virtual_hosts(0)
@@ -371,15 +372,76 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithTtlSet) {
   });
 
   std::set<std::string> set_cookies;
-  sendMultipleRequests(1024, [&](IntegrationStreamDecoder& response) {
-    EXPECT_STREQ("200", response.headers().Status()->value().c_str());
-    std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
-    set_cookies.insert(value);
-    EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15"));
-  });
+  sendMultipleRequests(
+      1024,
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
+        set_cookies.insert(value);
+        EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15"));
+      });
   EXPECT_EQ(set_cookies.size(), 1);
 }
 
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
+  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
+    auto* hash_policy = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->add_hash_policy();
+    auto* cookie = hash_policy->mutable_cookie();
+    cookie->set_name("foo");
+  });
 
+  std::set<std::string> served_by;
+  sendMultipleRequests(
+      1024,
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {"cookie", "foo=bar"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
+        served_by.insert(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+      });
+  EXPECT_EQ(served_by.size(), 1);
+}
+
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
+  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
+    auto* hash_policy = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->add_hash_policy();
+    auto* cookie = hash_policy->mutable_cookie();
+    cookie->set_name("foo");
+    cookie->mutable_ttl()->set_seconds(15);
+  });
+
+  std::set<std::string> served_by;
+  sendMultipleRequests(
+      1024,
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {"cookie", "foo=bar"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
+        served_by.insert(
+            response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+      });
+  EXPECT_EQ(served_by.size(), 1);
+}
 
 } // namespace Envoy
