@@ -179,14 +179,14 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body, bool overl
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
-      [&](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+      [this, overloaded](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
         if (overloaded) {
           headers->insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
         }
 
         callbacks_->encodeHeaders(std::move(headers), end_stream);
       },
-      [&](Buffer::Instance& data, bool end_stream) -> void {
+      [this](Buffer::Instance& data, bool end_stream) -> void {
         callbacks_->encodeData(data, end_stream);
       },
       stream_destroyed_, code, body);
@@ -313,8 +313,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::ServiceUnavailable,
-                                "no healthy upstream");
+  sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", false);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {

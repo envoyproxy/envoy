@@ -168,7 +168,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
                                 const Optional<Http::StreamResetReason>& reset_reason) {
   // We never retry if the overloaded header is set.
-  if (response_headers && response_headers->EnvoyOverloaded() != nullptr) {
+  if (response_headers != nullptr && response_headers->EnvoyOverloaded() != nullptr) {
     return false;
   }
 
