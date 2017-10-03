@@ -616,6 +616,45 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
+  setup(false, "");
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<Network::MockClientConnection>* upstream_connection_ =
+      new NiceMock<Network::MockClientConnection>();
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+
+  conn_info.connection_ = upstream_connection_;
+  conn_info.host_description_.reset(
+      new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
+                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                             envoy::api::v2::Metadata::default_instance(), 1,
+                             envoy::api::v2::Locality().default_instance()));
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+
+  // Websocket enabled route
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
+      .WillByDefault(Return(true));
+
+  // Non websocket request
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/scooby"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_total_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http1_active_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
   setup(false, "");
 
@@ -646,7 +685,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
+TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   setup(false, "");
 
   StreamDecoder* decoder = nullptr;
@@ -669,12 +708,11 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixRewrite) {
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
               finalizeRequestHeaders(_, _));
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
-      .WillOnce(Return(false));
-  // TODO (rshriram) figure out how to test the auto host rewrite. Need handle over headers.
+      .WillOnce(Return(true));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
-    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "newhost"},
                                                {":method", "GET"},
                                                {":path", "/scooby"},
                                                {"connection", "Upgrade"},
