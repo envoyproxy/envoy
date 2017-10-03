@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/timespan.h"
 
 namespace Envoy {
 namespace Server {
@@ -147,7 +148,7 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
 ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
                                                           Network::ConnectionPtr&& new_connection)
     : listener_(listener), connection_(std::move(new_connection)),
-      conn_length_(listener_.stats_.downstream_cx_length_ms_.allocateSpan()) {
+      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

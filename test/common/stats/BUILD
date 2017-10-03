@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "stats_impl_test",
     srcs = ["stats_impl_test.cc"],
-    deps = ["//source/common/stats:stats_lib"],
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(

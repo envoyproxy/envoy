@@ -28,8 +28,7 @@ public:
   /**
    * Returns the full name of the Metric.
    */
-  virtual std::string name() const PURE;
-
+  virtual const std::string& name() const PURE;
 };
 
 /**
@@ -37,7 +36,7 @@ public:
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
  * clears it.
  */
-class Counter : public Metric {
+class Counter : public virtual Metric {
 public:
   virtual ~Counter() {}
   virtual void add(uint64_t amount) PURE;
@@ -53,7 +52,7 @@ typedef std::shared_ptr<Counter> CounterSharedPtr;
 /**
  * A gauge that can both increment and decrement.
  */
-class Gauge : public Metric {
+class Gauge : public virtual Metric {
 public:
   virtual ~Gauge() {}
 
@@ -69,48 +68,25 @@ public:
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
 /**
- * An individual timespan that is owned by a timer. The initial time is captured on construction.
- * A timespan must be completed via complete() for it to be stored. If the timespan is deleted
- * this will be treated as a cancellation.
+ * A histogram that records values one at a time.
  */
-class Timespan {
-public:
-  virtual ~Timespan() {}
-
-  /**
-   * Complete the span using the default name of the timer that the span was allocated from.
-   */
-  virtual void complete() PURE;
-
-  /**
-   * Complete the span using a dynamic name. This is useful if a span needs to get counted
-   * against a timer with a dynamic name.
-   */
-  virtual void complete(const std::string& dynamic_name) PURE;
-};
-
-typedef std::unique_ptr<Timespan> TimespanPtr;
-
-/**
- * A timer that can capture timespans.
- */
-class Timer : public Metric {
-public:
-  virtual ~Timer() {}
-
-  virtual TimespanPtr allocateSpan() PURE;
-  virtual void recordDuration(std::chrono::milliseconds ms) PURE;
-};
-
-typedef std::shared_ptr<Timer> TimerSharedPtr;
-
-/**
- * A histogram that captures values one at a time.
- */
-class Histogram : public Metric {
+class Histogram : public virtual Metric {
 public:
   virtual ~Histogram() {}
 
+  enum ValueType {
+    Integer,
+    Duration,
+  };
+
+  /**
+   * Informs the user how the values should be interpreted.
+   */
+  virtual ValueType type() const PURE;
+
+  /**
+   * Records a value.  If a timer, values are in units of milliseconds.
+   */
   virtual void recordValue(uint64_t value) PURE;
 };
 
@@ -148,12 +124,7 @@ public:
   /**
    * Flush a histogram value.
    */
-  virtual void onHistogramComplete(const Metric& histogram, uint64_t value) PURE;
-
-  /**
-   * Flush a timespan value.
-   */
-  virtual void onTimespanComplete(const Metric& timespan, std::chrono::milliseconds ms) PURE;
+  virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
 };
 
 typedef std::unique_ptr<Sink> SinkPtr;
@@ -180,12 +151,7 @@ public:
   /**
    * Deliver an individual histogram value to all registered sinks.
    */
-  virtual void deliverHistogramToSinks(const Metric& histogram, uint64_t value) PURE;
-
-  /**
-   * Deliver an individual timespan completion to all registered sinks.
-   */
-  virtual void deliverTimingToSinks(const Metric& timer, std::chrono::milliseconds ms) PURE;
+  virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
    * @return a counter within the scope's namespace.
@@ -198,14 +164,9 @@ public:
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
-   * @return a timer within the scope's namespace.
+   * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Timer& timer(const std::string& name) PURE;
-
-  /**
-   * @return a histogram within the scope's namespace.
-   */
-  virtual Histogram& histogram(const std::string& name) PURE;
+  virtual Histogram& histogram(Histogram::ValueType type, const std::string& name) PURE;
 };
 
 /**

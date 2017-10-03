@@ -191,12 +191,14 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
     reply_documents_byte_size += document->byteSize();
   }
 
-  scope_.histogram(fmt::format("{}.reply_num_docs", prefix))
+  scope_.histogram(Stats::Histogram::ValueType::Integer, fmt::format("{}.reply_num_docs", prefix))
       .recordValue(message.documents().size());
-  scope_.histogram(fmt::format("{}.reply_size", prefix)).recordValue(reply_documents_byte_size);
-  scope_.timer(fmt::format("{}.reply_time_ms", prefix))
-      .recordDuration(std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::steady_clock::now() - active_query.start_time_));
+  scope_.histogram(Stats::Histogram::ValueType::Integer, fmt::format("{}.reply_size", prefix))
+      .recordValue(reply_documents_byte_size);
+  scope_.histogram(Stats::Histogram::ValueType::Duration, fmt::format("{}.reply_time_ms", prefix))
+      .recordValue(std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - active_query.start_time_)
+                       .count());
 }
 
 void ProxyFilter::doDecode(Buffer::Instance& buffer) {

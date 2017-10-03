@@ -42,13 +42,15 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   counter.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
 
-  NiceMock<MockMetric> histogram;
+  NiceMock<MockHistogram> histogram;
   histogram.name_ = "histogram_test_timer";
+  histogram.type_ = Histogram::ValueType::Duration;
   sink.onHistogramComplete(histogram, 5);
 
-  NiceMock<MockMetric> timer;
-  histogram.name_ = "test_timer";
-  sink.onTimespanComplete(timer, std::chrono::milliseconds(5));
+  NiceMock<MockHistogram> timer;
+  timer.name_ = "test_timer";
+  timer.type_ = Histogram::ValueType::Integer;
+  sink.onHistogramComplete(timer, 5);
   EXPECT_EQ(fd, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {

@@ -12,11 +12,12 @@ namespace Envoy {
 namespace Http {
 
 void UserAgent::completeConnectionLength(Stats::Timespan& span) {
-  if (!stats_) {
+  if (!stats_ || !scope_) {
     return;
   }
 
-  span.complete(prefix_ + "downstream_cx_length_ms");
+  scope_->histogram(Stats::Histogram::ValueType::Duration, prefix_ + "downstream_cx_length_ms")
+      .recordValue(span.getRawDuration().count());
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
@@ -44,6 +45,7 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
     stats_.reset(new UserAgentStats{ALL_USER_AGENTS_STATS(POOL_COUNTER_PREFIX(scope, prefix_))});
     stats_->downstream_cx_total_.inc();
     stats_->downstream_rq_total_.inc();
+    scope_ = &scope;
   }
 }
 

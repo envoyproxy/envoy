@@ -68,8 +68,9 @@ void UdpStatsdSink::flushGauge(const Metric& gauge, uint64_t value) {
   tls_->getTyped<Writer>().writeGauge(gauge.name(), value);
 }
 
-void UdpStatsdSink::onTimespanComplete(const Metric& timer, std::chrono::milliseconds ms) {
-  tls_->getTyped<Writer>().writeTimer(timer.name(), ms);
+void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
+  // For statsd histograms are all timers.
+  tls_->getTyped<Writer>().writeTimer(histogram.name(), std::chrono::milliseconds(value));
 }
 
 char TcpStatsdSink::STAT_PREFIX[] = "envoy.";

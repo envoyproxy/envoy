@@ -182,32 +182,36 @@ TEST(CodeUtilityResponseTimingTest, All) {
       true,         true,          "vhost_name", "req_vcluster_name",
       "from_az",    "to_az"};
 
-  EXPECT_CALL(cluster_scope, timer("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks(Property(&Stats::Metric::name, "prefix.upstream_rq_time"),
-                                   std::chrono::milliseconds(5)));
+              histogram(Stats::Histogram::ValueType::Duration, "prefix.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope, deliverHistogramToSinks(
+                                 Property(&Stats::Metric::name, "prefix.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, timer("prefix.canary.upstream_rq_time"));
   EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"),
-                                   std::chrono::milliseconds(5)));
-
-  EXPECT_CALL(cluster_scope, timer("prefix.internal.upstream_rq_time"));
-  EXPECT_CALL(cluster_scope, deliverTimingToSinks(
-                                 Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"),
-                                 std::chrono::milliseconds(5)));
-  EXPECT_CALL(global_store, timer("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+              histogram(Stats::Histogram::ValueType::Duration, "prefix.canary.upstream_rq_time"));
   EXPECT_CALL(
-      global_store,
-      deliverTimingToSinks(Property(&Stats::Metric::name,
-                                    "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
-                           std::chrono::milliseconds(5)));
+      cluster_scope,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, timer("prefix.zone.from_az.to_az.upstream_rq_time"));
   EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks(
-                  Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"),
-                  std::chrono::milliseconds(5)));
+              histogram(Stats::Histogram::ValueType::Duration, "prefix.internal.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"), 5));
+  EXPECT_CALL(global_store,
+              histogram(Stats::Histogram::ValueType::Duration,
+                        "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+  EXPECT_CALL(global_store,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
+                  5));
+
+  EXPECT_CALL(cluster_scope, histogram(Stats::Histogram::ValueType::Duration,
+                                       "prefix.zone.from_az.to_az.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
   CodeUtility::chargeResponseTiming(info);
 }
 

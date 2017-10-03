@@ -60,7 +60,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager)
     : config_(config), stats_(config_.stats()),
-      conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_)),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()) {}
@@ -348,7 +348,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(ConnectionManagerUtility::generateStreamId(*snapped_route_config_,
                                                             connection_manager.random_generator_)),
-      request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
+      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_)),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();

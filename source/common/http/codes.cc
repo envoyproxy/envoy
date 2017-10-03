@@ -81,33 +81,42 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 }
 
 void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
-  info.cluster_scope_.timer(info.prefix_ + "upstream_rq_time").recordDuration(info.response_time_);
+  info.cluster_scope_
+      .histogram(Stats::Histogram::ValueType::Duration, info.prefix_ + "upstream_rq_time")
+      .recordValue(info.response_time_.count());
   if (info.upstream_canary_) {
-    info.cluster_scope_.timer(info.prefix_ + "canary.upstream_rq_time")
-        .recordDuration(info.response_time_);
+    info.cluster_scope_
+        .histogram(Stats::Histogram::ValueType::Duration, info.prefix_ + "canary.upstream_rq_time")
+        .recordValue(info.response_time_.count());
   }
 
   if (info.internal_request_) {
-    info.cluster_scope_.timer(info.prefix_ + "internal.upstream_rq_time")
-        .recordDuration(info.response_time_);
+    info.cluster_scope_
+        .histogram(Stats::Histogram::ValueType::Duration,
+                   info.prefix_ + "internal.upstream_rq_time")
+        .recordValue(info.response_time_.count());
   } else {
-    info.cluster_scope_.timer(info.prefix_ + "external.upstream_rq_time")
-        .recordDuration(info.response_time_);
+    info.cluster_scope_
+        .histogram(Stats::Histogram::ValueType::Duration,
+                   info.prefix_ + "external.upstream_rq_time")
+        .recordValue(info.response_time_.count());
   }
 
   if (!info.request_vcluster_name_.empty()) {
     info.global_scope_
-        .timer("vhost." + info.request_vhost_name_ + ".vcluster." + info.request_vcluster_name_ +
-               ".upstream_rq_time")
-        .recordDuration(info.response_time_);
+        .histogram(Stats::Histogram::ValueType::Duration,
+                   "vhost." + info.request_vhost_name_ + ".vcluster." +
+                       info.request_vcluster_name_ + ".upstream_rq_time")
+        .recordValue(info.response_time_.count());
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
     info.cluster_scope_
-        .timer(fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_,
-                           info.to_zone_))
-        .recordDuration(info.response_time_);
+        .histogram(Stats::Histogram::ValueType::Duration,
+                   fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_,
+                               info.to_zone_))
+        .recordValue(info.response_time_.count());
   }
 }
 

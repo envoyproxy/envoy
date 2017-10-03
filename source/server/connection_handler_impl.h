@@ -12,6 +12,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"

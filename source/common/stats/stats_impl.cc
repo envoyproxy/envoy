@@ -10,16 +10,6 @@
 namespace Envoy {
 namespace Stats {
 
-void TimerImpl::recordDuration(std::chrono::milliseconds ms) {
-  parent_.deliverTimingToSinks(*this, ms);
-}
-
-void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
-  std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - start_);
-  parent_.parent_.timer(dynamic_name).recordDuration(ms);
-}
-
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   RawStatData* data = new RawStatData();
   memset(data, 0, sizeof(RawStatData));

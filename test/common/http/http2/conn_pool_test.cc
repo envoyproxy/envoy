@@ -122,9 +122,9 @@ public:
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   expectClientCreate();
   EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
 
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
