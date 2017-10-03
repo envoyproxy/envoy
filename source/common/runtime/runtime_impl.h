@@ -31,7 +31,10 @@ namespace Runtime {
 class RandomGeneratorImpl : public RandomGenerator {
 public:
   // Runtime::RandomGenerator
-  uint64_t random() override { return threadLocalGenerator()(); }
+  uint64_t random() override {
+    auto& gen = threadLocalGenerator();
+    return (gen() << 48) | gen();
+  }
   std::string uuid() override;
 
   static const size_t UUID_LENGTH;
