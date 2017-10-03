@@ -621,17 +621,6 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
-  NiceMock<Network::MockClientConnection>* upstream_connection_ =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection_;
-  conn_info.host_description_.reset(
-      new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                             envoy::api::v2::Metadata::default_instance(), 1,
-                             envoy::api::v2::Locality().default_instance()));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   // Websocket enabled route
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
@@ -640,9 +629,8 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
   // Non websocket request
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
-    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
-                                               {":method", "GET"},
-                                               {":path", "/scooby"}}};
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
     decoder->decodeHeaders(std::move(headers), true);
     data.drain(4);
   }));
