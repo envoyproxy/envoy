@@ -32,7 +32,7 @@ protected:
     envoy::api::v2::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_name("eds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
-    local_info_.zone_name_ = "us-east-1a";
+    local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseSdsClusterFromJson(json_config, eds_config);
     cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
@@ -202,6 +202,69 @@ TEST_F(EdsTest, EndpointLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
+}
+
+// Validate that onConfigUpdate() updates bins hosts per locality as expected.
+TEST_F(EdsTest, EndpointHostsPerLocality) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  uint32_t port = 1000;
+  auto add_hosts_to_locality = [cluster_load_assignment,
+                                &port](const std::string& region, const std::string& zone,
+                                       const std::string& sub_zone, uint32_t n) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region(region);
+    locality->set_zone(zone);
+    locality->set_sub_zone(sub_zone);
+
+    for (uint32_t i = 0; i < n; ++i) {
+      auto* socket_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+      socket_address->set_address("1.2.3.4");
+      socket_address->set_port_value(port++);
+    }
+  };
+
+  add_hosts_to_locality("oceania", "koala", "ingsoc", 2);
+  add_hosts_to_locality("", "us-east-1a", "", 1);
+
+  bool initialized = false;
+  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_TRUE(initialized);
+
+  EXPECT_EQ(2, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(1, cluster_->hostsPerLocality()[0].size());
+  EXPECT_EQ(Locality("", "us-east-1a", ""),
+            Locality(cluster_->hostsPerLocality()[0][0]->locality()));
+  EXPECT_EQ(2, cluster_->hostsPerLocality()[1].size());
+  EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
+            Locality(cluster_->hostsPerLocality()[1][0]->locality()));
+  EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
+            Locality(cluster_->hostsPerLocality()[1][1]->locality()));
+
+  add_hosts_to_locality("oceania", "koala", "eucalyptus", 3);
+  add_hosts_to_locality("general", "koala", "ingsoc", 5);
+
+  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+
+  EXPECT_EQ(4, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(1, cluster_->hostsPerLocality()[0].size());
+  EXPECT_EQ(Locality("", "us-east-1a", ""),
+            Locality(cluster_->hostsPerLocality()[0][0]->locality()));
+  EXPECT_EQ(5, cluster_->hostsPerLocality()[1].size());
+  EXPECT_EQ(Locality("general", "koala", "ingsoc"),
+            Locality(cluster_->hostsPerLocality()[1][0]->locality()));
+  EXPECT_EQ(3, cluster_->hostsPerLocality()[2].size());
+  EXPECT_EQ(Locality("oceania", "koala", "eucalyptus"),
+            Locality(cluster_->hostsPerLocality()[2][0]->locality()));
+  EXPECT_EQ(2, cluster_->hostsPerLocality()[3].size());
+  EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
+            Locality(cluster_->hostsPerLocality()[3][0]->locality()));
 }
 
 } // namespace Upstream
