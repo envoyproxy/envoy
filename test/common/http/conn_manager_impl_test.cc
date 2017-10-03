@@ -76,7 +76,7 @@ public:
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{
-            CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(fake_stats_, "listener._.http.fake."))} {
+            CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
     tracing_config_.reset(new TracingConnectionManagerConfig(
         {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
 
@@ -270,6 +270,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   uint32_t initial_buffer_limit_{};
   bool streaming_filter_{false};
+  Stats::IsolatedStoreImpl fake_listener_stats_;
   ConnectionManagerListenerStats listener_stats_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
