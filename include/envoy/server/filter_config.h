@@ -116,6 +116,11 @@ public:
    * @return Server::Admin& the server's global admin HTTP endpoint.
    */
   virtual Server::Admin& admin() PURE;
+
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
 };
 
 /**

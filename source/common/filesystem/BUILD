@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["filesystem_impl.cc"],
     hdrs = ["filesystem_impl.h"],
     deps = [
+        "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//source/common/buffer:buffer_lib",

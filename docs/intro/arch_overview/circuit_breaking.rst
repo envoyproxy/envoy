@@ -25,10 +25,14 @@ configure and code each application independently. Envoy supports various types 
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
   hosts in a cluster at any given time. In general we recommend aggressively circuit breaking
   retries so that retries for sporadic failures are allowed but the overall retry volume cannot
-  explode and cause large scale cascading failure. If this circuit breaker overflows the 
+  explode and cause large scale cascading failure. If this circuit breaker overflows the
   :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
   will increment.
 
 Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
 and tracked on a per upstream cluster and per priority basis. This allows different components of
 the distributed system to be tuned independently and have different limits.
+
+Note that circuit breaking will cause the :ref:`x-envoy-overloaded
+<config_http_filters_router_x-envoy-overloaded>` header to be set by the router filter in the
+case of HTTP requests.

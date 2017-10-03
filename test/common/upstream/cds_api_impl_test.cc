@@ -103,8 +103,8 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  local_info_.cluster_name_ = "";
-  local_info_.node_name_ = "";
+  local_info_.node_.set_cluster("");
+  local_info_.node_.set_id("");
   envoy::api::v2::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(

@@ -43,7 +43,8 @@ public:
                                           const std::vector<std::string>& expected_resource_names) {
     envoy::api::v2::DiscoveryRequest discovery_request;
     ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
-    if (expected_type_url != discovery_request.type_url()) {
+    // TODO(PiotrSikora): Remove this hack once fixed internally.
+    if (!(expected_type_url == discovery_request.type_url())) {
       return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                                discovery_request.type_url(), expected_type_url);
     }
@@ -56,7 +57,8 @@ public:
                  fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
                  discovery_request.DebugString());
     }
-    if (expected_version != discovery_request.version_info()) {
+    // TODO(PiotrSikora): Remove this hack once fixed internally.
+    if (!(expected_version == discovery_request.version_info())) {
       return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                                discovery_request.version_info(), expected_version,
                                                discovery_request.DebugString());

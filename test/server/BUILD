@@ -55,6 +55,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restart_impl_test",
+    srcs = ["hot_restart_impl_test.cc"],
+    deps = [
+        "//source/server:hot_restart_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "init_manager_impl_test",
     srcs = ["init_manager_impl_test.cc"],
     deps = [

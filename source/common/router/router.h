@@ -146,8 +146,9 @@ private:
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
-        : parent_(parent), conn_pool_(pool), calling_encode_headers_(false),
-          upstream_canary_(false), encode_complete_(false), encode_trailers_(false) {}
+        : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
+          calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
+          encode_trailers_(false) {}
 
     ~UpstreamRequest();
 
@@ -205,6 +206,7 @@ private:
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
+    bool grpc_rq_success_deferred_;
     Event::TimerPtr per_try_timeout_;
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
     Http::StreamEncoder* request_encoder_{};
@@ -226,10 +228,11 @@ private:
   Http::AccessLog::ResponseFlag
   streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
-  void chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                          Upstream::HostDescriptionConstSharedPtr upstream_host);
-  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host);
+  static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
+                          Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
+                          bool dropped);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
@@ -250,6 +253,10 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   void doRetry();
+  // Called immediately after a non-5xx header is received from upstream, performs stats accounting
+  // and handle difference between gRPC and non-gRPC requests.
+  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
+  void sendLocalReply(Http::Code code, const std::string& body, bool overloaded);
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -262,6 +269,7 @@ private:
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
+  bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;

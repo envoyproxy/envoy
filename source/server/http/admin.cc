@@ -362,7 +362,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerServerInfo), false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
-           false}} {
+           false}},
+      listener_stats_(
+          Http::ConnectionManagerImpl::generateListenerStats("http.admin.", server_.stats())) {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
