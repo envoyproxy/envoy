@@ -16,7 +16,7 @@ public:
   virtual ~OsSysCalls() {}
 
   /**
-   * @see bind (main 2 bind)
+   * @see bind (man 2 bind)
    */
   virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
