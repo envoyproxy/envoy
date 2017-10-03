@@ -74,7 +74,7 @@ namespace Http {
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
-  COUNTER(downstream_rq_too_large)                                                              \
+  COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \

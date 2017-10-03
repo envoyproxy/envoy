@@ -706,7 +706,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
                                                {":method", "GET"},
-                                               {":path", "/scooby"},
+                                               {":path", "/"},
                                                {"connection", "Upgrade"},
                                                {"upgrade", "websocket"}}};
     decoder->decodeHeaders(std::move(headers), true);
@@ -757,7 +757,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
                                                {":method", "GET"},
-                                               {":path", "/scooby"},
+                                               {":path", "/"},
                                                {"connection", "Upgrade"},
                                                {"upgrade", "websocket"}}};
     decoder->decodeHeaders(std::move(headers), true);
