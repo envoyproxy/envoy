@@ -713,7 +713,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
 
-  Event::MockTimer* connect_timeout_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* connect_timeout_timer =
+      new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*connect_timeout_timer, enableTimer(_));
   connect_timeout_timer->callback_();
 
