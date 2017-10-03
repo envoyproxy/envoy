@@ -112,13 +112,13 @@ Endpoint | stage | version | type   | xlarge
 ---------|-------|---------|--------|-------
 e1       | prod  | 1.0     | std    | true
 e2       | prod  | 1.0     | std    |
-e3       | prod  | 1.1     | std    | true
+e3       | prod  | 1.1     | std    |
 e4       | prod  | 1.1     | std    |
 e5       | prod  | 1.0     | bigmem |
 e6       | prod  | 1.1     | bigmem |
 e7       | dev   | 1.2-pre | std    |
 
-Note: Only e1 and e3 have the "xlarge" metadata key.
+Note: Only e1 has the "xlarge" metadata key.
 
 Given this CDS `envoy::api::v2::Cluster`:
 
@@ -154,7 +154,7 @@ The following subsets are created:
 `version=1.0` (e1, e2, e5)
 `version=1.1` (e3, e4, e6)
 `version=1.2-pre` (e7)
-`version=1.0, xlarge=true` (e1, e3)
+`version=1.0, xlarge=true` (e1)
 
 In addition, a default subset is created:
 
