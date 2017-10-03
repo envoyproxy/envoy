@@ -1,8 +1,6 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include <dirent.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include <chrono>
 #include <cstdint>
@@ -54,19 +52,9 @@ std::string fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-int OsSysCallsImpl::open(const std::string& full_path, int flags, int mode) {
-  return ::open(full_path.c_str(), flags, mode);
-}
-
-int OsSysCallsImpl::close(int fd) { return ::close(fd); }
-
-ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
-  return ::write(fd, buffer, num_bytes);
-}
-
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
-                   Thread::BasicLockable& lock, OsSysCalls& os_sys_calls, Stats::Store& stats_store,
-                   std::chrono::milliseconds flush_interval_msec)
+                   Thread::BasicLockable& lock, Api::OsSysCalls& os_sys_calls,
+                   Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec)
     : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notify_one();

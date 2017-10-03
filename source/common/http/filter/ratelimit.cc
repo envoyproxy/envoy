@@ -123,7 +123,7 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
-                                             *getTooManyRequestsHeader(),
+                                             enumToInt(Code::TooManyRequests),
                                              true,
                                              EMPTY_STRING,
                                              EMPTY_STRING,

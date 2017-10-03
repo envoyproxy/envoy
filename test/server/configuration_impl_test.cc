@@ -153,7 +153,7 @@ TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
 
   envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  server_.local_info_.cluster_name_ = "";
+  server_.local_info_.node_.set_cluster("");
   MainImpl config;
   EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
 }
@@ -176,7 +176,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
 
   envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  server_.local_info_.cluster_name_ = "";
+  server_.local_info_.node_.set_cluster("");
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
@@ -212,7 +212,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
 
   envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  server_.local_info_.cluster_name_ = "";
+  server_.local_info_.node_.set_cluster("");
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 

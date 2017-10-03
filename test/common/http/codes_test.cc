@@ -27,11 +27,9 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    TestHeaderMapImpl headers{{":status", std::to_string(code)}};
-
     CodeUtility::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        "prefix.", headers, internal_request,
-        request_vhost_name, request_vcluster_name, from_az,   to_az,   canary};
+        global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
+        request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
 
     CodeUtility::chargeResponseStat(info);
   }
@@ -92,7 +90,7 @@ TEST_F(CodeUtilityTest, Canary) {
 }
 
 TEST_F(CodeUtilityTest, All) {
-  std::vector<std::pair<Code, std::string>> testSet = {
+  const std::vector<std::pair<Code, std::string>> test_set = {
       std::make_pair(Code::Continue, "Continue"),
       std::make_pair(Code::OK, "OK"),
       std::make_pair(Code::Created, "Created"),
@@ -151,8 +149,8 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required"),
       std::make_pair(static_cast<Code>(600), "Unknown")};
 
-  for (const auto& testCase : testSet) {
-    EXPECT_EQ(testCase.second, CodeUtility::toString(testCase.first));
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, CodeUtility::toString(test_case.first));
   }
 
   EXPECT_EQ(std::string("Unknown"), CodeUtility::toString(static_cast<Code>(600)));

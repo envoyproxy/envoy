@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 
 #include "test/mocks/filesystem/mocks.h"
@@ -31,6 +32,31 @@ public:
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
 
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
+};
+
+class MockOsSysCalls : public OsSysCalls {
+public:
+  MockOsSysCalls();
+  ~MockOsSysCalls();
+
+  // Filesystem::OsSysCalls
+  ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
+  int open(const std::string& full_path, int flags, int mode) override;
+  MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
+  MOCK_METHOD1(close, int(int));
+  MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
+  MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
+  MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));
+  MOCK_METHOD1(shmUnlink, int(const char*));
+  MOCK_METHOD2(ftruncate, int(int fd, off_t length));
+  MOCK_METHOD6(mmap, void*(void* addr, size_t length, int prot, int flags, int fd, off_t offset));
+
+  size_t num_writes_;
+  size_t num_open_;
+  Thread::MutexBasicLockable write_mutex_;
+  Thread::MutexBasicLockable open_mutex_;
+  std::condition_variable_any write_event_;
+  std::condition_variable_any open_event_;
 };
 
 } // namespace Api

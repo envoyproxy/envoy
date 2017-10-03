@@ -239,8 +239,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster.hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.healthyHostsPerLocality().size());
 
   for (const HostSharedPtr& host : cluster.hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
@@ -480,8 +480,8 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_THAT(std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
+  EXPECT_EQ(0UL, cluster.hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.healthyHostsPerLocality().size());
   cluster.hosts()[0]->healthChecker().setUnhealthy();
 }
 

@@ -15,7 +15,7 @@ namespace Buffer {
  */
 struct RawSlice {
   void* mem_;
-  uint64_t len_;
+  size_t len_;
 };
 
 /**

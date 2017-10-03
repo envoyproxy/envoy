@@ -285,10 +285,10 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
 
 void ClusterImplBase::reloadHealthyHosts() {
   HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(hosts()));
-  HostListsConstSharedPtr hosts_per_zone_copy(
-      new std::vector<std::vector<HostSharedPtr>>(hostsPerZone()));
-  updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_zone_copy,
-              createHealthyHostLists(hostsPerZone()), {}, {});
+  HostListsConstSharedPtr hosts_per_locality_copy(
+      new std::vector<std::vector<HostSharedPtr>>(hostsPerLocality()));
+  updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_locality_copy,
+              createHealthyHostLists(hostsPerLocality()), {}, {});
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,

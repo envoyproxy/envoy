@@ -25,7 +25,7 @@ void CodeUtility::chargeBasicResponseStat(Stats::Scope& scope, const std::string
 }
 
 void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
-  uint64_t response_code = Utility::getResponseStatus(info.response_headers_);
+  const uint64_t response_code = info.response_status_code_;
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
 
   std::string group_string = groupStringForResponseCode(static_cast<Code>(response_code));

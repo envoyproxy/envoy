@@ -16,3 +16,8 @@ envoy_cc_library(
         "//include/envoy/thread:thread_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "os_sys_calls_interface",
+    hdrs = ["os_sys_calls.h"],
+)

@@ -42,36 +42,37 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
-  enum class ZoneRoutingState { NoZoneRouting, ZoneDirect, ZoneResidual };
+  enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
 
   /**
-   * @return decision on quick exit from zone aware routing based on cluster configuration.
+   * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonZoneRouting();
+  bool earlyExitNonLocalityRouting();
 
   /**
-   * Try to select upstream hosts from the same zone.
+   * Try to select upstream hosts from the same locality.
    */
-  const std::vector<HostSharedPtr>& tryChooseLocalZoneHosts();
+  const std::vector<HostSharedPtr>& tryChooseLocalLocalityHosts();
 
   /**
-   * @return (number of hosts in a given zone)/(total number of hosts) in ret param.
+   * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
    * Caller is responsible for allocation/de-allocation of ret.
    */
-  void calculateZonePercentage(const std::vector<std::vector<HostSharedPtr>>& hosts_per_zone,
-                               uint64_t* ret);
+  void
+  calculateLocalityPercentage(const std::vector<std::vector<HostSharedPtr>>& hosts_per_locality,
+                              uint64_t* ret);
 
   /**
-   * Regenerate zone aware routing structures for fast decisions on upstream zone selection.
+   * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateZoneRoutingStructures();
+  void regenerateLocalityRoutingStructures();
 
   const HostSet& host_set_;
   const HostSet* local_host_set_;
   uint64_t local_percent_to_route_{};
-  ZoneRoutingState zone_routing_state_{ZoneRoutingState::NoZoneRouting};
+  LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
   std::vector<uint64_t> residual_capacity_;
   Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
 };
