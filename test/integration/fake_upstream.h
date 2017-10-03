@@ -48,6 +48,7 @@ public:
   void encodeTrailers(const Http::HeaderMapImpl& trailers);
   void encodeResetStream();
   const Http::HeaderMap& headers() { return *headers_; }
+  void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForHeadersComplete();
   void waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length);
@@ -111,6 +112,7 @@ private:
   bool saw_reset_{};
   Grpc::Decoder grpc_decoder_;
   std::vector<Grpc::Frame> decoded_grpc_frames_;
+  bool add_served_by_header_{};
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
@@ -277,6 +279,11 @@ public:
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
   FakeRawConnectionPtr waitForRawConnection();
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+
+  // Wait for one of the upstreams to receive a connection
+  static FakeHttpConnectionPtr
+  waitForHttpConnection(Event::Dispatcher& client_dispatcher,
+                        std::vector<std::unique_ptr<FakeUpstream>>& upstreams);
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;

@@ -7,10 +7,14 @@
 
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+
+using ::testing::MatchesRegex;
 
 namespace Envoy {
 
@@ -252,5 +256,130 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 32, 1024 * 16);
 }
+
+Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
+  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->clear_hosts();
+    cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_RING_HASH);
+    for (int i = 0; i < num_upstreams_; i++) {
+      auto* socket = cluster->add_hosts()->mutable_socket_address();
+      socket->set_address(Network::Test::getLoopbackAddressString(version_));
+    }
+  });
+}
+
+Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
+  if (codec_client_) {
+    codec_client_->close();
+    codec_client_ = nullptr;
+  }
+  for (auto it = fake_upstream_connections_.begin(); it != fake_upstream_connections_.end(); ++it) {
+    (*it)->close();
+    (*it)->waitForDisconnect();
+  }
+}
+
+void Http2RingHashIntegrationTest::createUpstreams() {
+  for (int i = 0; i < num_upstreams_; i++) {
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
+  }
+}
+
+INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+void Http2RingHashIntegrationTest::sendMultipleRequests(
+    int request_bytes, std::function<void(IntegrationStreamDecoder&)> cb) {
+  TestRandomGenerator rand;
+  const uint32_t num_requests = 50;
+  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<FakeStreamPtr> upstream_requests;
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
+    encoders.push_back(
+        &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     *responses[i]));
+    codec_client_->sendData(*encoders[i], request_bytes, true);
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto fake_upstream_connection =
+        FakeUpstream::waitForHttpConnection(*dispatcher_, fake_upstreams_);
+    // As data and streams are interwoven, make sure waitForNewStream()
+    // ignores incoming data and waits for actual stream establishment.
+    upstream_requests.push_back(fake_upstream_connection->waitForNewStream(true));
+    upstream_requests.back()->setAddServedByHeader(true);
+    fake_upstream_connections_.push_back(std::move(fake_upstream_connection));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests[i]->waitForEndStream(*dispatcher_);
+    upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_requests[i]->encodeData(rand.random() % (1024 * 2), true);
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    responses[i]->waitForEndStream();
+    EXPECT_TRUE(upstream_requests[i]->complete());
+    EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
+
+    EXPECT_TRUE(responses[i]->complete());
+    cb(*responses[i]);
+  }
+}
+
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoTtl) {
+  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
+    auto* hash_policy = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->add_hash_policy();
+    auto* cookie = hash_policy->mutable_cookie();
+    cookie->set_name("foo");
+  });
+
+  std::set<std::string> served_by;
+  sendMultipleRequests(1024, [&](IntegrationStreamDecoder& response) {
+    EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+    EXPECT_FALSE(response.headers().get(Http::Headers::get().SetCookie) != nullptr);
+    served_by.insert(response.headers().get(Http::LowerCaseString("x-served-by"))->value().c_str());
+  });
+  EXPECT_EQ(served_by.size(), num_upstreams_);
+}
+
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithTtlSet) {
+  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
+    auto* hash_policy = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->add_hash_policy();
+    auto* cookie = hash_policy->mutable_cookie();
+    cookie->set_name("foo");
+    cookie->mutable_ttl()->set_seconds(15);
+  });
+
+  std::set<std::string> set_cookies;
+  sendMultipleRequests(1024, [&](IntegrationStreamDecoder& response) {
+    EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+    std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
+    set_cookies.insert(value);
+    EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15"));
+  });
+  EXPECT_EQ(set_cookies.size(), 1);
+}
+
+
 
 } // namespace Envoy
