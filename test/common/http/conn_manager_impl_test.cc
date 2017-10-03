@@ -700,7 +700,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
-    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "newhost"},
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
                                                {":method", "GET"},
                                                {":path", "/scooby"},
                                                {"connection", "Upgrade"},
