@@ -274,7 +274,9 @@ The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
 Coverage for every PR is available in Circle in the "artifacts" tab of the coverage job. You will
-need to navigate down and open "coverage.html" but then you can navigate per normal.
+need to navigate down and open "coverage.html" but then you can navigate per normal. NOTE: We
+have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
+then log back in and it should start working.
 
 The latest coverage report for master is available
 [here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
