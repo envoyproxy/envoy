@@ -39,7 +39,12 @@ Connection pool configuration
   }
 
 op_timeout_ms
-  *(required, integer)* Per-operation timeout in milliseconds.
+  *(required, integer)* Per-operation timeout in milliseconds. The timer starts when the first
+  command of a pipeline is written to the backend connection. Each response received from Redis
+  resets the timer since it signifies that the next command is being processed by the backend.
+  The only exception to this behavior is when a connection to a backend is not yet established. In
+  that case, the connect timeout on the cluster will govern the timeout until the connection is
+  ready.
 
 .. _config_network_filters_redis_proxy_stats:
 
