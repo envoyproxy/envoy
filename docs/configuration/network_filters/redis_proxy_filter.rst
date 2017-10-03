@@ -19,14 +19,15 @@ Redis :ref:`architecture overview <arch_overview_redis>`.
 
 cluster_name
   *(required, string)* Name of cluster from cluster manager.
-  See the :ref:`configuration section <arch_overview_redis_configuration>` of the architecture overview for recommendations
-  on configuring the backing cluster.
+  See the :ref:`configuration section <arch_overview_redis_configuration>` of the architecture
+  overview for recommendations on configuring the backing cluster.
 
 conn_pool
   *(required, object)* Connection pool configuration.
 
 stat_prefix
-  *(required, string)* The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
+  *(required, string)* The prefix to use when emitting :ref:`statistics
+  <config_network_filters_redis_proxy_stats>`.
 
 Connection pool configuration
 -----------------------------
@@ -66,21 +67,22 @@ following statistics:
 Splitter statistics
 -------------------
 
-The Redis filter will gather statistics for the command splitter in the *redis.<stat_prefix>.splitter.* with the
-following statistics:
+The Redis filter will gather statistics for the command splitter in the
+*redis.<stat_prefix>.splitter.* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  invalid_request, Counter, Number of requests with an incorrect number of arguments
-  unsupported_command, Counter, Number of commands issued which are not recognized by the command splitter
+  invalid_request, Counter, "Number of requests with an incorrect number of arguments"
+  unsupported_command, Counter, "Number of commands issued which are not recognized by the
+  command splitter"
   
 Per command statistics
 ----------------------
 
-The Redis filter will gather statistics for commands in the *redis.<stat_prefix>.command.<command>.*
-namespace.
+The Redis filter will gather statistics for commands in the
+*redis.<stat_prefix>.command.<command>.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
