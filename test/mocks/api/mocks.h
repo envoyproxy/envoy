@@ -42,8 +42,8 @@ public:
   // Filesystem::OsSysCalls
   ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
   int open(const std::string& full_path, int flags, int mode) override;
+  MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD1(close, int(int));
-
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
   MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));

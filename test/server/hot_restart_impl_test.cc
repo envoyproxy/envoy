@@ -28,6 +28,7 @@ TEST(HotRestartImplTest, alloc) {
   EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([&buffer]() {
     return buffer.data();
   }));
+  EXPECT_CALL(os_sys_calls, bind(_, _, _));
 
   // Test we match the correct stat with empty-slots before, after, or both.
   HotRestartImpl hot_restart1(options, os_sys_calls);
@@ -45,6 +46,7 @@ TEST(HotRestartImplTest, alloc) {
   EXPECT_CALL(options, restartEpoch()).WillRepeatedly(Return(1));
   EXPECT_CALL(os_sys_calls, shmOpen(_, _, _));
   EXPECT_CALL(os_sys_calls, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer.data()));
+  EXPECT_CALL(os_sys_calls, bind(_, _, _));
   HotRestartImpl hot_restart2(options, os_sys_calls);
   Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
   Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
