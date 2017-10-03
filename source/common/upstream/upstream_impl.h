@@ -37,7 +37,8 @@ namespace Upstream {
 
 // Wrapper around envoy::api::v2::Locality to make it easier to compare for ordering in std::map and
 // in tests to construct literals.
-class Locality : public std::tuple<std::string, std::string, std::string> {
+// TODO(htuch): Consider making this reference based when we have a single string implementation.
+class Locality : public std::tuple<std::string&, std::string&, std::string&> {
 public:
   Locality(const std::string& region, const std::string& zone, const std::string& sub_zone)
       : std::tuple<std::string, std::string, std::string>(region, zone, sub_zone) {}
