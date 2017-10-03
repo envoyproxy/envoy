@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * An individual timespan that is owned by a timer. The initial time is captured on construction.
- * A timespan must be completed via complete() for it to be stored. If the timespan is deleted
- * this will be treated as a cancellation.
+ * An individual timespan that flushes its measured value to a Duration histogram. The initial time
+ * is captured on construction. A timespan must be completed via complete() for it to be stored. If
+ * the timespan is deleted this will be treated as a cancellation.
  */
 class Timespan {
 public:
