@@ -69,6 +69,51 @@ elif [[ "$1" == "bazel.asan" ]]; then
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/coverage:coverage_tests \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
+
+  # remove the output directory and do coverage build
+elif [[ "$1" == "bazel.covbuild" ]]; then
+  setup_clang_toolchain
+  which lcov  # verify you're in the right docker image.
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  echo "Building and testing..."
+  # you will regularly have problems with stale files if you do not do this.
+  bazel clean --expunge  
+  # This commented out but was useful for rapid iterating on build options since it builds and runs
+  # far faster than the full coverage test.
+  # bazel test -c dbg ${BAZEL_TEST_OPTIONS}  @envoy//test/common/http:utility_test
+  bazel test  -c dbg ${BAZEL_TEST_OPTIONS}  @envoy//test/coverage:coverage_tests
+
+# generate coverage reports
+elif [[ "$1" == "bazel.cov" ]]; then
+  setup_clang_toolchain
+  # Yes, this is my custom bazel directory. I did claim these were horrible hacks, no?
+  cd /build/tmp/_bazel_bazel/400406edc57d332f0b9b805d2b8e33a1/
+  # code in foo.sh was easy to mess with in and outside of docker.  Pasted below.
+  sh ../foo.sh
+  echo "collecting"
+  # otherwise you get way more complaints of "can not find this file" when generating reports.
+  ln -s execroot/envoy/bazel-out/ bazel-out
+  echo "creating sh"
+  # the internet told me this was useful for running llvmcov
+  echo '#!/bin/bash' > llvm-gcov.sh; echo 'exec /usr/lib/llvm-5.0/bin/llvm-cov gcov "$@"' >> llvm-gcov.sh
+  chmod a+x llvm-gcov.sh;
+  echo " running lcov"
+  # Combine all the gcna/gcno data into the single cov.info
+  lcov --directory . --base-directory .   --gcov-tool ./llvm-gcov.sh  --capture -o cov.info
+  # strip a bunch of directories we don't care about from the cov.info
+  # the path simplification didn't seem to work so could probably be cut.
+  lcov --remove cov.info '/usr/include/*' 'bazel-out/local-dbg/genfiles/*'\
+     'external/envoy/ci/prebuilt/thirdparty/*' 'external/envoy/test/*' \
+     -p 'bazel-out' -o cov2.info
+  echo " running genhtml\n\n"
+  # generates all the HTML files from the stripped cov2.info
+  genhtml cov2.info -o output
+  # makes the human-readable links less onerous since lcov -p didn't do it for me.
+  sed -i 's/>bazel-out.local-dbg.bin.external.envoy./>/' output/index.html
+  echo "done"
+  exit 0
+
+
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests..."

@@ -12,6 +12,9 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
+        "-coverage",
+        "-g",
+        "-O0",
         "-std=c++0x",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
@@ -42,6 +45,8 @@ def envoy_linkopts():
         "//conditions:default": [
             "-pthread",
             "-lrt",
+            "--coverage",
+            "-O0",
             # Force MD5 hash in build. This is part of the workaround for
             # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
             # does this by itself prior to
@@ -64,7 +69,9 @@ def envoy_test_linkopts():
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-latomic"],
+        "//conditions:default": ["-pthread", "-latomic",
+            "-fprofile-arcs",
+            "-ftest-coverage",],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
