@@ -284,6 +284,7 @@ public:
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  Tracing::SpanPtr active_span_{new Tracing::MockSpan()};
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,
@@ -313,6 +314,7 @@ public:
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 
   Buffer::InstancePtr buffer_;
+  Tracing::SpanPtr active_span_{new Tracing::MockSpan()};
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {

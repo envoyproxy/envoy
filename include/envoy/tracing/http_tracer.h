@@ -49,6 +49,8 @@ public:
   virtual void finalize(Span& span) PURE;
 };
 
+typedef std::unique_ptr<SpanFinalizer> SpanFinalizerPtr;
+
 /*
  * Basic abstraction for span.
  */

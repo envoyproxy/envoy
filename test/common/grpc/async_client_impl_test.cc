@@ -3,6 +3,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/utility.h"
@@ -22,6 +23,9 @@ namespace Grpc {
 
 template class AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>;
 template class AsyncStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>;
+
+typedef MockAsyncSpanFinalizerFactory<helloworld::HelloRequest, helloworld::HelloReply>
+    MockHelloFinalizerFactory;
 
 namespace {
 
@@ -183,7 +187,9 @@ public:
     return headers;
   }
 
-  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
+  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata,
+                                                   MockHelloFinalizerFactory* finalizer_factory,
+                                                   bool create_finalizer = true) {
     http_streams_.emplace_back(new Http::MockAsyncClientStream());
     std::unique_ptr<HelloworldRequest> request(new HelloworldRequest(http_streams_.back().get()));
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
@@ -211,8 +217,22 @@ public:
     EXPECT_CALL(
         *(request->http_stream_),
         sendData(BufferStringEqual(std::string(HELLO_REQUEST_DATA, HELLO_REQUEST_SIZE)), true));
-    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
-                                                Optional<std::chrono::milliseconds>());
+
+    if (create_finalizer) {
+      NiceMock<Tracing::MockFinalizer>* finalizer{new NiceMock<Tracing::MockFinalizer>()};
+      EXPECT_CALL(*finalizer_factory, create_(_, _)).WillOnce(Return(finalizer));
+    }
+
+    NiceMock<Tracing::MockSpan> active_span;
+    NiceMock<Tracing::MockSpan>* child_span{new NiceMock<Tracing::MockSpan>()};
+
+    EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+        .WillOnce(Return(child_span));
+    EXPECT_CALL(*child_span, injectContext(_));
+
+    request->grpc_request_ =
+        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
+                           *finalizer_factory, Optional<std::chrono::milliseconds>());
     EXPECT_NE(request->grpc_request_, nullptr);
     // The header map should still be valid after grpc_client_->start() returns, since it is
     // retained by the HTTP async client for the deferred send.
@@ -276,7 +296,10 @@ TEST_F(GrpcAsyncClientImplTest, BasicStream) {
 // Validate that a simple request-reply unary RPC works.
 TEST_F(GrpcAsyncClientImplTest, BasicRequest) {
   TestMetadata empty_metadata;
-  auto request = createRequest(empty_metadata);
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+
+  auto request = createRequest(empty_metadata, finalizer_factory.get());
   request->sendReply();
 }
 
@@ -297,8 +320,13 @@ TEST_F(GrpcAsyncClientImplTest, MultiStream) {
 // Validate that multiple request-reply unary RPCs works.
 TEST_F(GrpcAsyncClientImplTest, MultiRequest) {
   TestMetadata empty_metadata;
-  auto request_0 = createRequest(empty_metadata);
-  auto request_1 = createRequest(empty_metadata);
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory1{
+      new NiceMock<MockHelloFinalizerFactory>()};
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory2{
+      new NiceMock<MockHelloFinalizerFactory>()};
+
+  auto request_0 = createRequest(empty_metadata, finalizer_factory1.get());
+  auto request_1 = createRequest(empty_metadata, finalizer_factory2.get());
   request_1->sendReply();
   request_0->sendReply();
 }
@@ -320,8 +348,22 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, ""));
   helloworld::HelloRequest request_msg;
-  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          Optional<std::chrono::milliseconds>());
+
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+  NiceMock<Tracing::MockFinalizer>* finalizer{new NiceMock<Tracing::MockFinalizer>()};
+  EXPECT_CALL(*finalizer_factory, create_(_, _)).WillOnce(Return(finalizer));
+
+  NiceMock<Tracing::MockSpan> active_span;
+  NiceMock<Tracing::MockSpan>* child_span{new NiceMock<Tracing::MockSpan>()};
+  EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+      .WillOnce(Return(child_span));
+
+  EXPECT_CALL(*child_span, injectContext(_)).Times(0);
+
+  auto* grpc_request =
+      grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks, active_span,
+                         *finalizer_factory, Optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 
@@ -374,8 +416,21 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
       }));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Internal, ""));
   helloworld::HelloRequest request_msg;
-  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          Optional<std::chrono::milliseconds>());
+
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+  NiceMock<Tracing::MockFinalizer>* finalizer{new NiceMock<Tracing::MockFinalizer>()};
+  EXPECT_CALL(*finalizer_factory, create_(_, _)).WillOnce(Return(finalizer));
+
+  NiceMock<Tracing::MockSpan> active_span;
+  NiceMock<Tracing::MockSpan>* child_span{new NiceMock<Tracing::MockSpan>()};
+  EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  auto* grpc_request =
+      grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks, active_span,
+                         *finalizer_factory, Optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 
@@ -490,7 +545,10 @@ TEST_F(GrpcAsyncClientImplTest, RequestClientInitialMetadata) {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  auto request = createRequest(initial_metadata);
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+
+  auto request = createRequest(initial_metadata, finalizer_factory.get(), false);
   dangling_streams_.push_back(request->http_stream_);
 }
 
@@ -534,7 +592,11 @@ TEST_F(GrpcAsyncClientImplTest, StreamTrailersOnly) {
 // an error.
 TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
   TestMetadata empty_metadata;
-  auto request = createRequest(empty_metadata);
+
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+  auto request = createRequest(empty_metadata, finalizer_factory.get());
+
   Http::HeaderMapPtr reply_headers{
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
   EXPECT_CALL(*request, onFailure(Status::Internal, ""));
@@ -598,7 +660,11 @@ TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseRemote) {
 // Validate that request cancel() works.
 TEST_F(GrpcAsyncClientImplTest, CancelRequest) {
   TestMetadata empty_metadata;
-  auto request = createRequest(empty_metadata);
+  std::unique_ptr<MockHelloFinalizerFactory> finalizer_factory{
+      new NiceMock<MockHelloFinalizerFactory>()};
+
+  auto request = createRequest(empty_metadata, finalizer_factory.get());
+
   EXPECT_CALL(*request->http_stream_, reset());
   request->grpc_request_->cancel();
 }

@@ -18,12 +18,12 @@ envoy_cc_library(
         ":ratelimit_proto",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/tracing:context_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

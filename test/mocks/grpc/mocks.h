@@ -19,6 +19,17 @@ public:
   MOCK_METHOD0(cancel, void());
 };
 
+template <class RequestType, class ResponseType>
+class MockAsyncSpanFinalizerFactory : public AsyncSpanFinalizerFactory<RequestType, ResponseType> {
+public:
+  Tracing::SpanFinalizerPtr create(const RequestType& request, const ResponseType* response) {
+    return Tracing::SpanFinalizerPtr{create_(request, response)};
+  }
+
+  MOCK_METHOD2_T(create_,
+                 Tracing::SpanFinalizer*(const RequestType& request, const ResponseType* response));
+};
+
 template <class RequestType> class MockAsyncStream : public AsyncStream<RequestType> {
 public:
   MOCK_METHOD2_T(sendMessage, void(const RequestType& request, bool end_stream));
@@ -59,10 +70,12 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD4_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
-                                     const RequestType& request,
-                                     AsyncRequestCallbacks<ResponseType>& callbacks,
-                                     const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD6_T(
+      send,
+      AsyncRequest*(const Protobuf::MethodDescriptor& service_method, const RequestType& request,
+                    AsyncRequestCallbacks<ResponseType>& callbacks, Tracing::Span& parent_span,
+                    AsyncSpanFinalizerFactory<RequestType, ResponseType>& finalizer_factory,
+                    const Optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
                                                   AsyncStreamCallbacks<ResponseType>& callbacks));
 };
