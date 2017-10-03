@@ -678,12 +678,16 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
+  Event::MockTimer* connect_timer =
+      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+
   NiceMock<Network::MockClientConnection>* upstream_connection_ =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
       .WillByDefault(Return(true));
+  EXPECT_CALL(*connect_timer, enableTimer(_));
 
   conn_info.connection_ = upstream_connection_;
   conn_info.host_description_.reset(
@@ -704,19 +708,16 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
     data.drain(4);
   }));
 
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
   // gateway timeout error
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_STREQ("504", headers.Status()->value().c_str());
       }));
 
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
-
-  Event::MockTimer* connect_timeout_timer =
-      new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*connect_timeout_timer, enableTimer(_));
-  connect_timeout_timer->callback_();
+  connect_timer->callback_();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
