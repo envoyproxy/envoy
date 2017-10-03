@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Upstream {
 
-static const std::string RuntimezoneEnabled = "upstream.zone_routing.enabled";
+static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
@@ -50,13 +50,13 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures() {
     return;
   }
 
-  size_t num_localitys = host_set_.healthyHostsPerLocality().size();
-  ASSERT(num_localitys > 0);
+  size_t num_localities = host_set_.healthyHostsPerLocality().size();
+  ASSERT(num_localities > 0);
 
-  uint64_t local_percentage[num_localitys];
+  uint64_t local_percentage[num_localities];
   calculateLocalityPercentage(local_host_set_->healthyHostsPerLocality(), local_percentage);
 
-  uint64_t upstream_percentage[num_localitys];
+  uint64_t upstream_percentage[num_localities];
   calculateLocalityPercentage(host_set_.healthyHostsPerLocality(), upstream_percentage);
 
   // If we have lower percent of hosts in the local cluster in the same locality,
@@ -89,12 +89,12 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures() {
   // residual_capacity: 0 10000 15000
   // Now to find a locality to route (bucket) we could simply iterate over residual_capacity
   // searching where sampled value is placed.
-  residual_capacity_.resize(num_localitys);
+  residual_capacity_.resize(num_localities);
 
   // Local locality (index 0) does not have residual capacity as we have routed all we could.
   residual_capacity_[0] = 0;
-  for (size_t i = 1; i < num_localitys; ++i) {
-    // Only route to the localitys that have additional capacity.
+  for (size_t i = 1; i < num_localities; ++i) {
+    // Only route to the localities that have additional capacity.
     if (upstream_percentage[i] > local_percentage[i]) {
       residual_capacity_[i] =
           residual_capacity_[i - 1] + upstream_percentage[i] - local_percentage[i];
@@ -115,7 +115,7 @@ bool LoadBalancerBase::earlyExitNonLocalityRouting() {
     return true;
   }
 
-  // Same number of localitys should be for local and upstream cluster.
+  // Same number of localities should be for local and upstream cluster.
   if (host_set_.healthyHostsPerLocality().size() !=
       local_host_set_->healthyHostsPerLocality().size()) {
     stats_.lb_zone_number_differs_.inc();
@@ -163,10 +163,10 @@ void LoadBalancerBase::calculateLocalityPercentage(
 const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts() {
   ASSERT(locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
-  // At this point it's guaranteed to be at least 2 localitys.
-  size_t number_of_localitys = host_set_.healthyHostsPerLocality().size();
+  // At this point it's guaranteed to be at least 2 localities.
+  size_t number_of_localities = host_set_.healthyHostsPerLocality().size();
 
-  ASSERT(number_of_localitys >= 2U);
+  ASSERT(number_of_localities >= 2U);
   ASSERT(local_host_set_->healthyHostsPerLocality().size() ==
          host_set_.healthyHostsPerLocality().size());
 
@@ -190,16 +190,16 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts(
 
   // This is *extremely* unlikely but possible due to rounding errors when calculating
   // locality percentages. In this case just select random locality.
-  if (residual_capacity_[number_of_localitys - 1] == 0) {
+  if (residual_capacity_[number_of_localities - 1] == 0) {
     stats_.lb_zone_no_capacity_left_.inc();
-    return host_set_.healthyHostsPerLocality()[random_.random() % number_of_localitys];
+    return host_set_.healthyHostsPerLocality()[random_.random() % number_of_localities];
   }
 
   // Random sampling to select specific locality for cross locality traffic based on the additional
-  // capacity in localitys.
-  uint64_t threshold = random_.random() % residual_capacity_[number_of_localitys - 1];
+  // capacity in localities.
+  uint64_t threshold = random_.random() % residual_capacity_[number_of_localities - 1];
 
-  // This potentially can be optimized to be O(log(N)) where N is the number of localitys.
+  // This potentially can be optimized to be O(log(N)) where N is the number of localities.
   // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
   int i = 0;
   while (threshold > residual_capacity_[i]) {
@@ -221,7 +221,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  if (!runtime_.snapshot().featureEnabled(RuntimezoneEnabled, 100)) {
+  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
     return host_set_.healthyHosts();
   }
 

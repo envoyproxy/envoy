@@ -157,7 +157,7 @@ public:
 
   /**
    * @return hosts per locality, index 0 is dedicated to local locality hosts.
-   * If there are no hosts in local locality for upstream cluster hosstPerLocality() will @return
+   * If there are no hosts in local locality for upstream cluster hostsPerLocality() will @return
    * empty vector.
    *
    * Note, that we sort localities in lexicographic order starting from index 1.
