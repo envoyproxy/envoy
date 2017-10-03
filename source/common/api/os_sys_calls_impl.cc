@@ -7,6 +7,10 @@
 namespace Envoy {
 namespace Api {
 
+int OsSysCallsImpl::bind(int sockfd, const sockaddr* addr, socklen_t addrlen) {
+  return ::bind(sockfd, addr, addrlen);
+}
+
 int OsSysCallsImpl::open(const std::string& full_path, int flags, int mode) {
   return ::open(full_path.c_str(), flags, mode);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <sys/mman.h> // for mode_t
+#include <sys/mman.h>   // for mode_t
+#include <sys/socket.h> // for sockaddr
 
 #include <memory>
 #include <string>
@@ -12,7 +13,12 @@ namespace Api {
 
 class OsSysCalls {
 public:
-  virtual ~OsSysCalls(){};
+  virtual ~OsSysCalls() {}
+
+  /**
+   * @see bind (man 2 bind)
+   */
+  virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
    * Open file by full_path with given flags and mode.
