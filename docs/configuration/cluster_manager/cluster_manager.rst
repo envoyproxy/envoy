@@ -55,7 +55,7 @@ Statistics
 ----------
 
 The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
-statistics:
+statistics. Any ``:`` character in the stats name is replaced with ``_``.
 
 .. csv-table::
   :header: Name, Type, Description

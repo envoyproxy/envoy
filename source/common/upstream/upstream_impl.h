@@ -250,7 +250,6 @@ private:
   };
 
   static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
-  std::string clusterStatsName(const std::string& cluster_name);
 
   Runtime::Loader& runtime_;
   const std::string name_;

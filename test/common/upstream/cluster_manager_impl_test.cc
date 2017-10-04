@@ -263,7 +263,7 @@ TEST_F(ClusterManagerImplTest, ValidClusterName) {
   )EOF";
 
   create(parseBootstrapFromJson(json));
-  EXPECT_EQ(0, factory_.stats_.counter("cluster.cluster_name.lb_local_cluster_not_ok").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster.cluster_name.upstream_rq_5xx").value());
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {

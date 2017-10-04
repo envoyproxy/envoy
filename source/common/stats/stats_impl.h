@@ -217,6 +217,7 @@ public:
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
+
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }
@@ -232,11 +233,18 @@ public:
 private:
   struct ScopeImpl : public Scope {
     ScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(prefix) {}
+        : parent_(parent), prefix_(sanitizeStatsName(prefix)) {}
 
     // Stats::Scope
     ScopePtr createScope(const std::string& name) override {
       return ScopePtr{new ScopeImpl(parent_, prefix_ + name)};
+    }
+    // ':' is a reserved char in statsd. Do the translation here and in
+    // ThreadLocalStoreImpl::ScopeImpl.
+    std::string sanitizeStatsName(const std::string& name) {
+      std::string stats_name = name;
+      std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+      return stats_name;
     }
     void deliverHistogramToSinks(const std::string&, uint64_t) override {}
     void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
