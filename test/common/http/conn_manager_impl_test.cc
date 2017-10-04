@@ -736,6 +736,12 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   NiceMock<Network::MockClientConnection>* upstream_connection_ =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
+  HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/"},
+                                               {"connection", "Upgrade"},
+                                               {"upgrade", "websocket"}}};
+  auto raw_header_ptr = headers.get()
 
   conn_info.connection_ = upstream_connection_;
   conn_info.host_description_.reset(
@@ -755,11 +761,6 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
-    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
-                                               {":method", "GET"},
-                                               {":path", "/"},
-                                               {"connection", "Upgrade"},
-                                               {"upgrade", "websocket"}}};
     decoder->decodeHeaders(std::move(headers), true);
     data.drain(4);
   }));
@@ -767,6 +768,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
 
+  // rewritten authority header when auto_host_rewrite is true
+  EXPECT_STREQ("newhost", raw_header_ptr->Host()->value().c_str());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
