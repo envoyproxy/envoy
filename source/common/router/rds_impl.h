@@ -124,7 +124,6 @@ private:
 
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
-  std::string rdsStatsName(const std::string& stat_prefix, const std::string& route_config_name);
 
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;

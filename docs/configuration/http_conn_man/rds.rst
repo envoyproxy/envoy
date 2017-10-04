@@ -70,7 +70,7 @@ Statistics
 ----------
 
 RDS has a statistics tree rooted at *http.<stat_prefix>.rds.<route_config_name>.*.
-Any ``:`` character in the ``route_config_name`` name gets replaces with ``_`` in the
+Any ``:`` character in the ``route_config_name`` name gets replaced with ``_`` in the
 stats tree. The stats tree contains the following statistics:
 
 .. csv-table::

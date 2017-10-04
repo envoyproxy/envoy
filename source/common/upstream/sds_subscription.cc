@@ -76,6 +76,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
   version_info_ = hash.first;
+  stats_.version_.set(hash.second);
   stats_.update_success_.inc();
 }
 
