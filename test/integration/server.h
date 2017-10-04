@@ -48,6 +48,7 @@ public:
   }
   Mode mode() const override { return Mode::Serve; }
   const std::string& serviceClusterName() override { return service_cluster_name_; }
+  const std::string& serviceVersion() override { return service_version_; }
   const std::string& serviceNodeName() override { return service_node_name_; }
   const std::string& serviceZone() override { return service_zone_; }
 
@@ -56,6 +57,7 @@ private:
   const std::string admin_address_path_;
   const Network::Address::IpVersion local_address_ip_version_;
   const std::string service_cluster_name_;
+  const std::string service_version_;
   const std::string service_node_name_;
   const std::string service_zone_;
   const std::string log_path_;

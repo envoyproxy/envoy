@@ -11,13 +11,16 @@ class LocalInfoImpl : public LocalInfo {
 public:
   LocalInfoImpl(const envoy::api::v2::Node& node, Network::Address::InstanceConstSharedPtr address,
                 const std::string zone_name, const std::string cluster_name,
-                const std::string node_name)
+                const std::string service_version, const std::string node_name)
       : node_(node), address_(address) {
     if (!zone_name.empty()) {
       node_.mutable_locality()->set_zone(zone_name);
     }
     if (!cluster_name.empty()) {
       node_.set_cluster(cluster_name);
+    }
+    if (!service_version.empty()) {
+      node_.set_version(service_version);
     }
     if (!node_name.empty()) {
       node_.set_id(node_name);
@@ -30,6 +33,7 @@ public:
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string zoneName() const override { return node_.locality().zone(); }
   const std::string clusterName() const override { return node_.cluster(); }
+  const std::string serviceVersion() const override { return node_.version(); }
   const std::string nodeName() const override { return node_.id(); }
   const envoy::api::v2::Node& node() const override { return node_; }
 

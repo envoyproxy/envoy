@@ -149,11 +149,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
 // Validate server localInfo() from bootstrap Node with CLI overrides.
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_version_ = "some_service_version";
   options_.service_node_name_ = "some_node_name";
   options_.service_zone_name_ = "some_zone_name";
   initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("some_zone_name", server_->localInfo().zoneName());
   EXPECT_EQ("some_cluster_name", server_->localInfo().clusterName());
+  EXPECT_EQ("some_service_version", server_->localInfo().serviceVersion());
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());

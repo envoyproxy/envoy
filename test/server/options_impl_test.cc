@@ -39,6 +39,7 @@ TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
+      "--service version v1 "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 "
       "--parent-shutdown-time-s 90 --log-path /foo/bar");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
@@ -50,6 +51,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
+  EXPECT_EQ("v1", options->serviceVersion());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());

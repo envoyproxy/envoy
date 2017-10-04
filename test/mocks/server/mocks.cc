@@ -22,6 +22,7 @@ MockOptions::MockOptions(const std::string& config_path)
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
+  ON_CALL(*this, serviceVersion()).WillByDefault(ReturnRef(service_version_));
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
   ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));

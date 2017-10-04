@@ -375,6 +375,8 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
+  EXPECT_CALL(local_info_, serviceVersion()).WillRepeatedly(Return("v1"));
+
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
@@ -395,6 +397,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, setTag(":method", "GET"));
   // Verify if the activeSpan interface returns reference to the current span.
   EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
+  EXPECT_CALL(*span, setTag("version", "v1"));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
