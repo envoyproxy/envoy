@@ -254,7 +254,7 @@ envoy_cc_library(
     name = "tls_context_json_lib",
     srcs = ["tls_context_json.cc"],
     hdrs = ["tls_context_json.h"],
-    external_deps = ["envoy_tls_context"],
+    external_deps = ["envoy_sds"],
     deps = [
         ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
