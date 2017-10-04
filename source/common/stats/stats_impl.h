@@ -18,6 +18,16 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Common stats utility routines.
+ */
+class Utility {
+public:
+  // ':' is a reserved char in statsd. Do a character replacement to avoid costly inline
+  // translations later.
+  static std::string sanitizeStatsName(const std::string& name);
+};
+
+/**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
  * it can be allocated from shared memory if needed.
  */
@@ -232,7 +242,7 @@ public:
 private:
   struct ScopeImpl : public Scope {
     ScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(prefix) {}
+        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
 
     // Stats::Scope
     ScopePtr createScope(const std::string& name) override {
