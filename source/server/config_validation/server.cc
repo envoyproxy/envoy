@@ -75,9 +75,9 @@ void ValidationInstance::initialize(Options& options,
   }
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
-  local_info_.reset(
-      new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
-                                   options.serviceClusterName(), options.serviceNodeName()));
+  local_info_.reset(new LocalInfo::LocalInfoImpl(
+      bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceVersion(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(bootstrap);
   thread_local_.registerThread(*dispatcher_, true);

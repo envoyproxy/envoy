@@ -48,6 +48,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                               "hot restart compatability version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
                                                "string", cmd);
+  TCLAP::ValueArg<std::string> service_version("", "service-version", "Service version", false, "",
+                                               "string", cmd);
   TCLAP::ValueArg<std::string> service_node("", "service-node", "Node name", false, "", "string",
                                             cmd);
   TCLAP::ValueArg<std::string> service_zone("", "service-zone", "Zone name", false, "", "string",
@@ -111,6 +113,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
   service_cluster_ = service_cluster.getValue();
+  service_version_ = service_version.getValue();
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());

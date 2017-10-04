@@ -112,6 +112,11 @@ public:
   virtual const std::string& serviceClusterName() PURE;
 
   /**
+   * @return const std::string& the server's cluster.
+   */
+  virtual const std::string& serviceVersion() PURE;
+
+  /**
    * @return const std::string& the server's node identification.
    */
   virtual const std::string& serviceNodeName() PURE;

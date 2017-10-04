@@ -556,6 +556,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       if (cached_route_.value() && cached_route_.value()->decorator()) {
         cached_route_.value()->decorator()->apply(*active_span_);
       }
+      if (!connection_manager_.local_info_.serviceVersion().empty()) {
+        active_span_->setTag("version", connection_manager_.local_info_.serviceVersion());
+      }
       active_span_->injectContext(*request_headers_);
     }
   }

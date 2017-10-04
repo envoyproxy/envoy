@@ -31,6 +31,7 @@ public:
   Server::Mode mode() const override { return mode_; }
   std::chrono::milliseconds fileFlushIntervalMsec() override { return file_flush_interval_msec_; }
   const std::string& serviceClusterName() override { return service_cluster_; }
+  const std::string& serviceVersion() override { return service_version_; }
   const std::string& serviceNodeName() override { return service_node_; }
   const std::string& serviceZone() override { return service_zone_; }
 
@@ -44,6 +45,7 @@ private:
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
+  std::string service_version_;
   std::string service_node_;
   std::string service_zone_;
   std::chrono::milliseconds file_flush_interval_msec_;

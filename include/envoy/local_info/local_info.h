@@ -33,6 +33,11 @@ public:
   virtual const std::string clusterName() const PURE;
 
   /**
+   * Human readable service version. E.g., "1".
+   */
+  virtual const std::string serviceVersion() const PURE;
+
+  /**
    * Human readable individual node name. E.g., "i-123456".
    */
   virtual const std::string nodeName() const PURE;
