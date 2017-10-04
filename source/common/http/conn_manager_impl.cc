@@ -369,9 +369,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
   if (request_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
-  } else {
-    Tracing::HttpConnManFinalizerImpl finalizer(request_headers_.get(), request_info_, *this);
-    active_span_->finishSpan(finalizer);
+  } else if (active_span_) {
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), request_info_,
+                                             *this);
   }
 
   ASSERT(state_.filter_call_state_ == 0);
@@ -548,6 +548,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (tracing_decision.is_tracing) {
       active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
       if (cached_route_.value() && cached_route_.value()->decorator()) {
+        // fix fix should this happen at end?
         cached_route_.value()->decorator()->apply(*active_span_);
       }
       active_span_->injectContext(*request_headers_);
@@ -1062,7 +1063,11 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
 }
 
 Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
-  return *parent_.active_span_;
+  if (parent_.active_span_) {
+    return *parent_.active_span_;
+  } else {
+    return Tracing::NullSpan::instance();
+  }
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {

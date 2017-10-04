@@ -29,11 +29,14 @@ public:
 template <class ResponseType>
 class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccess(std::unique_ptr<ResponseType>&& response) { onSuccess_(*response); }
+  void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) {
+    onSuccess_(*response, span);
+  }
 
   MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
-  MOCK_METHOD1_T(onSuccess_, void(const ResponseType& response));
-  MOCK_METHOD2_T(onFailure, void(Status::GrpcStatus status, const std::string& message));
+  MOCK_METHOD2_T(onSuccess_, void(const ResponseType& response, Tracing::Span& span));
+  MOCK_METHOD3_T(onFailure,
+                 void(Status::GrpcStatus status, const std::string& message, Tracing::Span& span));
 };
 
 template <class ResponseType>
@@ -59,9 +62,10 @@ public:
 template <class RequestType, class ResponseType>
 class MockAsyncClient : public AsyncClient<RequestType, ResponseType> {
 public:
-  MOCK_METHOD4_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
+  MOCK_METHOD5_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
                                      const RequestType& request,
                                      AsyncRequestCallbacks<ResponseType>& callbacks,
+                                     Tracing::Span& parent_span,
                                      const Optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
                                                   AsyncStreamCallbacks<ResponseType>& callbacks));

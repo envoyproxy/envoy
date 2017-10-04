@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -68,15 +69,18 @@ public:
   /**
    * Called when the async gRPC request succeeds. No further callbacks will be invoked.
    * @param response the gRPC response.
+   * @param span a tracing span to fill with extra tags.
    */
-  virtual void onSuccess(std::unique_ptr<ResponseType>&& response) PURE;
+  virtual void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) PURE;
 
   /**
    * Called when the async gRPC request fails. No further callbacks will be invoked.
    * @param status the gRPC status.
    * @param message the gRPC status message or empty string if not present.
+   * @param span a tracing span to fill with extra tags.
    */
-  virtual void onFailure(Status::GrpcStatus status, const std::string& message) PURE;
+  virtual void onFailure(Status::GrpcStatus status, const std::string& message,
+                         Tracing::Span& span) PURE;
 };
 
 /**
@@ -138,6 +142,7 @@ public:
    * @param service_method protobuf descriptor of gRPC service method.
    * @param request protobuf serializable message.
    * @param callbacks the callbacks to be notified of RPC status.
+   * @param parent_span the current parent tracing context.
    * @param timeout supplies the request timeout.
    * @return a request handle or nullptr if no request could be started. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
@@ -146,10 +151,12 @@ public:
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                              const RequestType& request,
                              AsyncRequestCallbacks<ResponseType>& callbacks,
+                             Tracing::Span& parent_span,
                              const Optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * Start a gRPC stream asynchronously.
+   * TODO(mattklein123): Determine if tracing should be added to streaming requests.
    * @param service_method protobuf descriptor of gRPC service method.
    * @param callbacks the callbacks to be notified of stream status.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case

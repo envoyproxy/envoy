@@ -76,8 +76,6 @@ public:
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
-    tracing_config_.reset(new TracingConnectionManagerConfig(
-        {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
 
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
@@ -88,7 +86,7 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  void setup(bool ssl, const std::string& server_name) {
+  void setup(bool ssl, const std::string& server_name, bool tracing = true) {
     if (ssl) {
       ssl_connection_.reset(new Ssl::MockConnection());
     }
@@ -102,6 +100,11 @@ public:
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
                                                   local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
+
+    if (tracing) {
+      tracing_config_.reset(new TracingConnectionManagerConfig(
+          {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
+    }
   }
 
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters) {
@@ -279,7 +282,7 @@ public:
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
-  setup(false, "envoy-custom-server");
+  setup(false, "envoy-custom-server", false);
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -387,9 +390,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
-  EXPECT_CALL(*span, finishSpan(_))
-      .WillOnce(
-          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
+  EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(":method", "GET"));
@@ -521,7 +522,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, finishSpan(_)).Times(0);
+  EXPECT_CALL(*span, finishSpan()).Times(0);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));

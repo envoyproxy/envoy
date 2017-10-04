@@ -560,7 +560,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
-    Tracing::SpanPtr active_span_{new Tracing::NullSpan()};
+    Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;
