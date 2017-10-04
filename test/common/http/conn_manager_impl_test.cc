@@ -737,11 +737,11 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
-                                               {":method", "GET"},
-                                               {":path", "/"},
-                                               {"connection", "Upgrade"},
-                                               {"upgrade", "websocket"}}};
-  auto raw_header_ptr = headers.get()
+                                             {":method", "GET"},
+                                             {":path", "/"},
+                                             {"connection", "Upgrade"},
+                                             {"upgrade", "websocket"}}};
+  auto raw_header_ptr = headers.get();
 
   conn_info.connection_ = upstream_connection_;
   conn_info.host_description_.reset(
