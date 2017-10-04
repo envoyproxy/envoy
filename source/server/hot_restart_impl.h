@@ -180,7 +180,7 @@ private:
     return reinterpret_cast<rpc_class*>(base_message);
   }
 
-  int bindDomainSocket(uint64_t id);
+  int bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls);
   sockaddr_un createDomainSocketAddress(uint64_t id);
   void onGetListenSocket(RpcGetListenSocketRequest& rpc);
   void onSocketEvent();

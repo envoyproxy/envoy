@@ -22,8 +22,7 @@ function bazel_release_binary_build() {
   mkdir -p "${ENVOY_SRCDIR}"/build_release
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
   mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release_stripped
-  strip "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
 }
 
 function bazel_debug_binary_build() {

@@ -77,6 +77,8 @@ LDS has a statistics tree rooted at *listener_manager.lds.* with the following s
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
   update_attempt, Counter, Total API fetches attempted
   update_success, Counter, Total API fetches completed successfully
   update_failure, Counter, Total API fetches that failed (either network or schema errors)
+  version, Gauge, Hash of the contents from the last successful API fetch

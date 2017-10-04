@@ -32,8 +32,8 @@ TEST(UtilityTest, GetTypedResources) {
 }
 
 TEST(UtilityTest, ComputeHashedVersion) {
-  EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}"));
-  EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo"));
+  EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
+  EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
 }
 
 TEST(UtilityTest, ApiConfigSourceRefreshDelay) {

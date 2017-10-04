@@ -81,7 +81,7 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(prefix) {}
+        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
 
     // Stats::Scope
