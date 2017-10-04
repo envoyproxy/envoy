@@ -37,10 +37,14 @@ public:
   static const size_t UUID_LENGTH;
 
 private:
-  static std::ranlux48& threadLocalGenerator() {
+  // based on std::ranlux48
+  typedef std::subtract_with_carry_engine<uint64_t, 64, 5, 12> ranlux64_base;
+  typedef std::discard_block_engine<ranlux64_base, 389, 11> ranlux64;
+
+  static ranlux64& threadLocalGenerator() {
     std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::system_clock::now().time_since_epoch());
-    static thread_local std::ranlux48 generator(now.count() ^ Thread::Thread::currentThreadId());
+    static thread_local ranlux64 generator(now.count() ^ Thread::Thread::currentThreadId());
 
     return generator;
   }
