@@ -16,15 +16,28 @@ namespace Upstream {
  */
 enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash, OriginalDst };
 
+/**
+ * Load Balancer subset configuration.
+ */
 class LoadBalancerSubsetInfo {
 public:
   virtual ~LoadBalancerSubsetInfo() {}
 
+  /**
+   * @return true if load balancer subsets are configured.
+   */
   virtual bool isEnabled() const PURE;
 
+  /**
+   * @return the fallback policy used when route metadata does not match any subset.
+   */
   virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
 
+  /**
+   * @return a ProtobufWkt::Struct that describes the metadata for a
+   *         host to be included in the default subset.
+   */
   virtual const ProtobufWkt::Struct& defaultSubset() const PURE;
 
   /*

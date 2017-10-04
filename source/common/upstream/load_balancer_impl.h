@@ -137,6 +137,9 @@ public:
   HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 };
 
+/**
+ * Implementation of LoadBalancerSubsetInfo.
+ */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
@@ -151,14 +154,12 @@ public:
     }
   }
 
+  // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
-
   envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallbackPolicy() const override {
     return fallback_policy_;
   }
-
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-
   const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
 
 private:
