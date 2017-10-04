@@ -52,8 +52,10 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
   }
 
   callbacks_->onConfigUpdate(resources);
-  version_info_ = Config::Utility::computeHashedVersion(response_body);
-  stats_.version_.set(HashUtil::xxHash64(version_info_));
+  std::pair<std::string, uint64_t> hash =
+      Envoy::Config::Utility::computeHashedVersion(response_body);
+  version_info_ = hash.first;
+  stats_.version_.set(hash.second);
   stats_.update_success_.inc();
 }
 

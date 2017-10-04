@@ -63,8 +63,9 @@ public:
    * Legacy APIs uses JSON and do not have an explicit version. Hash the body and append
    * a user-friendly prefix.
    */
-  static std::string computeHashedVersion(const std::string& input) {
-    return "hash_" + Hex::uint64ToHex(HashUtil::xxHash64(input));
+  static std::pair<std::string, uint64_t> computeHashedVersion(const std::string& input) {
+    uint64_t hash = HashUtil::xxHash64(input);
+    return std::make_pair("hash_" + Hex::uint64ToHex(hash), hash);
   }
 
   /**

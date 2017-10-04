@@ -134,8 +134,8 @@ TEST_F(CdsApiImplTest, Basic) {
   EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json), cds_->versionInfo());
-  EXPECT_EQ(882364716077341974U, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, cds_->versionInfo());
+  EXPECT_EQ(4054905652974790809U, store_.gauge("cluster_manager.cds.version").value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -157,8 +157,8 @@ TEST_F(CdsApiImplTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json), cds_->versionInfo());
-  EXPECT_EQ(13583056519077236228U, store_.gauge("cluster_manager.cds.version").value());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, cds_->versionInfo());
+  EXPECT_EQ(1872764556139482420U, store_.gauge("cluster_manager.cds.version").value());
 }
 
 TEST_F(CdsApiImplTest, Failure) {

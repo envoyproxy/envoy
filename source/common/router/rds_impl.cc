@@ -38,6 +38,13 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
+std::string RdsRouteConfigProviderImpl::rdsStatsName(const std::string& stat_prefix,
+                                                     const std::string& route_config_name) {
+  std::string stats_name = fmt::format("{}rds.{}.", stat_prefix, route_config_name);
+  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  return stats_name;
+}
+
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 // initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
@@ -48,7 +55,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
       route_config_name_(rds.route_config_name()),
-      scope_(scope.createScope(stat_prefix + "rds." + route_config_name_ + ".")),
+      scope_(scope.createScope(rdsStatsName(stat_prefix, route_config_name_))),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {

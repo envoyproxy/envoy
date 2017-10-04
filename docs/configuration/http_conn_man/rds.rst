@@ -69,7 +69,9 @@ will only perform a full reload if the hash value changes.
 Statistics
 ----------
 
-RDS has a statistics tree rooted at *http.<stat_prefix>.rds.<route_config_name>* with the following statistics:
+RDS has a statistics tree rooted at *http.<stat_prefix>.rds.<route_config_name>.*.
+Any ``:`` character in the ``route_config_name`` name gets replaces with ``_`` in the
+stats tree. The stats tree contains the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

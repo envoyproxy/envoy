@@ -244,7 +244,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
-  EXPECT_EQ(9442439806528790897U, store_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -262,7 +262,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
-  EXPECT_EQ(9442439806528790897U, store_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -320,7 +320,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
   EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
   data.drain(data.length());
-  EXPECT_EQ(16788639190244514033U, store_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   // Test that we get the same dump if we specify the route name.
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=foo_route_config", data));
@@ -348,7 +348,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(2UL, store_.counter("foo.rds.foo_route_config.config_reload").value());
   EXPECT_EQ(3UL, store_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(3UL, store_.counter("foo.rds.foo_route_config.update_success").value());
-  EXPECT_EQ(16788639190244514033U, store_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
 }
 
 TEST_F(RdsImplTest, Failure) {

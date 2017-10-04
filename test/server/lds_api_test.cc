@@ -157,8 +157,8 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json), lds_->versionInfo());
-  EXPECT_EQ(15523552336816307908U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
+  EXPECT_EQ(15400115654359694268U, store_.gauge("listener_manager.lds.version").value());
   expectRequest();
   interval_timer_->callback_();
 
@@ -189,11 +189,11 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json), lds_->versionInfo());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
-  EXPECT_EQ(11471698086172853U, store_.gauge("listener_manager.lds.version").value());
+  EXPECT_EQ(18068408981723255507U, store_.gauge("listener_manager.lds.version").value());
 }
 
 TEST_F(LdsApiTest, Failure) {
