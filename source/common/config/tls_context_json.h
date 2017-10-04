@@ -2,7 +2,7 @@
 
 #include "envoy/json/json_object.h"
 
-#include "api/tls_context.pb.h"
+#include "api/sds.pb.h"
 
 namespace Envoy {
 namespace Config {

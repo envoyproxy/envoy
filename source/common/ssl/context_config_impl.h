@@ -7,7 +7,7 @@
 
 #include "common/json/json_loader.h"
 
-#include "api/tls_context.pb.h"
+#include "api/sds.pb.h"
 
 namespace Envoy {
 namespace Ssl {

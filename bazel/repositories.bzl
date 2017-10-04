@@ -112,7 +112,7 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "4add0b29e66adfce5df33754c922ac8cc496fb71",
+        commit = "ea20cc35d1e762c8f0f35d22a7fb6cca867673f0",
     )
     api_bind_targets = [
         "address",
@@ -126,7 +126,7 @@ def envoy_api_deps(skip_targets):
         "lds",
         "protocol",
         "rds",
-        "tls_context",
+        "sds",
     ]
     for t in api_bind_targets:
         native.bind(
