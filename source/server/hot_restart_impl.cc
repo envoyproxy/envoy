@@ -93,7 +93,7 @@ HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
 
-  my_domain_socket_ = bindDomainSocket(options.restartEpoch());
+  my_domain_socket_ = bindDomainSocket(options.restartEpoch(), os_sys_calls);
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   if (options.restartEpoch() != 0) {
     parent_address_ = createDomainSocketAddress((options.restartEpoch() + -1));
@@ -138,12 +138,12 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   memset(&data, 0, sizeof(Stats::RawStatData));
 }
 
-int HotRestartImpl::bindDomainSocket(uint64_t id) {
+int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls) {
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
-  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  int rc = os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (rc != 0) {
     throw EnvoyException(
         fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
