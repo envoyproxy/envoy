@@ -85,7 +85,7 @@ public:
   virtual ValueType type() const PURE;
 
   /**
-   * Records a value.  If a timer, values are in units of milliseconds.
+   * Records an unsigned value. If a timer, values are in units of milliseconds.
    */
   virtual void recordValue(uint64_t value) PURE;
 };
