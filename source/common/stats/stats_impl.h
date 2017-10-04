@@ -217,7 +217,6 @@ public:
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
-
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }
