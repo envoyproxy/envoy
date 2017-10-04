@@ -76,10 +76,10 @@ public:
  */
 // clang-format off
 #define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE) \
-  COUNTER(update_attempt)               \
-  COUNTER(update_success)               \
-  COUNTER(update_failure)               \
-  COUNTER(update_rejected)              \
+  COUNTER(update_attempt)                      \
+  COUNTER(update_success)                      \
+  COUNTER(update_failure)                      \
+  COUNTER(update_rejected)                     \
   GAUGE(version)
 // clang-format on
 
