@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_hot_restart",
 )
 
 envoy_package()
@@ -50,6 +51,15 @@ envoy_cc_test(
     srcs = ["drain_manager_impl_test.cc"],
     deps = [
         "//source/server:drain_manager_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "hot_restart_impl_test",
+    srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
+    deps = [
+        "//source/server:hot_restart_lib",
         "//test/mocks/server:server_mocks",
     ],
 )

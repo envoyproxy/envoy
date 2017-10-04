@@ -38,6 +38,7 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
+  const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
@@ -106,6 +107,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyInternalRequestValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyOverloadedValues;
 
   struct {
     const std::string _5xx{"5xx"};

@@ -97,15 +97,15 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
-  HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
 
   cluster_.hosts_ = *hosts;
   cluster_.healthy_hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+  cluster_.healthy_hosts_per_locality_ = *hosts_per_locality;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                     empty_host_vector_, empty_host_vector_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -125,9 +125,9 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(1));
   // Trigger reload.
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                     empty_host_vector_, empty_host_vector_);
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(cluster_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
@@ -136,19 +136,20 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
-  HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr upstream_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
-  HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr local_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, local_hosts_per_zone, local_hosts_per_zone,
-                                    empty_host_vector_, empty_host_vector_);
+  cluster_.healthy_hosts_per_locality_ = *upstream_hosts_per_locality;
+  local_cluster_hosts_->updateHosts(hosts, hosts, local_hosts_per_locality,
+                                    local_hosts_per_locality, empty_host_vector_,
+                                    empty_host_vector_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -165,7 +166,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}));
-  HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")}}));
@@ -179,14 +180,14 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+  cluster_.healthy_hosts_per_locality_ = *hosts_per_locality;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                     empty_host_vector_, empty_host_vector_);
 
   // There is only one host in the given zone for zone aware routing.
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(cluster_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(cluster_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
 
   // Disable runtime global zone routing.
@@ -208,14 +209,14 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:1"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:2")}));
 
-  HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr upstream_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
         makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
         makeTestHost(cluster_.info_, "tcp://127.0.0.1:84")}}));
 
-  HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr local_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:0")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:1")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:2")}}));
@@ -229,18 +230,19 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
 
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
-  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
-  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
-                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
+  cluster_.healthy_hosts_per_locality_ = *upstream_hosts_per_locality;
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
+                                    local_hosts_per_locality, empty_host_vector_,
+                                    empty_host_vector_);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(100));
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(cluster_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(cluster_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -255,8 +257,8 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   HostVectorSharedPtr local_hosts(
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:0")}));
 
-  HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>());
-  HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>());
+  HostListsSharedPtr upstream_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>());
+  HostListsSharedPtr local_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -275,31 +277,32 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   for (int i = 0; i < 45000; ++i) {
     current[i] = host;
   }
-  local_hosts_per_zone->push_back(current);
+  local_hosts_per_locality->push_back(current);
 
   current.resize(55000);
   for (int i = 0; i < 55000; ++i) {
     current[i] = host;
   }
-  local_hosts_per_zone->push_back(current);
+  local_hosts_per_locality->push_back(current);
 
   current.resize(44999);
   for (int i = 0; i < 44999; ++i) {
     current[i] = host;
   }
-  upstream_hosts_per_zone->push_back(current);
+  upstream_hosts_per_locality->push_back(current);
 
   current.resize(55001);
   for (int i = 0; i < 55001; ++i) {
     current[i] = host;
   }
-  upstream_hosts_per_zone->push_back(current);
+  upstream_hosts_per_locality->push_back(current);
 
-  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
+  cluster_.healthy_hosts_per_locality_ = *upstream_hosts_per_locality;
 
   // To trigger update callback.
-  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
-                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
+                                    local_hosts_per_locality, empty_host_vector_,
+                                    empty_host_vector_);
 
   // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
@@ -311,13 +314,13 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   init(true);
   HostVectorSharedPtr hosts(
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")}));
-  HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+  cluster_.healthy_hosts_per_locality_ = *hosts_per_locality;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                     empty_host_vector_, empty_host_vector_);
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -327,15 +330,15 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   HostVectorSharedPtr hosts(
       new std::vector<HostSharedPtr>({makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.2:80")}));
-  HostListsSharedPtr hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
         makeTestHost(cluster_.info_, "tcp://127.0.0.2:80")}}));
 
   cluster_.healthy_hosts_ = *hosts;
   cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+  cluster_.healthy_hosts_per_locality_ = *hosts_per_locality;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                     empty_host_vector_, empty_host_vector_);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
@@ -350,10 +353,11 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
                                       makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}));
   HostVectorSharedPtr local_hosts(new std::vector<HostSharedPtr>({}, {}));
 
-  HostListsSharedPtr upstream_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>(
+  HostListsSharedPtr upstream_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>(
       {{makeTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
        {makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
-  HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>({{}, {}}));
+  HostListsSharedPtr local_hosts_per_locality(
+      new std::vector<std::vector<HostSharedPtr>>({{}, {}}));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillOnce(Return(50))
@@ -365,9 +369,10 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
-  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
-  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
-                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
+  cluster_.healthy_hosts_per_locality_ = *upstream_hosts_per_locality;
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
+                                    local_hosts_per_locality, empty_host_vector_,
+                                    empty_host_vector_);
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));

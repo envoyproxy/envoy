@@ -50,7 +50,7 @@ protected:
     )EOF";
 
     timer_ = new Event::MockTimer(&dispatcher_);
-    local_info_.zone_name_ = "us-east-1a";
+    local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     envoy::api::v2::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_name("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
@@ -151,10 +151,10 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(6860994315024339285U, cluster_->info()->stats().version_.value());
 
   // Hosts in SDS and static clusters should have empty hostname
@@ -185,10 +185,10 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ("us-east-1d", canary_host->locality().zone());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(3250177750903005831U, cluster_->info()->stats().version_.value());
 
   // Now test the failure case, our cluster size should not change.
@@ -200,10 +200,10 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
 
   // 503 response.
   setupRequest();
@@ -217,10 +217,10 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(3250177750903005831U, cluster_->info()->stats().version_.value());
 }
 
@@ -250,11 +250,11 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
   EXPECT_EQ(0UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(0UL, numHealthy());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(3UL, cluster_->hostsPerZone().size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(3UL, cluster_->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(6860994315024339285U, cluster_->info()->stats().version_.value());
 
   // Now run through and make all the hosts healthy except for the first one.
@@ -265,10 +265,10 @@ TEST_F(SdsTest, HealthChecker) {
 
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
   EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
 
   // Do the last one now which should fire the initialized event.
   EXPECT_CALL(membership_updated_, ready());
@@ -277,10 +277,10 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ("hash_5f3725fa79001155", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(6860994315024339285U, cluster_->info()->stats().version_.value());
 
   // Now we will remove some hosts, but since they are all healthy, they shouldn't actually be gone.
@@ -298,10 +298,10 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(13UL, numHealthy());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(4145707046791707664U, cluster_->info()->stats().version_.value());
 
   // Now set one of the removed hosts to unhealthy, and return the same query again, this should
@@ -320,10 +320,10 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
   EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(4145707046791707664U, cluster_->info()->stats().version_.value());
 
   // Now add back one of the hosts that was previously missing but we still have and make sure
@@ -341,10 +341,10 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
   EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
+  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(13400729244851125029U, cluster_->info()->stats().version_.value());
 }
 

@@ -76,6 +76,9 @@ headers <config_http_filters_router_headers>`. The following configurations are 
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
 
+Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
+<config_http_filters_router_x-envoy-overloaded>`.
+
 .. _arch_overview_http_routing_priority:
 
 Priority routing

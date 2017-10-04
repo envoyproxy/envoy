@@ -1,5 +1,8 @@
 #pragma once
 
+#include <sys/mman.h>   // for mode_t
+#include <sys/socket.h> // for sockaddr
+
 #include <memory>
 #include <string>
 
@@ -10,7 +13,12 @@ namespace Api {
 
 class OsSysCalls {
 public:
-  virtual ~OsSysCalls(){};
+  virtual ~OsSysCalls() {}
+
+  /**
+   * @see bind (man 2 bind)
+   */
+  virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
    * Open file by full_path with given flags and mode.
@@ -29,6 +37,26 @@ public:
    * @return zero on success, -1 returned otherwise.
    */
   virtual int close(int fd) PURE;
+
+  /**
+   * @see shm_open (man 3 shm_open)
+   */
+  virtual int shmOpen(const char* name, int oflag, mode_t mode) PURE;
+
+  /**
+   * @see shm_unlink (man 3 shm_unlink)
+   */
+  virtual int shmUnlink(const char* name) PURE;
+
+  /**
+   * @see man 2 ftruncate
+   */
+  virtual int ftruncate(int fd, off_t length) PURE;
+
+  /**
+   * @see man 2 mmap
+   */
+  virtual void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

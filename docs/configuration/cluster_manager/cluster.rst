@@ -182,6 +182,8 @@ dns_resolvers
   configuration. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
 
+.. _config_cluster_manager_cluster_outlier_detection_summary:
+
 :ref:`outlier_detection <config_cluster_manager_cluster_outlier_detection>`
   *(optional, object)* If specified, outlier detection will be enabled for this upstream cluster.
   See the :ref:`architecture overview <arch_overview_outlier_detection>` for more information on outlier

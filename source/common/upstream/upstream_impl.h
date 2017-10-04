@@ -35,6 +35,21 @@
 namespace Envoy {
 namespace Upstream {
 
+// Wrapper around envoy::api::v2::Locality to make it easier to compare for ordering in std::map and
+// in tests to construct literals.
+// TODO(htuch): Consider making this reference based when we have a single string implementation.
+class Locality : public std::tuple<std::string, std::string, std::string> {
+public:
+  Locality(const std::string& region, const std::string& zone, const std::string& sub_zone)
+      : std::tuple<std::string, std::string, std::string>(region, zone, sub_zone) {}
+  Locality(const envoy::api::v2::Locality& locality)
+      : std::tuple<std::string, std::string, std::string>(locality.region(), locality.zone(),
+                                                          locality.sub_zone()) {}
+  bool empty() const {
+    return std::get<0>(*this).empty() && std::get<1>(*this).empty() && std::get<2>(*this).empty();
+  }
+};
+
 /**
  * Null implementation of HealthCheckHostMonitor.
  */
@@ -158,29 +173,29 @@ class HostSetImpl : public virtual HostSet {
 public:
   HostSetImpl()
       : hosts_(new std::vector<HostSharedPtr>()), healthy_hosts_(new std::vector<HostSharedPtr>()),
-        hosts_per_zone_(new std::vector<std::vector<HostSharedPtr>>()),
-        healthy_hosts_per_zone_(new std::vector<std::vector<HostSharedPtr>>()) {}
+        hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()),
+        healthy_hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                   HostListsConstSharedPtr hosts_per_zone,
-                   HostListsConstSharedPtr healthy_hosts_per_zone,
+                   HostListsConstSharedPtr hosts_per_locality,
+                   HostListsConstSharedPtr healthy_hosts_per_locality,
                    const std::vector<HostSharedPtr>& hosts_added,
                    const std::vector<HostSharedPtr>& hosts_removed) {
     hosts_ = hosts;
     healthy_hosts_ = healthy_hosts;
-    hosts_per_zone_ = hosts_per_zone;
-    healthy_hosts_per_zone_ = healthy_hosts_per_zone;
+    hosts_per_locality_ = hosts_per_locality;
+    healthy_hosts_per_locality_ = healthy_hosts_per_locality;
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 
   // Upstream::HostSet
   const std::vector<HostSharedPtr>& hosts() const override { return *hosts_; }
   const std::vector<HostSharedPtr>& healthyHosts() const override { return *healthy_hosts_; }
-  const std::vector<std::vector<HostSharedPtr>>& hostsPerZone() const override {
-    return *hosts_per_zone_;
+  const std::vector<std::vector<HostSharedPtr>>& hostsPerLocality() const override {
+    return *hosts_per_locality_;
   }
-  const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
-    return *healthy_hosts_per_zone_;
+  const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const override {
+    return *healthy_hosts_per_locality_;
   }
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
@@ -195,8 +210,8 @@ protected:
 private:
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
-  HostListsConstSharedPtr hosts_per_zone_;
-  HostListsConstSharedPtr healthy_hosts_per_zone_;
+  HostListsConstSharedPtr hosts_per_locality_;
+  HostListsConstSharedPtr healthy_hosts_per_locality_;
   mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
                                   const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;

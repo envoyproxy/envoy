@@ -27,7 +27,7 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 8;
 
-SharedMemory& SharedMemory::initialize(Options& options) {
+SharedMemory& SharedMemory::initialize(Options& options, Api::OsSysCalls& os_sys_calls) {
   int flags = O_RDWR;
   std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
@@ -35,22 +35,22 @@ SharedMemory& SharedMemory::initialize(Options& options) {
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
     // is a clean restart this should then allow the shm_open() call below to succeed.
-    shm_unlink(shmem_name.c_str());
+    os_sys_calls.shmUnlink(shmem_name.c_str());
   }
 
-  int shmem_fd = shm_open(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+  int shmem_fd = os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (shmem_fd == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
   }
 
   if (options.restartEpoch() == 0) {
-    int rc = ftruncate(shmem_fd, sizeof(SharedMemory));
+    int rc = os_sys_calls.ftruncate(shmem_fd, sizeof(SharedMemory));
     RELEASE_ASSERT(rc != -1);
     UNREFERENCED_PARAMETER(rc);
   }
 
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
-      mmap(nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(os_sys_calls.mmap(
+      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
   RELEASE_ASSERT(shmem != MAP_FAILED);
 
   if (options.restartEpoch() == 0) {
@@ -88,12 +88,12 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
 
 std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeof(SharedMemory)); }
 
-HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
-      init_lock_(shmem_.init_lock_) {
+HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
+    : options_(options), shmem_(SharedMemory::initialize(options, os_sys_calls)),
+      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
+      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
 
-  my_domain_socket_ = bindDomainSocket(options.restartEpoch());
+  my_domain_socket_ = bindDomainSocket(options.restartEpoch(), os_sys_calls);
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   if (options.restartEpoch() != 0) {
     parent_address_ = createDomainSocketAddress((options.restartEpoch() + -1));
@@ -108,15 +108,20 @@ HotRestartImpl::HotRestartImpl(Options& options)
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
+  Stats::RawStatData* unused = nullptr;
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
   for (Stats::RawStatData& data : shmem_.stats_slots_) {
     if (!data.initialized()) {
-      data.initialize(name);
-      return &data;
+      unused = &data;
     } else if (data.matches(name)) {
       data.ref_count_++;
       return &data;
     }
+  }
+
+  if (unused != nullptr) {
+    unused->initialize(name);
+    return unused;
   }
 
   return nullptr;
@@ -133,12 +138,12 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   memset(&data, 0, sizeof(Stats::RawStatData));
 }
 
-int HotRestartImpl::bindDomainSocket(uint64_t id) {
+int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls) {
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
-  int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  int rc = os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (rc != 0) {
     throw EnvoyException(
         fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));

@@ -103,6 +103,7 @@ public:
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
   MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
+  MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {

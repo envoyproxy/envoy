@@ -224,6 +224,7 @@ private:
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \

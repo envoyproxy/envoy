@@ -379,16 +379,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
   HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primary_cluster.hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(
       new std::vector<HostSharedPtr>(primary_cluster.healthyHosts()));
-  HostListsConstSharedPtr hosts_per_zone_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.hostsPerZone()));
-  HostListsConstSharedPtr healthy_hosts_per_zone_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerZone()));
+  HostListsConstSharedPtr hosts_per_locality_copy(
+      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.hostsPerLocality()));
+  HostListsConstSharedPtr healthy_hosts_per_locality_copy(
+      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerLocality()));
 
-  tls_->runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy,
-                         healthy_hosts_per_zone_copy, hosts_added, hosts_removed]() -> void {
+  tls_->runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+                         healthy_hosts_per_locality_copy, hosts_added, hosts_removed]() -> void {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy, healthy_hosts_per_zone_copy,
-        hosts_added, hosts_removed, *tls_);
+        name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+        healthy_hosts_per_locality_copy, hosts_added, hosts_removed, *tls_);
   });
 }
 
@@ -512,7 +512,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-    HostListsConstSharedPtr hosts_per_zone, HostListsConstSharedPtr healthy_hosts_per_zone,
+    HostListsConstSharedPtr hosts_per_locality, HostListsConstSharedPtr healthy_hosts_per_locality,
     const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
     ThreadLocal::Slot& tls) {
 
@@ -520,7 +520,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   config.thread_local_clusters_[name]->host_set_.updateHosts(
-      hosts, healthy_hosts, hosts_per_zone, healthy_hosts_per_zone, hosts_added, hosts_removed);
+      hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality, hosts_added,
+      hosts_removed);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
