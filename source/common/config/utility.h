@@ -60,8 +60,11 @@ public:
   }
 
   /**
-   * Legacy APIs uses JSON and do not have an explicit version. Hash the body and append
-   * a user-friendly prefix.
+   * Legacy APIs uses JSON and do not have an explicit version.
+   * @param input the input to hash.
+   * @return std::pair<std::string, uint64_t> the string is the hash converted into
+   *         a hex string, pre-pended by a user friendly prefix. The uint64_t is the
+   *         raw hash.
    */
   static std::pair<std::string, uint64_t> computeHashedVersion(const std::string& input) {
     uint64_t hash = HashUtil::xxHash64(input);
