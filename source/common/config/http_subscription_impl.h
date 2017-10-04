@@ -60,7 +60,7 @@ public:
     request_.mutable_resource_names()->Swap(&resources_vector);
   }
 
-  const std::string versionInfo() const override { return request_.version_info(); }
+  const std::string versionInfo() const override { return version_info_; }
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override {
@@ -83,6 +83,8 @@ public:
     try {
       callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message.version_info());
+      version_info_ = message.version_info();
+      stats_.version_.set(HashUtil::xxHash64(version_info_));
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
@@ -105,6 +107,7 @@ private:
   }
 
   std::string path_;
+  std::string version_info_;
   Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;

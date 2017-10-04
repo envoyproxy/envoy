@@ -50,6 +50,7 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   resources[0].set_name(route_config_name_);
   callbacks_->onConfigUpdate(resources);
   version_info_ = Envoy::Config::Utility::computeHashedVersion(response_body);
+  stats_.version_.set(HashUtil::xxHash64(version_info_));
   stats_.update_success_.inc();
 }
 

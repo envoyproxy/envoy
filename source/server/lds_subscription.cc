@@ -53,6 +53,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
 
   callbacks_->onConfigUpdate(resources);
   version_info_ = Config::Utility::computeHashedVersion(response_body);
+  stats_.version_.set(HashUtil::xxHash64(version_info_));
   stats_.update_success_.inc();
 }
 

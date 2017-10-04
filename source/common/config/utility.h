@@ -5,6 +5,7 @@
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -149,7 +150,7 @@ public:
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
   }
 
   /**

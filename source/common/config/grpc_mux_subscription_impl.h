@@ -55,6 +55,7 @@ public:
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     version_info_ = version_info;
+    stats_.version_.set(HashUtil::xxHash64(version_info_));
     ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources", type_url_, resources.size());
 
 #ifndef NVLOG

@@ -69,7 +69,7 @@ will only perform a full reload if the hash value changes.
 Statistics
 ----------
 
-RDS has a statistics tree rooted at *http.<stat_prefix>.rds.* with the following statistics:
+RDS has a statistics tree rooted at *http.<stat_prefix>.rds.<route_config_name>* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
@@ -79,3 +79,4 @@ RDS has a statistics tree rooted at *http.<stat_prefix>.rds.* with the following
   update_attempt, Counter, Total API fetches attempted
   update_success, Counter, Total API fetches completed successfully
   update_failure, Counter, Total API fetches that failed (either network or schema errors)
+  version, Gauge, Hash of the contents from the last successful API fetch
