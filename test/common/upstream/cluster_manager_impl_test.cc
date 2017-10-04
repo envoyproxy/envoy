@@ -263,7 +263,14 @@ TEST_F(ClusterManagerImplTest, ValidClusterName) {
   )EOF";
 
   create(parseBootstrapFromJson(json));
-  EXPECT_EQ(0, factory_.stats_.counter("cluster.cluster_name.upstream_rq_5xx").value());
+  cluster_manager_->clusters()
+      .find("cluster:name")
+      ->second.get()
+      .info()
+      ->statsScope()
+      .counter("foo")
+      .inc();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {

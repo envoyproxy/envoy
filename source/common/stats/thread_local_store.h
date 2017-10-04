@@ -81,15 +81,8 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(sanitizeStatsName(prefix)) {}
+        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
-    // ':' is a reserved char in statsd. Do the translation here and in
-    // IsolatedStoreImpl::ScopeImpl.
-    std::string sanitizeStatsName(const std::string& name) {
-      std::string stats_name = name;
-      std::replace(stats_name.begin(), stats_name.end(), ':', '_');
-      return stats_name;
-    }
 
     // Stats::Scope
     Counter& counter(const std::string& name) override;

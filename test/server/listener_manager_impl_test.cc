@@ -648,6 +648,21 @@ TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
 }
 
+TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
+  const std::string json = R"EOF(
+  {
+    "address": "tcp://[::1]:10000",
+    "filters": []
+    "bind_to_port": false,
+  }
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->listeners().front().get().listenerScope().counter("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counter("listener.[__1]_10000.foo").value());
+}
+
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
