@@ -270,7 +270,7 @@ TEST_F(ClusterManagerImplTest, ValidClusterName) {
       ->statsScope()
       .counter("foo")
       .inc();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster.cluster_name.foo").value());
+  EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
