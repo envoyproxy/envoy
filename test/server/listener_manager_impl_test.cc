@@ -652,8 +652,8 @@ TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   const std::string json = R"EOF(
   {
     "address": "tcp://[::1]:10000",
-    "filters": []
-    "bind_to_port": false,
+    "filters": [],
+    "bind_to_port": false
   }
   )EOF";
 
