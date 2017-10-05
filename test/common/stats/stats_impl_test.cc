@@ -55,7 +55,7 @@ TEST(StatsIsolatedStoreImplTest, All) {
 }
 
 /**
- * All server wide stats. @see stats_macros.h
+ * Test stats macros. @see stats_macros.h
  */
 // clang-format off
 #define ALL_TEST_STATS(COUNTER, GAUGE, TIMER, HISTOGRAM)                                           \
