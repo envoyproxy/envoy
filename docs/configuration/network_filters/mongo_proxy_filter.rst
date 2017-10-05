@@ -128,7 +128,7 @@ namespace.
   total, Counter, Number of commands
   reply_num_docs, Histogram, Number of documents in reply
   reply_size, Histogram, Size of the reply in bytes
-  reply_time_ms, Timer, Command time in milliseconds
+  reply_time_ms, Histogram, Command time in milliseconds
 
 .. _config_network_filters_mongo_proxy_collection_stats:
 
@@ -147,7 +147,7 @@ The MongoDB filter will gather statistics for queries in the
   multi_get, Counter, Number of multi gets
   reply_num_docs, Histogram, Number of documents in reply
   reply_size, Histogram, Size of the reply in bytes
-  reply_time_ms, Timer, Query time in milliseconds
+  reply_time_ms, Histogram, Query time in milliseconds
 
 .. _config_network_filters_mongo_proxy_callsite_stats:
 

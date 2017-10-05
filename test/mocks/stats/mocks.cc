@@ -25,7 +25,6 @@ MockHistogram::MockHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, type()).WillByDefault(ReturnPointee(&type_));
 }
 MockHistogram::~MockHistogram() {}
 
@@ -34,16 +33,13 @@ MockSink::~MockSink() {}
 
 MockStore::MockStore() {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
-  ON_CALL(*this, histogram(_, _))
-      .WillByDefault(
-          Invoke([this](Histogram::ValueType type, const std::string& name) -> Histogram& {
-            auto* histogram = new NiceMock<MockHistogram>;
-            histogram->name_ = name;
-            histogram->store_ = this;
-            histogram->type_ = type;
-            histograms_.emplace_back(histogram);
-            return *histogram;
-          }));
+  ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
+    auto* histogram = new NiceMock<MockHistogram>;
+    histogram->name_ = name;
+    histogram->store_ = this;
+    histograms_.emplace_back(histogram);
+    return *histogram;
+  }));
 }
 MockStore::~MockStore() {}
 

@@ -87,15 +87,8 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   NiceMock<MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.type_ = Histogram::ValueType::Duration;
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n")));
   sink_->onHistogramComplete(timer, 5);
-
-  NiceMock<MockHistogram> histogram;
-  histogram.name_ = "histogram_test_timer";
-  histogram.type_ = Histogram::ValueType::Integer;
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.histogram_test_timer:15|ms\n")));
-  sink_->onHistogramComplete(histogram, 15);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   tls_.shutdownThread();

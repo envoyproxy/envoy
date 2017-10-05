@@ -41,7 +41,7 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
  * All mongo proxy stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_MONGO_PROXY_STATS(COUNTER, GAUGE, TIMER)                                               \
+#define ALL_MONGO_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                           \
   COUNTER(decoding_error)                                                                          \
   COUNTER(delays_injected)                                                                         \
   COUNTER(op_get_more)                                                                             \
@@ -68,7 +68,7 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
  * Struct definition for all mongo proxy stats. @see stats_macros.h
  */
 struct MongoProxyStats {
-  ALL_MONGO_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
+  ALL_MONGO_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -165,7 +165,7 @@ private:
   MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
                                                  POOL_GAUGE_PREFIX(scope, prefix),
-                                                 POOL_TIMER_PREFIX(scope, prefix))};
+                                                 POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
   void chargeQueryStats(const std::string& prefix, QueryMessageInfo::QueryType query_type);

@@ -174,69 +174,69 @@ public:
  * All cluster stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, TIMER)                                                   \
-  COUNTER(lb_healthy_panic)                                                                        \
-  COUNTER(lb_local_cluster_not_ok)                                                                 \
-  COUNTER(lb_recalculate_zone_structures)                                                          \
-  COUNTER(lb_zone_cluster_too_small)                                                               \
-  COUNTER(lb_zone_no_capacity_left)                                                                \
-  COUNTER(lb_zone_number_differs)                                                                  \
-  COUNTER(lb_zone_routing_all_directly)                                                            \
-  COUNTER(lb_zone_routing_sampled)                                                                 \
-  COUNTER(lb_zone_routing_cross_zone)                                                              \
-  COUNTER(upstream_cx_total)                                                                       \
-  GAUGE  (upstream_cx_active)                                                                      \
-  COUNTER(upstream_cx_http1_total)                                                                 \
-  COUNTER(upstream_cx_http2_total)                                                                 \
-  COUNTER(upstream_cx_connect_fail)                                                                \
-  COUNTER(upstream_cx_connect_timeout)                                                             \
-  COUNTER(upstream_cx_overflow)                                                                    \
-  TIMER  (upstream_cx_connect_ms)                                                                  \
-  TIMER  (upstream_cx_length_ms)                                                                   \
-  COUNTER(upstream_cx_destroy)                                                                     \
-  COUNTER(upstream_cx_destroy_local)                                                               \
-  COUNTER(upstream_cx_destroy_remote)                                                              \
-  COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
-  COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
-  COUNTER(upstream_cx_destroy_remote_with_active_rq)                                               \
-  COUNTER(upstream_cx_close_notify)                                                                \
-  COUNTER(upstream_cx_rx_bytes_total)                                                              \
-  GAUGE  (upstream_cx_rx_bytes_buffered)                                                           \
-  COUNTER(upstream_cx_tx_bytes_total)                                                              \
-  GAUGE  (upstream_cx_tx_bytes_buffered)                                                           \
-  COUNTER(upstream_cx_protocol_error)                                                              \
-  COUNTER(upstream_cx_max_requests)                                                                \
-  COUNTER(upstream_cx_none_healthy)                                                                \
-  COUNTER(upstream_rq_total)                                                                       \
-  GAUGE  (upstream_rq_active)                                                                      \
-  COUNTER(upstream_rq_pending_total)                                                               \
-  COUNTER(upstream_rq_pending_overflow)                                                            \
-  COUNTER(upstream_rq_pending_failure_eject)                                                       \
-  GAUGE  (upstream_rq_pending_active)                                                              \
-  COUNTER(upstream_rq_cancelled)                                                                   \
-  COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_per_try_timeout)                                                             \
-  COUNTER(upstream_rq_rx_reset)                                                                    \
-  COUNTER(upstream_rq_tx_reset)                                                                    \
-  COUNTER(upstream_rq_retry)                                                                       \
-  COUNTER(upstream_rq_retry_success)                                                               \
-  COUNTER(upstream_rq_retry_overflow)                                                              \
-  COUNTER(upstream_flow_control_paused_reading_total)                                              \
-  COUNTER(upstream_flow_control_resumed_reading_total)                                             \
-  COUNTER(upstream_flow_control_backed_up_total)                                                   \
-  COUNTER(upstream_flow_control_drained_total)                                                     \
-  COUNTER(bind_errors)                                                                             \
-  GAUGE  (max_host_weight)                                                                         \
-  COUNTER(membership_change)                                                                       \
-  GAUGE  (membership_healthy)                                                                      \
-  GAUGE  (membership_total)                                                                        \
-  COUNTER(retry_or_shadow_abandoned)                                                               \
-  COUNTER(update_attempt)                                                                          \
-  COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(update_empty)                                                                            \
-  GAUGE(version)
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                               \
+  COUNTER  (lb_healthy_panic)                                                                      \
+  COUNTER  (lb_local_cluster_not_ok)                                                               \
+  COUNTER  (lb_recalculate_zone_structures)                                                        \
+  COUNTER  (lb_zone_cluster_too_small)                                                             \
+  COUNTER  (lb_zone_no_capacity_left)                                                              \
+  COUNTER  (lb_zone_number_differs)                                                                \
+  COUNTER  (lb_zone_routing_all_directly)                                                          \
+  COUNTER  (lb_zone_routing_sampled)                                                               \
+  COUNTER  (lb_zone_routing_cross_zone)                                                            \
+  COUNTER  (upstream_cx_total)                                                                     \
+  GAUGE    (upstream_cx_active)                                                                    \
+  COUNTER  (upstream_cx_http1_total)                                                               \
+  COUNTER  (upstream_cx_http2_total)                                                               \
+  COUNTER  (upstream_cx_connect_fail)                                                              \
+  COUNTER  (upstream_cx_connect_timeout)                                                           \
+  COUNTER  (upstream_cx_overflow)                                                                  \
+  HISTOGRAM(upstream_cx_connect_ms)                                                                \
+  HISTOGRAM(upstream_cx_length_ms)                                                                 \
+  COUNTER  (upstream_cx_destroy)                                                                   \
+  COUNTER  (upstream_cx_destroy_local)                                                             \
+  COUNTER  (upstream_cx_destroy_remote)                                                            \
+  COUNTER  (upstream_cx_destroy_with_active_rq)                                                    \
+  COUNTER  (upstream_cx_destroy_local_with_active_rq)                                              \
+  COUNTER  (upstream_cx_destroy_remote_with_active_rq)                                             \
+  COUNTER  (upstream_cx_close_notify)                                                              \
+  COUNTER  (upstream_cx_rx_bytes_total)                                                            \
+  GAUGE    (upstream_cx_rx_bytes_buffered)                                                         \
+  COUNTER  (upstream_cx_tx_bytes_total)                                                            \
+  GAUGE    (upstream_cx_tx_bytes_buffered)                                                         \
+  COUNTER  (upstream_cx_protocol_error)                                                            \
+  COUNTER  (upstream_cx_max_requests)                                                              \
+  COUNTER  (upstream_cx_none_healthy)                                                              \
+  COUNTER  (upstream_rq_total)                                                                     \
+  GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_pending_total)                                                             \
+  COUNTER  (upstream_rq_pending_overflow)                                                          \
+  COUNTER  (upstream_rq_pending_failure_eject)                                                     \
+  GAUGE    (upstream_rq_pending_active)                                                            \
+  COUNTER  (upstream_rq_cancelled)                                                                 \
+  COUNTER  (upstream_rq_maintenance_mode)                                                          \
+  COUNTER  (upstream_rq_timeout)                                                                   \
+  COUNTER  (upstream_rq_per_try_timeout)                                                           \
+  COUNTER  (upstream_rq_rx_reset)                                                                  \
+  COUNTER  (upstream_rq_tx_reset)                                                                  \
+  COUNTER  (upstream_rq_retry)                                                                     \
+  COUNTER  (upstream_rq_retry_success)                                                             \
+  COUNTER  (upstream_rq_retry_overflow)                                                            \
+  COUNTER  (upstream_flow_control_paused_reading_total)                                            \
+  COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
+  COUNTER  (upstream_flow_control_backed_up_total)                                                 \
+  COUNTER  (upstream_flow_control_drained_total)                                                   \
+  COUNTER  (bind_errors)                                                                           \
+  GAUGE    (max_host_weight)                                                                       \
+  COUNTER  (membership_change)                                                                     \
+  GAUGE    (membership_healthy)                                                                    \
+  GAUGE    (membership_total)                                                                      \
+  COUNTER  (retry_or_shadow_abandoned)                                                             \
+  COUNTER  (update_attempt)                                                                        \
+  COUNTER  (update_success)                                                                        \
+  COUNTER  (update_failure)                                                                        \
+  COUNTER  (update_empty)                                                                          \
+  GAUGE    (version)
 
 // clang-format on
 
@@ -244,7 +244,7 @@ public:
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
-  ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
+  ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**

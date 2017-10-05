@@ -9,7 +9,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/stats/stats.h"
 
@@ -153,15 +152,12 @@ private:
  */
 class HistogramImpl : public Histogram, public MetricImpl {
 public:
-  HistogramImpl(const std::string& name, Store& parent, ValueType type)
-      : MetricImpl(name), parent_(parent), type_(type) {}
+  HistogramImpl(const std::string& name, Store& parent) : MetricImpl(name), parent_(parent) {}
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
-  ValueType type() const override { return type_; }
 
   Store& parent_;
-  ValueType type_;
 };
 
 /**
@@ -178,19 +174,19 @@ public:
 /**
  * A stats cache template that is used by the isolated store.
  */
-template <class Base, class Impl, class... ExtraAllocatorArgs> class IsolatedStatsCache {
+template <class Base, class Impl> class IsolatedStatsCache {
 public:
-  typedef std::function<Impl*(const std::string& name, ExtraAllocatorArgs... args)> Allocator;
+  typedef std::function<Impl*(const std::string& name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
-  Base& get(const std::string& name, ExtraAllocatorArgs... args) {
+  Base& get(const std::string& name) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    Impl* new_stat = alloc_(name, args...);
+    Impl* new_stat = alloc_(name);
     stats_.emplace(name, std::shared_ptr<Impl>{new_stat});
     return *new_stat;
   }
@@ -221,8 +217,8 @@ public:
         gauges_([this](const std::string& name) -> GaugeImpl* {
           return new GaugeImpl(*alloc_.alloc(name), alloc_);
         }),
-        histograms_([this](const std::string& name, Histogram::ValueType type) -> HistogramImpl* {
-          return new HistogramImpl(name, *this, type);
+        histograms_([this](const std::string& name) -> HistogramImpl* {
+          return new HistogramImpl(name, *this);
         }) {}
 
   // Stats::Scope
@@ -232,12 +228,8 @@ public:
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Histogram& histogram(Histogram::ValueType type, const std::string& name) override {
-    Histogram& histogram = histograms_.get(name, type);
-    if (histogram.type() != type) {
-      throw EnvoyException(fmt::format(
-          "Cached histogram type did not match the requested type for name: '{}'", name));
-    }
+  Histogram& histogram(const std::string& name) override {
+    Histogram& histogram = histograms_.get(name);
     return histogram;
   }
 
@@ -257,8 +249,8 @@ private:
     void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
     Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
     Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-    Histogram& histogram(Histogram::ValueType type, const std::string& name) override {
-      return parent_.histogram(type, prefix_ + name);
+    Histogram& histogram(const std::string& name) override {
+      return parent_.histogram(prefix_ + name);
     }
 
     IsolatedStoreImpl& parent_;
@@ -268,7 +260,7 @@ private:
   HeapRawStatDataAllocator alloc_;
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Histogram, HistogramImpl, Histogram::ValueType> histograms_;
+  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
 };
 
 } // namespace Stats

@@ -115,9 +115,9 @@ public:
     return wrapped_scope_->gauge(name);
   }
 
-  Histogram& histogram(Histogram::ValueType type, const std::string& name) override {
+  Histogram& histogram(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
-    return wrapped_scope_->histogram(type, name);
+    return wrapped_scope_->histogram(name);
   }
 
 private:
@@ -145,9 +145,9 @@ public:
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauge(name);
   }
-  Histogram& histogram(Histogram::ValueType type, const std::string& name) override {
+  Histogram& histogram(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
-    return store_.histogram(type, name);
+    return store_.histogram(name);
   }
 
   // Stats::Store

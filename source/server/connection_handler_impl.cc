@@ -164,7 +164,7 @@ ConnectionHandlerImpl::ActiveConnection::~ActiveConnection() {
 }
 
 ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
-  return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
+  return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
 } // namespace Server

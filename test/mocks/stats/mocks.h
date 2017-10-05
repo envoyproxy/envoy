@@ -59,10 +59,8 @@ public:
   // creates a deadlock in gmock and is an unintended use of mock functions.
   const std::string& name() const override { return name_; };
   MOCK_METHOD1(recordValue, void(uint64_t value));
-  MOCK_CONST_METHOD0(type, Histogram::ValueType());
 
   std::string name_;
-  Histogram::ValueType type_;
   Store* store_;
 };
 
@@ -91,7 +89,7 @@ public:
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::list<GaugeSharedPtr>());
-  MOCK_METHOD2(histogram, Histogram&(Histogram::ValueType type, const std::string& name));
+  MOCK_METHOD1(histogram, Histogram&(const std::string& name));
 
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;

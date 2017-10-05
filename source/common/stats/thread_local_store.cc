@@ -189,8 +189,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   return *central_ref;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(Histogram::ValueType type,
-                                                      const std::string& name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
@@ -206,12 +205,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(Histogram::ValueType type,
   std::unique_lock<std::mutex> lock(parent_.lock_);
   HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
   if (!central_ref) {
-    central_ref.reset(new HistogramImpl(final_name, parent_, type));
-  } else {
-    if (central_ref->type() != type) {
-      throw EnvoyException(fmt::format(
-          "Cached histogram type did not match the requested type for name: '{}'", name));
-    }
+    central_ref.reset(new HistogramImpl(final_name, parent_));
   }
 
   if (tls_ref) {

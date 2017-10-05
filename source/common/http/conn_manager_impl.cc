@@ -38,7 +38,7 @@ ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& p
                                                             Stats::Scope& scope) {
   return {
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_TIMER_PREFIX(scope, prefix))},
+                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
       prefix,
       scope};
 }

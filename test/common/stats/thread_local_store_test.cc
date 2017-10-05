@@ -99,25 +99,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Histogram& t1 = store_->histogram(Stats::Histogram::ValueType::Duration, "t1");
-  EXPECT_EQ(Histogram::ValueType::Duration, t1.type());
-  EXPECT_EQ(&t1, &store_->histogram(Stats::Histogram::ValueType::Duration, "t1"));
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(t1), 200));
-  t1.recordValue(200);
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(t1), 100));
-  store_->deliverHistogramToSinks(t1, 100);
-
-  Histogram& h1 = store_->histogram(Stats::Histogram::ValueType::Integer, "h1");
-  EXPECT_EQ(Histogram::ValueType::Integer, h1.type());
-  EXPECT_EQ(&h1, &store_->histogram(Stats::Histogram::ValueType::Integer, "h1"));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
   store_->deliverHistogramToSinks(h1, 100);
-
-  EXPECT_THROW_WITH_MESSAGE(
-      store_->histogram(Stats::Histogram::ValueType::Duration, "h1"), EnvoyException,
-      "Cached histogram type did not match the requested type for name: 'h1'");
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -144,8 +131,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Histogram& t1 = store_->histogram(Stats::Histogram::ValueType::Duration, "t1");
-  EXPECT_EQ(&t1, &store_->histogram(Stats::Histogram::ValueType::Duration, "t1"));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -184,21 +171,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
 
-  Histogram& t1 = store_->histogram(Stats::Histogram::ValueType::Duration, "t1");
-  Histogram& t2 = scope1->histogram(Stats::Histogram::ValueType::Duration, "t2");
-  EXPECT_EQ(Histogram::ValueType::Duration, t1.type());
-  EXPECT_EQ(Histogram::ValueType::Duration, t2.type());
-  EXPECT_EQ("t1", t1.name());
-  EXPECT_EQ("scope1.t2", t2.name());
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(t1), 100));
-  t1.recordValue(100);
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(t2), 200));
-  t2.recordValue(200);
-
-  Histogram& h1 = store_->histogram(Stats::Histogram::ValueType::Integer, "h1");
-  Histogram& h2 = scope1->histogram(Stats::Histogram::ValueType::Integer, "h2");
-  EXPECT_EQ(Histogram::ValueType::Integer, h1.type());
-  EXPECT_EQ(Histogram::ValueType::Integer, h2.type());
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -208,7 +182,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
-  scope1->deliverHistogramToSinks(t1, 200);
+  scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
 
   // Includes overflow stat.

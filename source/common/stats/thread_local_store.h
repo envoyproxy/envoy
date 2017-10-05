@@ -57,8 +57,8 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  Histogram& histogram(Histogram::ValueType type, const std::string& name) override {
-    return default_scope_->histogram(type, name);
+  Histogram& histogram(const std::string& name) override {
+    return default_scope_->histogram(name);
   };
 
   // Stats::Store
@@ -90,7 +90,7 @@ private:
     }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
-    Histogram& histogram(Histogram::ValueType type, const std::string& name) override;
+    Histogram& histogram(const std::string& name) override;
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;

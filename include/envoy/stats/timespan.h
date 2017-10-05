@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/stats/stats.h"
 
@@ -16,11 +15,8 @@ namespace Stats {
  */
 class Timespan {
 public:
-  Timespan(Histogram& histogram) : histogram_(histogram), start_(std::chrono::steady_clock::now()) {
-    if (histogram.type() != Histogram::ValueType::Duration) {
-      throw EnvoyException("Cannot intialize a timespan with a non-time valued histogram");
-    }
-  }
+  Timespan(Histogram& histogram)
+      : histogram_(histogram), start_(std::chrono::steady_clock::now()) {}
 
   virtual ~Timespan() {}
 

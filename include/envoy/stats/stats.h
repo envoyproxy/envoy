@@ -69,20 +69,14 @@ typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
 /**
  * A histogram that records values one at a time.
+ * Note: Histograms now incorporate what used to be timers because the only difference between the
+ * two stat types was the units being represented. It is assumed that no downstream user of this
+ * class (Sinks, in particular) will need to explicitly differentiate between histograms
+ * representing durations and histograms representing other types of data.
  */
 class Histogram : public virtual Metric {
 public:
   virtual ~Histogram() {}
-
-  enum ValueType {
-    Integer,
-    Duration,
-  };
-
-  /**
-   * Informs the user how the values should be interpreted.
-   */
-  virtual ValueType type() const PURE;
 
   /**
    * Records an unsigned value. If a timer, values are in units of milliseconds.
@@ -166,7 +160,7 @@ public:
   /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(Histogram::ValueType type, const std::string& name) PURE;
+  virtual Histogram& histogram(const std::string& name) PURE;
 };
 
 /**

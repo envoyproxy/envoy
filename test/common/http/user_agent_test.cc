@@ -17,15 +17,13 @@ namespace Http {
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
   NiceMock<Stats::MockHistogram> original_histogram;
-  original_histogram.type_ = Stats::Histogram::ValueType::Duration;
   Stats::Timespan span(original_histogram);
 
   EXPECT_CALL(stat_store.counter_, inc()).Times(5);
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_rq_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram(Stats::Histogram::ValueType::Duration,
-                                    "test.user_agent.ios.downstream_cx_length_ms"));
+  EXPECT_CALL(stat_store, histogram("test.user_agent.ios.downstream_cx_length_ms"));
   EXPECT_CALL(
       stat_store,
       deliverHistogramToSinks(
@@ -43,8 +41,7 @@ TEST(UserAgentTest, All) {
   EXPECT_CALL(stat_store, counter("test.user_agent.android.downstream_rq_total"));
   EXPECT_CALL(stat_store,
               counter("test.user_agent.android.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram(Stats::Histogram::ValueType::Duration,
-                                    "test.user_agent.android.downstream_cx_length_ms"));
+  EXPECT_CALL(stat_store, histogram("test.user_agent.android.downstream_cx_length_ms"));
   EXPECT_CALL(
       stat_store,
       deliverHistogramToSinks(

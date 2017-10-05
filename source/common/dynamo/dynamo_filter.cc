@@ -181,18 +181,14 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
                            std::to_string(status)))
       .inc();
 
-  scope_
-      .histogram(Stats::Histogram::ValueType::Duration,
-                 fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity))
+  scope_.histogram(fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity))
       .recordValue(latency.count());
   scope_
-      .histogram(Stats::Histogram::ValueType::Duration,
-                 fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
+      .histogram(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
                              group_string))
       .recordValue(latency.count());
   scope_
-      .histogram(Stats::Histogram::ValueType::Duration,
-                 fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
+      .histogram(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
                              std::to_string(status)))
       .recordValue(latency.count());
 }
