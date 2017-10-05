@@ -2,10 +2,8 @@
 
 #include <dirent.h>
 
-#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <random>
 #include <string>
 #include <unordered_map>
 
@@ -31,19 +29,10 @@ namespace Runtime {
 class RandomGeneratorImpl : public RandomGenerator {
 public:
   // Runtime::RandomGenerator
-  uint64_t random() override { return threadLocalGenerator()(); }
+  uint64_t random() override;
   std::string uuid() override;
 
   static const size_t UUID_LENGTH;
-
-private:
-  static std::ranlux48& threadLocalGenerator() {
-    std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::system_clock::now().time_since_epoch());
-    static thread_local std::ranlux48 generator(now.count() ^ Thread::Thread::currentThreadId());
-
-    return generator;
-  }
 };
 
 /**

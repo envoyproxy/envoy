@@ -23,6 +23,29 @@ namespace Runtime {
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
+uint64_t RandomGeneratorImpl::random() {
+  static thread_local uint8_t buffered[2048];
+  static thread_local size_t buffered_idx = sizeof(buffered);
+
+  // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
+  // i.e. out-of-range value, so the buffer will be filled with randomness on the first
+  // call to this function.
+  if (buffered_idx >= sizeof(buffered)) {
+    int rc = RAND_bytes(buffered, sizeof(buffered));
+    ASSERT(rc == 1);
+    UNREFERENCED_PARAMETER(rc);
+    buffered_idx = 0;
+  }
+
+  // Consume sizeof(uint64) bytes from the buffer.
+  ASSERT(buffered_idx + sizeof(uint64_t) <= sizeof(buffered));
+  uint64_t rand;
+  std::memcpy(reinterpret_cast<void*>(&rand), &buffered[buffered_idx], sizeof(uint64_t));
+  buffered_idx += sizeof(uint64_t);
+
+  return rand;
+}
+
 std::string RandomGeneratorImpl::uuid() {
   static thread_local uint8_t buffered[2048];
   static thread_local size_t buffered_idx = sizeof(buffered);
