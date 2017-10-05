@@ -61,9 +61,11 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits.
+  config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
   update_attempt, Counter, Total cluster membership update attempts
   update_success, Counter, Total cluster membership update successes
   update_failure, Counter, Total cluster membership update failures
+  version, Gauge, Hash of the contents from the last successful API fetch
   max_host_weight, Gauge, Maximum weight of any host in the cluster
   bind_errors, Counter, Total errors binding the socket to the configured source address.
 

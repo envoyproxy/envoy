@@ -81,7 +81,7 @@ Statistics
 ----------
 
 The listener manager has a statistics tree rooted at *listener_manager.* with the following
-statistics:
+statistics. Any ``:`` character in the stats name is replaced with ``_``.
 
 .. csv-table::
   :header: Name, Type, Description

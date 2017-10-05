@@ -8,6 +8,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/event/timer.h"
@@ -181,10 +182,10 @@ public:
                    HostListsConstSharedPtr healthy_hosts_per_locality,
                    const std::vector<HostSharedPtr>& hosts_added,
                    const std::vector<HostSharedPtr>& hosts_removed) {
-    hosts_ = hosts;
-    healthy_hosts_ = healthy_hosts;
-    hosts_per_locality_ = hosts_per_locality;
-    healthy_hosts_per_locality_ = healthy_hosts_per_locality;
+    hosts_ = std::move(hosts);
+    healthy_hosts_ = std::move(healthy_hosts);
+    hosts_per_locality_ = std::move(hosts_per_locality);
+    healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 

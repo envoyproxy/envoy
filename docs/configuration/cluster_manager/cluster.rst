@@ -31,7 +31,7 @@ Cluster
 name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.
-  The cluster name can be at most 60 characters long, and must **not** contain ``:``.
+  The cluster name can be at most 60 characters long.
 
 .. _config_cluster_manager_type:
 
@@ -181,6 +181,8 @@ dns_resolvers
   specified, the value defaults to the default resolver, which uses /etc/resolv.conf for
   configuration. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
+
+.. _config_cluster_manager_cluster_outlier_detection_summary:
 
 :ref:`outlier_detection <config_cluster_manager_cluster_outlier_detection>`
   *(optional, object)* If specified, outlier detection will be enabled for this upstream cluster.

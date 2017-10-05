@@ -28,6 +28,7 @@ Architecture overview
   tcp_proxy
   mongo
   dynamo
+  redis
   hot_restart
   dynamic_configuration
   init

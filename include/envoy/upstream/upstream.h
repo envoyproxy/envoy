@@ -235,7 +235,8 @@ public:
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
   COUNTER(update_failure)                                                                          \
-  COUNTER(update_empty)
+  COUNTER(update_empty)                                                                            \
+  GAUGE(version)
 
 // clang-format on
 

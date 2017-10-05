@@ -46,6 +46,12 @@ void RawStatData::configureForTestsOnly(Server::Options& options) {
   getMaxNameLength(configured) = configured;
 }
 
+std::string Utility::sanitizeStatsName(const std::string& name) {
+  std::string stats_name = name;
+  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  return stats_name;
+}
+
 void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
   std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now() - start_);
