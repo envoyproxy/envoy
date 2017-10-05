@@ -50,7 +50,6 @@ statistics:
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
-   downstream_rq_non_ws_on_ws_route, Counter, Total HTTP requests rejected by WebSocket enabled routes due to missing upgrade header
    downstream_rq_time, Timer, Request time milliseconds
    rs_too_large, Counter, Total response errors due to buffering an overly large body.
 

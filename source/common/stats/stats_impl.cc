@@ -10,6 +10,12 @@
 namespace Envoy {
 namespace Stats {
 
+std::string Utility::sanitizeStatsName(const std::string& name) {
+  std::string stats_name = name;
+  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  return stats_name;
+}
+
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   RawStatData* data = new RawStatData();
   memset(data, 0, sizeof(RawStatData));

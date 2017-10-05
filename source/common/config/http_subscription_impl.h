@@ -83,6 +83,7 @@ public:
     try {
       callbacks_->onConfigUpdate(typed_resources);
       request_.set_version_info(message.version_info());
+      stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
       stats_.update_success_.inc();
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config update rejected: {}", e.what());

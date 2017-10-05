@@ -27,7 +27,7 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
-    external_deps = ["envoy_tls_context"],
+    external_deps = ["envoy_sds"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",

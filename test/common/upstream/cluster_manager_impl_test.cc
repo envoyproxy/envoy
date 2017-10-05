@@ -248,20 +248,29 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
                             "document key: #/name");
 }
 
-TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
+TEST_F(ClusterManagerImplTest, ValidClusterName) {
   const std::string json = R"EOF(
   {
     "clusters": [
     {
-      "name": "cluster:"
+      "name": "cluster:name",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
     }]
   }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), Json::Exception,
-                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
-                            "#/properties/name\n Schema violation: pattern\n Offending document "
-                            "key: #/name");
+  create(parseBootstrapFromJson(json));
+  cluster_manager_->clusters()
+      .find("cluster:name")
+      ->second.get()
+      .info()
+      ->statsScope()
+      .counter("foo")
+      .inc();
+  EXPECT_EQ(1UL, factory_.stats_.counter("cluster.cluster_name.foo").value());
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction) {
