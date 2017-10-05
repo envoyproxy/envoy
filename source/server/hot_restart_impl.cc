@@ -53,7 +53,7 @@ SharedMemory& SharedMemory::initialize(Options& options, Api::OsSysCalls& os_sys
   SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
       os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
   RELEASE_ASSERT(shmem != MAP_FAILED);
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(shmem)) == 0);
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0);
 
   if (options.restartEpoch() == 0) {
     shmem->size_ = total_size;

@@ -101,7 +101,7 @@ TEST_P(HotRestartImplAlignmentTest, objectAlignment) {
   std::set<Stats::RawStatData*> used;
   for (uint64_t i = 0; i < num_stats_; i++) {
     Stats::RawStatData* stat = hot_restart_->alloc(fmt::format("stat {}", i));
-    EXPECT_TRUE((reinterpret_cast<uintptr_t>(stat) % alignof(*stat)) == 0);
+    EXPECT_TRUE((reinterpret_cast<uintptr_t>(stat) % alignof(decltype(*stat))) == 0);
     EXPECT_TRUE(used.find(stat) == used.end());
     used.insert(stat);
   }
