@@ -27,11 +27,7 @@ public:
   /**
    * Complete the timespan and send the time to the histogram.
    */
-  virtual void complete() {
-    histogram_.recordValue(std::chrono::duration_cast<std::chrono::milliseconds>(
-                               std::chrono::steady_clock::now() - start_)
-                               .count());
-  }
+  virtual void complete() { histogram_.recordValue(getRawDuration().count()); }
 
   /**
    * Get duration since the creation of the span.
