@@ -172,7 +172,7 @@ protected:
 
 #define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
 #define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_err_TO_LOGGER(LOGGER, ...) LOGGER.err(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_error_TO_LOGGER(LOGGER, ...) LOGGER.error(LOG_PREFIX __VA_ARGS__)
 #define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
 
 /**
