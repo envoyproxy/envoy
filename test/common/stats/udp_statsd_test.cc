@@ -34,11 +34,11 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
-  NiceMock<MockMetric> counter;
+  NiceMock<MockCounter> counter;
   counter.name_ = "test_counter";
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockMetric> gauge;
+  NiceMock<MockGauge> gauge;
   counter.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
 

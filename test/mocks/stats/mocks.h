@@ -17,16 +17,6 @@
 namespace Envoy {
 namespace Stats {
 
-class MockMetric : public Metric {
-public:
-  MockMetric();
-  ~MockMetric();
-
-  MOCK_CONST_METHOD0(name, const std::string&());
-
-  std::string name_;
-};
-
 class MockCounter : public Counter {
 public:
   MockCounter();
@@ -39,6 +29,8 @@ public:
   MOCK_METHOD0(reset, void());
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
+
+  std::string name_;
 };
 
 class MockGauge : public Gauge {
@@ -54,6 +46,8 @@ public:
   MOCK_METHOD1(sub, void(uint64_t amount));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
+
+  std::string name_;
 };
 
 class MockHistogram : public Histogram {
@@ -78,8 +72,8 @@ public:
   ~MockSink();
 
   MOCK_METHOD0(beginFlush, void());
-  MOCK_METHOD2(flushCounter, void(const Metric& counter, uint64_t delta));
-  MOCK_METHOD2(flushGauge, void(const Metric& gauge, uint64_t value));
+  MOCK_METHOD2(flushCounter, void(const Counter& counter, uint64_t delta));
+  MOCK_METHOD2(flushGauge, void(const Gauge& gauge, uint64_t value));
   MOCK_METHOD0(endFlush, void());
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };

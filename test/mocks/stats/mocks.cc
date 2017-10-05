@@ -13,14 +13,10 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-MockMetric::MockMetric() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
-
-MockMetric::~MockMetric() {}
-
-MockCounter::MockCounter() {}
+MockCounter::MockCounter() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
 MockCounter::~MockCounter() {}
 
-MockGauge::MockGauge() {}
+MockGauge::MockGauge() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
 MockGauge::~MockGauge() {}
 
 MockHistogram::MockHistogram() {

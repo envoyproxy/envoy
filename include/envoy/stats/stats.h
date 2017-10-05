@@ -108,12 +108,12 @@ public:
   /**
    * Flush a counter delta.
    */
-  virtual void flushCounter(const Metric& counter, uint64_t delta) PURE;
+  virtual void flushCounter(const Counter& counter, uint64_t delta) PURE;
 
   /**
    * Flush a gauge value.
    */
-  virtual void flushGauge(const Metric& gauge, uint64_t value) PURE;
+  virtual void flushGauge(const Gauge& gauge, uint64_t value) PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of

@@ -60,11 +60,11 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flushCounter(const Metric& counter, uint64_t delta) {
+void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {
   tls_->getTyped<Writer>().writeCounter(counter.name(), delta);
 }
 
-void UdpStatsdSink::flushGauge(const Metric& gauge, uint64_t value) {
+void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
   tls_->getTyped<Writer>().writeGauge(gauge.name(), value);
 }
 

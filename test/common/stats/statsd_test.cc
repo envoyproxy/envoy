@@ -65,10 +65,10 @@ TEST_F(TcpStatsdSinkTest, EmptyFlush) {
 
 TEST_F(TcpStatsdSinkTest, BasicFlow) {
   InSequence s;
-  NiceMock<MockMetric> counter;
+  NiceMock<MockCounter> counter;
   counter.name_ = "test_counter";
 
-  NiceMock<MockMetric> gauge;
+  NiceMock<MockGauge> gauge;
   gauge.name_ = "test_gauge";
 
   sink_->beginFlush();
@@ -104,7 +104,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   InSequence s;
 
-  NiceMock<MockMetric> counter;
+  NiceMock<MockCounter> counter;
   counter.name_ = "test_counter";
 
   sink_->beginFlush();
@@ -126,7 +126,7 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
 TEST_F(TcpStatsdSinkTest, Overflow) {
   InSequence s;
 
-  NiceMock<MockMetric> counter;
+  NiceMock<MockCounter> counter;
   counter.name_ = "test_counter";
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
