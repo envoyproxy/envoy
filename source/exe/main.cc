@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
         return Envoy::Server::SharedMemory::version(max_num_stats, max_stat_name_len);
       };
 #else
-  const Envoy::OptionsImpl::HotRestartVersionCB hot_restart_version_cb = [](uint64_t, uint64_t) {
+  const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
     return "disabled";
   };
 #endif
