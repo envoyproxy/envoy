@@ -477,7 +477,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
     std::copy_n(key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
 
     int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
-    RELEASE_ASSERT(rc);
+    ASSERT(rc);
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
     // EVP_CIPHER_key_length(cipher) at compile-time
