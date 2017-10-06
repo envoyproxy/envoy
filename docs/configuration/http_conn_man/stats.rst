@@ -27,7 +27,7 @@ statistics:
    downstream_cx_websocket_active, Gauge, Total active WebSocket connections
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
-   downstream_cx_length_ms, Timer, Connection length milliseconds
+   downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_rx_bytes_total, Counter, Total bytes received
    downstream_cx_rx_bytes_buffered, Gauge, Total received bytes currently buffered
    downstream_cx_tx_bytes_total, Counter, Total bytes sent
@@ -50,7 +50,7 @@ statistics:
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
-   downstream_rq_time, Timer, Request time milliseconds
+   downstream_rq_time, Histogram, Request time milliseconds
    rs_too_large, Counter, Total response errors due to buffering an overly large body.
 
 Per user agent statistics

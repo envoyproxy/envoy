@@ -114,6 +114,7 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
@@ -216,6 +217,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan",
     ],
 )
 

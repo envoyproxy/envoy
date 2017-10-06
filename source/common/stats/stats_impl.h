@@ -74,11 +74,26 @@ public:
 };
 
 /**
+ * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
+ * will inherit from Metric will have other base classes that will also inherit from Metric.
+ */
+class MetricImpl : public virtual Metric {
+public:
+  MetricImpl(const std::string& name) : name_(name) {}
+
+  const std::string& name() const override { return name_; }
+
+private:
+  const std::string name_;
+};
+
+/**
  * Counter implementation that wraps a RawStatData.
  */
-class CounterImpl : public Counter {
+class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc) : data_(data), alloc_(alloc) {}
+  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc)
+      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
 
   // Stats::Counter
@@ -90,10 +105,9 @@ public:
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
-  std::string name() override { return data_.name_; }
   void reset() override { data_.value_ = 0; }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  uint64_t value() override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
 
 private:
   RawStatData& data_;
@@ -103,9 +117,10 @@ private:
 /**
  * Gauge implementation that wraps a RawStatData.
  */
-class GaugeImpl : public Gauge {
+class GaugeImpl : public Gauge, public MetricImpl {
 public:
-  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc) : data_(data), alloc_(alloc) {}
+  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc)
+      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
 
   // Stats::Gauge
@@ -115,7 +130,6 @@ public:
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
-  virtual std::string name() override { return data_.name_; }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= RawStatData::Flags::Used;
@@ -125,8 +139,8 @@ public:
     ASSERT(used());
     data_.value_ -= amount;
   }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  virtual uint64_t value() override { return data_.value_; }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
 
 private:
   RawStatData& data_;
@@ -134,34 +148,15 @@ private:
 };
 
 /**
- * Timer implementation for the heap.
+ * Histogram implementation for the heap.
  */
-class TimerImpl : public Timer {
+class HistogramImpl : public Histogram, public MetricImpl {
 public:
-  TimerImpl(const std::string& name, Store& parent) : name_(name), parent_(parent) {}
+  HistogramImpl(const std::string& name, Store& parent) : MetricImpl(name), parent_(parent) {}
 
-  // Stats::Timer
-  TimespanPtr allocateSpan() override { return TimespanPtr{new TimespanImpl(*this)}; }
-  std::string name() override { return name_; }
+  // Stats::Histogram
+  void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
-private:
-  /**
-   * Timespan implementation for the heap.
-   */
-  class TimespanImpl : public Timespan {
-  public:
-    TimespanImpl(TimerImpl& parent) : parent_(parent), start_(std::chrono::steady_clock::now()) {}
-
-    // Stats::Timespan
-    void complete() override { complete(parent_.name_); }
-    void complete(const std::string& dynamic_name) override;
-
-  private:
-    TimerImpl& parent_;
-    MonotonicTime start_;
-  };
-
-  std::string name_;
   Store& parent_;
 };
 
@@ -222,18 +217,21 @@ public:
         gauges_([this](const std::string& name) -> GaugeImpl* {
           return new GaugeImpl(*alloc_.alloc(name), alloc_);
         }),
-        timers_(
-            [this](const std::string& name) -> TimerImpl* { return new TimerImpl(name, *this); }) {}
+        histograms_([this](const std::string& name) -> HistogramImpl* {
+          return new HistogramImpl(name, *this);
+        }) {}
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }
-  void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-  void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Timer& timer(const std::string& name) override { return timers_.get(name); }
+  Histogram& histogram(const std::string& name) override {
+    Histogram& histogram = histograms_.get(name);
+    return histogram;
+  }
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
@@ -248,11 +246,12 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return ScopePtr{new ScopeImpl(parent_, prefix_ + name)};
     }
-    void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-    void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+    void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
     Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
     Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-    Timer& timer(const std::string& name) override { return parent_.timer(prefix_ + name); }
+    Histogram& histogram(const std::string& name) override {
+      return parent_.histogram(prefix_ + name);
+    }
 
     IsolatedStoreImpl& parent_;
     const std::string prefix_;
@@ -261,7 +260,7 @@ private:
   HeapRawStatDataAllocator alloc_;
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Timer, TimerImpl> timers_;
+  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
 };
 
 } // namespace Stats

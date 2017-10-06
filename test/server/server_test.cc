@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using testing::InSequence;
+using testing::Property;
 using testing::SaveArg;
 using testing::StrictMock;
 using testing::_;
@@ -27,8 +28,8 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.gauge("world").set(5);
   std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
   EXPECT_CALL(*sink, beginFlush());
-  EXPECT_CALL(*sink, flushCounter("hello", 1));
-  EXPECT_CALL(*sink, flushGauge("world", 5));
+  EXPECT_CALL(*sink, flushCounter(Property(&Stats::Metric::name, "hello"), 1));
+  EXPECT_CALL(*sink, flushGauge(Property(&Stats::Metric::name, "world"), 5));
   EXPECT_CALL(*sink, endFlush());
 
   std::list<Stats::SinkPtr> sinks;

@@ -115,7 +115,7 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : sinks) {
-        sink->flushCounter(counter->name(), delta);
+        sink->flushCounter(*counter, delta);
       }
     }
   }
@@ -123,7 +123,7 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
   for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : sinks) {
-        sink->flushGauge(gauge->name(), gauge->value());
+        sink->flushGauge(*gauge, gauge->value());
       }
     }
   }
