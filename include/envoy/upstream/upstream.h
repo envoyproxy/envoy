@@ -237,7 +237,15 @@ public:
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
   GAUGE    (version)
+// clang-format on
 
+/**
+ * All cluster load report stats. These are only use for EDS load reporting and not sent to the
+ * stats sink. See envoy.api.v2.ClusterStats for the definition of upstream_rq_dropped.
+ */
+// clang-format off
+#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER)                                                     \
+  COUNTER (upstream_rq_dropped)
 // clang-format on
 
 /**
@@ -245,6 +253,13 @@ public:
  */
 struct ClusterStats {
   ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+/**
+ * Struct definition for all cluster load report stats. @see stats_macros.h
+ */
+struct ClusterLoadReportStats {
+  ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -332,6 +347,11 @@ public:
    *         stats that will be freed when the cluster is removed.
    */
   virtual Stats::Scope& statsScope() const PURE;
+
+  /**
+   * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
+   */
+  virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.

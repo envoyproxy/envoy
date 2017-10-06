@@ -231,6 +231,7 @@ public:
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
+  static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -248,6 +249,7 @@ public:
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
+  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
@@ -274,6 +276,8 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
+  Stats::IsolatedStoreImpl load_report_stats_store_;
+  mutable ClusterLoadReportStats load_report_stats_;
   Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
