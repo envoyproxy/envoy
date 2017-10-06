@@ -71,4 +71,9 @@ TEST(OptionsImplTest, BadCliOption) {
   EXPECT_DEATH(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                "error: unknown IP address version 'foo'");
 }
+
+TEST(OptionsImplTest, BadStatNameLenOption) {
+  EXPECT_DEATH(createOptionsImpl("envoy --max-stat-name-len 1"),
+               "error: the 'max-stat-name-len' value specified");
+}
 } // namespace Envoy
