@@ -63,7 +63,9 @@ struct RawStatData {
    * Returns the maximum length of the name of a stat.  This length
    * does not include a trailing NULL-terminator.
    */
-  static size_t maxNameLength() { return getMaxNameLength(DEFAULT_MAX_NAME_SIZE); }
+  static size_t maxNameLength() {
+    return initializeAndGetMutableMaxNameLength(DEFAULT_MAX_NAME_SIZE);
+  }
 
   /**
    * size in bytes of name_
@@ -102,7 +104,7 @@ struct RawStatData {
 private:
   static const size_t DEFAULT_MAX_NAME_SIZE = 127;
 
-  static size_t& getMaxNameLength(size_t configured_size);
+  static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
 };
 
 /**

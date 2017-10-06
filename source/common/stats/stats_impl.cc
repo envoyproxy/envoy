@@ -16,16 +16,21 @@ namespace {
 // Note: this implementation only works because 8 is a power of 2.
 size_t roundUpMultipleNaturalAlignment(size_t val) {
   const size_t multiple = alignof(RawStatData);
+  static_assert(multiple == 1 || multiple == 2 || multiple == 4 || multiple == 8 || multiple == 16,
+                "multiple must be a power of 2 for this algorithm to work");
   return (val + multiple - 1) & ~(multiple - 1);
 }
 
 } // namespace
 
 size_t RawStatData::size() {
+  // Normally the compiler would do this, but because name_ is a flexible-array-length
+  // element, the compiler can't.  RawStatData is put into an array in HotRestartImpl, so
+  // it's important that each element starts on the required alignment for the type.
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
 }
 
-size_t& RawStatData::getMaxNameLength(size_t configured_size) {
+size_t& RawStatData::initializeAndGetMutableMaxNameLength(size_t configured_size) {
   // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
   static size_t size = configured_size;
   return size;
@@ -34,7 +39,7 @@ size_t& RawStatData::getMaxNameLength(size_t configured_size) {
 void RawStatData::configure(Server::Options& options) {
   const size_t configured = options.maxStatNameLength();
   RELEASE_ASSERT(configured > 0);
-  size_t max_name_length = getMaxNameLength(configured);
+  size_t max_name_length = initializeAndGetMutableMaxNameLength(configured);
 
   // If this fails, it means that this function was called too late during
   // startup because things were already using this size before it was set.
@@ -43,7 +48,7 @@ void RawStatData::configure(Server::Options& options) {
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {
   const size_t configured = options.maxStatNameLength();
-  getMaxNameLength(configured) = configured;
+  initializeAndGetMutableMaxNameLength(configured) = configured;
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {
@@ -59,6 +64,7 @@ void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
+  // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
   return data;

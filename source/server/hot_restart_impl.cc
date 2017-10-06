@@ -170,8 +170,8 @@ int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls)
 }
 
 sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
-  // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the
-  // third stats up it will kill the oldest parent.
+  // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
+  // starts up it will kill the oldest parent.
   const uint64_t MAX_CONCURRENT_PROCESSES = 3;
   id = id % MAX_CONCURRENT_PROCESSES;
 
@@ -212,18 +212,20 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
 }
 
 void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
-  // There exists a race condition during hot restart involving fetching parent stats. It looks
-  // like this: 1) There currently exist 2 Envoy processes (draining has not completed): P0 and
-  // P1. 2) New process (P2) comes up and passes the INITIALIZING check. 3) P2 proceeds to the
-  // parent admin shutdown phase. 4) This races with P1 fetching parent stats from P0. 5) Calling
-  // receiveTypedRpc() below picks up the wrong message.
+  // There exists a race condition during hot restart involving fetching parent stats. It looks like
+  // this:
+  // 1) There currently exist 2 Envoy processes (draining has not completed): P0 and P1.
+  // 2) New process (P2) comes up and passes the INITIALIZING check.
+  // 3) P2 proceeds to the parent admin shutdown phase.
+  // 4) This races with P1 fetching parent stats from P0.
+  // 5) Calling receiveTypedRpc() below picks up the wrong message.
   //
-  // There are not any great solutions to this problem. We could potentially guard this using
-  // flags, but this is a legitimate race condition even under normal restart conditions, so
-  // exiting P2 with an error is not great. We could also rework all of this code so that P0<->P1
-  // and P1<->P2 communication occur over different socket pairs. This could work, but is a large
-  // change. We could also potentially use connection oriented sockets and accept connections from
-  // our child, and connect to our parent, but again, this becomes complicated.
+  // There are not any great solutions to this problem. We could potentially guard this using flags,
+  // but this is a legitimate race condition even under normal restart conditions, so exiting P2
+  // with an error is not great. We could also rework all of this code so that P0<->P1 and P1<->P2
+  // communication occur over different socket pairs. This could work, but is a large change. We
+  // could also potentially use connection oriented sockets and accept connections from our child,
+  // and connect to our parent, but again, this becomes complicated.
   //
   // Instead, we guard this condition with a lock. However, to avoid deadlock, we must try_lock()
   // in this path, since this call runs in the same thread as the event loop that is receiving

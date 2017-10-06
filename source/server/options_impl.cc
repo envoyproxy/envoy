@@ -12,16 +12,22 @@
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
+// Can be overridden at compile time
 #ifndef ENVOY_DEFAULT_MAX_STATS
 #define ENVOY_DEFAULT_MAX_STATS 16384
 #endif
 
+// Can be overridden at compile time
 #ifndef ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH
 #define ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH 127
 #endif
 
+#if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH < 127
+#error "ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH must be >= 127"
+#endif
+
 namespace Envoy {
-OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCB& hot_restart_version_cb,
+OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = "Log levels: ";
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
@@ -84,6 +90,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCB& hot_r
     cmd.parse(argc, argv);
   } catch (TCLAP::ArgException& e) {
     std::cerr << "error: " << e.error() << std::endl;
+    exit(1);
+  }
+
+  if (max_stat_name_len.getValue() < 127) {
+    std::cerr << "error: the 'max-stat-name-len' value specified (" << max_stat_name_len.getValue()
+              << ") is less than the minimum value of 127" << std::endl;
     exit(1);
   }
 

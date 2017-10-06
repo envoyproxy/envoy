@@ -14,9 +14,9 @@ namespace Envoy {
  */
 class OptionsImpl : public Server::Options {
 public:
-  typedef std::function<std::string(uint64_t, uint64_t)> HotRestartVersionCB;
+  typedef std::function<std::string(uint64_t, uint64_t)> HotRestartVersionCb;
 
-  OptionsImpl(int argc, char** argv, const HotRestartVersionCB& hot_restart_version_cb,
+  OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
   // Server::Options

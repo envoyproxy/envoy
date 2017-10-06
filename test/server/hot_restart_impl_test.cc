@@ -92,6 +92,13 @@ public:
     setup();
   }
 
+  void TearDown() {
+    // Configure it back so that later tests don't get the wonky values
+    // used here
+    NiceMock<MockOptions> default_options;
+    Stats::RawStatData::configureForTestsOnly(default_options);
+  }
+
   static const uint64_t num_stats_ = 8;
   const uint64_t name_len_;
 };
