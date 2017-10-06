@@ -22,7 +22,7 @@ TEST(DynamoUtility, PartitionIdStatString) {
     std::string expected_stat_string =
         "stat.prefix.table.locations.capacity.GetItem.__partition_id=c5883ca";
     EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() <= Stats::RawStatData::MAX_NAME_SIZE);
+    EXPECT_TRUE(partition_stat_string.size() <= Stats::RawStatData::maxNameLength());
   }
 
   {
@@ -37,7 +37,7 @@ TEST(DynamoUtility, PartitionIdStatString) {
                                        "partition-test-iad-mytest-rea.capacity.GetItem.__partition_"
                                        "id=c5883ca";
     EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() == Stats::RawStatData::MAX_NAME_SIZE);
+    EXPECT_TRUE(partition_stat_string.size() == Stats::RawStatData::maxNameLength());
   }
   {
     std::string stat_prefix = "http.egress_dynamodb_iad.dynamodb.";
@@ -52,7 +52,7 @@ TEST(DynamoUtility, PartitionIdStatString) {
                                        "id=c5883ca";
 
     EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() == Stats::RawStatData::MAX_NAME_SIZE);
+    EXPECT_TRUE(partition_stat_string.size() == Stats::RawStatData::maxNameLength());
   }
 }
 

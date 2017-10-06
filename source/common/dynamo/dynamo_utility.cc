@@ -19,7 +19,7 @@ std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
                   partition_id.substr(partition_id.size() - 7, partition_id.size()));
 
   // Calculate how many characters are available for the table prefix.
-  size_t remaining_size = Stats::RawStatData::MAX_NAME_SIZE - stats_partition_postfix.size();
+  size_t remaining_size = Stats::RawStatData::maxNameLength() - stats_partition_postfix.size();
 
   std::string stats_table_prefix = fmt::format("{}table.{}", stat_prefix, table_name);
   // Truncate the table prefix if the current string is too large.
