@@ -103,7 +103,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
           }
           break;
         case envoy::api::v2::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
-          // TODO(ggreenway): handle ticket keys from SDS
+          NOT_IMPLEMENTED;
           break;
         case envoy::api::v2::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
           break;

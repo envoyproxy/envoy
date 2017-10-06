@@ -80,12 +80,6 @@ protected:
   ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   /**
-   * Specifies the context for which the session can be reused.  Any data is acceptable here.
-   * @see SSL_CTX_set_session_id_ctx
-   */
-  static const unsigned char SERVER_SESSION_ID_CONTEXT;
-
-  /**
    * The global SSL-library index used for storing a pointer to the context
    * in the SSL instance, for retrieval in callbacks.
    */

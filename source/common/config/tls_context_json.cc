@@ -12,7 +12,7 @@ void TlsContextJson::translateDownstreamTlsContext(
   translateCommonTlsContext(json_tls_context, *downstream_tls_context.mutable_common_tls_context());
   JSON_UTIL_SET_BOOL(json_tls_context, downstream_tls_context, require_client_certificate);
 
-  std::vector<std::string> paths =
+  const std::vector<std::string> paths =
       json_tls_context.getStringArray("session_ticket_key_paths", true);
   for (const std::string& path : paths) {
     downstream_tls_context.mutable_session_ticket_keys()->mutable_keys()->Add()->set_filename(path);

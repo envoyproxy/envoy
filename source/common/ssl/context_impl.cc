@@ -18,8 +18,6 @@
 namespace Envoy {
 namespace Ssl {
 
-const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
-
 int ContextImpl::sslContextIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int ssl_context_index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
@@ -430,9 +428,10 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1);
 
-  // Include SERVER_SESSION_ID_CONTEXT so that if all the other verify-settings are unset
+  // Include "envoy" so that if all the other verify-settings are unset
   // we have a deterministic value.
-  rc = EVP_DigestUpdate(&md, &SERVER_SESSION_ID_CONTEXT, sizeof(SERVER_SESSION_ID_CONTEXT));
+  const char* initial_context = "envoy";
+  rc = EVP_DigestUpdate(&md, initial_context, strlen(initial_context));
   RELEASE_ASSERT(rc == 1);
 
   if (ca_cert_ != nullptr) {
@@ -440,17 +439,19 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
     rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
     RELEASE_ASSERT(rc == 1);
-  }
 
-  for (const std::string& name : verify_subject_alt_name_list_) {
-    rc = EVP_DigestUpdate(&md, name.data(), name.size());
+    // verify_subject_alt_name_list_ can only be set with a ca_cert
+    for (const std::string& name : verify_subject_alt_name_list_) {
+      rc = EVP_DigestUpdate(&md, name.data(), name.size());
+      RELEASE_ASSERT(rc == 1);
+    }
+
+    // verify_certificate_hash_ can only be set with a ca_cert
+    rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
+                          verify_certificate_hash_.size() *
+                              sizeof(decltype(verify_certificate_hash_)::value_type));
     RELEASE_ASSERT(rc == 1);
   }
-
-  rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
-                        verify_certificate_hash_.size() *
-                            sizeof(decltype(verify_certificate_hash_)::value_type));
-  RELEASE_ASSERT(rc == 1);
 
   rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
   RELEASE_ASSERT(rc == 1);
@@ -465,16 +466,21 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
+    if (session_ticket_keys_.empty()) {
+      return -1;
+    }
+
     const SessionTicketKey& key = session_ticket_keys_.front();
 
     static_assert(std::tuple_size<decltype(key.name)>::value == SSL_TICKET_KEY_NAME_LEN,
                   "Expected key.name length");
     std::copy_n(key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
 
-    int got_rand_bytes = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
-    RELEASE_ASSERT(got_rand_bytes);
+    int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
+    RELEASE_ASSERT(rc);
 
+    // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
+    // EVP_CIPHER_key_length(cipher) at compile-time
     RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
     if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
       return -1;
@@ -493,12 +499,12 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
                     "Expected key.name length");
       if (std::equal(key.name.begin(), key.name.end(), key_name)) {
         if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
-          return 0;
+          return -1;
         }
 
         RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
         if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
-          return 0;
+          return -1;
         }
 
         // If our current encryption was not the decryption key, renew
