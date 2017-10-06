@@ -478,6 +478,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
     int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
     ASSERT(rc);
+    UNREFERENCED_PARAMETER(rc);
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
     // EVP_CIPHER_key_length(cipher) at compile-time
