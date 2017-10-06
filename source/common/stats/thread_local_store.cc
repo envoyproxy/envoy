@@ -146,7 +146,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   return *central_ref;
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string& name,
+void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
                                                               uint64_t value) {
   // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
   // This is because the sinks may end up trying to create new connections via the thread local
@@ -157,22 +157,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const std::string&
     return;
   }
 
-  const std::string final_name = prefix_ + name;
   for (Sink& sink : parent_.timer_sinks_) {
-    sink.onHistogramComplete(final_name, value);
-  }
-}
-
-void ThreadLocalStoreImpl::ScopeImpl::deliverTimingToSinks(const std::string& name,
-                                                           std::chrono::milliseconds ms) {
-  // See comment in deliverHistogramToSinks() for why we guard this.
-  if (parent_.shutting_down_) {
-    return;
-  }
-
-  const std::string final_name = prefix_ + name;
-  for (Sink& sink : parent_.timer_sinks_) {
-    sink.onTimespanComplete(final_name, ms);
+    sink.onHistogramComplete(histogram, value);
   }
 }
 
@@ -203,13 +189,13 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   return *central_ref;
 }
 
-Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  TimerSharedPtr* tls_ref = nullptr;
+  HistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].timers_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
   }
 
   if (tls_ref && *tls_ref) {
@@ -217,9 +203,9 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  TimerSharedPtr& central_ref = central_cache_.timers_[final_name];
+  HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
   if (!central_ref) {
-    central_ref.reset(new TimerImpl(final_name, parent_));
+    central_ref.reset(new HistogramImpl(final_name, parent_));
   }
 
   if (tls_ref) {

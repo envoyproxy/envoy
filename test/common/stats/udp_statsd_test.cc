@@ -4,6 +4,7 @@
 #include "common/network/utility.h"
 #include "common/stats/statsd.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -33,10 +34,18 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
-  sink.flushCounter("test_counter", 1);
-  sink.flushGauge("test_gauge", 1);
-  sink.onHistogramComplete("histogram_test_timer", 5);
-  sink.onTimespanComplete("test_timer", std::chrono::milliseconds(5));
+  NiceMock<MockCounter> counter;
+  counter.name_ = "test_counter";
+  sink.flushCounter(counter, 1);
+
+  NiceMock<MockGauge> gauge;
+  counter.name_ = "test_gauge";
+  sink.flushGauge(gauge, 1);
+
+  NiceMock<MockHistogram> timer;
+  timer.name_ = "test_timer";
+  sink.onHistogramComplete(timer, 5);
+
   EXPECT_EQ(fd, sink.getFdForTests());
 
   if (GetParam() == Network::Address::IpVersion::v4) {

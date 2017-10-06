@@ -12,6 +12,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
@@ -22,18 +23,18 @@ namespace Envoy {
 namespace Server {
 
 // clang-format off
-#define ALL_LISTENER_STATS(COUNTER, GAUGE, TIMER)                                                  \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_destroy)                                                                   \
-  GAUGE  (downstream_cx_active)                                                                    \
-  TIMER  (downstream_cx_length_ms)
+#define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
+  COUNTER  (downstream_cx_total)                                                                   \
+  COUNTER  (downstream_cx_destroy)                                                                 \
+  GAUGE    (downstream_cx_active)                                                                  \
+  HISTOGRAM(downstream_cx_length_ms)
 // clang-format on
 
 /**
  * Wrapper struct for listener stats. @see stats_macros.h
  */
 struct ListenerStats {
-  ALL_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
+  ALL_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**

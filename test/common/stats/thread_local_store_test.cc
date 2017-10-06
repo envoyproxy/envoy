@@ -16,6 +16,7 @@
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 using testing::_;
 
@@ -98,14 +99,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Timer& t1 = store_->timer("t1");
-  EXPECT_EQ(&t1, &store_->timer("t1"));
-
-  EXPECT_CALL(sink_, onHistogramComplete("h", 100));
-  store_->deliverHistogramToSinks("h", 100);
-
-  EXPECT_CALL(sink_, onTimespanComplete("t", std::chrono::milliseconds(200)));
-  store_->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  store_->deliverHistogramToSinks(h1, 100);
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -132,8 +131,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Timer& t1 = store_->timer("t1");
-  EXPECT_EQ(&t1, &store_->timer("t1"));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -172,20 +171,18 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
 
-  Timer& t1 = store_->timer("t1");
-  Timer& t2 = scope1->timer("t2");
-  EXPECT_EQ("t1", t1.name());
-  EXPECT_EQ("scope1.t2", t2.name());
-
-  EXPECT_CALL(sink_, onHistogramComplete("scope1.h", 100));
-  scope1->deliverHistogramToSinks("h", 100);
-
-  EXPECT_CALL(sink_, onTimespanComplete("scope1.t", std::chrono::milliseconds(200)));
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 200));
+  h2.recordValue(200);
 
   store_->shutdownThreading();
-  scope1->deliverHistogramToSinks("h", 100);
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  scope1->deliverHistogramToSinks(h1, 100);
+  scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
 
   // Includes overflow stat.

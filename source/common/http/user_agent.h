@@ -7,6 +7,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 
 namespace Envoy {
 /**
@@ -62,6 +63,7 @@ private:
   Type type_{Type::NotInitialized};
   std::unique_ptr<UserAgentStats> stats_;
   std::string prefix_;
+  Stats::Scope* scope_{};
 };
 
 } // namespace Http

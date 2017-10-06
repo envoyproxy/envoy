@@ -22,7 +22,7 @@ namespace Envoy {
 namespace Ssl {
 
 // clang-format off
-#define ALL_SSL_STATS(COUNTER, GAUGE, TIMER)                                                       \
+#define ALL_SSL_STATS(COUNTER, GAUGE, HISTOGRAM)                                                   \
   COUNTER(connection_error)                                                                        \
   COUNTER(handshake)                                                                               \
   COUNTER(no_certificate)                                                                          \
@@ -36,7 +36,7 @@ namespace Ssl {
  * Wrapper struct for SSL stats. @see stats_macros.h
  */
 struct SslStats {
-  ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
+  ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class ContextImpl : public virtual Context {

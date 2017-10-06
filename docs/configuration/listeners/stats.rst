@@ -12,7 +12,7 @@ Every listener has a statistics tree rooted at *listener.<port>.* with the follo
    downstream_cx_total, Counter, Total connections
    downstream_cx_destroy, Counter, Total destroyed connections
    downstream_cx_active, Gauge, Total active connections
-   downstream_cx_length_ms, Timer, Connection length milliseconds
+   downstream_cx_length_ms, Histogram, Connection length milliseconds
    ssl.connection_error, Counter, Total TLS connection errors not including failed certificate verifications
    ssl.handshake, Counter, Total successful TLS connection handshakes
    ssl.no_certificate, Counter, Total successul TLS connections with no client certificate

@@ -32,9 +32,9 @@ namespace.
     :widths: 1, 1, 2
 
     upstream_rq_total, Counter, Total number of requests with <operation_name>
-    upstream_rq_time, Timer, Time spent on <operation_name>
+    upstream_rq_time, Histogram, Time spent on <operation_name>
     upstream_rq_total_xxx, Counter, Total number of requests with <operation_name> per response code (503/2xx/etc)
-    upstream_rq_time_xxx, Timer, Time spent on <operation_name> per response code (400/3xx/etc)
+    upstream_rq_time_xxx, Histogram, Time spent on <operation_name> per response code (400/3xx/etc)
 
 Per table stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.* namespace.
 Most of the operations to DynamoDB involve a single table, but BatchGetItem and BatchWriteItem can
@@ -46,9 +46,9 @@ in all operations from the batch.
     :widths: 1, 1, 2
 
     upstream_rq_total, Counter, Total number of requests on <table_name> table
-    upstream_rq_time, Timer, Time spent on <table_name> table
+    upstream_rq_time, Histogram, Time spent on <table_name> table
     upstream_rq_total_xxx, Counter, Total number of requests on <table_name> table per response code (503/2xx/etc)
-    upstream_rq_time_xxx, Timer, Time spent on <table_name> table per response code (400/3xx/etc)
+    upstream_rq_time_xxx, Histogram, Time spent on <table_name> table per response code (400/3xx/etc)
 
 *Disclaimer: Please note that this is a pre-release Amazon DynamoDB feature that is not yet widely available.*
 Per partition and operation stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.*

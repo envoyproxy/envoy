@@ -9,6 +9,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
