@@ -23,7 +23,7 @@ namespace Runtime {
 TEST(Random, DISABLED_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
 
-  for (size_t i = 0; i < 100000000; ++i) {
+  for (size_t i = 0; i < 1000000000; ++i) {
     random.random();
   }
 }

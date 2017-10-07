@@ -24,13 +24,32 @@ namespace Runtime {
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
+  // Prefetch 256 * sizeof(uint64_t) bytes of randomness. buffered_idx is initialized to 256,
+  // i.e. out-of-range value, so the buffer will be filled with randomness on the first call
+  // to this function.
+  //
+  // There is a diminishing return when increasing the prefetch size, as illustrated below in
+  // a test that generates 1,000,000,000 uint64_t numbers (results on Intel Xeon E5-1650v3).
+  //
+  // //test/common/runtime:runtime_impl_test - Random.DISABLED_benchmarkRandom
+  //
+  //  prefetch  |  time  | improvement
+  // (uint64_t) |  (ms)  | (% vs prev)
+  // ---------------------------------
+  //         32 | 25,931 |
+  //         64 | 15,124 | 42% faster
+  //        128 |  9,653 | 36% faster
+  //        256 |  6,930 | 28% faster  <-- used right now
+  //        512 |  5,571 | 20% faster
+  //       1024 |  4,888 | 12% faster
+  //       2048 |  4,594 |  6% faster
+  //       4096 |  4,424 |  4% faster
+  //       8192 |  4,386 |  1% faster
+
   const size_t prefetch = 256;
   static thread_local uint64_t buffered[prefetch];
   static thread_local size_t buffered_idx = prefetch;
 
-  // Prefetch 256 * sizeof(uint64_t) bytes of randomness. buffered_idx is initialized to 256,
-  // i.e. out-of-range value, so the buffer will be filled with randomness on the first call
-  // to this function.
   if (buffered_idx >= prefetch) {
     int rc = RAND_bytes(reinterpret_cast<uint8_t*>(buffered), sizeof(buffered));
     ASSERT(rc == 1);
@@ -43,12 +62,29 @@ uint64_t RandomGeneratorImpl::random() {
 }
 
 std::string RandomGeneratorImpl::uuid() {
-  static thread_local uint8_t buffered[2048];
-  static thread_local size_t buffered_idx = sizeof(buffered);
-
   // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first
   // call to this function.
+  //
+  // There is a diminishing return when increasing the prefetch size, as illustrated below
+  // in a test that generates 100,000,000 UUIDs (results on Intel Xeon E5-1650v3).
+  //
+  // //test/common/runtime:uuid_util_test - UUIDUtilsTest.DISABLED_benchmark
+  //
+  //   prefetch |  time  | improvement
+  //   (bytes)  |  (ms)  | (% vs prev)
+  // ---------------------------------
+  //        128 | 16,353 |
+  //        256 | 11,827 | 28% faster
+  //        512 |  9,676 | 18% faster
+  //       1024 |  8,594 | 11% faster
+  //       2048 |  8,097 |  6% faster  <-- used right now
+  //       4096 |  7,790 |  4% faster
+  //       8192 |  7,737 |  1% faster
+
+  static thread_local uint8_t buffered[2048];
+  static thread_local size_t buffered_idx = sizeof(buffered);
+
   if (buffered_idx >= sizeof(buffered)) {
     int rc = RAND_bytes(buffered, sizeof(buffered));
     ASSERT(rc == 1);
