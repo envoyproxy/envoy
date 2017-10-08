@@ -65,7 +65,7 @@ public:
       "codec_type": "auto",
       "stat_prefix": "foo",
       "filters": [
-        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+        { "name": "http_dynamo_filter", "config": {} }
       ]
     }
     )EOF";
@@ -122,7 +122,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
       "codec_type": "auto",
       "stat_prefix": "foo",
       "filters": [
-        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+        { "name": "http_dynamo_filter", "config": {} }
       ]
     }
     )EOF";
@@ -143,7 +143,7 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
       "codec_type": "auto",
       "stat_prefix": "foo",
       "filters": [
-        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+        { "name": "http_dynamo_filter", "config": {} }
       ]
     }
     )EOF";
@@ -166,7 +166,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
       "codec_type": "auto",
       "stat_prefix": "foo",
       "filters": [
-        { "type": "both", "name": "http_dynamo_filter", "config": {} }
+        { "name": "http_dynamo_filter", "config": {} }
       ]
     }
     )EOF";

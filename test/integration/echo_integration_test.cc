@@ -51,7 +51,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
     "name": "new_listener",
     "address": "tcp://{{ ip_loopback_address }}:0",
     "filters": [
-      { "type": "read", "name": "echo", "config": {} }
+      { "name": "echo", "config": {} }
     ]
   }
   )EOF",

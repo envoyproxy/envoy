@@ -4,7 +4,6 @@
       "address": "tcp://0.0.0.0:80",
       "filters": [
         {
-          "type": "read",
           "name": "http_connection_manager",
           "config": {
             "codec_type": "auto",
@@ -26,7 +25,6 @@
             },
             "filters": [
               {
-                "type": "decoder",
                 "name": "router",
                 "config": {}
               }

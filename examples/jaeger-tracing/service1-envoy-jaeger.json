@@ -4,7 +4,6 @@
       "address": "tcp://0.0.0.0:80",
       "filters": [
         {
-          "type": "read",
           "name": "http_connection_manager",
           "config": {
             "tracing": {
@@ -31,7 +30,6 @@
             },
             "filters": [
               {
-                "type": "decoder",
                 "name": "router",
                 "config": {}
               }
@@ -44,7 +42,6 @@
       "address": "tcp://0.0.0.0:9000",
       "filters": [
         {
-          "type": "read",
           "name": "http_connection_manager",
           "config": {
             "tracing": {
@@ -72,7 +69,6 @@
             },
             "filters": [
               {
-                "type": "decoder",
                 "name": "router",
                 "config": {}
               }
