@@ -51,8 +51,9 @@ void LoadStatsReporter::establishNewStream() {
 void LoadStatsReporter::sendLoadStatsRequest() {
   request_.mutable_cluster_stats()->Clear();
   for (const std::string& cluster_name : clusters_) {
-    auto it = cm_.clusters().find(cluster_name);
-    if (it == cm_.clusters().end()) {
+    auto cluster_info_map = cm_.clusters();
+    auto it = cluster_info_map.find(cluster_name);
+    if (it == cluster_info_map.end()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
@@ -106,8 +107,9 @@ void LoadStatsReporter::onReceiveMessage(
   // Reset stats for all hosts in clusters we are tracking.
   for (const std::string& cluster_name : message->clusters()) {
     clusters_.emplace_back(cluster_name);
-    auto it = cm_.clusters().find(cluster_name);
-    if (it == cm_.clusters().end()) {
+    auto cluster_info_map = cm_.clusters();
+    auto it = cluster_info_map.find(cluster_name);
+    if (it == cluster_info_map.end()) {
       continue;
     }
     auto& cluster = it->second.get();
