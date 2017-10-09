@@ -59,8 +59,7 @@ TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
       ]
     },
     "filters": [
-      { "type": "encoder", "name": "foo", "config": {}
-      }
+      { "name": "foo", "config": {} }
     ]
   }
   )EOF";
@@ -97,7 +96,7 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
       "request_headers_for_tags": [ "foo" ]
     },
     "filters": [
-      { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      { "name": "http_dynamo_filter", "config": {} }
     ]
   }
   )EOF";
@@ -132,7 +131,7 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
       ]
     },
     "filters": [
-      { "type": "both", "name": "http_dynamo_filter", "config": {} }
+      { "name": "http_dynamo_filter", "config": {} }
     ]
   }
   )EOF";

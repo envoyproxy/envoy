@@ -156,12 +156,11 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
       Http::CodeUtility::chargeResponseStat(info);
     }
 
-    if (upstream_host) {
-      if (dropped) {
-        upstream_host->stats().rq_dropped_.inc();
-      } else if (Http::CodeUtility::is5xx(response_status_code)) {
-        upstream_host->stats().rq_error_.inc();
-      }
+    if (dropped) {
+      cluster_->loadReportStats().upstream_rq_dropped_.inc();
+    }
+    if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
+      upstream_host->stats().rq_error_.inc();
     }
   }
 }

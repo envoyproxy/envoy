@@ -251,7 +251,7 @@ bool ContextImpl::verifyCertificateHash(X509* cert, const std::vector<uint8_t>& 
 SslStats ContextImpl::generateStats(Stats::Scope& store) {
   std::string prefix("ssl.");
   return {ALL_SSL_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix),
-                        POOL_TIMER_PREFIX(store, prefix))};
+                        POOL_HISTOGRAM_PREFIX(store, prefix))};
 }
 
 size_t ContextImpl::daysUntilFirstCertExpires() {

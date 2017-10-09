@@ -47,7 +47,8 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
-      route_config_name_(rds.route_config_name()), scope_(scope.createScope(stat_prefix + "rds.")),
+      route_config_name_(rds.route_config_name()),
+      scope_(scope.createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {

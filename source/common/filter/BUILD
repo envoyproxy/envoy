@@ -49,6 +49,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",

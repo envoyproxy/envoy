@@ -234,10 +234,10 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();
   read_callbacks_->upstreamHost()->stats().cx_total_.inc();
   read_callbacks_->upstreamHost()->stats().cx_active_.inc();
-  connect_timespan_ =
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
-  connected_timespan_ =
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_.allocateSpan();
+  connect_timespan_.reset(new Stats::Timespan(
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_));
+  connected_timespan_.reset(new Stats::Timespan(
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_));
 
   return Network::FilterStatus::Continue;
 }

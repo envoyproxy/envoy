@@ -83,11 +83,11 @@ public:
     EXPECT_EQ(version_, subscription_.versionInfo());
   }
 
-  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected,
-                   uint32_t failure) override {
+  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
+                   uint64_t version) override {
     // The first attempt always fail unless there was a file there to begin with.
     SubscriptionTestHarness::verifyStats(attempt, success, rejected,
-                                         failure + (file_at_start_ ? 0 : 1));
+                                         failure + (file_at_start_ ? 0 : 1), version);
   }
 
   const std::string path_;

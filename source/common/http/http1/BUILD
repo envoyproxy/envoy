@@ -45,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:timespan",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:linked_object",
         "//source/common/common:utility_lib",

@@ -32,12 +32,17 @@ int main(int argc, char** argv) {
 
 #ifdef ENVOY_HOT_RESTART
   // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
-  const std::string shared_mem_version = Envoy::Server::SharedMemory::version();
+  const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb =
+      [](uint64_t max_num_stats, uint64_t max_stat_name_len) {
+        return Envoy::Server::SharedMemory::version(max_num_stats, max_stat_name_len);
+      };
 #else
-  const std::string shared_mem_version = "disabled";
+  const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
+    return "disabled";
+  };
 #endif
 
-  Envoy::OptionsImpl options(argc, argv, shared_mem_version, spdlog::level::warn);
+  Envoy::OptionsImpl options(argc, argv, hot_restart_version_cb, spdlog::level::warn);
 
   return Envoy::main_common(options);
 }

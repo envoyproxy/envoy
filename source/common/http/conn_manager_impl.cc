@@ -38,7 +38,7 @@ ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& p
                                                             Stats::Scope& scope) {
   return {
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
-                               POOL_TIMER_PREFIX(scope, prefix))},
+                               POOL_HISTOGRAM_PREFIX(scope, prefix))},
       prefix,
       scope};
 }
@@ -60,7 +60,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager)
     : config_(config), stats_(config_.stats()),
-      conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_)),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()) {}
@@ -348,7 +348,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(ConnectionManagerUtility::generateStreamId(*snapped_route_config_,
                                                             connection_manager.random_generator_)),
-      request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
+      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_)),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
@@ -514,34 +514,28 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // should return 404. The current returns no response if there is no router filter.
   if ((protocol == Protocol::Http11) && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    const bool websocket_required = (route_entry != nullptr) && route_entry->useWebSocket();
+    const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
     const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_requested || websocket_required) {
-      if (websocket_requested && websocket_required) {
-        ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
+    if (websocket_requested && websocket_allowed) {
+      ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
-        connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-            *request_headers_, request_info_, *route_entry, *this,
-            connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
-        connection_manager_.ws_connection_->onNewConnection();
-        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
-        connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
-        connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
-      } else if (websocket_requested) {
-        // Do not allow WebSocket upgrades if the route does not support it.
-        connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
-        encodeHeaders(nullptr, headers, true);
-      } else {
-        // Do not allow normal connections on WebSocket routes.
-        connection_manager_.stats_.named_.downstream_rq_non_ws_on_ws_route_.inc();
-        HeaderMapImpl headers{
-            {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
-        encodeHeaders(nullptr, headers, true);
-      }
+      connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
+          *request_headers_, request_info_, *route_entry, *this,
+          connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
+      connection_manager_.ws_connection_->onNewConnection();
+      connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+      connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
+      connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+      return;
+    } else if (websocket_requested) {
+      // Do not allow WebSocket upgrades if the route does not support it.
+      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
+      encodeHeaders(nullptr, headers, true);
       return;
     }
+    // Allow non websocket requests to go through websocket enabled routes.
   }
 
   // Check if tracing is enabled at all.

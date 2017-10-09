@@ -63,12 +63,10 @@ HTTP_CONN_NETWORK_FILTER_BLOB = {
                 "endpoint": "/healthcheck",
                 "pass_through_mode": false
             },
-            "type": "both",
             "name": "health_check"
         },
         {
             "config": {},
-            "type": "decoder",
             "name": "router"
         }
     ],

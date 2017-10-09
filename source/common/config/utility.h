@@ -5,6 +5,7 @@
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -59,11 +60,15 @@ public:
   }
 
   /**
-   * Legacy APIs uses JSON and do not have an explicit version. Hash the body and append
-   * a user-friendly prefix.
+   * Legacy APIs uses JSON and do not have an explicit version.
+   * @param input the input to hash.
+   * @return std::pair<std::string, uint64_t> the string is the hash converted into
+   *         a hex string, pre-pended by a user friendly prefix. The uint64_t is the
+   *         raw hash.
    */
-  static std::string computeHashedVersion(const std::string& input) {
-    return "hash_" + Hex::uint64ToHex(HashUtil::xxHash64(input));
+  static std::pair<std::string, uint64_t> computeHashedVersion(const std::string& input) {
+    uint64_t hash = HashUtil::xxHash64(input);
+    return std::make_pair("hash_" + Hex::uint64ToHex(hash), hash);
   }
 
   /**
@@ -149,7 +154,7 @@ public:
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope))};
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
   }
 
   /**

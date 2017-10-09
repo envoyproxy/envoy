@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Property;
 using testing::_;
 
 namespace Envoy {
@@ -181,17 +182,31 @@ TEST(CodeUtilityResponseTimingTest, All) {
       true,         true,          "vhost_name", "req_vcluster_name",
       "from_az",    "to_az"};
 
+  EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope, deliverHistogramToSinks(
+                                 Property(&Stats::Metric::name, "prefix.upstream_rq_time"), 5));
+
+  EXPECT_CALL(cluster_scope, histogram("prefix.canary.upstream_rq_time"));
+  EXPECT_CALL(
+      cluster_scope,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"), 5));
+
+  EXPECT_CALL(cluster_scope, histogram("prefix.internal.upstream_rq_time"));
   EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope,
-              deliverTimingToSinks("prefix.canary.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.internal.upstream_rq_time",
-                                                  std::chrono::milliseconds(5)));
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"), 5));
   EXPECT_CALL(global_store,
-              deliverTimingToSinks("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
-                                   std::chrono::milliseconds(5)));
-  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time",
-                                                  std::chrono::milliseconds(5)));
+              histogram("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+  EXPECT_CALL(global_store,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
+                  5));
+
+  EXPECT_CALL(cluster_scope, histogram("prefix.zone.from_az.to_az.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
   CodeUtility::chargeResponseTiming(info);
 }
 

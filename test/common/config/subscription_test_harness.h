@@ -49,12 +49,13 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string> cluster_names,
                                    const std::string& version, bool accept) PURE;
 
-  virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected,
-                           uint32_t failure) {
+  virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
+                           uint64_t version) {
     EXPECT_EQ(attempt, stats_.update_attempt_.value());
     EXPECT_EQ(success, stats_.update_success_.value());
     EXPECT_EQ(rejected, stats_.update_rejected_.value());
     EXPECT_EQ(failure, stats_.update_failure_.value());
+    EXPECT_EQ(version, stats_.version_.value());
   }
 
   Stats::MockIsolatedStatsStore stats_store_;

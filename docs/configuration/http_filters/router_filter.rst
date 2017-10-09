@@ -266,7 +266,7 @@ statistics:
 
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
-  upstream_rq_time, Timer, Request time milliseconds
+  upstream_rq_time, Histogram, Request time milliseconds
 
 Runtime
 -------

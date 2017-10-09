@@ -58,6 +58,8 @@ public:
   MOCK_METHOD0(serviceClusterName, const std::string&());
   MOCK_METHOD0(serviceNodeName, const std::string&());
   MOCK_METHOD0(serviceZone, const std::string&());
+  MOCK_METHOD0(maxStats, uint64_t());
+  MOCK_METHOD0(maxStatNameLength, uint64_t());
 
   std::string config_path_;
   std::string admin_address_path_;
