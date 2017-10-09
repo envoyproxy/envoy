@@ -5,8 +5,6 @@
 
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::_;
 
