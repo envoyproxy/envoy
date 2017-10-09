@@ -317,6 +317,10 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  // route cert verify configs
+  virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
+  virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;
 };
 
 /**

@@ -221,6 +221,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
+
+  // TODO:
+  // 1. check subjectAltName from callbacks_->requestInfo() and route_entry_
+  // 2. check cert hash from callbacks_->requestInfo() and route_entry_
+  // 3. maybe add stats here
+  if (false) {
+    Http::Utility::sendLocalReply(...);
+  }
+
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();
