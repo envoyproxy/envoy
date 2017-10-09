@@ -65,7 +65,7 @@ TEST(UUIDUtilsTest, checkDistribution) {
 TEST(UUIDUtilsTest, DISABLED_benchmark) {
   Runtime::RandomGeneratorImpl random;
 
-  for (int i = 0; i < 10000000; ++i) {
+  for (int i = 0; i < 100000000; ++i) {
     random.uuid();
   }
 }
