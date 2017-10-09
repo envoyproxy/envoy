@@ -466,9 +466,10 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    if (session_ticket_keys_.empty()) {
-      return -1;
-    }
+    RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
+    // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
+    // or if we allow it to be emptied, reconfigure the context so this callback
+    // isn't set.
 
     const SessionTicketKey& key = session_ticket_keys_.front();
 
