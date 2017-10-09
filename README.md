@@ -44,7 +44,7 @@ for information on email list usage.
 
 ## Community Meeting
 
-The Envoy team meets every other Tuesday at 8am PT. The public google calendar is here: https://goo.gl/PkDijT
+The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
 
 Meeting minutes are here: https://goo.gl/5Cergb
 
