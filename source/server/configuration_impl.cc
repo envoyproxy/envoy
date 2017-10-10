@@ -123,7 +123,7 @@ InitialImpl::InitialImpl(const envoy::api::v2::Bootstrap& bootstrap) {
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
-  admin_.address_ = Network::Utility::fromProtoAddress(admin.address());
+  admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
 
   if (!bootstrap.flags_path().empty()) {
     flags_path_.value(bootstrap.flags_path());

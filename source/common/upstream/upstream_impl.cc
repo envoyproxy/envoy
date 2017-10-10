@@ -20,6 +20,7 @@
 #include "common/config/tls_context_json.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -41,7 +42,7 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const Network::Address::InstanceConstSharedPtr source_address) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
-    return Network::Utility::fromProtoSocketAddress(
+    return Network::Address::resolveProtoSocketAddress(
         cluster.upstream_bind_config().source_address());
   }
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
@@ -150,7 +151,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
     resolvers.reserve(resolver_addrs.size());
     for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Utility::fromProtoAddress(resolver_addr));
+      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
     selected_dns_resolver = dispatcher.createDnsResolver(resolvers);
   }
@@ -342,7 +343,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const auto& host : cluster.hosts()) {
     new_hosts->emplace_back(
-        HostSharedPtr{new HostImpl(info_, "", Network::Utility::fromProtoAddress(host),
+        HostSharedPtr{new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
                                    envoy::api::v2::Metadata::default_instance(), 1,
                                    envoy::api::v2::Locality().default_instance())});
   }

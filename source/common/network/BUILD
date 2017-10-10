@@ -135,6 +135,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resolver_lib",
     srcs = ["resolver_impl.cc"],
+    hdrs = ["resolver_impl.h"],
     external_deps = ["envoy_base"],
     deps = [
         ":utility_lib",

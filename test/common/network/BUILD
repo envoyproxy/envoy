@@ -144,6 +144,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
     ],
 )

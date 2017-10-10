@@ -146,25 +146,6 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-Address::InstanceConstSharedPtr Utility::fromProtoAddress(const envoy::api::v2::Address& address) {
-  switch (address.address_case()) {
-  case envoy::api::v2::Address::kSocketAddress:
-    return Utility::fromProtoSocketAddress(address.socket_address());
-  case envoy::api::v2::Address::kPipe:
-    return Address::InstanceConstSharedPtr{new Address::PipeInstance(address.pipe().path())};
-  default:
-    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
-  }
-}
-
-Address::InstanceConstSharedPtr
-Utility::fromProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
-  // TODO(htuch): Support custom resolvers #1477.
-  ASSERT(socket_address.resolver_name().empty());
-  ASSERT(socket_address.named_port().empty());
-  return parseInternetAddress(socket_address.address(), socket_address.port_value());
-}
-
 void Utility::throwWithMalformedIp(const std::string& ip_address) {
   throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
 }
