@@ -598,13 +598,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   }
 
   // Append routing cookies
-  for (auto& cookie : downstream_set_cookies_) {
-    const std::string& key = std::get<0>(cookie);
-    const std::string& value = std::get<1>(cookie);
-    const int max_age = std::get<2>(cookie);
-
-    headers->addReferenceKey(Http::Headers::get().SetCookie,
-                             fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age));
+  for (const auto& header_value : downstream_set_cookies_) {
+    headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
   downstream_response_started_ = true;

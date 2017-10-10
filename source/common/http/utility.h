@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -64,6 +65,16 @@ public:
    * @return bool true if the cookie is set, false otherwise
    */
   static bool hasSetCookie(const HeaderMap& headers, const std::string& key);
+
+  /**
+   * Produce the value for a Set-Cookie header with the given parameters.
+   * @param key is the name of the cookie that is being set.
+   * @param value the value to set the cookie to.
+   * @param max_age the length of time for which the cookie is valid.
+   * @return std::string a valid Set-Cookie header value string
+   */
+  static std::string makeSetCookieValue(const std::string& key, const std::string& value,
+                                        const std::chrono::seconds max_age);
 
   /**
    * Get the response status from the response headers.

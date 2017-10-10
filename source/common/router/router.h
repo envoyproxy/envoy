@@ -19,6 +19,7 @@
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -168,7 +169,8 @@ public:
     }
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
-    downstream_set_cookies_.emplace_back(key, cookie_value, max_age.count());
+    downstream_set_cookies_.emplace_back(
+        Http::Utility::makeSetCookieValue(key, cookie_value, max_age));
     return cookie_value;
   }
 
@@ -313,7 +315,7 @@ private:
   // list of cookies to add to upstream headers
   // 'mutable' is safe because this is only read in onUpstreamHeaders(), which
   // is not const
-  mutable std::list<std::tuple<std::string, std::string, long>> downstream_set_cookies_;
+  mutable std::vector<std::string> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

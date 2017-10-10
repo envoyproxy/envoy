@@ -121,6 +121,11 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
   return state.ret_;
 }
 
+std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
+                               const std::chrono::seconds max_age) {
+  return fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age.count());
+}
+
 bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 
   struct State {
