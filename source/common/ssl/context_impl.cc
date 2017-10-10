@@ -418,22 +418,48 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
         });
   }
 
-  // Hash all the settings that affect whether the server will allow/accept
-  // the client connection.  This ensures that the client is always validated against
-  // the correct settings, even if session resumption across different listeners
-  // is enabled.
   uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
   unsigned session_context_len = 0;
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1);
 
-  // Include "envoy" so that if all the other verify-settings are unset
-  // we have a deterministic value.
-  const char* initial_context = "envoy";
-  rc = EVP_DigestUpdate(&md, initial_context, strlen(initial_context));
+  // Hash the CommonName/SANs in the server certificate.  This makes sure that
+  // sessions can only be resumed to a certificate for the same name, but allows
+  // resuming to unique certs in the case that different Envoy instances each have
+  // their own certs.
+  X509* cert = SSL_CTX_get0_certificate(ctx_.get());
+  X509_NAME* cert_subject = X509_get_subject_name(cert);
+  int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+  X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+  ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+  RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0);
+  rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
   RELEASE_ASSERT(rc == 1);
 
+  STACK_OF(GENERAL_NAME)* san_names = static_cast<STACK_OF(GENERAL_NAME)*>(
+      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
+  if (san_names != nullptr) {
+    for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names); i++) {
+      const GENERAL_NAME* san = sk_GENERAL_NAME_value(san_names, i);
+      if (san->type == GEN_DNS || san->type == GEN_URI) {
+        rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
+        RELEASE_ASSERT(rc == 1);
+      }
+    }
+    sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+  }
+
+  X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
+  rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+  rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1);
+
+  // Hash all the settings that affect whether the server will allow/accept
+  // the client connection.  This ensures that the client is always validated against
+  // the correct settings, even if session resumption across different listeners
+  // is enabled.
   if (ca_cert_ != nullptr) {
     rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);

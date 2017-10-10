@@ -582,6 +582,70 @@ TEST_P(SslConnectionImplTest, TicketSessionResumptionWrongKey) {
                               GetParam());
 }
 
+// Sessions can be resumed because the server certificates are different but the CN/SANs and
+// issuer are identical
+TEST_P(SslConnectionImplTest, TicketSessionResumptionDifferentServerCert) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, true,
+                              GetParam());
+}
+
+// Sessions cannot be resumed because the server certificates are different and the SANs
+// are not identical
+TEST_P(SslConnectionImplTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, false,
+                              GetParam());
+}
+
 // Test that if two listeners use the same cert and session ticket key, but
 // different client CA, that sessions cannot be resumed.
 TEST_P(SslConnectionImplTest, ClientAuthCrossListenerSessionResumption) {
