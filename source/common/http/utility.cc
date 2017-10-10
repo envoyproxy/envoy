@@ -122,7 +122,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                               const std::chrono::seconds max_age) {
+                                        const std::chrono::seconds max_age) {
   return fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age.count());
 }
 
