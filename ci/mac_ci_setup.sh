@@ -7,11 +7,6 @@ function is_installed {
     brew ls --versions "$1" >/dev/null
 }
 
-if ! brew update; then
-    echo "Failed to update homebrew"
-    exit 1
-fi
-
 function install {
     echo "Installing $1"
     if ! brew install "$1"
@@ -20,6 +15,11 @@ function install {
         exit 1
     fi
 }
+
+if ! brew update; then
+    echo "Failed to update homebrew"
+    exit 1
+fi
 
 DEPS="coreutils wget cmake libtool go bazel"
 for DEP in ${DEPS}
