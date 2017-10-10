@@ -339,8 +339,6 @@ TEST_F(RouterTest, AddMultipleCookies) {
         return Optional<uint64_t>(10);
       }));
 
-  EXPECT_CALL(random_, uuid()).Times(2).WillOnce(Return("late")).WillOnce(Return("bar"));
-
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
         MockFunction<void(const std::string&)> cb;

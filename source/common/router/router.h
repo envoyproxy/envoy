@@ -156,14 +156,15 @@ public:
   std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) const {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
+    // Since the downstream port is part of the hashed value, multiple HTTP1
+    // connections can receive different cookies if they race on requests.
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     if (conn) {
       value = conn->remoteAddress().asString() + conn->localAddress().asString();
-    }
-    if (value.empty()) {
-      // Fall back to random if necessary
-      value = config_.random_.uuid();
+    } else {
+      //TODO(akonradi) talk to mattklein123 and figure out when this can happen
+      ENVOY_LOG(warn, "Downstream connection was null while trying to make a routing cookie");
     }
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
