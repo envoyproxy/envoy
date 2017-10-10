@@ -343,6 +343,9 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
     cookie->set_name("foo");
   });
 
+  // This test is non-deterministic, so make it extremely unlikely that not all
+  // upstreams get hit.
+  num_upstreams_ = 2;
   std::set<std::string> served_by;
   sendMultipleRequests(
       1024,

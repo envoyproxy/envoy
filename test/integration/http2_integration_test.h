@@ -27,6 +27,6 @@ public:
                             std::function<void(IntegrationStreamDecoder&)> cb);
 
   std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
-  const int num_upstreams_ = 5;
+  int num_upstreams_ = 5;
 };
 } // namespace Envoy
