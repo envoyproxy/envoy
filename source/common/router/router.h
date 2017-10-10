@@ -157,7 +157,7 @@ public:
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     std::string value;
-    const Network::Connection* conn = callbacks_->connection();
+    const Network::Connection* conn = downstreamConnection();
     if (conn) {
       value = conn->remoteAddress().asString() + conn->localAddress().asString();
     }

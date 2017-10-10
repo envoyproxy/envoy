@@ -216,8 +216,7 @@ public:
   virtual ~HashPolicy() {}
 
   /**
-   * A callback used for requesting that a random cookie be set with the given
-   * lifetime
+   * A callback used for requesting that a cookie be set with the given lifetime.
    */
   typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
       AddCookieCallback;
