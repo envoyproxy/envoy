@@ -164,7 +164,7 @@ public:
     if (conn) {
       value = conn->remoteAddress().asString() + conn->localAddress().asString();
     } else {
-      //TODO(akonradi) talk to mattklein123 and figure out when this can happen
+      // TODO(akonradi) talk to mattklein123 and figure out when this can happen
       ENVOY_LOG(warn, "Downstream connection was null while trying to make a routing cookie");
     }
 

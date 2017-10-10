@@ -153,6 +153,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
           // If the key matches, parse the value from the rest of the cookie string.
           if (k == state->key_) {
             state->ret_ = true;
+            // TODO(akonradi) early exit here (need to change iterate())
           }
         }
       },
