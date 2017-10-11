@@ -116,7 +116,7 @@ public:
    * logical/unresolved name.
    *
    * This string has a source-dependent format and should preserve the original
-   * name for Address::Instances resolved by a Network::AddressResolver.
+   * name for Address::Instances resolved by a Network::Address::Resolver.
    */
   virtual const std::string& logicalName() const PURE;
 

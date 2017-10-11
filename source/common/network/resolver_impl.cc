@@ -16,7 +16,7 @@ namespace Network {
 namespace Address {
 
 /**
- * Implementation of a resolver for IP addresses
+ * Implementation of a resolver for IP addresses.
  */
 class IpResolver : public Resolver {
 
@@ -24,7 +24,7 @@ public:
   InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) {
     switch (socket_address.port_specifier_case()) {
     case envoy::api::v2::SocketAddress::kPortValue:
-    // default to port 0 if no port value is specified
+    // Default to port 0 if no port value is specified.
     case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
       return Network::Utility::parseInternetAddress(socket_address.address(),
                                                     socket_address.port_value());
@@ -37,7 +37,7 @@ public:
 };
 
 /**
- * Implementation of an IP address resolver factory
+ * Implementation of an IP address resolver factory.
  */
 class IpResolverFactory : public ResolverFactory {
 public:

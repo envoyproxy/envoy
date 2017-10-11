@@ -13,14 +13,14 @@ namespace Network {
 namespace Address {
 /**
  * Create an Instance from a envoy::api::v2::Address.
- * @param address message.
+ * @param address supplies the address proto to resolve.
  * @return pointer to the Instance.
  */
 Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::Address& address);
 
 /**
  * Create an Instance from a envoy::api::v2::SocketAddress.
- * @param socket address message.
+ * @param address supplies the socket address proto to resolve.
  * @return pointer to the Instance.
  */
 Address::InstanceConstSharedPtr

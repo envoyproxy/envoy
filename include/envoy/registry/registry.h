@@ -86,7 +86,7 @@ public:
   RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
 
   /**
-   * Destructor that removes an instance of the factory from the FactoryRegistry
+   * Destructor that removes an instance of the factory from the FactoryRegistry.
    */
   ~RegisterFactory() { FactoryRegistry<Base>::unregisterFactory(instance_); }
 

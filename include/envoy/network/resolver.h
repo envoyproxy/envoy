@@ -15,7 +15,7 @@ namespace Network {
 namespace Address {
 
 /**
- * Interface for all network address resolvers
+ * Interface for all network address resolvers.
  */
 class Resolver {
 public:
@@ -32,7 +32,7 @@ public:
 typedef std::unique_ptr<Resolver> ResolverPtr;
 
 /**
- * A factory for individual network address resolvers
+ * A factory for individual network address resolvers.
  */
 class ResolverFactory {
 public:
