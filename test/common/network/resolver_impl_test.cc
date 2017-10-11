@@ -141,6 +141,20 @@ TEST(ResolverTest, NonStandardResolver) {
   }
 }
 
+TEST(ResolverTest, UninitializedAddress) {
+  envoy::api::v2::Address address;
+  EXPECT_THROW(resolveProtoAddress(address), EnvoyException);
+}
+
+TEST(ResolverTest, NoSuchResolver) {
+  envoy::api::v2::Address address;
+  auto socket = address.mutable_socket_address();
+  socket->set_address("foo");
+  socket->set_port_value(5);
+  socket->set_resolver_name("envoy.test.resolver");
+  EXPECT_THROW(resolveProtoAddress(address), EnvoyException);
+}
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy
