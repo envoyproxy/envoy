@@ -28,9 +28,18 @@ public:
     }));
     EXPECT_CALL(os_sys_calls_, bind(_, _, _));
 
+    Stats::RawStatData::configureForTestsOnly(options_);
+
     // Test we match the correct stat with empty-slots before, after, or both.
     hot_restart_.reset(new HotRestartImpl(options_, os_sys_calls_));
     hot_restart_->drainParentListeners();
+  }
+
+  void TearDown() {
+    // Configure it back so that later tests don't get the wonky values
+    // used here
+    NiceMock<MockOptions> default_options;
+    Stats::RawStatData::configureForTestsOnly(default_options);
   }
 
   Api::MockOsSysCalls os_sys_calls_;
@@ -38,6 +47,12 @@ public:
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
+
+TEST_F(HotRestartImplTest, versionString) {
+  setup();
+  EXPECT_EQ(hot_restart_->version(), Envoy::Server::SharedMemory::version(
+                                         options_.maxStats(), options_.maxStatNameLength()));
+}
 
 TEST_F(HotRestartImplTest, crossAlloc) {
   setup();
@@ -87,16 +102,7 @@ public:
   HotRestartImplAlignmentTest() : name_len_(8 + GetParam()) {
     EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(num_stats_));
     EXPECT_CALL(options_, maxStatNameLength()).WillRepeatedly(Return(name_len_));
-    Stats::RawStatData::configureForTestsOnly(options_);
-    EXPECT_EQ(name_len_, Stats::RawStatData::maxNameLength());
     setup();
-  }
-
-  void TearDown() {
-    // Configure it back so that later tests don't get the wonky values
-    // used here
-    NiceMock<MockOptions> default_options;
-    Stats::RawStatData::configureForTestsOnly(default_options);
   }
 
   static const uint64_t num_stats_ = 8;
