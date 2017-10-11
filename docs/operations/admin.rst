@@ -30,7 +30,7 @@ modify different aspects of the server.
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
       :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
 
-    - added_via_api - false if the clunter was added via static configuration, true if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
+    - added_via_api - false if the cluster was added via static configuration, true if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
 
   Per host statistics
     .. csv-table::
