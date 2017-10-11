@@ -147,8 +147,9 @@ public:
   }
 
   /**
-   * Set a pseudo-random cookie with the name @param key and TTL @param max_age
-   * to be sent to the downstream host.
+   * Set a computed cookie to be sent with the downstream headers.
+   * @param key supplies the size of the cookie
+   * @param max_age the lifetime of the cookie
    * @return std::string the value of the new cookie
    *
    * marked const so it can be called from hashKey(), and because all mutated

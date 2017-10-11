@@ -142,7 +142,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
         // Find the set-cookie headers in the request
         if (header.key() == Http::Headers::get().SetCookie.get().c_str()) {
           const std::string value{header.value().c_str()};
-          size_t equals_index = value.find('=');
+          const size_t equals_index = value.find('=');
 
           if (equals_index == std::string::npos) {
             // The cookie is malformed if it does not have an `=`.
@@ -150,7 +150,6 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
           }
           std::string k = value.substr(0, equals_index);
           State* state = static_cast<State*>(context);
-          // If the key matches, parse the value from the rest of the cookie string.
           if (k == state->key_) {
             state->ret_ = true;
             // TODO(akonradi) early exit here (need to change iterate())
