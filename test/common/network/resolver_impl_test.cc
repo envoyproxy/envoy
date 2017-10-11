@@ -39,7 +39,9 @@ TEST_F(IpResolverTest, DisallowsNamedPort) {
   envoy::api::v2::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_named_port("http");
-  EXPECT_THROW(resolver->resolve(socket_address), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(resolver->resolve(socket_address), EnvoyException,
+                            fmt::format("IP resolver can't handle port specifier type {}",
+                                        envoy::api::v2::SocketAddress::kNamedPort));
 }
 
 TEST(ResolverTest, FromProtoAddress) {
