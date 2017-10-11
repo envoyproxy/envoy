@@ -23,7 +23,7 @@ public:
    * routing attempt.
    * @return Optional<uint64_t> the optional hash key to use.
    */
-  virtual Optional<uint64_t> hashKey() PURE;
+  virtual Optional<uint64_t> computeHashKey() PURE;
 
   /**
    * @return const Network::Connection* the incoming connection or nullptr to use during load

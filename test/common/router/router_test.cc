@@ -185,7 +185,7 @@ TEST_F(RouterTest, HashPolicy) {
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(10UL, context->hashKey().value());
+            EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -210,7 +210,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(false, context->hashKey().valid());
+            EXPECT_EQ(false, context->computeHashKey().valid());
             return &cm_.conn_pool_;
           }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -244,7 +244,7 @@ TEST_F(RouterTest, AddCookie) {
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(10UL, context->hashKey().value());
+            EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
 
@@ -291,7 +291,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(10UL, context->hashKey().value());
+            EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
 
@@ -338,7 +338,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(10UL, context->hashKey().value());
+            EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
 

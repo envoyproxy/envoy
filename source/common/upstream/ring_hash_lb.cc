@@ -37,10 +37,10 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* c
 
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
-  // hashKey() may be computed on demand, so get it only once.
+  // computeHashKey() may be computed on demand, so get it only once.
   Optional<uint64_t> hash;
   if (context) {
-    hash = context->hashKey();
+    hash = context->computeHashKey();
   }
   const uint64_t h = hash.valid() ? hash.value() : random.random();
 

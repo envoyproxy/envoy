@@ -36,7 +36,7 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() override { return 0; }
+  Optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
 
   Optional<uint64_t> hash_key_;
