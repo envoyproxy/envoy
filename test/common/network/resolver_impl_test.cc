@@ -29,13 +29,13 @@ TEST_F(IpResolverTest, Basic) {
   envoy::api::v2::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_port_value(443);
-  auto address = factory_->create()->resolve(socket_address);
+  auto address = factory_->createResolver()->resolve(socket_address);
   EXPECT_EQ(address->ip()->addressAsString(), "1.2.3.4");
   EXPECT_EQ(address->ip()->port(), 443);
 }
 
 TEST_F(IpResolverTest, DisallowsNamedPort) {
-  auto resolver = factory_->create();
+  auto resolver = factory_->createResolver();
   envoy::api::v2::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_named_port("http");
@@ -101,7 +101,9 @@ class TestResolverFactory : public ResolverFactory {
 public:
   std::string name() override { return "envoy.test.resolver"; }
 
-  ResolverPtr create() const override { return ResolverPtr{new TestResolver(name_mappings_)}; }
+  ResolverPtr createResolver() const override {
+    return ResolverPtr{new TestResolver(name_mappings_)};
+  }
 
   void addMapping(const std::string& logical, const std::string& physical) {
     name_mappings_[logical] = physical;

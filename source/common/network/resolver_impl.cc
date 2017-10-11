@@ -41,7 +41,7 @@ public:
  */
 class IpResolverFactory : public ResolverFactory {
 public:
-  ResolverPtr create() const override { return ResolverPtr{new IpResolver()}; }
+  ResolverPtr createResolver() const override { return ResolverPtr{new IpResolver()}; }
 
   std::string name() override { return Config::AddressResolverNames::get().IP; }
 };
@@ -75,7 +75,7 @@ resolveProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
   if (resolver_factory == nullptr) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-  ResolverPtr resolver(resolver_factory->create());
+  ResolverPtr resolver(resolver_factory->createResolver());
   return resolver->resolve(socket_address);
 }
 

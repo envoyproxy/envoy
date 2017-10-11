@@ -38,7 +38,7 @@ class ResolverFactory {
 public:
   virtual ~ResolverFactory() {}
 
-  virtual ResolverPtr create() const PURE;
+  virtual ResolverPtr createResolver() const PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of
