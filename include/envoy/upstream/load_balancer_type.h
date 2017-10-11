@@ -24,18 +24,19 @@ public:
   virtual ~LoadBalancerSubsetInfo() {}
 
   /**
-   * @return true if load balancer subsets are configured.
+   * @return bool true if load balancer subsets are configured.
    */
   virtual bool isEnabled() const PURE;
 
   /**
-   * @return the fallback policy used when route metadata does not match any subset.
+   * @return LbSubsetFallbackPolicy the fallback policy used when
+   * route metadata does not match any subset.
    */
   virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
 
   /**
-   * @return a ProtobufWkt::Struct that describes the metadata for a
+   * @return ProtobufWkt::Struct the struct describing the metadata for a
    *         host to be included in the default subset.
    */
   virtual const ProtobufWkt::Struct& defaultSubset() const PURE;

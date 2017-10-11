@@ -577,13 +577,11 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_value = ProtobufWkt::Value();
   subset_value.set_string_value("the value");
 
-  auto subset_selector = envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector();
-  subset_selector.add_keys("selector_key");
-
   auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
   subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
-  subset_config.mutable_subset_selectors()->Add()->CopyFrom(subset_selector);
+  auto subset_selector = subset_config.mutable_subset_selectors()->Add();
+  subset_selector->add_keys("selector_key");
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 

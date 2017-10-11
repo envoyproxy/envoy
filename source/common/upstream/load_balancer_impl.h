@@ -143,11 +143,11 @@ public:
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
   LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
-      : enabled_(subset_config.subset_selectors_size() != 0),
+      : enabled_(!subset_config.subset_selectors().empty()),
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()) {
-    for (auto subset : subset_config.subset_selectors()) {
-      if (subset.keys_size() > 0) {
+    for (const auto& subset : subset_config.subset_selectors()) {
+      if (!subset.keys().empty()) {
         subset_keys_.emplace_back(
             std::set<std::string>(subset.keys().begin(), subset.keys().end()));
       }
@@ -163,9 +163,9 @@ public:
   const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
 
 private:
-  bool enabled_;
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
-  ProtobufWkt::Struct default_subset_;
+  const bool enabled_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const ProtobufWkt::Struct default_subset_;
   std::vector<std::set<std::string>> subset_keys_;
 };
 
