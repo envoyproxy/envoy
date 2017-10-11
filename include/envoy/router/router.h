@@ -255,7 +255,8 @@ public:
    * metadata to be matched against upstream endpoints when load
    * balancing, sorted lexically by name.
    */
-  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const PURE;
+  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
+  metadataMatchCriteria() const PURE;
 };
 
 /**
