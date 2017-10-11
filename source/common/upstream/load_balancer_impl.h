@@ -88,7 +88,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set_, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
   size_t rr_index_{};
@@ -114,7 +114,7 @@ public:
                            Runtime::RandomGenerator& random);
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
   HostSharedPtr last_host_;
@@ -131,7 +131,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 };
 
 } // namespace Upstream

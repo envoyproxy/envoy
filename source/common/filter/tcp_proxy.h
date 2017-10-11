@@ -101,7 +101,7 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const override { return {}; }
+  Optional<uint64_t> hashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }

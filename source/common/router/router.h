@@ -130,7 +130,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const override {
+  Optional<uint64_t> hashKey() override {
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
@@ -152,11 +152,8 @@ public:
    * @param key supplies the size of the cookie
    * @param max_age the lifetime of the cookie
    * @return std::string the value of the new cookie
-   *
-   * marked const so it can be called from hashKey(), and because all mutated
-   * state is only visible when calling onUpstreamHeaders()
    */
-  std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) const {
+  std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
@@ -312,9 +309,7 @@ private:
   bool stream_destroyed_{};
 
   // list of cookies to add to upstream headers
-  // 'mutable' is safe because this is only read in onUpstreamHeaders(), which
-  // is not const
-  mutable std::vector<std::string> downstream_set_cookies_;
+  std::vector<std::string> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

@@ -20,7 +20,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
   refresh();
 }
 
-HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+HostConstSharedPtr RingHashLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
     return all_hosts_ring_.chooseHost(context, random_);
@@ -29,7 +29,7 @@ HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* c
   }
 }
 
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* context,
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* context,
                                                           Runtime::RandomGenerator& random) {
   if (ring_.empty()) {
     return nullptr;
