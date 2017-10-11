@@ -144,6 +144,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
+        "//source/common/protobuf",
     ],
 )
 

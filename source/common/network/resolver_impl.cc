@@ -9,6 +9,8 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "api/address.pb.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -19,14 +21,18 @@ namespace Address {
 class IpResolver : public Resolver {
 
 public:
-  Network::Address::InstanceConstSharedPtr resolve(const std::string& address,
-                                                   const uint32_t port) override {
-    return Network::Utility::parseInternetAddress(address, port);
-  }
+  InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) {
+    switch (socket_address.port_specifier_case()) {
+    case envoy::api::v2::SocketAddress::kPortValue:
+    // default to port 0 if no port value is specified
+    case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
+      return Network::Utility::parseInternetAddress(socket_address.address(),
+                                                    socket_address.port_value());
 
-  Network::Address::InstanceConstSharedPtr resolve(const std::string&,
-                                                   const std::string&) override {
-    throw EnvoyException("named ports are not supported by this resolver");
+    default:
+      throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
+                                       socket_address.port_specifier_case()));
+    }
   }
 };
 
@@ -70,19 +76,7 @@ resolveProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
   ResolverPtr resolver(resolver_factory->create());
-  switch (socket_address.port_specifier_case()) {
-  case envoy::api::v2::SocketAddress::kNamedPort:
-    return resolver->resolve(socket_address.address(), socket_address.named_port());
-
-  case envoy::api::v2::SocketAddress::kPortValue:
-  // default to port 0 if no port value is specified
-  case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
-    return resolver->resolve(socket_address.address(), socket_address.port_value());
-
-  default:
-    throw EnvoyException(
-        fmt::format("Unknown port specifier type {}", socket_address.port_specifier_case()));
-  }
+  return resolver->resolve(socket_address);
 }
 
 } // namespace Address

@@ -8,6 +8,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+#include "api/address.pb.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -20,22 +22,11 @@ public:
   virtual ~Resolver() {}
 
   /**
-   * Resolve a custom address string and port to an Address::Instance
-   * @param address the address to resolve
-   * @param supplies the port on the address
-   * @return an appropriate Address::Instance
+   * Resolve a custom address string and port to an Address::Instance.
+   * @param socket_address supplies the socket address to resolve.
+   * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
-  virtual Network::Address::InstanceConstSharedPtr resolve(const std::string& address,
-                                                           const uint32_t port) PURE;
-
-  /**
-   * Resolve a custom address string and named port to an Address::Instance
-   * @param address the address to resolve
-   * @param named_port the named port to resolve
-   * @return an appropriate Address::Instance
-   */
-  virtual Network::Address::InstanceConstSharedPtr resolve(const std::string& address,
-                                                           const std::string& named_port) PURE;
+  virtual InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) PURE;
 };
 
 typedef std::unique_ptr<Resolver> ResolverPtr;

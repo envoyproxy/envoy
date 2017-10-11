@@ -14,6 +14,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "api/address.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,14 +26,20 @@ public:
 };
 
 TEST_F(IpResolverTest, Basic) {
-  auto address = factory_->create()->resolve("1.2.3.4", 443);
+  envoy::api::v2::SocketAddress socket_address;
+  socket_address.set_address("1.2.3.4");
+  socket_address.set_port_value(443);
+  auto address = factory_->create()->resolve(socket_address);
   EXPECT_EQ(address->ip()->addressAsString(), "1.2.3.4");
   EXPECT_EQ(address->ip()->port(), 443);
 }
 
 TEST_F(IpResolverTest, DisallowsNamedPort) {
   auto resolver = factory_->create();
-  EXPECT_THROW(resolver->resolve("1.2.3.4", "http"), EnvoyException);
+  envoy::api::v2::SocketAddress socket_address;
+  socket_address.set_address("1.2.3.4");
+  socket_address.set_named_port("http");
+  EXPECT_THROW(resolver->resolve(socket_address), EnvoyException);
 }
 
 TEST(ResolverTest, FromProtoAddress) {
@@ -55,16 +62,12 @@ class TestResolver : public Resolver {
 public:
   TestResolver(const std::map<std::string, std::string> name_mappings)
       : name_mappings_(name_mappings) {}
-  InstanceConstSharedPtr resolve(const std::string& logical, uint32_t port) {
-    std::string physical = getPhysicalName(logical);
+  InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) {
+    const std::string logical = socket_address.address();
+    const std::string physical = getPhysicalName(logical);
+    const std::string port = getPort(socket_address);
     return InstanceConstSharedPtr{new MockResolvedAddress(fmt::format("{}:{}", logical, port),
                                                           fmt::format("{}:{}", physical, port))};
-  }
-
-  InstanceConstSharedPtr resolve(const std::string& logical, const std::string& named_port) {
-    std::string physical = getPhysicalName(logical);
-    return InstanceConstSharedPtr{new MockResolvedAddress(
-        fmt::format("{}:{}", logical, named_port), fmt::format("{}:{}", physical, named_port))};
   }
 
 private:
@@ -74,6 +77,21 @@ private:
       throw EnvoyException("no such mapping exists");
     }
     return it->second;
+  }
+
+  std::string getPort(const envoy::api::v2::SocketAddress& socket_address) {
+    switch (socket_address.port_specifier_case()) {
+    case envoy::api::v2::SocketAddress::kNamedPort:
+      return socket_address.named_port();
+    case envoy::api::v2::SocketAddress::kPortValue:
+    // default to port 0 if no port value is specified
+    case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
+      return fmt::format("{}", socket_address.port_value());
+
+    default:
+      throw EnvoyException(
+          fmt::format("Unknown port specifier type {}", socket_address.port_specifier_case()));
+    }
   }
 
   std::map<std::string, std::string> name_mappings_;
