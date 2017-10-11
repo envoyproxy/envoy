@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
@@ -162,12 +163,9 @@ public:
     // connections can receive different cookies if they race on requests.
     std::string value;
     const Network::Connection* conn = downstreamConnection();
-    if (conn) {
-      value = conn->remoteAddress().asString() + conn->localAddress().asString();
-    } else {
-      // TODO(akonradi) talk to mattklein123 and figure out when this can happen
-      ENVOY_LOG(warn, "Downstream connection was null while trying to make a routing cookie");
-    }
+    // need to check for null conn if this is ever used by Http::AsyncClient in the fiture
+    ASSERT(conn);
+    value = conn->remoteAddress().asString() + conn->localAddress().asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(

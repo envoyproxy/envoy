@@ -10,6 +10,7 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -47,6 +48,11 @@ public:
     return RetryStatePtr{retry_state_};
   }
 
+  const Network::Connection* downstreamConnection() const override {
+    return &downstream_connection_;
+  }
+
+  NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
 };
 
@@ -62,6 +68,10 @@ public:
 
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
+    ON_CALL(router_.downstream_connection_, localAddress())
+        .WillByDefault(ReturnRef(*host_address_));
+    ON_CALL(router_.downstream_connection_, remoteAddress())
+        .WillByDefault(ReturnRef(*remote_address_));
   }
 
   void expectResponseTimerCreate() {
@@ -106,6 +116,8 @@ public:
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  Network::Address::InstanceConstSharedPtr remote_address_{
+      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80")};
 };
 
 TEST_F(RouterTest, RouteNotFound) {
