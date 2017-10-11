@@ -128,7 +128,7 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   default:
-    RELEASE_ASSERT(false);
+    NOT_REACHED;
   }
 }
 
