@@ -229,9 +229,9 @@ public:
                                           const Http::HeaderMap& headers) const PURE;
 };
 
-class MetadataMatch {
+class MetadataMatchCriterion {
 public:
-  virtual ~MetadataMatch() {}
+  virtual ~MetadataMatchCriterion() {}
 
   /*
    * @return const std::string& the name of the metadata key
@@ -244,18 +244,18 @@ public:
   virtual const HashedValue& value() const PURE;
 };
 
-typedef std::shared_ptr<const MetadataMatch> MetadataMatchConstSharedPtr;
+typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
 
-class MetadataMatches {
+class MetadataMatchCriteria {
 public:
-  virtual ~MetadataMatches() {}
+  virtual ~MetadataMatchCriteria() {}
 
   /*
-   * @return std::vector<MetadataMatchConstSharedPtr>& a vector of
+   * @return std::vector<MetadataMatchCriterionConstSharedPtr>& a vector of
    * metadata to be matched against upstream endpoints when load
    * balancing, sorted lexically by name.
    */
-  virtual const std::vector<MetadataMatchConstSharedPtr>& metadataMatches() const PURE;
+  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const PURE;
 };
 
 /**
@@ -340,10 +340,10 @@ public:
   virtual bool useWebSocket() const PURE;
 
   /**
-   * @return MetadataMatches* the metadata that a subset load balancer should match when selecting
-   * an upstream host
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
    */
-  virtual const MetadataMatches* metadataMatches() const PURE;
+  virtual const MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 
   /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated

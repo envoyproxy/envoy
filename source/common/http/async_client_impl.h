@@ -146,7 +146,7 @@ private:
     void finalizeRequestHeaders(Http::HeaderMap&,
                                 const Http::AccessLog::RequestInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
-    const Router::MetadataMatches* metadataMatches() const override { return nullptr; }
+    const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;
     }
