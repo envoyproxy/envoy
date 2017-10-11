@@ -28,6 +28,7 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -253,6 +254,7 @@ public:
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
+  const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
 
 private:
   struct ResourceManagers {
@@ -286,6 +288,7 @@ private:
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   const bool added_via_api_;
+  LoadBalancerSubsetInfoImpl lb_subset_;
 };
 
 /**
