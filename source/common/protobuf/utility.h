@@ -110,4 +110,48 @@ public:
   }
 };
 
+class ValueUtil {
+public:
+  static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+
+  /**
+   * Compare two ProtobufWkt::Values for equality.
+   * @param v1 message of type type.googleapis.com/google.protobuf.Value
+   * @param v2 message of type type.googleapis.com/google.protobuf.Value
+   * @return true if v1 and v2 are identical
+   */
+  static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+};
+
+/**
+ * HashedValue is a wrapper around ProtobufWkt::Value that computes
+ * and stores a hash code for the Value at construction.
+ */
+class HashedValue {
+public:
+  HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
+  HashedValue(const HashedValue& v) : value_(v.value_), hash_(v.hash_){};
+
+  const ProtobufWkt::Value& value() const { return value_; }
+  std::size_t hash() const { return hash_; }
+
+  bool operator==(const HashedValue& rhs) const {
+    return hash_ == rhs.hash_ && ValueUtil::equal(value_, rhs.value_);
+  }
+
+  bool operator!=(const HashedValue& rhs) const { return !(*this == rhs); }
+
+private:
+  const ProtobufWkt::Value value_;
+  const std::size_t hash_;
+};
+
 } // namespace Envoy
+
+namespace std {
+// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
+template <> struct hash<Envoy::HashedValue> {
+  std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
+};
+
+} // namespace std

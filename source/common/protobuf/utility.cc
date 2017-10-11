@@ -75,4 +75,61 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   MessageUtil::loadFromJson(json, dest);
 }
 
+bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
+  ProtobufWkt::Value::KindCase kind = v1.kind_case();
+  if (kind != v2.kind_case()) {
+    return false;
+  }
+
+  switch (kind) {
+  case ProtobufWkt::Value::kNullValue:
+    return true;
+
+  case ProtobufWkt::Value::kNumberValue:
+    return v1.number_value() == v2.number_value();
+
+  case ProtobufWkt::Value::kStringValue:
+    return v1.string_value() == v2.string_value();
+
+  case ProtobufWkt::Value::kBoolValue:
+    return v1.bool_value() == v2.bool_value();
+
+  case ProtobufWkt::Value::kStructValue: {
+    const ProtobufWkt::Struct& s1 = v1.struct_value();
+    const ProtobufWkt::Struct& s2 = v2.struct_value();
+    if (s1.fields_size() != s2.fields_size()) {
+      return false;
+    }
+    for (const auto& it1 : s1.fields()) {
+      const auto& it2 = s2.fields().find(it1.first);
+      if (it2 == s2.fields().end()) {
+        return false;
+      }
+
+      if (!equal(it1.second, it2->second)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  case ProtobufWkt::Value::kListValue: {
+    const ProtobufWkt::ListValue& l1 = v1.list_value();
+    const ProtobufWkt::ListValue& l2 = v2.list_value();
+    if (l1.values_size() != l2.values_size()) {
+      return false;
+    }
+    for (int i = 0; i < l1.values_size(); i++) {
+      if (!equal(l1.values(i), l2.values(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  default:
+    NOT_REACHED;
+  }
+}
+
 } // namespace Envoy
