@@ -144,6 +144,9 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
         cluster.second.get().info()->name(), "high",
         cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
 
+    response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
+                             cluster.second.get().info()->addedViaApi()));
+
     for (auto& host : cluster.second.get().hosts()) {
       std::map<std::string, uint64_t> all_stats;
       for (const Stats::CounterSharedPtr& counter : host->counters()) {
