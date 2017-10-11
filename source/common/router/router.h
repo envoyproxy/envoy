@@ -16,7 +16,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/watermark_buffer.h"
-#include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
@@ -161,7 +160,6 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // need to check for null conn if this is ever used by Http::AsyncClient in the fiture
-    ASSERT(conn);
     value = conn->remoteAddress().asString() + conn->localAddress().asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
