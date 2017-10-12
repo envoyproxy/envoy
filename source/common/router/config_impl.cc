@@ -226,8 +226,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         const auto filter_it = cluster.metadata_match().filter_metadata().find(
             Envoy::Config::MetadataFilters::get().ENVOY_LB);
         if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-          cluster_metadata_match_criteria =
-              metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+          if (metadata_match_criteria_) {
+            cluster_metadata_match_criteria =
+                metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+          } else {
+            cluster_metadata_match_criteria.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+          }
         }
       }
 
