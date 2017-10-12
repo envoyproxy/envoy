@@ -132,7 +132,8 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::api::v2::Address address;
-  EXPECT_THROW(resolveProtoAddress(address), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
+                            "Address must be a socket or pipe: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
@@ -141,7 +142,8 @@ TEST(ResolverTest, NoSuchResolver) {
   socket->set_address("foo");
   socket->set_port_value(5);
   socket->set_resolver_name("envoy.test.resolver");
-  EXPECT_THROW(resolveProtoAddress(address), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
+                            "Unknown address resolver: envoy.test.resolver");
 }
 
 } // namespace Address
