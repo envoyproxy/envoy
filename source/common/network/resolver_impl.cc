@@ -34,14 +34,6 @@ public:
                                        socket_address.port_specifier_case()));
     }
   }
-};
-
-/**
- * Implementation of an IP address resolver factory.
- */
-class IpResolverFactory : public ResolverFactory {
-public:
-  ResolverPtr createResolver() const override { return ResolverPtr{new IpResolver()}; }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
 };
@@ -49,7 +41,7 @@ public:
 /**
  * Static registration for the IP resolver. @see RegisterFactory.
  */
-static Registry::RegisterFactory<IpResolverFactory, ResolverFactory> ip_registered_;
+static Registry::RegisterFactory<IpResolver, Resolver> ip_registered_;
 
 InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::Address& address) {
   switch (address.address_case()) {
@@ -64,18 +56,17 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::Address& addres
 
 InstanceConstSharedPtr
 resolveProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
-  const ResolverFactory* resolver_factory = nullptr;
+  Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
   if (resolver_name.empty()) {
-    resolver_factory = Registry::FactoryRegistry<ResolverFactory>::getFactory(
-        Config::AddressResolverNames::get().IP);
+    resolver =
+        Registry::FactoryRegistry<Resolver>::getFactory(Config::AddressResolverNames::get().IP);
   } else {
-    resolver_factory = Registry::FactoryRegistry<ResolverFactory>::getFactory(resolver_name);
+    resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
   }
-  if (resolver_factory == nullptr) {
+  if (resolver == nullptr) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-  ResolverPtr resolver(resolver_factory->createResolver());
   return resolver->resolve(socket_address);
 }
 

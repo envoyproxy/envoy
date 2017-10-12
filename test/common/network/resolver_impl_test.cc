@@ -22,24 +22,23 @@ namespace Network {
 namespace Address {
 class IpResolverTest : public testing::Test {
 public:
-  ResolverFactory* factory_{Registry::FactoryRegistry<ResolverFactory>::getFactory("envoy.ip")};
+  Resolver* resolver_{Registry::FactoryRegistry<Resolver>::getFactory("envoy.ip")};
 };
 
 TEST_F(IpResolverTest, Basic) {
   envoy::api::v2::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_port_value(443);
-  auto address = factory_->createResolver()->resolve(socket_address);
+  auto address = resolver_->resolve(socket_address);
   EXPECT_EQ(address->ip()->addressAsString(), "1.2.3.4");
   EXPECT_EQ(address->ip()->port(), 443);
 }
 
 TEST_F(IpResolverTest, DisallowsNamedPort) {
-  auto resolver = factory_->createResolver();
   envoy::api::v2::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_named_port("http");
-  EXPECT_THROW_WITH_MESSAGE(resolver->resolve(socket_address), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(resolver_->resolve(socket_address), EnvoyException,
                             fmt::format("IP resolver can't handle port specifier type {}",
                                         envoy::api::v2::SocketAddress::kNamedPort));
 }
@@ -62,8 +61,6 @@ TEST(ResolverTest, FromProtoAddress) {
 
 class TestResolver : public Resolver {
 public:
-  TestResolver(const std::map<std::string, std::string> name_mappings)
-      : name_mappings_(name_mappings) {}
   InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) {
     const std::string logical = socket_address.address();
     const std::string physical = getPhysicalName(logical);
@@ -71,6 +68,12 @@ public:
     return InstanceConstSharedPtr{new MockResolvedAddress(fmt::format("{}:{}", logical, port),
                                                           fmt::format("{}:{}", physical, port))};
   }
+
+  void addMapping(const std::string& logical, const std::string& physical) {
+    name_mappings_[logical] = physical;
+  }
+
+  std::string name() const override { return "envoy.test.resolver"; }
 
 private:
   std::string getPhysicalName(const std::string& logical) {
@@ -99,27 +102,11 @@ private:
   std::map<std::string, std::string> name_mappings_;
 };
 
-class TestResolverFactory : public ResolverFactory {
-public:
-  std::string name() const override { return "envoy.test.resolver"; }
-
-  ResolverPtr createResolver() const override {
-    return ResolverPtr{new TestResolver(name_mappings_)};
-  }
-
-  void addMapping(const std::string& logical, const std::string& physical) {
-    name_mappings_[logical] = physical;
-  }
-
-private:
-  std::map<std::string, std::string> name_mappings_;
-};
-
 TEST(ResolverTest, NonStandardResolver) {
-  Registry::RegisterFactory<TestResolverFactory, ResolverFactory> register_resolver;
-  auto& test_factory = register_resolver.testGetFactory();
-  test_factory.addMapping("foo", "1.2.3.4");
-  test_factory.addMapping("bar", "4.3.2.1");
+  Registry::RegisterFactory<TestResolver, Resolver> register_resolver;
+  auto& test_resolver = register_resolver.testGetFactory();
+  test_resolver.addMapping("foo", "1.2.3.4");
+  test_resolver.addMapping("bar", "4.3.2.1");
 
   {
     envoy::api::v2::Address address;

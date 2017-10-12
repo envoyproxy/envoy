@@ -27,27 +27,13 @@ public:
    * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
   virtual InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) PURE;
-};
-
-typedef std::unique_ptr<Resolver> ResolverPtr;
-
-/**
- * A factory for individual network address resolvers.
- */
-class ResolverFactory {
-public:
-  virtual ~ResolverFactory() {}
-
-  virtual ResolverPtr createResolver() const PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of
-   * a resolver produced by the factory.
+   * a resolver.
    */
   virtual std::string name() const PURE;
 };
-
-typedef std::shared_ptr<ResolverFactory> ResolverFactorySharedPtr;
 
 } // namespace Address
 } // namespace Network
