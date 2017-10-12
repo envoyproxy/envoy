@@ -259,7 +259,7 @@ HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_heade
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
   rhs.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> bool {
         // TODO(mattklein123) PERF: Avoid copying here is not necessary.
         HeaderString key_string;
         key_string.setCopy(header.key().c_str(), header.key().size());
@@ -268,6 +268,7 @@ HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
 
         static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
                                                          std::move(value_string));
+        return HeaderMap::Continue;
       },
       this);
 }
@@ -384,7 +385,10 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
 
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
-    cb(header, context);
+    const bool result = cb(header, context);
+    if (result == HeaderMap::Break) {
+      break;
+    }
   }
 }
 

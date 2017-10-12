@@ -358,12 +358,17 @@ public:
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
 
+  // aliases to make iterate() callbacks easier to read
+  static const bool Continue = true;
+  static const bool Break = false;
+
   /**
    * Callback when calling iterate() over a const header map.
    * @param header supplies the header entry.
    * @param context supplies the context passed to iterate().
+   * @return true to continue iteration.
    */
-  typedef void (*ConstIterateCb)(const HeaderEntry& header, void* context);
+  typedef bool (*ConstIterateCb)(const HeaderEntry& header, void* context);
 
   /**
    * Iterate over a constant header map.

@@ -402,5 +402,25 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
 }
 
+TEST(HeaderMapImplTest, Iterate) {
+  TestHeaderMapImpl headers;
+  headers.addCopy("hello", "world");
+  headers.addCopy("foo", "bar");
+  headers.addCopy("world", "hello");
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  MockCb cb;
+
+  EXPECT_CALL(cb, Call("hello", "world"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
+  EXPECT_CALL(cb, Call("world", "hello"));
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* cb_v) -> bool {
+        static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
+      },
+      &cb);
+}
+
 } // namespace Http
 } // namespace Envoy

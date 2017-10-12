@@ -440,9 +440,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NVLOG
   request_headers_->iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> bool {
         ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
                          header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
       },
       this);
 #endif
@@ -791,9 +792,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
                    end_stream && continue_data_entry == encoder_filters_.end());
 #ifndef NVLOG
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> bool {
         ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
                          header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
       },
       this);
 #endif
@@ -874,9 +876,10 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec", *this);
 #ifndef NVLOG
   trailers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> bool {
         ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
                          header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
       },
       this);
 #endif

@@ -76,8 +76,9 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 #ifndef NVLOG
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):", end_stream);
   headers->iterate(
-      [](const HeaderEntry& header, void*) -> void {
+      [](const HeaderEntry& header, void*) -> bool {
         ENVOY_LOG(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
       },
       nullptr);
 #endif
@@ -98,8 +99,9 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 #ifndef NVLOG
   ENVOY_LOG(debug, "async http request response trailers:");
   trailers->iterate(
-      [](const HeaderEntry& header, void*) -> void {
+      [](const HeaderEntry& header, void*) -> bool {
         ENVOY_LOG(debug, "  '{}':'{}'", header.key().c_str(), header.value().c_str());
+        return HeaderMap::Continue;
       },
       nullptr);
 #endif
