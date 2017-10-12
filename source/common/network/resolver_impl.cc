@@ -21,7 +21,7 @@ namespace Address {
 class IpResolver : public Resolver {
 
 public:
-  InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) {
+  InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) override {
     switch (socket_address.port_specifier_case()) {
     case envoy::api::v2::SocketAddress::kPortValue:
     // Default to port 0 if no port value is specified.
