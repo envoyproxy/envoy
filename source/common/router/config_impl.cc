@@ -211,7 +211,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
-  // single cluster, pointing back to the parent.
+  // single cluster, pointing back to the parent. Metadata criteria
+  // from the weighted cluster (if any) are merged with and override
+  // the criteria from the route.
   if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
@@ -224,8 +226,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         const auto filter_it = cluster.metadata_match().filter_metadata().find(
             Envoy::Config::MetadataFilters::get().ENVOY_LB);
         if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-          cluster_metadata_match_criteria.reset(
-              new MetadataMatchCriteriaImpl(metadata_match_criteria_.get(), filter_it->second));
+          cluster_metadata_match_criteria =
+              metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
         }
       }
 

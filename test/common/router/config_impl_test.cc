@@ -2651,7 +2651,7 @@ TEST(MetadataMatchCriteriaImpl, Create) {
   mutable_fields->insert({"b", v2});
   mutable_fields->insert({"c", v3});
 
-  auto matches = MetadataMatchCriteriaImpl(nullptr, metadata_struct);
+  auto matches = MetadataMatchCriteriaImpl(metadata_struct);
 
   EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
   auto it = matches.metadataMatchCriteria().begin();
@@ -2667,7 +2667,7 @@ TEST(MetadataMatchCriteriaImpl, Create) {
   EXPECT_EQ((*it)->value().value().bool_value(), true);
 }
 
-TEST(MetadataMatchCriteriaImpl, CreateWithParent) {
+TEST(MetadataMatchCriteriaImpl, Merge) {
   auto pv1 = ProtobufWkt::Value();
   pv1.set_string_value("v1");
   auto pv2 = ProtobufWkt::Value();
@@ -2681,7 +2681,7 @@ TEST(MetadataMatchCriteriaImpl, CreateWithParent) {
   parent_fields->insert({"b", pv2});
   parent_fields->insert({"c", pv3});
 
-  auto parent_matches = MetadataMatchCriteriaImpl(nullptr, parent_struct);
+  auto parent_matches = MetadataMatchCriteriaImpl(parent_struct);
 
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("override1");
@@ -2696,10 +2696,10 @@ TEST(MetadataMatchCriteriaImpl, CreateWithParent) {
   mutable_fields->insert({"b++", v2});
   mutable_fields->insert({"c", v3});
 
-  auto matches = MetadataMatchCriteriaImpl(&parent_matches, metadata_struct);
+  MetadataMatchCriteriaImplConstPtr matches = parent_matches.mergeMatchCriteria(metadata_struct);
 
-  EXPECT_EQ(matches.metadataMatchCriteria().size(), 4);
-  auto it = matches.metadataMatchCriteria().begin();
+  EXPECT_EQ(matches->metadataMatchCriteria().size(), 4);
+  auto it = matches->metadataMatchCriteria().begin();
   EXPECT_EQ((*it)->name(), std::string("a"));
   EXPECT_EQ((*it)->value().value().string_value(), std::string("override1"));
   it++;

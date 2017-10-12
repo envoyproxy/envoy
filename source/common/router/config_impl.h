@@ -227,33 +227,41 @@ private:
   const HashedValue value_;
 };
 
+class MetadataMatchCriteriaImpl;
+typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
+
 class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
 public:
   MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
-      : MetadataMatchCriteriaImpl(nullptr, metadata_matches){};
+      : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
 
   /**
-   * Constructs a new MetadataMatchCriteriaImpl, merging existing
-   * metadata criteria from a parent. Metadata from the
-   * ProtobufWkt::Struct override those from the parent.
+   * Creates a new MetadataMatchCriteriaImpl, merging existing
+   * metadata criteria this criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the
+   * ProtobufWkt::Struct taking precedence.
    */
-  MetadataMatchCriteriaImpl(const MetadataMatchCriteriaImpl* parent,
-                            const ProtobufWkt::Struct& metadata_matches)
-      : metadata_match_criteria_(extractMetadataMatchCriteria(parent, metadata_matches)){};
+  MetadataMatchCriteriaImplConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const {
+    return MetadataMatchCriteriaImplConstPtr(
+        new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
+  }
 
+  // MetadataMatchCriteria
   const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
     return metadata_match_criteria_;
   }
 
 private:
+  MetadataMatchCriteriaImpl(const std::vector<MetadataMatchCriterionConstSharedPtr>& criteria)
+      : metadata_match_criteria_(criteria){};
+
   static std::vector<MetadataMatchCriterionConstSharedPtr>
   extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
                                const ProtobufWkt::Struct& metadata_matches);
 
   const std::vector<MetadataMatchCriterionConstSharedPtr> metadata_match_criteria_;
 };
-
-typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
 
 /**
  * Implementation of Decorator that reads from the proto route decorator.
