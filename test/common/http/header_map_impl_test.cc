@@ -437,7 +437,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   headers.iterateReverse(
       [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
-        if (0 != strcmp("foo", header.key().c_str())) {
+        if ("foo" != std::string{header.key().c_str()}) {
           return HeaderMap::Iterate::Continue;
         } else {
           return HeaderMap::Iterate::Break;

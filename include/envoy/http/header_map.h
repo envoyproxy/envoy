@@ -365,7 +365,7 @@ public:
    * Callback when calling iterate() over a const header map.
    * @param header supplies the header entry.
    * @param context supplies the context passed to iterate().
-   * @return true to continue iteration.
+   * @return Iterate::Continue to continue iteration.
    */
   typedef Iterate (*ConstIterateCb)(const HeaderEntry& header, void* context);
 

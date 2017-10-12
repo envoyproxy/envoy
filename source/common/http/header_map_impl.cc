@@ -385,8 +385,7 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
 
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
-    const HeaderMap::Iterate result = cb(header, context);
-    if (result == HeaderMap::Iterate::Break) {
+    if (cb(header, context) == HeaderMap::Iterate::Break) {
       break;
     }
   }
@@ -394,8 +393,7 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
 
 void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
-    const HeaderMap::Iterate result = cb(*it, context);
-    if (result == HeaderMap::Iterate::Break) {
+    if (cb(*it, context) == HeaderMap::Iterate::Break) {
       break;
     }
   }
