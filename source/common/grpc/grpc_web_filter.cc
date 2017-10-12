@@ -175,13 +175,13 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   // Trailers in the trailers frame are separated by CRLFs.
   Buffer::OwnedImpl temp;
   trailers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> bool {
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
         temp->add(header.key().c_str(), header.key().size());
         temp->add(":");
         temp->add(header.value().c_str(), header.value().size());
         temp->add("\r\n");
-        return Http::HeaderMap::Continue;
+        return Http::HeaderMap::Iterate::Continue;
       },
       &temp);
   Buffer::OwnedImpl buffer;

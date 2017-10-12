@@ -415,9 +415,9 @@ TEST(HeaderMapImplTest, Iterate) {
   EXPECT_CALL(cb, Call("foo", "bar"));
   EXPECT_CALL(cb, Call("world", "hello"));
   headers.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> bool {
+      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
-        return HeaderMap::Continue;
+        return HeaderMap::Iterate::Continue;
       },
       &cb);
 }
@@ -435,12 +435,12 @@ TEST(HeaderMapImplTest, IterateReverse) {
   EXPECT_CALL(cb, Call("foo", "bar"));
   // no "hello"
   headers.iterateReverse(
-      [](const Http::HeaderEntry& header, void* cb_v) -> bool {
+      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
         if (0 != strcmp("foo", header.key().c_str())) {
-          return HeaderMap::Continue;
+          return HeaderMap::Iterate::Continue;
         } else {
-          return HeaderMap::Break;
+          return HeaderMap::Iterate::Break;
         }
       },
       &cb);

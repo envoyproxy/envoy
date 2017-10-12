@@ -259,7 +259,7 @@ HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_heade
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
   rhs.iterate(
-      [](const HeaderEntry& header, void* context) -> bool {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // TODO(mattklein123) PERF: Avoid copying here is not necessary.
         HeaderString key_string;
         key_string.setCopy(header.key().c_str(), header.key().size());
@@ -268,7 +268,7 @@ HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
 
         static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
                                                          std::move(value_string));
-        return HeaderMap::Continue;
+        return HeaderMap::Iterate::Continue;
       },
       this);
 }
@@ -385,8 +385,8 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
 
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
-    const bool result = cb(header, context);
-    if (result == HeaderMap::Break) {
+    const HeaderMap::Iterate result = cb(header, context);
+    if (result == HeaderMap::Iterate::Break) {
       break;
     }
   }
@@ -394,8 +394,8 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
 
 void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
-    const bool result = cb(*it, context);
-    if (result == HeaderMap::Break) {
+    const HeaderMap::Iterate result = cb(*it, context);
+    if (result == HeaderMap::Iterate::Break) {
       break;
     }
   }
