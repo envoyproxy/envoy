@@ -6,7 +6,6 @@
   "address": "{{ address }}",
   "filters": [
   {
-    "type": "read",
     "name": "http_connection_manager",
     "config": {
       "codec_type": "auto",
@@ -69,18 +68,18 @@
         ]
       },
       "filters": [
-        { "type": "both", "name": "health_check",
+        { "name": "health_check",
           "config": {
             "pass_through_mode": true, "cache_time_ms": 2500, "endpoint": "/healthcheck"
            }
         },
-        { "type": "decoder", "name": "buffer",
+        { "name": "buffer",
           "config": {
             "max_request_bytes": 5242880,
             "max_request_time_s": 120
           }
         },
-        { "type": "decoder", "name": "router", "config": {} }
+        { "name": "router", "config": {} }
       ]
     }
   }]
@@ -94,7 +93,6 @@
     "address": "tcp://127.0.0.1:9001",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
@@ -150,13 +148,13 @@
           ]
         },
         "filters": [
-          {"type": "decoder", "name": "rate_limit",
+          {"name": "rate_limit",
             "config": {
               "domain": "envoy_service_to_service"
             }
           },
-          {"type": "both", "name": "grpc_http1_bridge", "config": {}},
-          {"type": "decoder", "name": "router", "config": {}}
+          {"name": "grpc_http1_bridge", "config": {}},
+          {"name": "router", "config": {}}
         ]
       }
     }]
@@ -166,7 +164,6 @@
     "address": "tcp://127.0.0.1:9002",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
@@ -192,13 +189,13 @@
           "route_config_name": "9002_http_conn_man"
         },
         "filters": [
-          {"type": "decoder", "name": "rate_limit",
+          {"name": "rate_limit",
             "config": {
               "domain": "envoy_service_to_service"
             }
           },
-          {"type": "both", "name": "grpc_http1_bridge", "config": {}},
-          {"type": "decoder", "name": "router", "config": {}}
+          {"name": "grpc_http1_bridge", "config": {}},
+          {"name": "router", "config": {}}
         ]
       }
     }]
@@ -209,7 +206,6 @@
     "address": "{{ mapping['address'] }}",
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
@@ -254,9 +250,9 @@
         },
         "filters": [
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] %}
-            { "type": "both", "name": "http_dynamo_filter", "config": {}},
+          { "name": "http_dynamo_filter", "config": {}},
           {% endif %}
-          { "type": "decoder", "name": "router", "config": {} }
+          { "name": "router", "config": {} }
         ]
       }
     }]
@@ -269,7 +265,6 @@
     "filters": [
     {% if value.get('ratelimit', False) %}
     {
-      "type": "read",
       "name": "ratelimit",
       "config": {
         "stat_prefix": "{{ key }}",
@@ -279,7 +274,6 @@
     },
     {% endif %}
     {
-      "type": "both",
       "name": "mongo_proxy",
       "config": {
         "stat_prefix": "{{ key }}",
@@ -287,7 +281,6 @@
       }
     },
     {
-      "type": "read",
       "name": "tcp_proxy",
       "config": {
         "stat_prefix": "mongo_{{ key }}",

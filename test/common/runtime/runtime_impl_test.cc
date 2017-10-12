@@ -20,6 +20,26 @@ using testing::ReturnNew;
 namespace Envoy {
 namespace Runtime {
 
+TEST(Random, DISABLED_benchmarkRandom) {
+  Runtime::RandomGeneratorImpl random;
+
+  for (size_t i = 0; i < 1000000000; ++i) {
+    random.random();
+  }
+}
+
+TEST(Random, sanityCheckOfUniquenessRandom) {
+  Runtime::RandomGeneratorImpl random;
+  std::set<uint64_t> results;
+  const size_t num_of_results = 1000000;
+
+  for (size_t i = 0; i < num_of_results; ++i) {
+    results.insert(random.random());
+  }
+
+  EXPECT_EQ(num_of_results, results.size());
+}
+
 TEST(UUID, checkLengthOfUUID) {
   RandomGeneratorImpl random;
 

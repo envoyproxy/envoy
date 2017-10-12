@@ -14,7 +14,6 @@
     {% endif -%}
     "filters": [
     {
-      "type": "read",
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
@@ -57,18 +56,18 @@
           ]
         },
         "filters": [
-          { "type": "both", "name": "health_check",
+          { "name": "health_check",
             "config": {
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
           },
-          { "type": "decoder", "name": "buffer",
+          { "name": "buffer",
             "config": {
               "max_request_bytes": 5242880,
               "max_request_time_s": 120
             }
           },
-          { "type": "decoder", "name": "router", "config": {} }
+          { "name": "router", "config": {} }
         ]
       }
     }]

@@ -36,9 +36,13 @@ envoy_cc_library(
     hdrs = ["router.h"],
     deps = [
         "//include/envoy/common:optional",
+        "//include/envoy/http:access_log_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

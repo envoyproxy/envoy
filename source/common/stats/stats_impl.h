@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
+#include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
@@ -30,17 +31,67 @@ public:
 /**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
  * it can be allocated from shared memory if needed.
+ *
+ * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful.  Use
+ * RawStatData::size() instead.
  */
 struct RawStatData {
   struct Flags {
     static const uint8_t Used = 0x1;
   };
 
-  static const size_t MAX_NAME_SIZE = 127;
+  /**
+   * Due to the flexible-array-length of name_, c-style allocation
+   * and initialization are neccessary.
+   */
+  RawStatData() = delete;
+  ~RawStatData() = delete;
 
-  RawStatData() { memset(name_, 0, sizeof(name_)); }
+  /**
+   * Configure static settings.  This MUST be called
+   * before any other static or instance methods.
+   */
+  static void configure(Server::Options& options);
+
+  /**
+   * Allow tests to re-configure this value after it has been set.
+   * This is unsafe in a non-test context.
+   */
+  static void configureForTestsOnly(Server::Options& options);
+
+  /**
+   * Returns the maximum length of the name of a stat.  This length
+   * does not include a trailing NULL-terminator.
+   */
+  static size_t maxNameLength() {
+    return initializeAndGetMutableMaxNameLength(DEFAULT_MAX_NAME_SIZE);
+  }
+
+  /**
+   * size in bytes of name_
+   */
+  static size_t nameSize() { return maxNameLength() + 1; }
+
+  /**
+   * Returns the size of this struct, accounting for the length of name_
+   * and padding for alignment.
+   */
+  static size_t size();
+
+  /**
+   * Initializes this object to have the specified name,
+   * a refcount of 1, and all other values zero.
+   */
   void initialize(const std::string& name);
+
+  /**
+   * Returns true if object is in use.
+   */
   bool initialized() { return name_[0] != '\0'; }
+
+  /**
+   * Returns true if this matches name, truncated to maxNameLength().
+   */
   bool matches(const std::string& name);
 
   std::atomic<uint64_t> value_;
@@ -48,7 +99,12 @@ struct RawStatData {
   std::atomic<uint16_t> flags_;
   std::atomic<uint16_t> ref_count_;
   std::atomic<uint32_t> unused_;
-  char name_[MAX_NAME_SIZE + 1];
+  char name_[];
+
+private:
+  static const size_t DEFAULT_MAX_NAME_SIZE = 127;
+
+  static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
 };
 
 /**
