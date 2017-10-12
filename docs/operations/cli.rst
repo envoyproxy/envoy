@@ -119,9 +119,11 @@ following are the command line options that Envoy supports.
 
 .. option:: --max-stat-name-len <uint64_t>
 
-  *(optional)* The maximum name length (in bytes) for a stat.  Instances of Envoy must have the
-  same value for this option in order to hot-restart. Defaults to 127.
+  *(optional)* The maximum name length (in bytes) for a stat. This setting affects the output
+  of :option:`--hot-restart-version`; the same value must be used to hot restart. Defaults to 127.
 
 .. option:: --max-stats <uint64_t>
-  *(optional)* The maximum number of stats that can be shared between hot-restarts. Instances of
-  Envoy must have the same value for this option in order to hot-restart. Defaults to 16384.
+
+  *(optional)* The maximum number of stats that can be shared between hot-restarts. This setting
+  affects the output of :option:`--hot-restart-version`; the same value must be used to hot
+  restart. Defaults to 16384.
