@@ -422,5 +422,29 @@ TEST(HeaderMapImplTest, Iterate) {
       &cb);
 }
 
+TEST(HeaderMapImplTest, IterateReverse) {
+  TestHeaderMapImpl headers;
+  headers.addCopy("hello", "world");
+  headers.addCopy("foo", "bar");
+  headers.addCopy("world", "hello");
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  MockCb cb;
+
+  EXPECT_CALL(cb, Call("world", "hello"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
+  // no "hello"
+  headers.iterateReverse(
+      [](const Http::HeaderEntry& header, void* cb_v) -> bool {
+        static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+        if (0 != strcmp("foo", header.key().c_str())) {
+          return HeaderMap::Continue;
+        } else {
+          return HeaderMap::Break;
+        }
+      },
+      &cb);
+}
+
 } // namespace Http
 } // namespace Envoy

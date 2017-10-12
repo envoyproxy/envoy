@@ -358,7 +358,7 @@ public:
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
 
-  // aliases to make iterate() callbacks easier to read
+  // aliases to make iterate() and iterateReverse() callbacks easier to read
   static const bool Continue = true;
   static const bool Break = false;
 
@@ -376,6 +376,13 @@ public:
    * @param context supplies the context that will be passed to the callback.
    */
   virtual void iterate(ConstIterateCb cb, void* context) const PURE;
+
+  /**
+   * Iterate over a constant header map in reverse order.
+   * @param cb supplies the iteration callback.
+   * @param context supplies the context that will be passed to the callback.
+   */
+  virtual void iterateReverse(ConstIterateCb cb, void* context) const PURE;
 
   /**
    * Remove all instances of a header by key.

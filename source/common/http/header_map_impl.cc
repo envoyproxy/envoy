@@ -392,6 +392,15 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   }
 }
 
+void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
+  for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
+    const bool result = cb(*it, context);
+    if (result == HeaderMap::Break) {
+      break;
+    }
+  }
+}
+
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
