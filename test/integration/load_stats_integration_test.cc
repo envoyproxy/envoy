@@ -71,7 +71,6 @@ public:
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
       fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
       service_upstream_[i] = fake_upstreams_.back().get();
-      // service_upstream_[i]->set_allow_unexpected_disconnects(true);
     }
   }
 
@@ -201,6 +200,12 @@ public:
     }
   }
 
+  void sendAndReceiveUpstream(uint32_t endpoint_index, uint32_t response_code = 200) {
+    initiateClientConnection();
+    waitForUpstreamResponse(endpoint_index, response_code);
+    cleanupUpstreamConnection();
+  }
+
   static constexpr uint32_t upstream_endpoints_ = 3;
 
   FakeHttpConnectionPtr fake_loadstats_connection_;
@@ -235,9 +240,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 2);
 
   for (uint32_t i = 0; i < 4; ++i) {
-    initiateClientConnection();
-    waitForUpstreamResponse(i % 2);
-    cleanupUpstreamConnection();
+    sendAndReceiveUpstream(i % 2);
   }
 
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0)});
@@ -252,9 +255,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 3);
 
   for (uint32_t i = 0; i < 6; ++i) {
-    initiateClientConnection();
-    waitForUpstreamResponse((i + 1) % 3);
-    cleanupUpstreamConnection();
+    sendAndReceiveUpstream((i + 1) % 3);
   }
 
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 4, 0, 0)});
@@ -270,15 +271,28 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   test_server_->waitForCounterGe("load_reporter.requests", 3);
 
   for (uint32_t i = 0; i < 1; ++i) {
-    initiateClientConnection();
-    waitForUpstreamResponse(1);
-    cleanupUpstreamConnection();
+    sendAndReceiveUpstream(1);
   }
 
   waitForLoadStatsRequest({localityStats("winter", 1, 0, 0)});
 
   EXPECT_EQ(3, test_server_->counter("load_reporter.requests")->value());
   EXPECT_EQ(4, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  // A LoadStatsResponse arrives before the expiration of the reporting interval.
+  sendLoadStatsResponse({"cluster_0"}, 1);
+  test_server_->waitForCounterGe("load_reporter.requests", 4);
+  sendAndReceiveUpstream(1);
+  sendLoadStatsResponse({"cluster_0"}, 1);
+  test_server_->waitForCounterGe("load_reporter.requests", 5);
+  sendAndReceiveUpstream(1);
+  sendAndReceiveUpstream(1);
+
+  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0)});
+
+  EXPECT_EQ(5, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_EQ(5, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();
@@ -299,14 +313,10 @@ TEST_P(LoadStatsIntegrationTest, Error) {
   test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 1);
 
   // This should count as an error since 5xx.
-  initiateClientConnection();
-  waitForUpstreamResponse(0, 503);
-  cleanupUpstreamConnection();
+  sendAndReceiveUpstream(0, 503);
 
   // This should count as "success" since non-5xx.
-  initiateClientConnection();
-  waitForUpstreamResponse(0, 404);
-  cleanupUpstreamConnection();
+  sendAndReceiveUpstream(0, 404);
 
   waitForLoadStatsRequest({localityStats("winter", 1, 1, 0)});
 
