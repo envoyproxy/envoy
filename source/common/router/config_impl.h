@@ -229,6 +229,14 @@ private:
 
 class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
 public:
+  MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
+      : MetadataMatchCriteriaImpl(nullptr, metadata_matches){};
+
+  /**
+   * Constructs a new MetadataMatchCriteriaImpl, merging existing
+   * metadata criteria from a parent. Metadata from the
+   * ProtobufWkt::Struct override those from the parent.
+   */
   MetadataMatchCriteriaImpl(const MetadataMatchCriteriaImpl* parent,
                             const ProtobufWkt::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(parent, metadata_matches)){};
