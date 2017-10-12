@@ -43,7 +43,7 @@ class IpResolverFactory : public ResolverFactory {
 public:
   ResolverPtr createResolver() const override { return ResolverPtr{new IpResolver()}; }
 
-  std::string name() override { return Config::AddressResolverNames::get().IP; }
+  std::string name() const override { return Config::AddressResolverNames::get().IP; }
 };
 
 /**

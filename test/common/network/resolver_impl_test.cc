@@ -101,7 +101,7 @@ private:
 
 class TestResolverFactory : public ResolverFactory {
 public:
-  std::string name() override { return "envoy.test.resolver"; }
+  std::string name() const override { return "envoy.test.resolver"; }
 
   ResolverPtr createResolver() const override {
     return ResolverPtr{new TestResolver(name_mappings_)};
