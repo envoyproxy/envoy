@@ -1,5 +1,7 @@
 #pragma once
 
+#include <numeric>
+
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 
