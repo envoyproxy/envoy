@@ -257,6 +257,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const Http::AccessLog::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+  const MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
@@ -317,6 +318,7 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+    const MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);

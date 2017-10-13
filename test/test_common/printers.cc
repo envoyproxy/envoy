@@ -12,9 +12,10 @@ namespace Envoy {
 namespace Http {
 void PrintTo(const HeaderMapImpl& headers, std::ostream* os) {
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         std::ostream* os = static_cast<std::ostream*>(context);
         *os << "{'" << header.key().c_str() << "','" << header.value().c_str() << "'}";
+        return HeaderMap::Iterate::Continue;
       },
       os);
 }

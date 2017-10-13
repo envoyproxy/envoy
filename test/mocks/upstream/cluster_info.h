@@ -19,6 +19,21 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Upstream {
 
+class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
+public:
+  MockLoadBalancerSubsetInfo();
+  ~MockLoadBalancerSubsetInfo();
+
+  // Upstream::LoadBalancerSubsetInfo
+  MOCK_CONST_METHOD0(isEnabled, bool());
+  MOCK_CONST_METHOD0(fallbackPolicy,
+                     envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
+  MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
+  MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
+
+  std::vector<std::set<std::string>> subset_keys_;
+};
+
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
@@ -40,6 +55,7 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};
@@ -52,6 +68,7 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
+  NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
 };
 
 } // namespace Upstream

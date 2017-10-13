@@ -81,20 +81,22 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   // layers understand that we do two passes here to build the final header list to encode.
   final_headers.reserve(headers.size());
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] == ':') {
           insertHeader(*final_headers, header);
         }
+        return HeaderMap::Iterate::Continue;
       },
       &final_headers);
 
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
         if (header.key().c_str()[0] != ':') {
           insertHeader(*final_headers, header);
         }
+        return HeaderMap::Iterate::Continue;
       },
       &final_headers);
 }

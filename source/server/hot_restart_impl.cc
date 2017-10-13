@@ -101,7 +101,9 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
                      max_stat_name_len);
 }
 
-std::string SharedMemory::version() { return version(num_stats_, Stats::RawStatData::size()); }
+std::string SharedMemory::version() {
+  return version(num_stats_, Stats::RawStatData::maxNameLength());
+}
 
 HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
     : options_(options), shmem_(SharedMemory::initialize(options, os_sys_calls)),

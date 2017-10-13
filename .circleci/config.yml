@@ -69,15 +69,14 @@ jobs:
        - run: docs/build.sh
        - add_ssh_keys
        - run: docs/publish.sh
-   # Commented out right now due to CI config issues
-   #mac:
-   #  macos:
-   #    xcode: "8.3.3"
-   #  steps:
-   #    - run: sudo ntpdate -vu time.apple.com
-   #    - checkout
-   #    - run: ci/mac_ci_setup.sh
-   #    - run: ci/mac_ci_steps.sh
+   mac:
+     macos:
+       xcode: "8.3.3"
+     steps:
+       - run: sudo ntpdate -vu time.apple.com
+       - checkout
+       - run: ci/mac_ci_setup.sh
+       - run: ci/mac_ci_steps.sh
 
 workflows:
   version: 2
@@ -93,4 +92,4 @@ workflows:
       - format
       - build_image
       - docs
-      #- mac
+      - mac

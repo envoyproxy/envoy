@@ -39,7 +39,7 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         const char* key_to_use = header.key().c_str();
         uint32_t key_size_to_use = header.key().size();
         // Translate :authority -> host so that upper layers do not need to deal with this.
@@ -50,11 +50,12 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
 
         // Skip all headers starting with ':' that make it here.
         if (key_to_use[0] == ':') {
-          return;
+          return HeaderMap::Iterate::Continue;
         }
 
         static_cast<StreamEncoderImpl*>(context)->encodeHeader(
             key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+        return HeaderMap::Iterate::Continue;
       },
       this);
 

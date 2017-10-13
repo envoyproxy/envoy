@@ -279,10 +279,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 #ifndef NVLOG
   headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> void {
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
                          *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
                          header.key().c_str(), header.value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
       },
       callbacks_);
 #endif
