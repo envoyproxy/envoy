@@ -2655,15 +2655,15 @@ TEST(MetadataMatchCriteriaImpl, Create) {
 
   EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
   auto it = matches.metadataMatchCriteria().begin();
-  EXPECT_EQ((*it)->name(), std::string("a"));
-  EXPECT_EQ((*it)->value().value().string_value(), std::string("v1"));
+  EXPECT_EQ((*it)->name(), "a");
+  EXPECT_EQ((*it)->value().value().string_value(), "v1");
   it++;
 
-  EXPECT_EQ((*it)->name(), std::string("b"));
+  EXPECT_EQ((*it)->name(), "b");
   EXPECT_EQ((*it)->value().value().number_value(), 2.0);
   it++;
 
-  EXPECT_EQ((*it)->name(), std::string("c"));
+  EXPECT_EQ((*it)->name(), "c");
   EXPECT_EQ((*it)->value().value().bool_value(), true);
 }
 
@@ -2700,20 +2700,20 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 
   EXPECT_EQ(matches->metadataMatchCriteria().size(), 4);
   auto it = matches->metadataMatchCriteria().begin();
-  EXPECT_EQ((*it)->name(), std::string("a"));
-  EXPECT_EQ((*it)->value().value().string_value(), std::string("override1"));
+  EXPECT_EQ((*it)->name(), "a");
+  EXPECT_EQ((*it)->value().value().string_value(), "override1");
   it++;
 
-  EXPECT_EQ((*it)->name(), std::string("b"));
+  EXPECT_EQ((*it)->name(), "b");
   EXPECT_EQ((*it)->value().value().number_value(), 2.0);
   it++;
 
-  EXPECT_EQ((*it)->name(), std::string("b++"));
+  EXPECT_EQ((*it)->name(), "b++");
   EXPECT_EQ((*it)->value().value().string_value(), "v2");
   it++;
 
-  EXPECT_EQ((*it)->name(), std::string("c"));
-  EXPECT_EQ((*it)->value().value().string_value(), std::string("override3"));
+  EXPECT_EQ((*it)->name(), "c");
+  EXPECT_EQ((*it)->value().value().string_value(), "override3");
 }
 
 TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
@@ -2785,8 +2785,8 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
     EXPECT_EQ(matches->metadataMatchCriteria().size(), 2);
-    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), std::string("r1_key"));
-    EXPECT_EQ(matches->metadataMatchCriteria().at(1)->name(), std::string("r1_wc_key"));
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r1_key");
+    EXPECT_EQ(matches->metadataMatchCriteria().at(1)->name(), "r1_wc_key");
   }
 
   {
@@ -2799,7 +2799,7 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
     EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
-    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), std::string("r2_wc_key"));
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r2_wc_key");
   }
 
   {
@@ -2811,7 +2811,7 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
     EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
-    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), std::string("r3_key"));
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r3_key");
   }
 
   {
@@ -2824,7 +2824,7 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
     auto* matches = route_entry->metadataMatchCriteria();
     EXPECT_NE(matches, nullptr);
     EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
-    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), std::string("r4_key"));
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r4_key");
   }
 }
 
