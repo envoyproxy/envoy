@@ -18,6 +18,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "api/bootstrap.pb.h"
@@ -248,6 +249,7 @@ private:
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
+  LoadStatsReporterPtr load_stats_reporter_;
 };
 
 } // namespace Upstream

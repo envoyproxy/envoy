@@ -77,6 +77,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
     // If local locality is not defined then skip populating per locality hosts.
     const Locality local_locality(local_info_.node().locality());
+    ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
     if (!local_locality.empty()) {
       std::map<Locality, std::vector<HostSharedPtr>> hosts_per_locality;
 

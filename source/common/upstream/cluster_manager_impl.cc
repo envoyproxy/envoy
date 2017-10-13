@@ -238,6 +238,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   init_helper_.onStaticLoadComplete();
   ads_mux_->start();
+
+  if (cm_config.has_load_stats_config()) {
+    const auto& load_stats_config = cm_config.load_stats_config();
+    if (load_stats_config.cluster_name().size() != 1) {
+      // TODO(htuch): Add support for multiple clusters, #1170.
+      throw EnvoyException(
+          "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
+    }
+    load_stats_reporter_.reset(new LoadStatsReporter(
+        bootstrap.node(), *this, stats, load_stats_config.cluster_name()[0], primary_dispatcher));
+  }
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
