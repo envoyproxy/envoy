@@ -57,8 +57,8 @@ public:
     UNREFERENCED_PARAMETER(version);
   }
 
-  void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
-                           bool accept) override {
+  void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
+                           const std::string& version, bool accept) override {
     std::string file_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       file_json += "{\"@type\":\"type.googleapis.com/"

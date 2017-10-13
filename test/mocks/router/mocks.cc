@@ -52,6 +52,9 @@ MockVirtualHost::~MockVirtualHost() {}
 MockHashPolicy::MockHashPolicy() {}
 MockHashPolicy::~MockHashPolicy() {}
 
+MockMetadataMatchCriteria::MockMetadataMatchCriteria() {}
+MockMetadataMatchCriteria::~MockMetadataMatchCriteria() {}
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));

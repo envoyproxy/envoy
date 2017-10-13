@@ -17,7 +17,8 @@ namespace Upstream {
  * All per host stats. @see stats_macros.h
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
- * envoy.api.v2.UpstreamLocalityStats for the definitions of success/error.
+ * envoy.api.v2.UpstreamLocalityStats for the definitions of success/error. These are latched by
+ * LoadStatsReporter, independent of the normal stats sink flushing.
  */
 // clang-format off
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \

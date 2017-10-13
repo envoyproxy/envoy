@@ -61,6 +61,7 @@ public:
   template <class T> void sendGrpcMessage(const T& message) {
     auto serialized_response = Grpc::Common::serializeBody(message);
     encodeData(*serialized_response, false);
+    ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
   }
   template <class T> void decodeGrpcFrame(T& message) {
     EXPECT_GE(decoded_grpc_frames_.size(), 1);

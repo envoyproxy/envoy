@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/router/router.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -24,6 +25,12 @@ public:
    * @return Optional<uint64_t> the optional hash key to use.
    */
   virtual Optional<uint64_t> computeHashKey() PURE;
+
+  /**
+   * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts
+   *         during load balancing.
+   */
+  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 
   /**
    * @return const Network::Connection* the incoming connection or nullptr to use during load
