@@ -225,14 +225,14 @@ public:
   const std::string RESPONSE_CODE_CLASS = "envoy.response_code_class";
 
   // Mapping from the names above to their respective regex strings.
-  const std::unordered_map<std::string, std::string> regex_map_;
+  const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
 
   // Constructor to fill map.
-  TagNameValues() : regex_map_(getRegexMapping()) {}
+  TagNameValues() : name_regex_pairs_(getRegexMapping()) {}
 
 private:
   // Creates a regex mapping for all tag names.
-  std::unordered_map<std::string, std::string> getRegexMapping();
+  std::vector<std::pair<std::string, std::string>> getRegexMapping();
 };
 
 typedef ConstSingleton<TagNameValues> TagNames;

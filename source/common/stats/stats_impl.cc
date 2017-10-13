@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 
@@ -74,9 +75,12 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
     return TagExtractorPtr{new TagExtractorImpl(name, regex)};
   } else {
     // Look up the default for that name.
-    const auto tag_names = Config::TagNames::get();
-    auto it = tag_names.regex_map_.find(name);
-    if (it != tag_names.regex_map_.end()) {
+    const auto& name_regex_pairs = Config::TagNames::get().name_regex_pairs_;
+    auto it = std::find_if(name_regex_pairs.begin(), name_regex_pairs.end(),
+                           [&name](const std::pair<std::string, std::string>& name_regex_pair) {
+                             return name == name_regex_pair.first;
+                           });
+    if (it != name_regex_pairs.end()) {
       return TagExtractorPtr{new TagExtractorImpl(name, it->second)};
     } else {
       throw EnvoyException(fmt::format(

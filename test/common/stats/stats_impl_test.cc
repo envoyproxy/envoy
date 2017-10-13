@@ -110,7 +110,7 @@ public:
   DefaultTagRegexTester() {
     const auto& tag_names = Config::TagNames::get();
 
-    for (const std::pair<std::string, std::string>& name_and_regex : tag_names.regex_map_) {
+    for (const std::pair<std::string, std::string>& name_and_regex : tag_names.name_regex_pairs_) {
       tag_extractors_.emplace_back(TagExtractorImpl::createTagExtractor(name_and_regex.first, ""));
     }
   }

@@ -70,7 +70,6 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(options, local_address, component_factory, version_int);
-
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());

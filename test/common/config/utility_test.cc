@@ -1,9 +1,9 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "test/test_common/utility.h"
 
 #include "test/mocks/local_info/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
 #include "gmock/gmock.h"
@@ -77,10 +77,10 @@ TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
 
   // Default configuration should be all default tag extractors
   std::vector<Stats::TagExtractorPtr> tag_extractors = Utility::createTagExtractors(bootstrap);
-  EXPECT_EQ(tag_names.regex_map_.size(), tag_extractors.size());
+  EXPECT_EQ(tag_names.name_regex_pairs_.size(), tag_extractors.size());
 
   // Default extractors are explicitly turned off.
-  auto &stats_config = *bootstrap.mutable_stats_config();
+  auto& stats_config = *bootstrap.mutable_stats_config();
   stats_config.mutable_use_all_default_tags()->set_value(false);
   tag_extractors = Utility::createTagExtractors(bootstrap);
   EXPECT_EQ(0, tag_extractors.size());
@@ -88,25 +88,28 @@ TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
   // Default extractors explicitly tuned on.
   stats_config.mutable_use_all_default_tags()->set_value(true);
   tag_extractors = Utility::createTagExtractors(bootstrap);
-  EXPECT_EQ(tag_names.regex_map_.size(), tag_extractors.size());
+  EXPECT_EQ(tag_names.name_regex_pairs_.size(), tag_extractors.size());
 
   // Create a duplicate name by adding a default name with all the defaults enabled.
   auto& custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name(tag_names.CLUSTER_NAME);
-  EXPECT_THROW_WITH_MESSAGE(Utility::createTagExtractors(bootstrap), EnvoyException, fmt::format("Tag name '{}' specified twice.",tag_names.CLUSTER_NAME));
+  EXPECT_THROW_WITH_MESSAGE(Utility::createTagExtractors(bootstrap), EnvoyException,
+                            fmt::format("Tag name '{}' specified twice.", tag_names.CLUSTER_NAME));
 
   // Remove the defaults and ensure the manually added default gets the correct regex.
   stats_config.mutable_use_all_default_tags()->set_value(false);
   tag_extractors = Utility::createTagExtractors(bootstrap);
   ASSERT_EQ(1, tag_extractors.size());
   std::vector<Stats::Tag> tags;
-  std::string extracted_name = tag_extractors.at(0)->extractTag("cluster.test_cluster.test_stat", tags);
+  std::string extracted_name =
+      tag_extractors.at(0)->extractTag("cluster.test_cluster.test_stat", tags);
   EXPECT_EQ("cluster.test_stat", extracted_name);
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ(tag_names.CLUSTER_NAME, tags.at(0).name_);
   EXPECT_EQ("test_cluster", tags.at(0).value_);
 
-  // Add a custom regex for the name instead of relying on the default. The regex below just captures the entire string, and should override the default for this name.
+  // Add a custom regex for the name instead of relying on the default. The regex below just
+  // captures the entire string, and should override the default for this name.
   custom_tag_extractor.set_regex("((.*))");
   tag_extractors = Utility::createTagExtractors(bootstrap);
   ASSERT_EQ(1, tag_extractors.size());
@@ -132,7 +135,9 @@ TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
 
   // Non-default custom name without regex should throw
   custom_tag_extractor.set_regex("");
-  EXPECT_THROW_WITH_MESSAGE(Utility::createTagExtractors(bootstrap), EnvoyException, "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::createTagExtractors(bootstrap), EnvoyException,
+      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
 } // namespace Config

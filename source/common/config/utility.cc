@@ -121,7 +121,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-std::vector<Stats::TagExtractorPtr> Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
+std::vector<Stats::TagExtractorPtr>
+Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
 
   std::vector<Stats::TagExtractorPtr> tag_extractors;
 
@@ -139,7 +140,7 @@ std::vector<Stats::TagExtractorPtr> Utility::createTagExtractors(const envoy::ap
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
       bootstrap.stats_config().use_all_default_tags().value()) {
     for (const std::pair<std::string, std::string>& default_tag :
-        TagNames::get().regex_map_) {
+         TagNames::get().name_regex_pairs_) {
       add_tag(default_tag.first, default_tag.second);
     }
   }
