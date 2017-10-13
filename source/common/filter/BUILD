@@ -47,6 +47,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/router:router_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan",

@@ -173,6 +173,16 @@ public:
                                                       const Http::HeaderMap& headers));
 };
 
+class MockMetadataMatchCriteria : public MetadataMatchCriteria {
+public:
+  MockMetadataMatchCriteria();
+  ~MockMetadataMatchCriteria();
+
+  // Router::MetadataMatchCriteria
+  MOCK_CONST_METHOD0(metadataMatchCriteria,
+                     const std::vector<MetadataMatchCriterionConstSharedPtr>&());
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -207,6 +217,7 @@ public:
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
+  MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
 };
 

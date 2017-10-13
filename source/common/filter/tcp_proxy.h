@@ -102,6 +102,7 @@ public:
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> hashKey() const override { return {}; }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }
