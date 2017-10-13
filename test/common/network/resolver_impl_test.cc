@@ -103,6 +103,7 @@ private:
 };
 
 TEST(ResolverTest, NonStandardResolver) {
+  // TODO(akonradi) Use singleton override for this test once #1808 is resolved.
   Registry::RegisterFactory<TestResolver, Resolver> register_resolver;
   auto& test_resolver = register_resolver.testGetFactory();
   test_resolver.addMapping("foo", "1.2.3.4");
