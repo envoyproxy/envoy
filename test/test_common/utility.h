@@ -32,7 +32,7 @@ namespace Envoy {
   }
 
 // Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
-// one can run the test with --test_arg=--gtest_filter=[seed]
+// one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {
 public:
   TestRandomGenerator();
