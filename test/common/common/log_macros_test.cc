@@ -16,6 +16,9 @@ public:
   void logMessage() {
     ENVOY_LOG(trace, "fake message");
     ENVOY_LOG(debug, "fake message");
+    ENVOY_LOG(warn, "fake message");
+    ENVOY_LOG(error, "fake message");
+    ENVOY_LOG(critical, "fake message");
     ENVOY_CONN_LOG(info, "fake message", connection_);
     ENVOY_STREAM_LOG(info, "fake message", stream_);
   }

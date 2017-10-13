@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "stats_impl_test",
     srcs = ["stats_impl_test.cc"],
-    deps = ["//source/common/stats:stats_lib"],
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -39,6 +42,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:statsd_lib",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

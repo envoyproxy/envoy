@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "common/common/c_smart_ptr.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
@@ -16,6 +17,7 @@
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 using testing::_;
 
@@ -31,10 +33,9 @@ public:
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
-    std::unique_ptr<RawStatData>& stat_ref = stats_[name];
+    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
     if (!stat_ref) {
-      stat_ref.reset(new RawStatData());
-      memset(stat_ref.get(), 0, sizeof(RawStatData));
+      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
       stat_ref->initialize(name);
     } else {
       stat_ref->ref_count_++;
@@ -59,7 +60,8 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::unique_ptr<RawStatData>> stats_;
+  static void freeAdapter(RawStatData* data) { ::free(data); }
+  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
 };
 
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
@@ -98,14 +100,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Timer& t1 = store_->timer("t1");
-  EXPECT_EQ(&t1, &store_->timer("t1"));
-
-  EXPECT_CALL(sink_, onHistogramComplete("h", 100));
-  store_->deliverHistogramToSinks("h", 100);
-
-  EXPECT_CALL(sink_, onTimespanComplete("t", std::chrono::milliseconds(200)));
-  store_->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  store_->deliverHistogramToSinks(h1, 100);
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -132,8 +132,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
-  Timer& t1 = store_->timer("t1");
-  EXPECT_EQ(&t1, &store_->timer("t1"));
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
   EXPECT_EQ(&c1, store_->counters().front().get());
@@ -172,20 +172,18 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
 
-  Timer& t1 = store_->timer("t1");
-  Timer& t2 = scope1->timer("t2");
-  EXPECT_EQ("t1", t1.name());
-  EXPECT_EQ("scope1.t2", t2.name());
-
-  EXPECT_CALL(sink_, onHistogramComplete("scope1.h", 100));
-  scope1->deliverHistogramToSinks("h", 100);
-
-  EXPECT_CALL(sink_, onTimespanComplete("scope1.t", std::chrono::milliseconds(200)));
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 200));
+  h2.recordValue(200);
 
   store_->shutdownThreading();
-  scope1->deliverHistogramToSinks("h", 100);
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  scope1->deliverHistogramToSinks(h1, 100);
+  scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
 
   // Includes overflow stat.

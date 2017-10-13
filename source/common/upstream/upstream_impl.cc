@@ -67,7 +67,11 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(100U, new_weight)); }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
+  return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+}
+
+ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
 ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
@@ -82,11 +86,14 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
-      stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
+      stats_(generateStats(*stats_scope_)),
+      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(getSourceAddress(config, source_address)), added_via_api_(added_via_api) {
+      source_address_(getSourceAddress(config, source_address)), added_via_api_(added_via_api),
+      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())) {
   ssl_ctx_ = nullptr;
   if (config.has_tls_context()) {
     Ssl::ClientContextConfigImpl context_config(config.tls_context());

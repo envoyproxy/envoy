@@ -30,6 +30,9 @@ modify different aspects of the server.
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
       :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
 
+    - ``added_via_api`` flag - ``false`` if the cluster was added via static configuration, ``true``
+       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
+
   Per host statistics
     .. csv-table::
       :header: Name, Type, Description
@@ -40,6 +43,8 @@ modify different aspects of the server.
       cx_connect_fail, Counter, Total connection failures
       rq_total, Counter, Total requests
       rq_timeout, Counter, Total timed out requests
+      rq_success, Counter, Total requests with non-5xx responses
+      rq_error, Counter, Total requests with 5xx responses
       rq_active, Gauge, Total active requests
       healthy, String, The health status of the host. See below
       weight, Integer, Load balancing weight (1-100)
@@ -128,7 +133,7 @@ The fields are:
 
 .. http:get:: /stats
 
-  Outputs all statistics on demand. This includes only counters and gauges. Timers are not output as
-  Envoy currently has no built in histogram support and relies on statsd for timer aggregation. This
-  command is very useful for local debugging. See :ref:`here <operations_stats>` for more
-  information.
+  Outputs all statistics on demand. This includes only counters and gauges. Histograms are not
+  output as Envoy currently has no built in histogram support and relies on statsd for
+  aggregation. This command is very useful for local debugging. See :ref:`here <operations_stats>`
+  for more information.

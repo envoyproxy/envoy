@@ -278,6 +278,7 @@ envoy_cc_library(
     hdrs = ["upstream_impl.h"],
     external_deps = ["envoy_base"],
     deps = [
+        ":load_balancer_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",
         "//include/envoy/event:timer_interface",

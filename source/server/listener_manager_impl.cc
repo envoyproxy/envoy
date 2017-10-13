@@ -91,11 +91,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() == 1);
   const auto& filter_chain = config.filter_chains()[0];
 
-  // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
-  // later.
-  std::string final_stat_name = fmt::format("listener.{}.", address_->asString());
-  std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
-  listener_scope_ = parent_.server_.stats().createScope(final_stat_name);
+  listener_scope_ =
+      parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()));
 
   if (filter_chain.has_tls_context()) {
     Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());

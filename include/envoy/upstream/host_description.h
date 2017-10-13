@@ -16,8 +16,8 @@ namespace Upstream {
 /**
  * All per host stats. @see stats_macros.h
  *
- * {rq_success, rq_error, rq_dropped} have specific semantics driven by the needs of EDS load
- * reporting. See envoy.api.v2.UpstreamLocalityStats for the definitions of success/error/dropped.
+ * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
+ * envoy.api.v2.UpstreamLocalityStats for the definitions of success/error.
  */
 // clang-format off
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
@@ -28,7 +28,6 @@ namespace Upstream {
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_success)                                                                              \
   COUNTER(rq_error)                                                                                \
-  COUNTER(rq_dropped)                                                                              \
   GAUGE  (rq_active)
 // clang-format on
 

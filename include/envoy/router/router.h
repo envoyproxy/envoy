@@ -15,6 +15,9 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -226,6 +229,36 @@ public:
                                           const Http::HeaderMap& headers) const PURE;
 };
 
+class MetadataMatchCriterion {
+public:
+  virtual ~MetadataMatchCriterion() {}
+
+  /*
+   * @return const std::string& the name of the metadata key
+   */
+  virtual const std::string& name() const PURE;
+
+  /*
+   * @return const Envoy::HashedValue& the value for the metadata key
+   */
+  virtual const HashedValue& value() const PURE;
+};
+
+typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
+
+class MetadataMatchCriteria {
+public:
+  virtual ~MetadataMatchCriteria() {}
+
+  /*
+   * @return std::vector<MetadataMatchCriterionConstSharedPtr>& a vector of
+   * metadata to be matched against upstream endpoints when load
+   * balancing, sorted lexically by name.
+   */
+  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
+  metadataMatchCriteria() const PURE;
+};
+
 /**
  * An individual resolved route entry.
  */
@@ -306,6 +339,12 @@ public:
    * @return bool true if this route should use WebSockets.
    */
   virtual bool useWebSocket() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 
   /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated

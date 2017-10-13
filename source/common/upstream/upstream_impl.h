@@ -8,6 +8,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/event/timer.h"
@@ -27,6 +28,7 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -181,10 +183,10 @@ public:
                    HostListsConstSharedPtr healthy_hosts_per_locality,
                    const std::vector<HostSharedPtr>& hosts_added,
                    const std::vector<HostSharedPtr>& hosts_removed) {
-    hosts_ = hosts;
-    healthy_hosts_ = healthy_hosts;
-    hosts_per_locality_ = hosts_per_locality;
-    healthy_hosts_per_locality_ = healthy_hosts_per_locality;
+    hosts_ = std::move(hosts);
+    healthy_hosts_ = std::move(healthy_hosts);
+    hosts_per_locality_ = std::move(hosts_per_locality);
+    healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 
@@ -230,6 +232,7 @@ public:
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
+  static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -247,9 +250,11 @@ public:
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
+  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
+  const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
 
 private:
   struct ResourceManagers {
@@ -273,6 +278,8 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
+  Stats::IsolatedStoreImpl load_report_stats_store_;
+  mutable ClusterLoadReportStats load_report_stats_;
   Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
@@ -281,6 +288,7 @@ private:
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   const bool added_via_api_;
+  LoadBalancerSubsetInfoImpl lb_subset_;
 };
 
 /**

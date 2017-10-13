@@ -19,8 +19,9 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
   for (const std::string& s : words) {
     argv.push_back(s.c_str());
   }
-  return std::unique_ptr<OptionsImpl>(
-      new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]), "1", spdlog::level::warn));
+  return std::unique_ptr<OptionsImpl>(new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]),
+                                                      [](uint64_t, uint64_t) { return "1"; },
+                                                      spdlog::level::warn));
 }
 
 TEST(OptionsImplDeathTest, HotRestartVersion) {
@@ -69,5 +70,10 @@ TEST(OptionsImplTest, DefaultParams) {
 TEST(OptionsImplTest, BadCliOption) {
   EXPECT_DEATH(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                "error: unknown IP address version 'foo'");
+}
+
+TEST(OptionsImplTest, BadStatNameLenOption) {
+  EXPECT_DEATH(createOptionsImpl("envoy --max-stat-name-len 1"),
+               "error: the 'max-stat-name-len' value specified");
 }
 } // namespace Envoy

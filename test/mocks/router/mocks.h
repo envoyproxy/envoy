@@ -184,6 +184,7 @@ public:
                      void(Http::HeaderMap& headers,
                           const Http::AccessLog::RequestInfo& request_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());

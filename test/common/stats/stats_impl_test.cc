@@ -1,6 +1,10 @@
 #include <chrono>
 
+#include "envoy/stats/stats_macros.h"
+
 #include "common/stats/stats_impl.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -21,21 +25,48 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
 
-  Timer& t1 = store.timer("t1");
-  Timer& t2 = scope1->timer("t2");
-  EXPECT_EQ("t1", t1.name());
-  EXPECT_EQ("scope1.t2", t2.name());
-
-  store.deliverHistogramToSinks("h", 100);
-  store.deliverTimingToSinks("t", std::chrono::milliseconds(200));
-  scope1->deliverHistogramToSinks("h", 100);
-  scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
+  Histogram& h1 = store.histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  h1.recordValue(200);
+  h2.recordValue(200);
 
   ScopePtr scope2 = scope1->createScope("foo.");
   EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
 
   EXPECT_EQ(3UL, store.counters().size());
   EXPECT_EQ(2UL, store.gauges().size());
+}
+
+/**
+ * Test stats macros. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
+  COUNTER  (test_counter)                                                                          \
+  GAUGE    (test_gauge)                                                                            \
+  HISTOGRAM(test_histogram)
+// clang-format on
+
+struct TestStats {
+  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+TEST(StatsMacros, All) {
+  IsolatedStoreImpl stats_store;
+  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
+                                      POOL_GAUGE_PREFIX(stats_store, "test."),
+                                      POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
+
+  Counter& counter = test_stats.test_counter_;
+  EXPECT_EQ("test.test_counter", counter.name());
+
+  Gauge& gauge = test_stats.test_gauge_;
+  EXPECT_EQ("test.test_gauge", gauge.name());
+
+  Histogram& histogram = test_stats.test_histogram_;
+  EXPECT_EQ("test.test_histogram", histogram.name());
 }
 
 } // namespace Stats

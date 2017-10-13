@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["stats_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",

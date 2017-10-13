@@ -42,6 +42,12 @@ to find out more about the origin story and design philosophy of Envoy.
 Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread 
 for information on email list usage.
 
+## Community Meeting
+
+The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
+
+Meeting minutes are here: https://goo.gl/5Cergb
+
 ## Reporting security vulnerabilities
 
 If you've found a vulnerability or a potential vulnerability in Envoy

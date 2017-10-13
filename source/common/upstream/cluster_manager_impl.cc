@@ -520,8 +520,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   config.thread_local_clusters_[name]->host_set_.updateHosts(
-      hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality, hosts_added,
-      hosts_removed);
+      std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
+      std::move(healthy_hosts_per_locality), hosts_added, hosts_removed);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(

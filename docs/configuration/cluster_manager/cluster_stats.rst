@@ -22,8 +22,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection timeouts
   upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
-  upstream_cx_connect_ms, Timer, Connection establishment milliseconds
-  upstream_cx_length_ms, Timer, Connection length milliseconds
+  upstream_cx_connect_ms, Histogram, Connection establishment milliseconds
+  upstream_cx_length_ms, Histogram, Connection length milliseconds
   upstream_cx_destroy, Counter, Total destroyed connections
   upstream_cx_destroy_local, Counter, Total connections destroyed locally
   upstream_cx_destroy_remote, Counter, Total connections destroyed remotely
@@ -61,9 +61,11 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits.
+  config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
   update_attempt, Counter, Total cluster membership update attempts
   update_success, Counter, Total cluster membership update successes
   update_failure, Counter, Total cluster membership update failures
+  version, Gauge, Hash of the contents from the last successful API fetch
   max_host_weight, Gauge, Maximum weight of any host in the cluster
   bind_errors, Counter, Total errors binding the socket to the configured source address.
 
@@ -118,16 +120,16 @@ are rooted at *cluster.<name>.* and contain the following statistics:
 
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
-  upstream_rq_time, Timer, Request time milliseconds
+  upstream_rq_time, Histogram, Request time milliseconds
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
   canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
-  canary.upstream_rq_time, Timer, Upstream canary request time milliseconds
+  canary.upstream_rq_time, Histogram, Upstream canary request time milliseconds
   internal.upstream_rq_<\*xx>, Counter, Internal origin aggregate HTTP response codes
   internal.upstream_rq_<\*>, Counter, Internal origin specific HTTP response codes
-  internal.upstream_rq_time, Timer, Internal origin request time milliseconds
+  internal.upstream_rq_time, Histogram, Internal origin request time milliseconds
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
-  external.upstream_rq_time, Timer, External origin request time milliseconds
+  external.upstream_rq_time, Histogram, External origin request time milliseconds
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
 
@@ -154,7 +156,7 @@ Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<t
 
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
-  upstream_rq_time, Timer, Request time milliseconds
+  upstream_rq_time, Histogram, Request time milliseconds
 
 Load balancer statistics
 ------------------------

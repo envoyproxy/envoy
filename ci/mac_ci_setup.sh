@@ -16,6 +16,11 @@ function install {
     fi
 }
 
+if ! brew update; then
+    echo "Failed to update homebrew"
+    exit 1
+fi
+
 DEPS="coreutils wget cmake libtool go bazel"
 for DEP in ${DEPS}
 do

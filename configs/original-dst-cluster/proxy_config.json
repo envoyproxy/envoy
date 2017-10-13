@@ -3,7 +3,6 @@
         "address": "tcp://0.0.0.0:10000",
         "use_original_dst": true,
         "filters": [{
-            "type": "read",
             "name": "http_connection_manager",
             "config": {
                 "codec_type": "auto",
@@ -22,7 +21,6 @@
                     }]
                 },
                 "filters": [{
-                    "type": "decoder",
                     "name": "router",
                     "config": {}
                 }]

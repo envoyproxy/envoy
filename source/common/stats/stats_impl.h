@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
+#include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
@@ -18,19 +19,79 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Common stats utility routines.
+ */
+class Utility {
+public:
+  // ':' is a reserved char in statsd. Do a character replacement to avoid costly inline
+  // translations later.
+  static std::string sanitizeStatsName(const std::string& name);
+};
+
+/**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
  * it can be allocated from shared memory if needed.
+ *
+ * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful.  Use
+ * RawStatData::size() instead.
  */
 struct RawStatData {
   struct Flags {
     static const uint8_t Used = 0x1;
   };
 
-  static const size_t MAX_NAME_SIZE = 127;
+  /**
+   * Due to the flexible-array-length of name_, c-style allocation
+   * and initialization are neccessary.
+   */
+  RawStatData() = delete;
+  ~RawStatData() = delete;
 
-  RawStatData() { memset(name_, 0, sizeof(name_)); }
+  /**
+   * Configure static settings.  This MUST be called
+   * before any other static or instance methods.
+   */
+  static void configure(Server::Options& options);
+
+  /**
+   * Allow tests to re-configure this value after it has been set.
+   * This is unsafe in a non-test context.
+   */
+  static void configureForTestsOnly(Server::Options& options);
+
+  /**
+   * Returns the maximum length of the name of a stat.  This length
+   * does not include a trailing NULL-terminator.
+   */
+  static size_t maxNameLength() {
+    return initializeAndGetMutableMaxNameLength(DEFAULT_MAX_NAME_SIZE);
+  }
+
+  /**
+   * size in bytes of name_
+   */
+  static size_t nameSize() { return maxNameLength() + 1; }
+
+  /**
+   * Returns the size of this struct, accounting for the length of name_
+   * and padding for alignment.
+   */
+  static size_t size();
+
+  /**
+   * Initializes this object to have the specified name,
+   * a refcount of 1, and all other values zero.
+   */
   void initialize(const std::string& name);
+
+  /**
+   * Returns true if object is in use.
+   */
   bool initialized() { return name_[0] != '\0'; }
+
+  /**
+   * Returns true if this matches name, truncated to maxNameLength().
+   */
   bool matches(const std::string& name);
 
   std::atomic<uint64_t> value_;
@@ -38,7 +99,12 @@ struct RawStatData {
   std::atomic<uint16_t> flags_;
   std::atomic<uint16_t> ref_count_;
   std::atomic<uint32_t> unused_;
-  char name_[MAX_NAME_SIZE + 1];
+  char name_[];
+
+private:
+  static const size_t DEFAULT_MAX_NAME_SIZE = 127;
+
+  static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
 };
 
 /**
@@ -64,11 +130,26 @@ public:
 };
 
 /**
+ * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
+ * will inherit from Metric will have other base classes that will also inherit from Metric.
+ */
+class MetricImpl : public virtual Metric {
+public:
+  MetricImpl(const std::string& name) : name_(name) {}
+
+  const std::string& name() const override { return name_; }
+
+private:
+  const std::string name_;
+};
+
+/**
  * Counter implementation that wraps a RawStatData.
  */
-class CounterImpl : public Counter {
+class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc) : data_(data), alloc_(alloc) {}
+  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc)
+      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
 
   // Stats::Counter
@@ -80,10 +161,9 @@ public:
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
-  std::string name() override { return data_.name_; }
   void reset() override { data_.value_ = 0; }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  uint64_t value() override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
 
 private:
   RawStatData& data_;
@@ -93,9 +173,10 @@ private:
 /**
  * Gauge implementation that wraps a RawStatData.
  */
-class GaugeImpl : public Gauge {
+class GaugeImpl : public Gauge, public MetricImpl {
 public:
-  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc) : data_(data), alloc_(alloc) {}
+  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc)
+      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
 
   // Stats::Gauge
@@ -105,7 +186,6 @@ public:
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
-  virtual std::string name() override { return data_.name_; }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= RawStatData::Flags::Used;
@@ -115,8 +195,8 @@ public:
     ASSERT(used());
     data_.value_ -= amount;
   }
-  bool used() override { return data_.flags_ & RawStatData::Flags::Used; }
-  virtual uint64_t value() override { return data_.value_; }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
 
 private:
   RawStatData& data_;
@@ -124,34 +204,15 @@ private:
 };
 
 /**
- * Timer implementation for the heap.
+ * Histogram implementation for the heap.
  */
-class TimerImpl : public Timer {
+class HistogramImpl : public Histogram, public MetricImpl {
 public:
-  TimerImpl(const std::string& name, Store& parent) : name_(name), parent_(parent) {}
+  HistogramImpl(const std::string& name, Store& parent) : MetricImpl(name), parent_(parent) {}
 
-  // Stats::Timer
-  TimespanPtr allocateSpan() override { return TimespanPtr{new TimespanImpl(*this)}; }
-  std::string name() override { return name_; }
+  // Stats::Histogram
+  void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
-private:
-  /**
-   * Timespan implementation for the heap.
-   */
-  class TimespanImpl : public Timespan {
-  public:
-    TimespanImpl(TimerImpl& parent) : parent_(parent), start_(std::chrono::steady_clock::now()) {}
-
-    // Stats::Timespan
-    void complete() override { complete(parent_.name_); }
-    void complete(const std::string& dynamic_name) override;
-
-  private:
-    TimerImpl& parent_;
-    MonotonicTime start_;
-  };
-
-  std::string name_;
   Store& parent_;
 };
 
@@ -212,18 +273,21 @@ public:
         gauges_([this](const std::string& name) -> GaugeImpl* {
           return new GaugeImpl(*alloc_.alloc(name), alloc_);
         }),
-        timers_(
-            [this](const std::string& name) -> TimerImpl* { return new TimerImpl(name, *this); }) {}
+        histograms_([this](const std::string& name) -> HistogramImpl* {
+          return new HistogramImpl(name, *this);
+        }) {}
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }
-  void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-  void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Timer& timer(const std::string& name) override { return timers_.get(name); }
+  Histogram& histogram(const std::string& name) override {
+    Histogram& histogram = histograms_.get(name);
+    return histogram;
+  }
 
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
@@ -232,17 +296,18 @@ public:
 private:
   struct ScopeImpl : public Scope {
     ScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(prefix) {}
+        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
 
     // Stats::Scope
     ScopePtr createScope(const std::string& name) override {
       return ScopePtr{new ScopeImpl(parent_, prefix_ + name)};
     }
-    void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-    void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
+    void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
     Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
     Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-    Timer& timer(const std::string& name) override { return parent_.timer(prefix_ + name); }
+    Histogram& histogram(const std::string& name) override {
+      return parent_.histogram(prefix_ + name);
+    }
 
     IsolatedStoreImpl& parent_;
     const std::string prefix_;
@@ -251,7 +316,7 @@ private:
   HeapRawStatDataAllocator alloc_;
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Timer, TimerImpl> timers_;
+  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
 };
 
 } // namespace Stats
