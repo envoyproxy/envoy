@@ -358,11 +358,12 @@ TEST_F(RouterTest, AddMultipleCookies) {
         EXPECT_CALL(cb, Call("choco=\"" + choco_c + "\"; Max-Age=15"));
 
         headers.iterate(
-            [](const Http::HeaderEntry& header, void* context) {
+            [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
               if (header.key().c_str() == Http::Headers::get().SetCookie.get().c_str()) {
                 static_cast<MockFunction<void(const std::string&)>*>(context)->Call(
                     std::string(header.value().c_str()));
               }
+              return Http::HeaderMap::Iterate::Continue;
             },
             &cb);
       }));
