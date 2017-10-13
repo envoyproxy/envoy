@@ -358,12 +358,16 @@ public:
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
 
+  // aliases to make iterate() and iterateReverse() callbacks easier to read
+  enum class Iterate { Continue, Break };
+
   /**
    * Callback when calling iterate() over a const header map.
    * @param header supplies the header entry.
    * @param context supplies the context passed to iterate().
+   * @return Iterate::Continue to continue iteration.
    */
-  typedef void (*ConstIterateCb)(const HeaderEntry& header, void* context);
+  typedef Iterate (*ConstIterateCb)(const HeaderEntry& header, void* context);
 
   /**
    * Iterate over a constant header map.
@@ -371,6 +375,13 @@ public:
    * @param context supplies the context that will be passed to the callback.
    */
   virtual void iterate(ConstIterateCb cb, void* context) const PURE;
+
+  /**
+   * Iterate over a constant header map in reverse order.
+   * @param cb supplies the iteration callback.
+   * @param context supplies the context that will be passed to the callback.
+   */
+  virtual void iterateReverse(ConstIterateCb cb, void* context) const PURE;
 
   /**
    * Remove all instances of a header by key.

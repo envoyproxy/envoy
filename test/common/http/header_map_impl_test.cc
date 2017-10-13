@@ -402,5 +402,49 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
 }
 
+TEST(HeaderMapImplTest, Iterate) {
+  TestHeaderMapImpl headers;
+  headers.addCopy("hello", "world");
+  headers.addCopy("foo", "bar");
+  headers.addCopy("world", "hello");
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  MockCb cb;
+
+  EXPECT_CALL(cb, Call("hello", "world"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
+  EXPECT_CALL(cb, Call("world", "hello"));
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+        static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+        return HeaderMap::Iterate::Continue;
+      },
+      &cb);
+}
+
+TEST(HeaderMapImplTest, IterateReverse) {
+  TestHeaderMapImpl headers;
+  headers.addCopy("hello", "world");
+  headers.addCopy("foo", "bar");
+  headers.addCopy("world", "hello");
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  MockCb cb;
+
+  EXPECT_CALL(cb, Call("world", "hello"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
+  // no "hello"
+  headers.iterateReverse(
+      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+        static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+        if ("foo" != std::string{header.key().c_str()}) {
+          return HeaderMap::Iterate::Continue;
+        } else {
+          return HeaderMap::Iterate::Break;
+        }
+      },
+      &cb);
+}
+
 } // namespace Http
 } // namespace Envoy

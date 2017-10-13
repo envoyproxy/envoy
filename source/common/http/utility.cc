@@ -85,8 +85,8 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
   State state;
   state.key_ = key;
 
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
+  headers.iterateReverse(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // Find the cookie headers in the request (typically, there's only one).
         if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
           // Split the cookie header into individual cookies.
@@ -111,10 +111,11 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
                 v = v.substr(1, v.size() - 2);
               }
               state->ret_ = v;
-              return;
+              return HeaderMap::Iterate::Break;
             }
           }
         }
+        return HeaderMap::Iterate::Continue;
       },
       &state);
 

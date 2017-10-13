@@ -110,10 +110,11 @@ protected:
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
     response_headers.iterate(
-        [](const Http::HeaderEntry& entry, void* context) -> void {
+        [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
           Http::LowerCaseString lower_key{entry.key().c_str()};
           EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+          return Http::HeaderMap::Iterate::Continue;
         },
         response_.get());
     if (!response_body.empty()) {
