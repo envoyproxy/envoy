@@ -145,6 +145,13 @@ public:
    * Get the downstream address.
    */
   virtual const std::string& getDownstreamAddress() const PURE;
+
+  // cert info for request
+  virtual const Optional<std::vector<std::string> >& subjectAltNames() const PURE;
+  virtual void subjectAltNames(const std::vector<std::string> > sans) const PURE;
+
+  virtual const Optional<std::string>& certificateHash() const PURE;
+  virtual void certificateHash(const std::string& hash) const PURE;
 };
 
 /**
