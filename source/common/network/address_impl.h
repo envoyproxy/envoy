@@ -48,6 +48,8 @@ public:
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override { return asString() == rhs.asString(); }
   const std::string& asString() const override { return friendly_name_; }
+  // Default logical name is the human-readable name.
+  const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
 
 protected:

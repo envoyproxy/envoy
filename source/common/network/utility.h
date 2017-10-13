@@ -86,21 +86,6 @@ public:
   static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address);
 
   /**
-   * Create an Instance from a envoy::api::v2::Address.
-   * @param address message.
-   * @return pointer to the Instance.
-   */
-  static Address::InstanceConstSharedPtr fromProtoAddress(const envoy::api::v2::Address& address);
-
-  /**
-   * Create an Instance from a envoy::api::v2::SocketAddress.
-   * @param socket address message.
-   * @return pointer to the Instance.
-   */
-  static Address::InstanceConstSharedPtr
-  fromProtoSocketAddress(const envoy::api::v2::SocketAddress& address);
-
-  /**
    * Get the local address of the first interface address that is of type
    * version and is not a loopback address. If no matches are found, return the
    * loopback address of type version.

@@ -70,6 +70,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
@@ -218,6 +219,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
     ],
 )
@@ -265,6 +267,7 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

@@ -46,6 +46,16 @@ public:
     return it->second;
   }
 
+  /**
+   * Remove a factory by name.
+   */
+  static void unregisterFactory(Base& factory) {
+    auto result = factories().erase(factory.name());
+    if (result == 0) {
+      throw EnvoyException(fmt::format("No registration for name: '{}'", factory.name()));
+    }
+  }
+
 private:
   /**
    * Gets the current map of factory implementations.
@@ -73,10 +83,17 @@ public:
   /**
    * Contructor that registers an instance of the factory with the FactoryRegistry.
    */
-  RegisterFactory() {
-    static T* instance = new T;
-    FactoryRegistry<Base>::registerFactory(*instance);
-  }
+  RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
+
+  /**
+   * Destructor that removes an instance of the factory from the FactoryRegistry.
+   */
+  ~RegisterFactory() { FactoryRegistry<Base>::unregisterFactory(instance_); }
+
+  T& testGetFactory() { return instance_; }
+
+private:
+  T instance_;
 };
 
 } // namespace Registry
