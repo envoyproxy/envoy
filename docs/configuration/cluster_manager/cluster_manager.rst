@@ -7,6 +7,7 @@ Cluster manager
   :hidden:
 
   cluster
+  cluster_v2
   sds
   sds_api
   outlier

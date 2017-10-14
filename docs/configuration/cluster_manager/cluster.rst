@@ -3,6 +3,11 @@
 Cluster
 =======
 
+.. attention::
+
+  Envoy supports additional cluster configuration fields when using the :ref:`V2 API
+  <config_cluster_manager_cluster_v2>`.
+
 .. code-block:: json
 
   {

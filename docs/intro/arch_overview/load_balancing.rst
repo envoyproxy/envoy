@@ -128,3 +128,38 @@ with regard to percentage relations in the local zone between originating and up
   In this case the local zone of the upstream cluster can get all of the requests from the
   local zone of the originating cluster and also have some space to allow traffic from other zones
   in the originating cluster (if needed).
+
+.. _arch_overview_load_balancer_subsets:
+
+Load Balancer Subsets
+---------------------
+
+Envoy may be configured to divide hosts within an upstream cluster into subsets based on metadata
+attached to the hosts. Routes may then specify the metadata that a host must have in order to be
+selected by the load balancer, with the option of falling back to a predefined set of hosts,
+including any host.
+
+Subsets use the load balancer policy specified by the cluster. The original destination policy may
+not be used with subsets because the upstream hosts are not known in advance. Subsets are compatible
+with zone aware routing, but be aware that the use of subsets may easily violate the minimum hosts
+condition described above.
+
+If subsets are :ref:`configured <config_cluster_manager_cluster_v2>` and a route specifies no
+metadata or no subset matching the metadata exists, the subset load balancer initiates its fallback
+policy. The default policy is `NO_ENDPOINT`, in which case the request fails as if the cluster had
+no hosts. Conversely, the `ANY_ENDPOINT` fallback policy load balances across all hosts in the
+cluster, without regard to host metadata. Finally, the `DEFAULT_SUBSET` causes fallback to load
+balance among hosts that match a specific set of metadata.
+
+Subsets must be predefined to allow the subset load balancer to efficiently select the correct
+subset of hosts. Each definition is a set of keys, which translates to zero or more
+subsets. Conceptually, each host that has a metadata value for all of the keys in a definition is
+added to a subset specific to its key-value pairs. If no host has all the keys, no subsets result
+from the definition. Multiple definitions may be provided, and a single host may appear in multiple
+subsets if it matches multiple definitions.
+
+During routing, the route's metadata match configuration is used to find a specific subset. If there
+is a subset with the exact keys and values specified by the route, the subset is used for load
+balancing. Otherwise, the fallback policy is used. The cluster's subset configuration must,
+therefore, contain a definition that has the same keys as a given route in order for subset load
+balancing to occur.
