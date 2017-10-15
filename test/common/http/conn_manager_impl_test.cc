@@ -397,6 +397,71 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
+  EXPECT_CALL(*span, setOperation("testOp"));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":method", "GET"},
+                              {":authority", "host"},
+                              {":path", "/"},
+                              {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"},
+                              {"x-envoy-decorator-operation", "testOp"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+
+    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+    filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgress) {
+  setup(false, "");
+  tracing_config_.reset(new TracingConnectionManagerConfig(
+      {Tracing::OperationName::Egress, {LowerCaseString(":method")}}));
+
+  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(tracer_, startSpan_(_, _, _))
+      .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
+                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+        EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
+
+        return span;
+      }));
+  ON_CALL(route_config_provider_.route_config_->route_->decorator_, getOperation())
+      .WillByDefault(Return("testOp"));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
+      .WillOnce(
+          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+  EXPECT_CALL(*span, finishSpan(_))
+      .WillOnce(
+          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -427,6 +492,13 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
     data.drain(4);
   }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_NE(nullptr, headers.EnvoyDecoratorOperation());
+        EXPECT_STREQ("testOp", headers.EnvoyDecoratorOperation()->value().c_str());
+        return FilterHeadersStatus::StopIteration;
+      }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);

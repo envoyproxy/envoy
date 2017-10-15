@@ -502,6 +502,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
+  const HeaderEntry* decorator_operation = request_headers_->EnvoyDecoratorOperation();
   ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
@@ -541,23 +542,38 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
-    Tracing::Decision tracing_decision =
-        Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
-    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                              connection_manager_.config_.tracingStats());
-
-    if (tracing_decision.is_tracing) {
-      active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
-      if (cached_route_.value() && cached_route_.value()->decorator()) {
-        cached_route_.value()->decorator()->apply(*active_span_);
-      }
-      active_span_->injectContext(*request_headers_);
-    }
+    traceRequest(decorator_operation);
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.
   request_info_.downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
+}
+
+void ConnectionManagerImpl::ActiveStream::traceRequest(const HeaderEntry* decorator_operation) {
+  Tracing::Decision tracing_decision =
+      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+  ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
+                                            connection_manager_.config_.tracingStats());
+
+  if (tracing_decision.is_tracing) {
+    active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    if (cached_route_.value() && cached_route_.value()->decorator()) {
+      cached_route_.value()->decorator()->apply(*active_span_);
+      if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+              Tracing::OperationName::Egress &&
+          !cached_route_.value()->decorator()->getOperation().empty()) {
+        request_headers_->insertEnvoyDecoratorOperation().value(
+            cached_route_.value()->decorator()->getOperation());
+      }
+    }
+    if (decorator_operation && !decorator_operation->value().empty() &&
+        connection_manager_.config_.tracingConfig()->operation_name_ ==
+            Tracing::OperationName::Ingress) {
+      active_span_->setOperation(decorator_operation->value().c_str());
+    }
+    active_span_->injectContext(*request_headers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,

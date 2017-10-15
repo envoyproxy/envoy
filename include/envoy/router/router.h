@@ -370,6 +370,12 @@ public:
    * @param Tracing::Span& the span.
    */
   virtual void apply(Tracing::Span& span) const PURE;
+
+  /**
+   * This method returns the operation name.
+   * @return the operation name
+   */
+  virtual const std::string getOperation() const PURE;
 };
 
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
