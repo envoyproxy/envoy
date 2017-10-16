@@ -6,6 +6,13 @@
 cat "$(location :lightstep_compiler_flags)"
 source "$(location :lightstep_compiler_flags)"
 
+if [[ `uname` == "Darwin" ]]; then
+   # OSX CROSSTOOL CC is a relative path, force it to be absolute to be independent of working
+   # directory). Must use CC make variable ($(CC) not $${CC}) or the substitution does not take.
+   export CC="$${PWD}/$(CC)"
+   export CXX="$${PWD}/$(CC)"
+fi
+
 CONFIGURE="$${PWD}/$(location :configure)"
 PROTOC="$${PWD}/$(location @protobuf_bzl//:protoc)"
 PROTOBUF_SRC="$${PWD}/external/protobuf_bzl/src/"
