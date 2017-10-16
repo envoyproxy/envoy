@@ -7,6 +7,7 @@
 #include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
 #include "common/json/config_schemas.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -84,7 +85,13 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
                                const Optional<envoy::api::v2::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
-  cluster.set_name(json_cluster.getString("name"));
+
+  const std::string name = json_cluster.getString("name");
+  if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
+    throw EnvoyException("Cluster name is longer than max configured length");
+  }
+  cluster.set_name(name);
+
   const std::string string_type = json_cluster.getString("type");
   auto set_dns_hosts = [&json_cluster, &cluster] {
     const auto hosts = json_cluster.getObjectArray("hosts");

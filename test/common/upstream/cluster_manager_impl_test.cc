@@ -242,10 +242,7 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), Json::Exception,
-                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
-                            "#/properties/name\n Schema violation: maxLength\n Offending "
-                            "document key: #/name");
+  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, ValidClusterName) {

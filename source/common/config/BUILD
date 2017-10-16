@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

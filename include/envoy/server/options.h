@@ -130,6 +130,11 @@ public:
    * @return uint64_t the maximum name length of a stat.
    */
   virtual uint64_t maxStatNameLength() PURE;
+
+  /**
+   * @return uint64_t the maximum name length of a cluster/route/listener.
+   */
+  virtual uint64_t maxUserSuppliedNameLength() PURE;
 };
 
 } // namespace Server

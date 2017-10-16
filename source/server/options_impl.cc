@@ -7,6 +7,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/version.h"
+#include "common/stats/stats_impl.h"
 
 #include "fmt/format.h"
 #include "spdlog/spdlog.h"
@@ -22,8 +23,20 @@
 #define ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH 127
 #endif
 
+// Can be overridden at compile time
+#ifndef ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH
+#define ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH 60
+#endif
+
 #if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH < 127
 #error "ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH must be >= 127"
+#endif
+
+// Based on current defaults: cluster name is 60 chars, and the rest is 67 chars.
+// So, with a configurable cluster name length, we still need to have head room for 67 chars.
+#if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH < (ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH + DEFAULT_MAX_STAT_SUFFIX_LENGTH)
+#error                                                                                             \
+    "ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH must be >= (ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH+DEFAULT_MAX_STAT_SUFFIX_LENGTH)"
 #endif
 
 namespace Envoy {
@@ -85,6 +98,9 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   TCLAP::ValueArg<uint64_t> max_stat_name_len("", "max-stat-name-len",
                                               "Maximum name length for a stat", false,
                                               ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH, "uint64_t", cmd);
+  TCLAP::ValueArg<uint64_t> max_user_supplied_name_len(
+      "", "max-user-supplied-name-len", "Maximum name length for a cluster, route or listener",
+      false, ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH, "uint64_t", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -96,6 +112,13 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   if (max_stat_name_len.getValue() < 127) {
     std::cerr << "error: the 'max-stat-name-len' value specified (" << max_stat_name_len.getValue()
               << ") is less than the minimum value of 127" << std::endl;
+    exit(1);
+  }
+
+  if (max_stat_name_len.getValue() < (max_user_supplied_name_len.getValue() + DEFAULT_MAX_STAT_SUFFIX_LENGTH)) {
+    std::cerr << "error: the 'max-stat-name-len' value specified (" << max_stat_name_len.getValue()
+              << ") is less than DEFAULT_MAX_STAT_SUFFIX_LENGTH (" << DEFAULT_MAX_STAT_SUFFIX_LENGTH << ") + max-user-supplied-name-len value ("
+              << max_user_supplied_name_len.getValue() << ")" << std::endl;
     exit(1);
   }
 
@@ -145,5 +168,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_stat_name_length_ = max_stat_name_len.getValue();
+  max_user_supplied_name_length_ = max_user_supplied_name_len.getValue();
 }
 } // namespace Envoy
