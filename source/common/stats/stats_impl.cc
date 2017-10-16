@@ -1,10 +1,11 @@
+#include "common/stats/stats_impl.h"
+
 #include <string.h>
 
 #include <chrono>
 #include <string>
 
 #include "common/common/utility.h"
-#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -47,7 +48,8 @@ void RawStatData::configure(Server::Options& options) {
 
   RELEASE_ASSERT(opt_max_stat_name_len > 0);
   RELEASE_ASSERT(opt_max_user_supplied_name_len > 0);
-  RELEASE_ASSERT(opt_max_stat_name_len >= (DEFAULT_MAX_STAT_SUFFIX_LENGTH + opt_max_user_supplied_name_len));
+  RELEASE_ASSERT(opt_max_stat_name_len >=
+                 (DEFAULT_MAX_STAT_SUFFIX_LENGTH + opt_max_user_supplied_name_len));
   size_t max_name_len = initializeAndGetMutableMaxNameLength(opt_max_stat_name_len);
   size_t max_user_supplied_name_len =
       initializeAndGetMutableMaxUserSuppliedNameLength(opt_max_user_supplied_name_len);

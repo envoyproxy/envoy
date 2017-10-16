@@ -34,7 +34,8 @@
 
 // Based on current defaults: cluster name is 60 chars, and the rest is 67 chars.
 // So, with a configurable cluster name length, we still need to have head room for 67 chars.
-#if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH < (ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH + DEFAULT_MAX_STAT_SUFFIX_LENGTH)
+#if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH <                                                           \
+    (ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH + DEFAULT_MAX_STAT_SUFFIX_LENGTH)
 #error                                                                                             \
     "ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH must be >= (ENVOY_DEFAULT_MAX_USER_SUPPLIED_NAME_LENGTH+DEFAULT_MAX_STAT_SUFFIX_LENGTH)"
 #endif
@@ -115,10 +116,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     exit(1);
   }
 
-  if (max_stat_name_len.getValue() < (max_user_supplied_name_len.getValue() + DEFAULT_MAX_STAT_SUFFIX_LENGTH)) {
+  if (max_stat_name_len.getValue() <
+      (max_user_supplied_name_len.getValue() + DEFAULT_MAX_STAT_SUFFIX_LENGTH)) {
     std::cerr << "error: the 'max-stat-name-len' value specified (" << max_stat_name_len.getValue()
-              << ") is less than DEFAULT_MAX_STAT_SUFFIX_LENGTH (" << DEFAULT_MAX_STAT_SUFFIX_LENGTH << ") + max-user-supplied-name-len value ("
-              << max_user_supplied_name_len.getValue() << ")" << std::endl;
+              << ") is less than DEFAULT_MAX_STAT_SUFFIX_LENGTH (" << DEFAULT_MAX_STAT_SUFFIX_LENGTH
+              << ") + max-user-supplied-name-len value (" << max_user_supplied_name_len.getValue()
+              << ")" << std::endl;
     exit(1);
   }
 

@@ -17,7 +17,7 @@
 
 namespace Envoy {
 
-//total length must be equal to DEFAULT_MAX_NAME_SIZE
+// total length must be equal to DEFAULT_MAX_NAME_SIZE
 #define DEFAULT_MAX_STAT_SUFFIX_LENGTH 67
 
 namespace Stats {
@@ -84,9 +84,7 @@ struct RawStatData {
    * contributes to a stat name.  This length does not include a
    * trailing NULL-terminator.
    */
-  static size_t maxStatSuffixLength() {
-    return DEFAULT_MAX_STAT_SUFFIX_LENGTH;
-  }
+  static size_t maxStatSuffixLength() { return DEFAULT_MAX_STAT_SUFFIX_LENGTH; }
 
   /**
    * size in bytes of name_
