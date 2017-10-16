@@ -179,8 +179,8 @@ the following statistics:
 Load balancer subset statistics
 -------------------------------
 
-Statistics for monitoring load balancer subset decisions. Stats are rooted at *cluster.<name>.* and
-contain the following statistics:
+Statistics for monitoring `load balancer subset <arch_overview_load_balancer_subsets>`
+decisions. Stats are rooted at *cluster.<name>.* and contain the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

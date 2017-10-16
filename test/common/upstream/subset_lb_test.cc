@@ -179,7 +179,7 @@ public:
   }
 
   void modifyHosts(std::vector<HostSharedPtr> add, std::vector<HostSharedPtr> remove,
-                   Optional<size_t> add_in_locality = {}) {
+                   Optional<uint32_t> add_in_locality = {}) {
     for (const auto& host : remove) {
       auto it = std::find(cluster_.hosts_.begin(), cluster_.hosts_.end(), host);
       if (it != cluster_.hosts_.end()) {
@@ -220,7 +220,7 @@ public:
   }
 
   void modifyLocalHosts(std::vector<HostSharedPtr> add, std::vector<HostSharedPtr> remove,
-                        size_t add_in_locality) {
+                        uint32_t add_in_locality) {
     for (const auto& host : remove) {
       auto it = std::find(local_hosts_->begin(), local_hosts_->end(), host);
       if (it != local_hosts_->end()) {
@@ -748,7 +748,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_EQ(cluster_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {cluster_.hosts_[0]},
-              Optional<size_t>(0));
+              Optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
                    0);
@@ -869,7 +869,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_EQ(cluster_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {cluster_.hosts_[1]},
-              Optional<size_t>(0));
+              Optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
@@ -988,7 +988,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_EQ(cluster_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {cluster_.hosts_[1]},
-              Optional<size_t>(0));
+              Optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
                    0);

@@ -5,9 +5,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 
+#include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -51,11 +53,11 @@ private:
     bool empty() { return empty_; };
 
   private:
-    int findLocalityIndex(const HostSharedPtr& host);
+    Optional<uint32_t> findLocalityIndex(const HostSharedPtr& host);
     void addKnownHosts(HostVectorSharedPtr known_hosts, HostVectorConstSharedPtr hosts);
 
     const HostSet& original_host_set_;
-    std::unordered_map<HostSharedPtr, int> host_to_locality_;
+    std::unordered_map<HostSharedPtr, Optional<uint32_t>> host_to_locality_;
     bool empty_;
   };
 
@@ -107,17 +109,17 @@ private:
 
   SubsetPtr findSubset(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& matches);
 
-  LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs, size_t idx,
+  LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
                                       bool allow_create);
 
   SubsetPtr newSubset(std::function<bool(const HostSharedPtr&)> predicate);
 
   bool extractSubsetMetadata(const std::set<std::string>& subset_keys, const HostSharedPtr& host,
-                             SubsetMetadata* kvs);
+                             SubsetMetadata& kvs);
 
   LoadBalancer* newLoadBalancer(const SubsetPtr& subset);
 
-  static const HostSetImpl empty_host_set_;
+  const HostSetImpl& emptyHostSet() { CONSTRUCT_ON_FIRST_USE(HostSetImpl); };
 };
 
 } // namespace Upstream

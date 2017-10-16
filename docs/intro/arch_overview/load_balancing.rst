@@ -163,3 +163,7 @@ is a subset with the exact keys and values specified by the route, the subset is
 balancing. Otherwise, the fallback policy is used. The cluster's subset configuration must,
 therefore, contain a definition that has the same keys as a given route in order for subset load
 balancing to occur.
+
+The `design document
+<https://github.com/envoyproxy/envoy/blob/master/source/docs/subset_load_balancer.md>` for subset
+load balancing contains concrete examples.
