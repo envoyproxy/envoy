@@ -12,8 +12,13 @@ cc_library(
         ":_prefix/include/lightstep_carrier.pb.h",
     ],
     includes = [
-        "_prefix/include",
+        # Note: src/ is listed before _prefix to allow unsandboxed builds.
+        #
+        # Otherwise the compiler will locate included headers in `_prefix`
+        # even though they're properly defined under `src/`, which breaks
+        # strict include checking.
         "src/c++11",
+        "_prefix/include",
     ],
     visibility = ["//visibility:public"],
     deps = ["@protobuf_bzl//:protobuf"],
@@ -37,6 +42,7 @@ genrule(
         ":lightstep_compiler_flags",
         ":protobuf_deps",
         "@protobuf_bzl//:well_known_protos",
+        "@local_config_cc//:toolchain",
     ],
     outs = [
         "_prefix/lib/liblightstep_core_cxx11.a",
