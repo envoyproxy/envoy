@@ -12,6 +12,7 @@
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
+#include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
 

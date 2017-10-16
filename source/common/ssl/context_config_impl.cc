@@ -87,13 +87,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
           for (const auto& datasource : config.session_ticket_keys().keys()) {
             switch (datasource.specifier_case()) {
             case envoy::api::v2::DataSource::kFilename: {
-              const std::string key_data = Filesystem::fileReadToEnd(datasource.filename());
-              validateAndAppendKey(ret, key_data);
+              validateAndAppendKey(ret, Filesystem::fileReadToEnd(datasource.filename()));
               break;
             }
             case envoy::api::v2::DataSource::kInline: {
-              const std::string& key_data = datasource.inline_();
-              validateAndAppendKey(ret, key_data);
+              validateAndAppendKey(ret, datasource.inline_());
               break;
             }
             default:
@@ -140,7 +138,7 @@ void ServerContextConfigImpl::validateAndAppendKey(
                                      key_data.size(), sizeof(SessionTicketKey)));
   }
 
-  keys.push_back({});
+  keys.emplace_back();
   SessionTicketKey& dst_key = keys.back();
 
   std::copy_n(key_data.begin(), dst_key.name_.size(), dst_key.name_.begin());

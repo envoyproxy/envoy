@@ -116,9 +116,9 @@ session_ticket_key_paths
   .. attention::
 
     Using this feature has serious security considerations and risks. Improper handling of keys may
-    result in loss of secrecy in connections, even if ciphers supporting perfect foward secrecy are
-    used. See https://www.imperialviolet.org/2013/06/27/botchingpfs.html for some discussion. To
-    minimize the risk, you must:
+    result in loss of secrecy in connections, even if ciphers supporting perfect forward secrecy
+    are used. See https://www.imperialviolet.org/2013/06/27/botchingpfs.html for some discussion.
+    To minimize the risk, you must:
 
     * Keep the keys at least as secure as your TLS certificate private keys
     * Rotate session ticket keys at least daily, and preferably hourly
