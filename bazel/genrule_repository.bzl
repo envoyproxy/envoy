@@ -74,6 +74,13 @@ genrule_cc_deps = rule(
     implementation = _genrule_cc_deps,
 )
 
+def _absolute_bin(path):
+  # If the binary path looks like it's relative to the current directory,
+  # transform it to be absolute by appending "${PWD}".
+  if "/" in path and not path.startswith("/"):
+    return '"${PWD}"/%r' % (path,)
+  return '%r' % (path,)
+
 def _genrule_environment(ctx):
   lines = []
 
@@ -98,8 +105,8 @@ def _genrule_environment(ctx):
   lines.append("export CFLAGS=%r" % (" ".join(cc_flags),))
   lines.append("export LDFLAGS=%r" % (" ".join(ld_flags),))
   lines.append("export LIBS=%r" % (" ".join(ld_libs),))
-  lines.append("export CC=%r" % (ctx.var['CC'],))
-  lines.append("export CXX=%r" % (ctx.var['CC'],))
+  lines.append("export CC=%s" % (_absolute_bin(ctx.var['CC']),))
+  lines.append("export CXX=%s" % (_absolute_bin(ctx.var['CC']),))
 
   # Some Autoconf helper binaries leak, which makes ./configure think the
   # system is unable to do anything. Turn off leak checking during part of
