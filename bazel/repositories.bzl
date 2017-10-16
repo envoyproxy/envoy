@@ -143,7 +143,8 @@ def envoy_api_deps(skip_targets):
         actual = "@googleapis//:http_api_protos_genproto",
     )
 
-def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
+def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = [],
+                       repository = ""):
     native.bind(
         name = "cc_wkt_protos",
         actual = "@protobuf_bzl//:cc_wkt_protos",
@@ -190,13 +191,13 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
     # dependencies and name conflicts.
     existing_rule_keys = native.existing_rules().keys()
     if not ("fmtlib" in skip_targets or "com_github_fmtlib_fmt" in existing_rule_keys):
-        com_github_fmtlib_fmt()
+        com_github_fmtlib_fmt(repository)
     if not ("spdlog" in skip_targets or "com_github_gabime_spdlog" in existing_rule_keys):
-        com_github_gabime_spdlog()
+        com_github_gabime_spdlog(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
-        com_github_lightstep_lightstep_tracer_cpp()
+        com_github_lightstep_lightstep_tracer_cpp(repository)
     if not (skip_protobuf_bzl or "protobuf_bzl" in existing_rule_keys):
-        protobuf_bzl()
+        protobuf_bzl(repository)
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -209,7 +210,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
     cc_deps(skip_targets)
     envoy_api_deps(skip_targets)
 
-def com_github_fmtlib_fmt():
+def com_github_fmtlib_fmt(repository = ""):
   native.new_http_archive(
       name = "com_github_fmtlib_fmt",
       urls = [
@@ -217,14 +218,14 @@ def com_github_fmtlib_fmt():
       ],
       sha256 = "10a9f184d4d66f135093a08396d3b0a0ebe8d97b79f8b3ddb8559f75fe4fcbc3",
       strip_prefix = "fmt-4.0.0",
-      build_file = "//bazel/external:fmtlib.BUILD",
+      build_file = repository + "//bazel/external:fmtlib.BUILD",
   )
   native.bind(
       name="fmtlib",
       actual="@com_github_fmtlib_fmt//:fmtlib",
   )
 
-def com_github_gabime_spdlog():
+def com_github_gabime_spdlog(repository = ""):
   native.new_http_archive(
       name = "com_github_gabime_spdlog",
       urls = [
@@ -232,14 +233,14 @@ def com_github_gabime_spdlog():
       ],
       sha256 = "eb5beb4e53f4bfff5b32eb4db8588484bdc15a17b90eeefef3a9fc74fec1d83d",
       strip_prefix = "spdlog-0.14.0",
-      build_file = "//bazel/external:spdlog.BUILD",
+      build_file = repository + "//bazel/external:spdlog.BUILD",
   )
   native.bind(
       name="spdlog",
       actual="@com_github_gabime_spdlog//:spdlog",
   )
 
-def com_github_lightstep_lightstep_tracer_cpp():
+def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   genrule_repository(
       name = "com_github_lightstep_lightstep_tracer_cpp",
       urls = [
@@ -248,17 +249,17 @@ def com_github_lightstep_lightstep_tracer_cpp():
       sha256 = "f7477e67eca65f904c0b90a6bfec46d58cccfc998a8e75bc3259b6e93157ff84",
       strip_prefix = "lightstep-tracer-cpp-0.36",
       patches = [
-          "//bazel/external:lightstep-missing-header.patch",
+          repository + "//bazel/external:lightstep-missing-header.patch",
       ],
-      genrule_cmd_file = "//bazel/external:lightstep.genrule_cmd",
-      build_file = "//bazel/external:lightstep.BUILD",
+      genrule_cmd_file = repository + "//bazel/external:lightstep.genrule_cmd",
+      build_file = repository + "//bazel/external:lightstep.BUILD",
   )
   native.bind(
       name="lightstep",
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
   )
 
-def protobuf_bzl():
+def protobuf_bzl(repository = ""):
   patched_http_archive(
       name = "protobuf_bzl",
       urls = [
@@ -267,7 +268,7 @@ def protobuf_bzl():
       sha256 = "71434f6f836a1e479c44008bb033b2a8b2560ff539374dcdefb126be739e1635",
       strip_prefix = "protobuf-3.4.0",
       patches = [
-          "//bazel/external:protobuf-memory-errors.patch",
+          repository + "//bazel/external:protobuf-memory-errors.patch",
       ],
   )
   native.bind(
