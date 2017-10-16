@@ -199,13 +199,15 @@ public:
 
   // Router::HashPolicy
   Optional<uint64_t> generateHash(const std::string& downstream_addr,
-                                  const Http::HeaderMap& headers) const override;
+                                  const Http::HeaderMap& headers,
+                                  const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
     virtual Optional<uint64_t> evaluate(const std::string& downstream_addr,
-                                        const Http::HeaderMap& headers) const PURE;
+                                        const Http::HeaderMap& headers,
+                                        const AddCookieCallback add_cookie) const PURE;
   };
 
   typedef std::unique_ptr<HashMethod> HashMethodPtr;

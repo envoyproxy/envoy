@@ -47,7 +47,7 @@ public:
     LoadBalancer(HostSet& host_set, ClusterSharedPtr& parent);
 
     // Upstream::LoadBalancer
-    HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
   private:
     /**

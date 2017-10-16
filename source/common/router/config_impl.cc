@@ -74,7 +74,8 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
@@ -88,10 +89,34 @@ private:
   const Http::LowerCaseString header_name_;
 };
 
+class CookieHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
+
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback add_cookie) const override {
+    Optional<uint64_t> hash;
+    std::string value = Http::Utility::parseCookieValue(headers, key_);
+
+    if (value.empty() && ttl_ != std::chrono::seconds(0)) {
+      value = add_cookie(key_, ttl_);
+      hash.value(HashUtil::xxHash64(value));
+
+    } else if (!value.empty()) {
+      hash.value(HashUtil::xxHash64(value));
+    }
+    return hash;
+  }
+
+private:
+  const std::string key_;
+  const std::chrono::seconds ttl_;
+};
+
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  Optional<uint64_t> evaluate(const std::string& downstream_addr,
-                              const Http::HeaderMap&) const override {
+  Optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
       hash.value(HashUtil::xxHash64(downstream_addr));
@@ -110,6 +135,10 @@ HashPolicyImpl::HashPolicyImpl(
     case envoy::api::v2::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
+    case envoy::api::v2::RouteAction::HashPolicy::kCookie:
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
+      break;
     case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());
@@ -123,14 +152,15 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers) const {
+                                                const Http::HeaderMap& headers,
+                                                const AddCookieCallback add_cookie) const {
   Optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
+    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
     if (new_hash.valid()) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy
-      uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      const uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
       hash.value(old_value ^ new_hash.value());
     }
   }
