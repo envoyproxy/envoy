@@ -16,7 +16,8 @@ TLS :ref:`architecture overview <arch_overview_ssl>`.
     "verify_certificate_hash": "...",
     "verify_subject_alt_name": [],
     "cipher_suites": "...",
-    "ecdh_curves": "..."
+    "ecdh_curves": "...",
+    "session_ticket_key_paths": []
   }
 
 cert_chain_file
@@ -98,3 +99,12 @@ will be used.
 ecdh_curves
   *(optional, string)* If specified, the TLS connection will only support the specified ECDH curves.
   If not specified, the default curves (X25519, P-256) will be used.
+
+session_ticket_key_paths
+  *(optional, array)* Paths to keyfiles for encrypting and decrypting TLS session tickets. The
+  first keyfile in the array contains the key to encrypt all new sessions created by this context.
+  All keys are candidates for decrypting received tickets. This allows for easy rotation of keys
+  by, for example, putting the new keyfile first, and the previous keyfile second
+
+  Each keyfile must contain exactly 80 bytes of cryptographically-secure random data.  For example,
+  the output of ``openssl rand 80``.

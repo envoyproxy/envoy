@@ -80,7 +80,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       session_ticket_keys_([&config] {
-        std::vector<std::vector<uint8_t>> ret;
+        std::vector<SessionTicketKey> ret;
 
         switch (config.session_ticket_keys_type_case()) {
         case envoy::api::v2::DownstreamTlsContext::kSessionTicketKeys:
@@ -88,12 +88,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
             switch (datasource.specifier_case()) {
             case envoy::api::v2::DataSource::kFilename: {
               const std::string key_data = Filesystem::fileReadToEnd(datasource.filename());
-              ret.push_back(std::vector<uint8_t>(key_data.begin(), key_data.end()));
+              validateAndAppendKey(ret, key_data);
               break;
             }
             case envoy::api::v2::DataSource::kInline: {
               const std::string& key_data = datasource.inline_();
-              ret.push_back(std::vector<uint8_t>(key_data.begin(), key_data.end()));
+              validateAndAppendKey(ret, key_data);
               break;
             }
             default:
@@ -124,6 +124,33 @@ ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
         Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
         return downstream_tls_context;
       }()) {}
+
+// Append a SessionTicketKey to keys, initializing it with key_data.
+// Throws if key_data is invalid.
+void ServerContextConfigImpl::validateAndAppendKey(
+    std::vector<ServerContextConfig::SessionTicketKey>& keys, const std::string& key_data) {
+  // If this changes, need to figure out how to deal with key files
+  // that previously worked.  For now, just assert so we'll notice that
+  // it changed if it does.
+  static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
+
+  if (key_data.size() != sizeof(SessionTicketKey)) {
+    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length.  "
+                                     "Length {}, expected length {}.",
+                                     key_data.size(), sizeof(SessionTicketKey)));
+  }
+
+  keys.push_back({});
+  SessionTicketKey& dst_key = keys.back();
+
+  std::copy_n(key_data.begin(), dst_key.name_.size(), dst_key.name_.begin());
+  size_t pos = dst_key.name_.size();
+  std::copy_n(key_data.begin() + pos, dst_key.hmac_key_.size(), dst_key.hmac_key_.begin());
+  pos += dst_key.hmac_key_.size();
+  std::copy_n(key_data.begin() + pos, dst_key.aes_key_.size(), dst_key.aes_key_.begin());
+  pos += dst_key.aes_key_.size();
+  ASSERT(key_data.begin() + pos == key_data.end());
+}
 
 } // namespace Ssl
 } // namespace Envoy

@@ -144,12 +144,7 @@ private:
 
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
-  struct SessionTicketKey {
-    std::array<uint8_t, SSL_TICKET_KEY_NAME_LEN> name;
-    std::array<uint8_t, SHA256_DIGEST_LENGTH> hmac_key;
-    std::array<uint8_t, 256 / 8> aes_key;
-  };
-  std::vector<SessionTicketKey> session_ticket_keys_;
+  const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 
 } // Ssl

@@ -356,7 +356,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      ServerContextConfig& config, Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), runtime_(runtime) {
+    : ContextImpl(parent, scope, config), runtime_(runtime),
+      session_ticket_keys_(config.sessionTicketKeys()) {
   if (!config.caCertFile().empty()) {
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
     if (nullptr == list) {
@@ -382,31 +383,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
                                this);
   }
 
-  if (!config.sessionTicketKeys().empty()) {
-    session_ticket_keys_.resize(config.sessionTicketKeys().size());
-    for (unsigned i = 0; i < config.sessionTicketKeys().size(); ++i) {
-      // If this changes, need to figure out how to deal with key files
-      // that previously worked.  For now, just assert so we'll notice that
-      // it changed if it does.
-      static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
-
-      const std::vector<uint8_t>& src_key = config.sessionTicketKeys().at(i);
-      SessionTicketKey& dst_key = session_ticket_keys_.at(i);
-
-      if (src_key.size() != sizeof(SessionTicketKey)) {
-        throw EnvoyException(fmt::format("Incorrect TLS session ticket key length.  "
-                                         "Index {}, length {}, expected length {}.",
-                                         i, src_key.size(), sizeof(SessionTicketKey)));
-      }
-
-      std::copy_n(src_key.begin(), dst_key.name.size(), dst_key.name.begin());
-      size_t pos = dst_key.name.size();
-      std::copy_n(src_key.begin() + pos, dst_key.hmac_key.size(), dst_key.hmac_key.begin());
-      pos += dst_key.hmac_key.size();
-      std::copy_n(src_key.begin() + pos, dst_key.aes_key.size(), dst_key.aes_key.begin());
-      pos += dst_key.aes_key.size();
-      ASSERT(src_key.begin() + pos == src_key.end());
-    }
+  if (!session_ticket_keys_.empty()) {
     SSL_CTX_set_tlsext_ticket_key_cb(
         ctx_.get(),
         [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
@@ -429,6 +406,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   // resuming to unique certs in the case that different Envoy instances each have
   // their own certs.
   X509* cert = SSL_CTX_get0_certificate(ctx_.get());
+  RELEASE_ASSERT(cert != nullptr);
   X509_NAME* cert_subject = X509_get_subject_name(cert);
   RELEASE_ASSERT(cert_subject != nullptr);
   int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
@@ -501,11 +479,11 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.
 
-    const SessionTicketKey& key = session_ticket_keys_.front();
+    const ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
 
-    static_assert(std::tuple_size<decltype(key.name)>::value == SSL_TICKET_KEY_NAME_LEN,
+    static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                   "Expected key.name length");
-    std::copy_n(key.name.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
+    std::copy_n(key.name_.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
 
     int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
     ASSERT(rc);
@@ -513,12 +491,12 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
     // EVP_CIPHER_key_length(cipher) at compile-time
-    RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
-    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
+    RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
       return -1;
     }
 
-    if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
+    if (!HMAC_Init_ex(hmac_ctx, key.hmac_key_.data(), key.hmac_key_.size(), hmac, nullptr)) {
       return -1;
     }
 
@@ -526,16 +504,16 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   } else {
     // Decrypt
     bool is_enc_key = true; // first element is the encryption key
-    for (const SessionTicketKey& key : session_ticket_keys_) {
-      static_assert(std::tuple_size<decltype(key.name)>::value == SSL_TICKET_KEY_NAME_LEN,
+    for (const ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
+      static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
                     "Expected key.name length");
-      if (std::equal(key.name.begin(), key.name.end(), key_name)) {
-        if (!HMAC_Init_ex(hmac_ctx, key.hmac_key.data(), key.hmac_key.size(), hmac, nullptr)) {
+      if (std::equal(key.name_.begin(), key.name_.end(), key_name)) {
+        if (!HMAC_Init_ex(hmac_ctx, key.hmac_key_.data(), key.hmac_key_.size(), hmac, nullptr)) {
           return -1;
         }
 
-        RELEASE_ASSERT(key.aes_key.size() == EVP_CIPHER_key_length(cipher));
-        if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key.data(), iv)) {
+        RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+        if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
           return -1;
         }
 
