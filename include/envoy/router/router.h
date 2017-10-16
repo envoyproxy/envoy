@@ -375,7 +375,7 @@ public:
    * This method returns the operation name.
    * @return the operation name
    */
-  virtual const std::string getOperation() const PURE;
+  virtual const std::string& getOperation() const PURE;
 };
 
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;

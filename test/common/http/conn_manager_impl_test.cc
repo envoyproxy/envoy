@@ -451,7 +451,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgress) {
         return span;
       }));
   ON_CALL(route_config_provider_.route_config_->route_->decorator_, getOperation())
-      .WillByDefault(Return("testOp"));
+      .WillByDefault(ReturnRef("testOp"));
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(

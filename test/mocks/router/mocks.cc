@@ -78,7 +78,9 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
 
 MockConfig::~MockConfig() {}
 
-MockDecorator::MockDecorator() { ON_CALL(*this, getOperation()).WillByDefault(Return(operation_)); }
+MockDecorator::MockDecorator() {
+  ON_CALL(*this, getOperation()).WillByDefault(ReturnRef(operation_));
+}
 MockDecorator::~MockDecorator() {}
 
 MockRoute::MockRoute() {
