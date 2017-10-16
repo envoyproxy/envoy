@@ -5,7 +5,7 @@ version: 2
 jobs:
    release:
      docker:
-       - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
+       - image: lyft/envoy-build:42485dd6111408d43a911a5b1126316ef3151798
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -16,7 +16,7 @@ jobs:
        - run: ci/docker_tag.sh
    asan:
      docker:
-       - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
+       - image: lyft/envoy-build:42485dd6111408d43a911a5b1126316ef3151798
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -24,7 +24,7 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.asan
    tsan:
      docker:
-       - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
+       - image: lyft/envoy-build:42485dd6111408d43a911a5b1126316ef3151798
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -32,7 +32,7 @@ jobs:
        - run: ci/do_circle_ci.sh bazel.tsan
    coverage:
      docker:
-       - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
+       - image: lyft/envoy-build:42485dd6111408d43a911a5b1126316ef3151798
      resource_class: xlarge
      working_directory: /source
      steps:
@@ -43,7 +43,7 @@ jobs:
            path: /build/envoy/generated/coverage
    format:
      docker:
-       - image: lyft/envoy-build:8839608c2f4b0d7c8311361ee5c8785e543d517a
+       - image: lyft/envoy-build:42485dd6111408d43a911a5b1126316ef3151798
      resource_class: small
      working_directory: /source
      steps:
