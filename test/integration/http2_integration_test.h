@@ -14,4 +14,19 @@ public:
 
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 };
+
+class Http2RingHashIntegrationTest : public Http2IntegrationTest {
+public:
+  Http2RingHashIntegrationTest();
+
+  ~Http2RingHashIntegrationTest() override;
+
+  void createUpstreams() override;
+
+  void sendMultipleRequests(int request_bytes, Http::TestHeaderMapImpl headers,
+                            std::function<void(IntegrationStreamDecoder&)> cb);
+
+  std::vector<FakeHttpConnectionPtr> fake_upstream_connections_;
+  int num_upstreams_ = 5;
+};
 } // namespace Envoy

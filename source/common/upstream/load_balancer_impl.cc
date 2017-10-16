@@ -233,7 +233,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   return tryChooseLocalLocalityHosts();
 }
 
-HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext*) {
+HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
   const std::vector<HostSharedPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
@@ -262,7 +262,7 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
   });
 }
 
-HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
+HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(LoadBalancerContext*) {
   bool is_weight_imbalanced = stats_.max_host_weight_.value() != 1;
   bool is_weight_enabled = runtime_.snapshot().getInteger("upstream.weight_enabled", 1UL) != 0;
 
@@ -298,7 +298,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContex
   }
 }
 
-HostConstSharedPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
+HostConstSharedPtr RandomLoadBalancer::chooseHost(LoadBalancerContext*) {
   const std::vector<HostSharedPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
