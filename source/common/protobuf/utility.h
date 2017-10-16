@@ -1,5 +1,7 @@
 #pragma once
 
+#include <numeric>
+
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 
@@ -45,6 +47,18 @@ public:
   static std::string join(const Protobuf::RepeatedPtrField<ProtobufTypes::String>& source,
                           const std::string& delimiter) {
     return StringUtil::join(std::vector<std::string>(source.begin(), source.end()), delimiter);
+  }
+
+  template <class ProtoType>
+  static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
+    if (source.empty()) {
+      return "[]";
+    }
+    return std::accumulate(std::next(source.begin()), source.end(), "[" + source[0].DebugString(),
+                           [](std::string debug_string, const Protobuf::Message& message) {
+                             return debug_string + ", " + message.DebugString();
+                           }) +
+           "]";
   }
 };
 

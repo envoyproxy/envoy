@@ -133,6 +133,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "resolver_lib",
+    srcs = ["resolver_impl.cc"],
+    hdrs = ["resolver_impl.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/network:resolver_interface",
+        "//include/envoy/registry",
+        "//source/common/config:well_known_names",
+        "//source/common/network:address_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

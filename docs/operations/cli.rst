@@ -116,3 +116,14 @@ following are the command line options that Envoy supports.
   *(optional)* The time in seconds that Envoy will wait before shutting down the parent process
   during a hot restart. See the :ref:`hot restart overview <arch_overview_hot_restart>` for more
   information. Defaults to 900 seconds (15 minutes).
+
+.. option:: --max-stat-name-len <uint64_t>
+
+  *(optional)* The maximum name length (in bytes) for a stat. This setting affects the output
+  of :option:`--hot-restart-version`; the same value must be used to hot restart. Defaults to 127.
+
+.. option:: --max-stats <uint64_t>
+
+  *(optional)* The maximum number of stats that can be shared between hot-restarts. This setting
+  affects the output of :option:`--hot-restart-version`; the same value must be used to hot
+  restart. Defaults to 16384.

@@ -92,8 +92,8 @@ public:
     timer_cb_();
   }
 
-  void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
-                           bool accept) override {
+  void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
+                           const std::string& version, bool accept) override {
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"

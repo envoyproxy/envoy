@@ -22,6 +22,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AssertionFailure;
+using testing::AssertionResult;
+using testing::AssertionSuccess;
+
 namespace Envoy {
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
   try {                                                                                            \
@@ -32,7 +36,7 @@ namespace Envoy {
   }
 
 // Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
-// one can run the test with --test_arg=--gtest_filter=[seed]
+// one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {
 public:
   TestRandomGenerator();
@@ -101,9 +105,45 @@ public:
    * @return bool indicating whether the protos are equal. Type name and string serialization are
    *         used for equality testing.
    */
-  template <class ProtoType> static bool protoEqual(ProtoType lhs, ProtoType rhs) {
+  template <class ProtoType> static bool protoEqual(const ProtoType& lhs, const ProtoType& rhs) {
     return lhs.GetTypeName() == rhs.GetTypeName() &&
            lhs.SerializeAsString() == rhs.SerializeAsString();
+  }
+
+  /**
+   * Compare two RepeatedPtrFields of the same type for equality.
+   *
+   * @param lhs RepeatedPtrField on LHS.
+   * @param rhs RepeatedPtrField on RHS.
+   * @return bool indicating whether the RepeatedPtrField are equal. TestUtility::protoEqual() is
+   *              used for individual element testing.
+   */
+  template <class ProtoType>
+  static bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
+                                    const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+    if (lhs.size() != rhs.size()) {
+      return false;
+    }
+
+    for (int i = 0; i < lhs.size(); ++i) {
+      if (!TestUtility::protoEqual(lhs[i], rhs[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  template <class ProtoType>
+  static AssertionResult
+  assertRepeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
+                              const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+    if (!repeatedPtrFieldEqual(lhs, rhs)) {
+      return AssertionFailure() << RepeatedPtrUtil::debugString(lhs) << " does not match "
+                                << RepeatedPtrUtil::debugString(rhs);
+    }
+
+    return AssertionSuccess();
   }
 
   /**
@@ -196,18 +236,6 @@ public:
 
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
-MATCHER_P(RepeatedProtoEq, rhs, "") {
-  if (arg.size() != rhs.size()) {
-    return false;
-  }
-
-  for (int i = 0; i < arg.size(); ++i) {
-    if (!TestUtility::protoEqual(arg[i], rhs[i])) {
-      return false;
-    }
-  }
-
-  return true;
-}
+MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
 
 } // Envoy

@@ -249,5 +249,27 @@ public:
   MOCK_METHOD0(stopListeners, void());
 };
 
+class MockResolvedAddress : public Address::Instance {
+public:
+  MockResolvedAddress(const std::string& logical, const std::string& physical)
+      : logical_(logical), physical_(physical) {}
+
+  bool operator==(const Address::Instance& other) const override {
+    return asString() == other.asString();
+  }
+
+  MOCK_CONST_METHOD1(bind, int(int));
+  MOCK_CONST_METHOD1(connect, int(int));
+  MOCK_CONST_METHOD0(ip, Address::Ip*());
+  MOCK_CONST_METHOD1(socket, int(Address::SocketType));
+  MOCK_CONST_METHOD0(type, Address::Type());
+
+  const std::string& asString() const override { return physical_; }
+  const std::string& logicalName() const override { return logical_; }
+
+  const std::string logical_;
+  const std::string physical_;
+};
+
 } // namespace Network
 } // namespace Envoy

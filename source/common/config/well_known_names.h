@@ -78,6 +78,17 @@ public:
 typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
 
 /**
+ * Well-known address resolver names.
+ */
+class AddressResolverNameValues {
+public:
+  // Basic IP resolver
+  const std::string IP = "envoy.ip";
+};
+
+typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
+
+/**
  * Well-known http filter names.
  */
 class HttpFilterNameValues {

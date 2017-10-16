@@ -119,22 +119,6 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPort("[::1]:0")->asString());
 }
 
-TEST(NetworkUtility, FromProtoAddress) {
-  envoy::api::v2::Address ipv4_address;
-  ipv4_address.mutable_socket_address()->set_address("1.2.3.4");
-  ipv4_address.mutable_socket_address()->set_port_value(5);
-  EXPECT_EQ("1.2.3.4:5", Utility::fromProtoAddress(ipv4_address)->asString());
-
-  envoy::api::v2::Address ipv6_address;
-  ipv4_address.mutable_socket_address()->set_address("1::1");
-  ipv4_address.mutable_socket_address()->set_port_value(2);
-  EXPECT_EQ("[1::1]:2", Utility::fromProtoAddress(ipv4_address)->asString());
-
-  envoy::api::v2::Address pipe_address;
-  pipe_address.mutable_pipe()->set_path("/foo/bar");
-  EXPECT_EQ("/foo/bar", Utility::fromProtoAddress(pipe_address)->asString());
-}
-
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,

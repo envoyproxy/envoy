@@ -4,7 +4,9 @@
 #include <memory>
 #include <string>
 
+#include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
@@ -2558,9 +2560,9 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
               {
                 "key": "x-client-ip",
                 "value": "%CLIENT_IP%"
-              }  
+              }
             ]
-          }  
+          }
         ]
       }
     ],
@@ -2633,6 +2635,197 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
       ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
       "Incorrect header configuration. Expected variable format %<variable_name>%, actual format "
       "%CLIENT_IP");
+}
+
+TEST(MetadataMatchCriteriaImpl, Create) {
+  auto v1 = ProtobufWkt::Value();
+  v1.set_string_value("v1");
+  auto v2 = ProtobufWkt::Value();
+  v2.set_number_value(2.0);
+  auto v3 = ProtobufWkt::Value();
+  v3.set_bool_value(true);
+
+  auto metadata_struct = ProtobufWkt::Struct();
+  auto mutable_fields = metadata_struct.mutable_fields();
+  mutable_fields->insert({"a", v1});
+  mutable_fields->insert({"b", v2});
+  mutable_fields->insert({"c", v3});
+
+  auto matches = MetadataMatchCriteriaImpl(metadata_struct);
+
+  EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
+  auto it = matches.metadataMatchCriteria().begin();
+  EXPECT_EQ((*it)->name(), "a");
+  EXPECT_EQ((*it)->value().value().string_value(), "v1");
+  it++;
+
+  EXPECT_EQ((*it)->name(), "b");
+  EXPECT_EQ((*it)->value().value().number_value(), 2.0);
+  it++;
+
+  EXPECT_EQ((*it)->name(), "c");
+  EXPECT_EQ((*it)->value().value().bool_value(), true);
+}
+
+TEST(MetadataMatchCriteriaImpl, Merge) {
+  auto pv1 = ProtobufWkt::Value();
+  pv1.set_string_value("v1");
+  auto pv2 = ProtobufWkt::Value();
+  pv2.set_number_value(2.0);
+  auto pv3 = ProtobufWkt::Value();
+  pv3.set_bool_value(true);
+
+  auto parent_struct = ProtobufWkt::Struct();
+  auto parent_fields = parent_struct.mutable_fields();
+  parent_fields->insert({"a", pv1});
+  parent_fields->insert({"b", pv2});
+  parent_fields->insert({"c", pv3});
+
+  auto parent_matches = MetadataMatchCriteriaImpl(parent_struct);
+
+  auto v1 = ProtobufWkt::Value();
+  v1.set_string_value("override1");
+  auto v2 = ProtobufWkt::Value();
+  v2.set_string_value("v2");
+  auto v3 = ProtobufWkt::Value();
+  v3.set_string_value("override3");
+
+  auto metadata_struct = ProtobufWkt::Struct();
+  auto mutable_fields = metadata_struct.mutable_fields();
+  mutable_fields->insert({"a", v1});
+  mutable_fields->insert({"b++", v2});
+  mutable_fields->insert({"c", v3});
+
+  MetadataMatchCriteriaImplConstPtr matches = parent_matches.mergeMatchCriteria(metadata_struct);
+
+  EXPECT_EQ(matches->metadataMatchCriteria().size(), 4);
+  auto it = matches->metadataMatchCriteria().begin();
+  EXPECT_EQ((*it)->name(), "a");
+  EXPECT_EQ((*it)->value().value().string_value(), "override1");
+  it++;
+
+  EXPECT_EQ((*it)->name(), "b");
+  EXPECT_EQ((*it)->value().value().number_value(), 2.0);
+  it++;
+
+  EXPECT_EQ((*it)->name(), "b++");
+  EXPECT_EQ((*it)->value().value().string_value(), "v2");
+  it++;
+
+  EXPECT_EQ((*it)->name(), "c");
+  EXPECT_EQ((*it)->value().value().string_value(), "override3");
+}
+
+TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
+  auto route_config = envoy::api::v2::RouteConfiguration();
+  auto* vhost = route_config.add_virtual_hosts();
+  vhost->set_name("vhost");
+  vhost->add_domains("www.lyft.com");
+
+  // route provides metadata matches combined from RouteAction and WeightedCluster
+  auto* route = vhost->add_routes();
+  route->mutable_match()->set_prefix("/both");
+  auto* route_action = route->mutable_route();
+  auto* weighted_cluster = route_action->mutable_weighted_clusters()->add_clusters();
+  weighted_cluster->set_name("www1");
+  weighted_cluster->mutable_weight()->set_value(100);
+  Envoy::Config::Metadata::mutableMetadataValue(*weighted_cluster->mutable_metadata_match(),
+                                                Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                "r1_wc_key")
+      .set_string_value("r1_wc_value");
+  Envoy::Config::Metadata::mutableMetadataValue(*route_action->mutable_metadata_match(),
+                                                Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                "r1_key")
+      .set_string_value("r1_value");
+
+  // route provides metadata matches from WeightedCluster only
+  route = vhost->add_routes();
+  route->mutable_match()->set_prefix("/cluster-only");
+  route_action = route->mutable_route();
+  weighted_cluster = route_action->mutable_weighted_clusters()->add_clusters();
+  weighted_cluster->set_name("www2");
+  weighted_cluster->mutable_weight()->set_value(100);
+  Envoy::Config::Metadata::mutableMetadataValue(*weighted_cluster->mutable_metadata_match(),
+                                                Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                "r2_wc_key")
+      .set_string_value("r2_wc_value");
+
+  // route provides metadata matches from RouteAction only
+  route = vhost->add_routes();
+  route->mutable_match()->set_prefix("/route-only");
+  route_action = route->mutable_route();
+  route_action->set_cluster("www3");
+  Envoy::Config::Metadata::mutableMetadataValue(*route_action->mutable_metadata_match(),
+                                                Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                "r3_key")
+      .set_string_value("r3_value");
+
+  // route provides metadata matches from RouteAction (but WeightedCluster exists)
+  route = vhost->add_routes();
+  route->mutable_match()->set_prefix("/cluster-passthrough");
+  route_action = route->mutable_route();
+  weighted_cluster = route_action->mutable_weighted_clusters()->add_clusters();
+  weighted_cluster->set_name("www4");
+  weighted_cluster->mutable_weight()->set_value(100);
+  Envoy::Config::Metadata::mutableMetadataValue(*route_action->mutable_metadata_match(),
+                                                Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                "r4_key")
+      .set_string_value("r4_value");
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(route_config, runtime, cm, true);
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/both", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+
+    auto* route_entry = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www1", route_entry->clusterName());
+    auto* matches = route_entry->metadataMatchCriteria();
+    EXPECT_NE(matches, nullptr);
+    EXPECT_EQ(matches->metadataMatchCriteria().size(), 2);
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r1_key");
+    EXPECT_EQ(matches->metadataMatchCriteria().at(1)->name(), "r1_wc_key");
+  }
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("www.lyft.com", "/cluster-only", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+
+    auto* route_entry = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route_entry->clusterName());
+    auto* matches = route_entry->metadataMatchCriteria();
+    EXPECT_NE(matches, nullptr);
+    EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r2_wc_key");
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/route-only", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+
+    auto* route_entry = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www3", route_entry->clusterName());
+    auto* matches = route_entry->metadataMatchCriteria();
+    EXPECT_NE(matches, nullptr);
+    EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r3_key");
+  }
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("www.lyft.com", "/cluster-passthrough", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+
+    auto* route_entry = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www4", route_entry->clusterName());
+    auto* matches = route_entry->metadataMatchCriteria();
+    EXPECT_NE(matches, nullptr);
+    EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
+    EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r4_key");
+  }
 }
 
 } // namespace

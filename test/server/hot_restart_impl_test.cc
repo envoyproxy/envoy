@@ -103,6 +103,7 @@ public:
     EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(num_stats_));
     EXPECT_CALL(options_, maxStatNameLength()).WillRepeatedly(Return(name_len_));
     setup();
+    EXPECT_EQ(name_len_, Stats::RawStatData::maxNameLength());
   }
 
   static const uint64_t num_stats_ = 8;
