@@ -26,7 +26,7 @@ public:
                        Runtime::RandomGenerator& random);
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
   struct RingEntry {
@@ -35,8 +35,7 @@ private:
   };
 
   struct Ring {
-    HostConstSharedPtr chooseHost(const LoadBalancerContext* context,
-                                  Runtime::RandomGenerator& random);
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context, Runtime::RandomGenerator& random);
     void create(Runtime::Loader& runtime, const std::vector<HostSharedPtr>& hosts);
 
     std::vector<RingEntry> ring_;

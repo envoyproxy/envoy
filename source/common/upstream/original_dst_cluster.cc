@@ -38,8 +38,7 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(HostSet& host_set, ClusterSharedP
   });
 }
 
-HostConstSharedPtr
-OriginalDstCluster::LoadBalancer::chooseHost(const LoadBalancerContext* context) {
+HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     const Network::Connection* connection = context->downstreamConnection();
 

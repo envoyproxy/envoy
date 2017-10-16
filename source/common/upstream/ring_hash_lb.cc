@@ -20,7 +20,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
   refresh();
 }
 
-HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+HostConstSharedPtr RingHashLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
     return all_hosts_ring_.chooseHost(context, random_);
@@ -29,7 +29,7 @@ HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* c
   }
 }
 
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* context,
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* context,
                                                           Runtime::RandomGenerator& random) {
   if (ring_.empty()) {
     return nullptr;
@@ -37,10 +37,10 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerCont
 
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
-  // hashKey() may be computed on demand, so get it only once.
+  // computeHashKey() may be computed on demand, so get it only once.
   Optional<uint64_t> hash;
   if (context) {
-    hash = context->hashKey();
+    hash = context->computeHashKey();
   }
   const uint64_t h = hash.valid() ? hash.value() : random.random();
 

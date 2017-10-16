@@ -395,7 +395,7 @@ public:
                                 : Network::FilterStatus::StopIteration,
               filter_->onNewConnection());
 
-    EXPECT_EQ(Optional<uint64_t>(), filter_->hashKey());
+    EXPECT_EQ(Optional<uint64_t>(), filter_->computeHashKey());
     EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
   }
 

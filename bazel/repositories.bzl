@@ -1,5 +1,7 @@
-load(":target_recipes.bzl", "TARGET_RECIPES")
+load(":genrule_repository.bzl", "genrule_repository")
+load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPO_LOCATIONS")
+load(":target_recipes.bzl", "TARGET_RECIPES")
 
 def _repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
@@ -30,15 +32,6 @@ def _repository_impl(ctxt):
               "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
         # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
         fail("External dep build failed")
-
-def _protobuf_repository_impl(ctxt):
-    deps_path = ctxt.attr.envoy_deps_path
-    if not deps_path.endswith("/"):
-        deps_path += "/"
-    ctxt.symlink(Label(deps_path + "thirdparty/protobuf:protobuf.bzl"), "protobuf.bzl")
-    ctxt.symlink(Label(deps_path + "thirdparty/protobuf:BUILD"), "BUILD")
-    ctxt.symlink(ctxt.path(Label(deps_path + "thirdparty/protobuf:BUILD")).dirname.get_child("src"),
-                 "src")
 
 def py_jinja2_dep():
     BUILD = """
@@ -150,7 +143,8 @@ def envoy_api_deps(skip_targets):
         actual = "@googleapis//:http_api_protos_genproto",
     )
 
-def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
+def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = [],
+                       repository = ""):
     native.bind(
         name = "cc_wkt_protos",
         actual = "@protobuf_bzl//:cc_wkt_protos",
@@ -187,21 +181,23 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
         recipes = recipes.to_list(),
     )
 
-    protobuf_repository = repository_rule(
-        implementation = _protobuf_repository_impl,
-        attrs = {
-            "envoy_deps_path": attr.string(),
-        },
-    )
-
-    # If the WORKSPACE hasn't already supplied @protobuf_bzl and told us to skip it, we need to map in the
-    # full repo into @protobuf_bzl so that we can depend on this in envoy_build_system.bzl and for things
-    # like @protobuf_bzl//:cc_wkt_protos in envoy-api. We do this by some evil symlink stuff.
-    if not skip_protobuf_bzl:
-        protobuf_repository(
-            name = "protobuf_bzl",
-            envoy_deps_path = path,
-        )
+    # `existing_rule_keys` contains the names of repositories that have already
+    # been defined in the Bazel workspace. By skipping repos with existing keys,
+    # users can override dependency versions by using standard Bazel repository
+    # rules in their WORKSPACE files.
+    #
+    # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
+    # semi-standard in the Bazel community, intended to avoid both duplicate
+    # dependencies and name conflicts.
+    existing_rule_keys = native.existing_rules().keys()
+    if not ("fmtlib" in skip_targets or "com_github_fmtlib_fmt" in existing_rule_keys):
+        com_github_fmtlib_fmt(repository)
+    if not ("spdlog" in skip_targets or "com_github_gabime_spdlog" in existing_rule_keys):
+        com_github_gabime_spdlog(repository)
+    if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
+        com_github_lightstep_lightstep_tracer_cpp(repository)
+    if not (skip_protobuf_bzl or "protobuf_bzl" in existing_rule_keys):
+        protobuf_bzl(repository)
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -213,3 +209,73 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
     python_deps(skip_targets)
     cc_deps(skip_targets)
     envoy_api_deps(skip_targets)
+
+def com_github_fmtlib_fmt(repository = ""):
+  native.new_http_archive(
+      name = "com_github_fmtlib_fmt",
+      urls = [
+          "https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip",
+      ],
+      sha256 = "10a9f184d4d66f135093a08396d3b0a0ebe8d97b79f8b3ddb8559f75fe4fcbc3",
+      strip_prefix = "fmt-4.0.0",
+      build_file = repository + "//bazel/external:fmtlib.BUILD",
+  )
+  native.bind(
+      name="fmtlib",
+      actual="@com_github_fmtlib_fmt//:fmtlib",
+  )
+
+def com_github_gabime_spdlog(repository = ""):
+  native.new_http_archive(
+      name = "com_github_gabime_spdlog",
+      urls = [
+          "https://github.com/gabime/spdlog/archive/v0.14.0.tar.gz",
+      ],
+      sha256 = "eb5beb4e53f4bfff5b32eb4db8588484bdc15a17b90eeefef3a9fc74fec1d83d",
+      strip_prefix = "spdlog-0.14.0",
+      build_file = repository + "//bazel/external:spdlog.BUILD",
+  )
+  native.bind(
+      name="spdlog",
+      actual="@com_github_gabime_spdlog//:spdlog",
+  )
+
+def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
+  genrule_repository(
+      name = "com_github_lightstep_lightstep_tracer_cpp",
+      urls = [
+          "https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_36/lightstep-tracer-cpp-0.36.tar.gz",
+      ],
+      sha256 = "f7477e67eca65f904c0b90a6bfec46d58cccfc998a8e75bc3259b6e93157ff84",
+      strip_prefix = "lightstep-tracer-cpp-0.36",
+      patches = [
+          repository + "//bazel/external:lightstep-missing-header.patch",
+      ],
+      genrule_cmd_file = repository + "//bazel/external:lightstep.genrule_cmd",
+      build_file = repository + "//bazel/external:lightstep.BUILD",
+  )
+  native.bind(
+      name="lightstep",
+      actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+  )
+
+def protobuf_bzl(repository = ""):
+  patched_http_archive(
+      name = "protobuf_bzl",
+      urls = [
+          "https://github.com/google/protobuf/releases/download/v3.4.0/protobuf-cpp-3.4.0.tar.gz",
+      ],
+      sha256 = "71434f6f836a1e479c44008bb033b2a8b2560ff539374dcdefb126be739e1635",
+      strip_prefix = "protobuf-3.4.0",
+      patches = [
+          repository + "//bazel/external:protobuf-memory-errors.patch",
+      ],
+  )
+  native.bind(
+      name="protobuf",
+      actual="@protobuf_bzl//:protobuf",
+  )
+  native.bind(
+      name="protoc",
+      actual="@protobuf_bzl//:protoc",
+  )

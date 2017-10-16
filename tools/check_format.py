@@ -7,7 +7,7 @@ import os.path
 import sys
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
-                     "./bazel-")
+                     "./bazel-", "./bazel/external")
 SUFFIXES = (".cc", ".h", "BUILD")
 
 # Files in these paths can make reference to protobuf stuff directly
@@ -69,8 +69,17 @@ def checkProtobufExternalDeps(file_path):
     return True
 
 
+def isBuildFile(file_path):
+  basename = os.path.basename(file_path)
+  if basename in ["BUILD", "BUILD.bazel"]:
+    return True
+  if basename.endswith(".BUILD"):
+    return True
+  return False
+
+
 def checkFilePath(file_path):
-  if os.path.basename(file_path) == "BUILD":
+  if isBuildFile(file_path):
     if os.system("%s %s | diff -q %s - > /dev/null" %
                  (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       printError("envoy_build_fixer check failed for file: %s" % file_path)
