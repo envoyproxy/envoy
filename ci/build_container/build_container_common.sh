@@ -26,6 +26,7 @@ echo "Building opt deps ${DEPS}"
 "$(dirname "$0")"/build_and_install_deps.sh ${DEPS}
 
 echo "Building Bazel-managed deps (//bazel/external:all_external)"
+mkdir /bazel-prebuilt-root /bazel-prebuilt-output
 BAZEL_OPTIONS="--output_user_root=/bazel-prebuilt-root --output_base=/bazel-prebuilt-output"
 cd /bazel-prebuilt
 for BAZEL_MODE in opt dbg fastbuild; do
