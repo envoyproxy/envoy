@@ -13,7 +13,10 @@ ContextManagerImpl::~ContextManagerImpl() { ASSERT(contexts_.empty()); }
 
 void ContextManagerImpl::releaseContext(Context* context) {
   std::unique_lock<std::mutex> lock(contexts_lock_);
-  ASSERT(std::find(contexts_.begin(), contexts_.end(), context) != contexts_.end());
+
+  // context may not be found, in the case that a subclass of Context throws
+  // in it's constructor.  In that case the context did not get added, but
+  // the destructor of Context will run and call releaseContext().
   contexts_.remove(context);
 }
 

@@ -55,6 +55,23 @@ TEST(FileSystemImpl, fileReadToEndSuccess) {
   EXPECT_EQ(data, Filesystem::fileReadToEnd(file_path));
 }
 
+// Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
+// unmodified
+TEST(FileSystemImpl, fileReadToEndSuccessBinary) {
+  std::string data;
+  for (unsigned i = 0; i < 256; i++) {
+    data.push_back(i);
+  }
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
+
+  const std::string read = Filesystem::fileReadToEnd(file_path);
+  const std::vector<uint8_t> binary_read(read.begin(), read.end());
+  EXPECT_EQ(binary_read.size(), 256);
+  for (unsigned i = 0; i < 256; i++) {
+    EXPECT_EQ(binary_read.at(i), i);
+  }
+}
+
 TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),

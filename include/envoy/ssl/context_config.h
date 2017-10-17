@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -75,10 +76,23 @@ public:
 
 class ServerContextConfig : public virtual ContextConfig {
 public:
+  struct SessionTicketKey {
+    std::array<uint8_t, 16> name_;         // 16 == SSL_TICKET_KEY_NAME_LEN
+    std::array<uint8_t, 32> hmac_key_;     // 32 == SHA256_DIGEST_LENGTH
+    std::array<uint8_t, 256 / 8> aes_key_; // AES256 key size, in bytes
+  };
+
   /**
    * @return True if client certificate is required, false otherwise.
    */
   virtual bool requireClientCertificate() const PURE;
+
+  /**
+   * @return The keys to use for encrypting and decrypting session tickets.
+   * The first element is used for encrypting new tickets, and all elements
+   * are candidates for decrypting received tickets.
+   */
+  virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
 };
 
 } // namespace Ssl
