@@ -14,6 +14,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/api_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
@@ -260,9 +261,11 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
     ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
 
+    Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
     return Runtime::LoaderPtr{new Runtime::LoaderImpl(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
-        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random())};
+        config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
+        std::move(os_sys_calls))};
   } else {
     return Runtime::LoaderPtr{new Runtime::NullLoaderImpl(server.random())};
   }

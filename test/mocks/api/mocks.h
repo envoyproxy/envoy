@@ -39,7 +39,7 @@ public:
   MockOsSysCalls();
   ~MockOsSysCalls();
 
-  // Filesystem::OsSysCalls
+  // Api::OsSysCalls
   ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
   int open(const std::string& full_path, int flags, int mode) override;
   MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
@@ -50,6 +50,7 @@ public:
   MOCK_METHOD1(shmUnlink, int(const char*));
   MOCK_METHOD2(ftruncate, int(int fd, off_t length));
   MOCK_METHOD6(mmap, void*(void* addr, size_t length, int prot, int flags, int fd, off_t offset));
+  MOCK_METHOD2(stat, int(const char* name, struct stat* stat));
 
   size_t num_writes_;
   size_t num_open_;

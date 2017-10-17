@@ -148,8 +148,9 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 SnapshotImpl::SnapshotImpl(const std::string& root_path, const std::string& override_path,
-                           RuntimeStats& stats, RandomGenerator& generator)
-    : generator_(generator) {
+                           RuntimeStats& stats, RandomGenerator& generator,
+                           Api::OsSysCalls& os_sys_calls)
+    : generator_(generator), os_sys_calls_(os_sys_calls) {
   try {
     walkDirectory(root_path, "");
     if (Filesystem::directoryExists(override_path)) {
@@ -209,7 +210,7 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
     }
 
     struct stat stat_result;
-    int rc = ::stat(full_path.c_str(), &stat_result);
+    int rc = os_sys_calls_.stat(full_path.c_str(), &stat_result);
     if (rc != 0) {
       throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
     }
@@ -241,10 +242,11 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
                        const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator)
+                       RandomGenerator& generator, Api::OsSysCallsPtr os_sys_calls)
     : watcher_(dispatcher.createFilesystemWatcher()), tls_(tls.allocateSlot()),
       generator_(generator), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir), stats_(generateStats(store)) {
+      override_path_(root_symlink_path + "/" + override_dir), stats_(generateStats(store)),
+      os_sys_calls_(std::move(os_sys_calls)) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
                      [this](uint32_t) -> void { onSymlinkSwap(); });
 
@@ -259,7 +261,8 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 }
 
 void LoaderImpl::onSymlinkSwap() {
-  current_snapshot_.reset(new SnapshotImpl(root_path_, override_path_, stats_, generator_));
+  current_snapshot_.reset(
+      new SnapshotImpl(root_path_, override_path_, stats_, generator_, *os_sys_calls_));
   ThreadLocal::ThreadLocalObjectSharedPtr ptr_copy = current_snapshot_;
   tls_->set([ptr_copy](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return ptr_copy;
