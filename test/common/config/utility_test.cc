@@ -1,3 +1,4 @@
+#include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -67,6 +68,26 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ(30000, Protobuf::util::TimeUtil::DurationToMilliseconds(
                        api_config_source_grpc.refresh_delay()));
   EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_name(0));
+}
+
+TEST(UtilityTest, UserSuppliedNameLength) {
+  EXPECT_THROW(Utility::checkUserSuppliedNameLength(
+                   "test", "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"),
+               EnvoyException);
+}
+
+TEST(LdsJsonTest, TranslateListenerWithLongName) {
+  std::string lds_json = R"EOF(
+    {
+      "name": "listenerwithareallyreallylongnamemorethanmaxcharsallowedbyschema",
+      "address": "tcp://0.0.0.0:1",
+      "filters": []
+    }
+  )EOF";
+
+  envoy::api::v2::Listener listener;
+  auto json_object_ptr = Json::Factory::loadFromString(lds_json);
+  EXPECT_THROW(Config::LdsJson::translateListener(*json_object_ptr, listener), EnvoyException);
 }
 
 } // namespace Config

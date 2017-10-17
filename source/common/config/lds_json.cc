@@ -4,10 +4,10 @@
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
+#include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -16,11 +16,8 @@ void LdsJson::translateListener(const Json::Object& json_listener,
                                 envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
-  const std::string name = json_listener.getString("name");
-  if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
-    throw EnvoyException("Listener name is longer than max configured length");
-  }
-
+  const std::string name = json_listener.getString("name", "");
+  Utility::checkUserSuppliedNameLength("Invalid listener name", name);
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
                                 *listener.mutable_address());
 
@@ -51,7 +48,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
 
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
-  JSON_UTIL_SET_STRING(json_listener, listener, name);
+  JSON_UTIL_SET_STRING_VALUE(json_listener, listener, name, name);
 
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
 }

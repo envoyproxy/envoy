@@ -152,6 +152,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     external_deps = ["envoy_eds"],
     deps = [
+        "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
         "//test/mocks/local_info:local_info_mocks",
     ],

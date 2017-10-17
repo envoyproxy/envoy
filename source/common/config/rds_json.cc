@@ -7,7 +7,6 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
-#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Config {
