@@ -40,6 +40,8 @@
 #include "rapidjson/stringbuffer.h"
 #include "spdlog/spdlog.h"
 
+using namespace rapidjson;
+
 namespace Envoy {
 namespace Server {
 
@@ -274,7 +276,7 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& re
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
