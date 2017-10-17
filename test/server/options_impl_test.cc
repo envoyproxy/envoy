@@ -76,9 +76,4 @@ TEST(OptionsImplTest, BadStatNameLenOption) {
   EXPECT_DEATH(createOptionsImpl("envoy --max-stat-name-len 1"),
                "error: the 'max-stat-name-len' value specified");
 }
-
-TEST(OptionsImplTest, BadUserSuppliedNameLenOption) {
-  EXPECT_DEATH(createOptionsImpl("envoy --max-user-supplied-name-len 100"),
-               "error: the 'max-stat-name-len' value specified");
-}
 } // namespace Envoy

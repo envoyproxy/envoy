@@ -86,6 +86,12 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
 
 void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
+
+  const std::string name = json_rds.getString("route_config_name");
+  if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
+    throw EnvoyException("Route config name is longer than max configured length");
+  }
+
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
                            json_rds.getString("api_type", ApiType::get().RestLegacy),

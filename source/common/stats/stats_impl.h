@@ -16,10 +16,6 @@
 #include "common/common/assert.h"
 
 namespace Envoy {
-
-// total length must be equal to DEFAULT_MAX_NAME_SIZE
-#define DEFAULT_MAX_STAT_SUFFIX_LENGTH 67
-
 namespace Stats {
 
 /**
@@ -76,15 +72,8 @@ struct RawStatData {
    * does not include a trailing NULL-terminator.
    */
   static size_t maxUserSuppliedNameLength() {
-    return initializeAndGetMutableMaxUserSuppliedNameLength(DEFAULT_MAX_USER_SUPPLIED_NAME_SIZE);
+    return maxNameLength() - DEFAULT_MAX_USER_SUPPLIED_NAME_SIZE;
   }
-
-  /**
-   * Returns the maximum length of a envoy generated stats suffix that
-   * contributes to a stat name.  This length does not include a
-   * trailing NULL-terminator.
-   */
-  static size_t maxStatSuffixLength() { return DEFAULT_MAX_STAT_SUFFIX_LENGTH; }
 
   /**
    * size in bytes of name_
@@ -122,10 +111,10 @@ struct RawStatData {
 
 private:
   static const size_t DEFAULT_MAX_NAME_SIZE = 127;
-  static const size_t DEFAULT_MAX_USER_SUPPLIED_NAME_SIZE = 60;
+  // total length must be equal to DEFAULT_MAX_NAME_SIZE
+  static const size_t DEFAULT_MAX_STAT_SUFFIX_LENGTH = 67;
 
   static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
-  static size_t& initializeAndGetMutableMaxUserSuppliedNameLength(size_t configured_size);
 };
 
 /**

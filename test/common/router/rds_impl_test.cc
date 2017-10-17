@@ -182,6 +182,27 @@ TEST_F(RdsImplTest, UnknownCluster) {
                EnvoyException);
 }
 
+TEST_F(RdsImplTest, MaxRouteConfigName) {
+  const std::string config_json = R"EOF(
+  {
+    "rds": {
+      "cluster": "foo_cluster",
+      "route_config_name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
+    },
+    "codec_type": "auto",
+    "stat_prefix": "foo",
+    "filters": [
+      { "name": "http_dynamo_filter", "config": {} }
+    ]
+  }
+  )EOF";
+
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                               runtime_, cm_, store_, "foo.", init_manager_,
+                                               *route_config_provider_manager_),
+               EnvoyException);
+}
+
 TEST_F(RdsImplTest, DestroyDuringInitialize) {
   InSequence s;
 

@@ -36,36 +36,19 @@ size_t& RawStatData::initializeAndGetMutableMaxNameLength(size_t configured_size
   return size;
 }
 
-size_t& RawStatData::initializeAndGetMutableMaxUserSuppliedNameLength(size_t configured_size) {
-  // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
-  static size_t size = configured_size;
-  return size;
-}
-
 void RawStatData::configure(Server::Options& options) {
-  const size_t opt_max_stat_name_len = options.maxStatNameLength();
-  const size_t opt_max_user_supplied_name_len = options.maxUserSuppliedNameLength();
-
-  RELEASE_ASSERT(opt_max_stat_name_len > 0);
-  RELEASE_ASSERT(opt_max_user_supplied_name_len > 0);
-  RELEASE_ASSERT(opt_max_stat_name_len >=
-                 (DEFAULT_MAX_STAT_SUFFIX_LENGTH + opt_max_user_supplied_name_len));
-  size_t max_name_len = initializeAndGetMutableMaxNameLength(opt_max_stat_name_len);
-  size_t max_user_supplied_name_len =
-      initializeAndGetMutableMaxUserSuppliedNameLength(opt_max_user_supplied_name_len);
+  const size_t configured = options.maxStatNameLength();
+  RELEASE_ASSERT(configured > 0);
+  size_t max_name_length = initializeAndGetMutableMaxNameLength(configured);
 
   // If this fails, it means that this function was called too late during
   // startup because things were already using this size before it was set.
-  RELEASE_ASSERT(max_name_len == opt_max_stat_name_len);
-  RELEASE_ASSERT(max_user_supplied_name_len == opt_max_user_supplied_name_len);
+  RELEASE_ASSERT(max_name_length == configured);
 }
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const size_t opt_max_stat_name_len = options.maxStatNameLength();
-  const size_t opt_max_user_supplied_name_len = options.maxUserSuppliedNameLength();
-  initializeAndGetMutableMaxNameLength(opt_max_stat_name_len) = opt_max_stat_name_len;
-  initializeAndGetMutableMaxUserSuppliedNameLength(opt_max_user_supplied_name_len) =
-      opt_max_user_supplied_name_len;
+  const size_t configured = options.maxStatNameLength();
+  initializeAndGetMutableMaxNameLength(configured) = configured;
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {

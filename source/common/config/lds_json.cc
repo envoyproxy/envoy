@@ -7,6 +7,7 @@
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -14,6 +15,11 @@ namespace Config {
 void LdsJson::translateListener(const Json::Object& json_listener,
                                 envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
+
+  const std::string name = json_listener.getString("name");
+  if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
+    throw EnvoyException("Listener name is longer than max configured length");
+  }
 
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
                                 *listener.mutable_address());

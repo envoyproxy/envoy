@@ -37,7 +37,6 @@ public:
   const std::string& serviceZone() override { return service_zone_; }
   uint64_t maxStats() override { return max_stats_; }
   uint64_t maxStatNameLength() override { return max_stat_name_length_; }
-  uint64_t maxUserSuppliedNameLength() override { return max_user_supplied_name_length_; }
 
 private:
   uint64_t base_id_;
@@ -57,6 +56,5 @@ private:
   Server::Mode mode_;
   uint64_t max_stats_;
   uint64_t max_stat_name_length_;
-  uint64_t max_user_supplied_name_length_;
 };
 } // namespace Envoy
