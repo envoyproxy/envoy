@@ -107,7 +107,7 @@ public:
     EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(num_stats_));
     EXPECT_CALL(options_, maxObjNameLength()).WillRepeatedly(Return(name_len_));
     setup();
-    EXPECT_EQ(name_len_, Stats::RawStatData::maxNameLength());
+    EXPECT_EQ(name_len_, Stats::RawStatData::maxObjNameLength());
   }
 
   static const uint64_t num_stats_ = 8;
@@ -136,7 +136,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   std::vector<TestStat> stats;
   for (uint64_t i = 0; i < num_stats_; i++) {
     std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzz", i)
-                           .substr(0, Stats::RawStatData::maxNameLength());
+                           .substr(0, Stats::RawStatData::maxObjNameLength());
     TestStat ts;
     ts.stat_ = hot_restart_->alloc(name);
     ts.name_ = ts.stat_->name_;
@@ -144,7 +144,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
 
     // If this isn't true then the hard coded part of the name isn't long enough to make the test
     // valid.
-    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxNameLength());
+    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxObjNameLength());
 
     stats.push_back(ts);
   }
