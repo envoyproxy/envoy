@@ -71,17 +71,18 @@ public:
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
 
-  void setup(const std::string& primary_dir, const std::string& override_dir) {
+  void setup() {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
 
-    if (os_sys_calls_ == nullptr) {
-      os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
-    }
-    Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
+    os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
     ON_CALL(*os_sys_calls_, stat(_, _))
         .WillByDefault(
             Invoke([](const char* filename, struct stat* stat) { return ::stat(filename, stat); }));
+  }
+
+  void run(const std::string& primary_dir, const std::string& override_dir) {
+    Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
     loader.reset(new LoaderImpl(dispatcher, tls, TestEnvironment::temporaryPath(primary_dir),
                                 "envoy", override_dir, store, generator, std::move(os_sys_calls)));
   }
@@ -96,7 +97,8 @@ public:
 };
 
 TEST_F(RuntimeImplTest, All) {
-  setup("test/common/runtime/test_data/current", "envoy_override");
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
 
   // Basic string getting.
   EXPECT_EQ("world", loader->snapshot().get("file2"));
@@ -127,17 +129,21 @@ TEST_F(RuntimeImplTest, All) {
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
 }
 
-TEST_F(RuntimeImplTest, BadDirectory) { setup("/baddir", "/baddir"); }
+TEST_F(RuntimeImplTest, BadDirectory) {
+  setup();
+  run("/baddir", "/baddir");
+}
 
 TEST_F(RuntimeImplTest, BadStat) {
-  os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
+  setup();
   EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(-1));
-  setup("test/common/runtime/test_data/current", "envoy_override");
+  run("test/common/runtime/test_data/current", "envoy_override");
   EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
 }
 
 TEST_F(RuntimeImplTest, OverrideFolderDoesNotExist) {
-  setup("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
 }
