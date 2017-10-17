@@ -71,9 +71,7 @@ struct RawStatData {
    * Returns the maximum length of a user supplied field in a stat.  This length
    * does not include a trailing NULL-terminator.
    */
-  static size_t maxUserSuppliedNameLength() {
-    return maxNameLength() - MAX_STAT_SUFFIX_LENGTH;
-  }
+  static size_t maxUserSuppliedNameLength() { return maxNameLength() - MAX_STAT_SUFFIX_LENGTH; }
 
   /**
    * size in bytes of name_
