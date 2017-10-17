@@ -1,25 +1,21 @@
 load("@envoy//bazel:genrule_repository.bzl", "genrule_cc_deps", "genrule_environment")
 load(":genrule_cmd.bzl", "genrule_cmd")
 
+_HDRS = glob([
+    "src/c++11/lightstep/**/*.h",
+    "src/c++11/mapbox_variant/**/*.hpp",
+])
+
+_PREFIX_HDRS = [hdr.replace("src/c++11/", "_prefix/include/") for hdr in _HDRS] + [
+    "_prefix/include/collector.pb.h",
+    "_prefix/include/lightstep_carrier.pb.h",
+]
+
 cc_library(
     name = "lightstep",
     srcs = [":_prefix/lib/liblightstep_core_cxx11.a"],
-    hdrs = glob([
-        "src/c++11/lightstep/**/*.h",
-        "src/c++11/mapbox_variant/**/*.hpp",
-    ]) + [
-        ":_prefix/include/collector.pb.h",
-        ":_prefix/include/lightstep_carrier.pb.h",
-    ],
-    includes = [
-        # Note: src/ is listed before _prefix to allow unsandboxed builds.
-        #
-        # Otherwise the compiler will locate included headers in `_prefix`
-        # even though they're properly defined under `src/`, which breaks
-        # strict include checking.
-        "src/c++11",
-        "_prefix/include",
-    ],
+    hdrs = [":" + hdr for hdr in _PREFIX_HDRS],
+    includes = ["_prefix/include"],
     visibility = ["//visibility:public"],
     deps = ["@protobuf_bzl//:protobuf"],
 )
@@ -44,10 +40,8 @@ genrule(
         "@protobuf_bzl//:well_known_protos",
         "@local_config_cc//:toolchain",
     ],
-    outs = [
+    outs = _PREFIX_HDRS + [
         "_prefix/lib/liblightstep_core_cxx11.a",
-        "_prefix/include/collector.pb.h",
-        "_prefix/include/lightstep_carrier.pb.h",
     ],
     cmd = genrule_cmd("@envoy//bazel/external:lightstep.genrule_cmd"),
     tools = [
