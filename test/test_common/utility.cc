@@ -119,7 +119,7 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
     std::string file_name = fmt::format("{}/{}", path, std::string(entry->d_name));
     struct stat stat_result;
     int rc = ::stat(file_name.c_str(), &stat_result);
-    ASSERT_EQ(rc, 0);
+    EXPECT_EQ(rc, 0);
 
     if (recursive && S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
