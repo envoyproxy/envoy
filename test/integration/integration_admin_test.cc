@@ -117,9 +117,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
-  Json::ObjectSharedPtr statsobj = statsjson->getObject("stats");
-  std::vector<Json::ObjectSharedPtr> statsarray = statsobj->asObjectArray();
-  EXPECT_TRUE(statsarray.size() > 0);
+  EXPECT_TRUE(statsjson->hasObject("stats"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
                                                 downstreamProtocol(), version_);
