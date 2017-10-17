@@ -143,6 +143,20 @@ def envoy_api_deps(skip_targets):
         actual = "@googleapis//:http_api_protos_genproto",
     )
 
+
+def abseil_deps(skip_targets):
+  if 'abseil' not in skip_targets:
+    native.git_repository(
+        name = "abseil",
+        remote = REPO_LOCATIONS["abseil_cpp"],
+        commit = "6de53819a7173bd446156237a37f53464b7732cc",
+    )
+    native.bind(
+        name = "abseil_base",
+        actual = "@abseil//absl/base:base",
+    )
+
+
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = [],
                        repository = ""):
     native.bind(
@@ -209,6 +223,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
     python_deps(skip_targets)
     cc_deps(skip_targets)
     envoy_api_deps(skip_targets)
+    abseil_deps(skip_targets)
 
 def com_github_fmtlib_fmt(repository = ""):
   native.new_http_archive(
