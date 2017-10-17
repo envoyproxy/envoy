@@ -70,8 +70,8 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_name(0));
 }
 
-TEST(UtilityTest, UserSuppliedNameLength) {
-  EXPECT_THROW(Utility::checkUserSuppliedNameLength(
+TEST(UtilityTest, ObjNameLength) {
+  EXPECT_THROW(Utility::checkObjNameLength(
                    "test", "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"),
                EnvoyException);
 }

@@ -17,7 +17,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   const std::string name = json_listener.getString("name", "");
-  Utility::checkUserSuppliedNameLength("Invalid listener name", name);
+  Utility::checkObjNameLength("Invalid listener name", name);
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
                                 *listener.mutable_address());
 

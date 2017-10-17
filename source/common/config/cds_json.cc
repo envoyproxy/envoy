@@ -86,7 +86,7 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   const std::string name = json_cluster.getString("name");
-  Utility::checkUserSuppliedNameLength("Invalid cluster name", name);
+  Utility::checkObjNameLength("Invalid cluster name", name);
   cluster.set_name(name);
 
   const std::string string_type = json_cluster.getString("type");

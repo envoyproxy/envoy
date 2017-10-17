@@ -219,7 +219,7 @@ public:
    * @param error_prefix supplies the prefix to use in error messages.
    * @param name supplies the name to check for length limits.
    */
-  static void checkUserSuppliedNameLength(const std::string& error_prefix, const std::string& name);
+  static void checkObjNameLength(const std::string& error_prefix, const std::string& name);
 };
 
 } // namespace Config
