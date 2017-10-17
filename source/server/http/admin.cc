@@ -31,18 +31,14 @@
 #include "common/upstream/host_utility.h"
 
 #include "fmt/format.h"
-
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
+#include "rapidjson/prettywriter.h"
 #include "rapidjson/reader.h"
 #include "rapidjson/schema.h"
 #include "rapidjson/stream.h"
 #include "rapidjson/stringbuffer.h"
-#include "rapidjson/prettywriter.h"
-
 #include "spdlog/spdlog.h"
-
-
 
 namespace Envoy {
 namespace Server {
