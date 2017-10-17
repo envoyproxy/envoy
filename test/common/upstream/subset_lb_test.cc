@@ -69,7 +69,7 @@ public:
             new TestMetadataMatchCriteria(std::map<std::string, std::string>(metadata_matches))) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const override { return 0; }
+  Optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
     return matches_.get();

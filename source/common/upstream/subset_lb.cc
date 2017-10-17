@@ -44,7 +44,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_s
   }
 }
 
-HostConstSharedPtr SubsetLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
     if (match_criteria) {

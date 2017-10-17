@@ -24,7 +24,7 @@ public:
                      Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets);
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
   LoadBalancerType lb_type_;
