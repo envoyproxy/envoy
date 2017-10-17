@@ -7,6 +7,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/version.h"
+#include "common/stats/stats_impl.h"
 
 #include "fmt/format.h"
 #include "spdlog/spdlog.h"
@@ -21,8 +22,6 @@
 #ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
 #define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
 #endif
-
-#define ENVOY_MAX_STAT_SUFFIX_LENGTH 67
 
 #if ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH < 60
 #error "ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be >= 60"
@@ -106,7 +105,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
 
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() + ENVOY_MAX_STAT_SUFFIX_LENGTH);
+                                        max_obj_name_len.getValue() +
+                                            Stats::RawStatData::maxStatSuffixLength());
     exit(0);
   }
 
@@ -150,6 +150,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_stat_name_length_ = max_obj_name_len.getValue() + ENVOY_MAX_STAT_SUFFIX_LENGTH;
+  max_stat_name_length_ = max_obj_name_len.getValue() + Stats::RawStatData::maxStatSuffixLength();
 }
 } // namespace Envoy

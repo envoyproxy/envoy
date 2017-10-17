@@ -126,7 +126,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
 void Utility::checkUserSuppliedNameLength(const std::string& error_prefix,
                                           const std::string& name) {
   if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
-    throw EnvoyException(fmt::format("{}: name exceeds allowed maximum {}", error_prefix,
+    throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
+                                     error_prefix, name, name.length(),
                                      Stats::RawStatData::maxUserSuppliedNameLength()));
   }
 }

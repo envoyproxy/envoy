@@ -74,6 +74,12 @@ struct RawStatData {
   static size_t maxUserSuppliedNameLength() { return maxNameLength() - MAX_STAT_SUFFIX_LENGTH; }
 
   /**
+   * Returns the maximum length of a stat suffix that Envoy generates (over the user supplied name).
+   * This length does not include a trailing NULL-terminator.
+   */
+  static size_t maxStatSuffixLength() { return MAX_STAT_SUFFIX_LENGTH; }
+
+  /**
    * size in bytes of name_
    */
   static size_t nameSize() { return maxNameLength() + 1; }
