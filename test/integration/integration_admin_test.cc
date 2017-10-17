@@ -9,7 +9,7 @@
 #include "fmt/format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
-
+ 
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,

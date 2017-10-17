@@ -41,7 +41,7 @@
 #include "spdlog/spdlog.h"
 
 using namespace rapidjson;
-
+ 
 namespace Envoy {
 namespace Server {
 
