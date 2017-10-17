@@ -107,6 +107,20 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
+  std::vector<Json::ObjectSharedPtr> stats_info = statsjson->asObjectArray();
+  EXPECT_TRUE(stats_info.size() > 0);
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
