@@ -72,7 +72,7 @@ struct RawStatData {
    * does not include a trailing NULL-terminator.
    */
   static size_t maxUserSuppliedNameLength() {
-    return maxNameLength() - DEFAULT_MAX_STAT_SUFFIX_LENGTH;
+    return maxNameLength() - MAX_STAT_SUFFIX_LENGTH;
   }
 
   /**
@@ -112,7 +112,7 @@ struct RawStatData {
 private:
   static const size_t DEFAULT_MAX_NAME_SIZE = 127;
   // total length must be equal to DEFAULT_MAX_NAME_SIZE
-  static const size_t DEFAULT_MAX_STAT_SUFFIX_LENGTH = 67;
+  static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
 
   static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
 };
