@@ -17,6 +17,12 @@ if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$want_push" == "true" ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
         echo "There are changes in the ci/build_container directory"
+        want_push='true'
+    elif [[ $(git diff HEAD^ bazel/) ]]; then
+        echo "There are changes in the bazel directory"
+        want_push='true'
+    fi
+    if [ "$want_push" == "true" ]
         cd ci/build_container
         docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
