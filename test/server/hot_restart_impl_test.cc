@@ -135,8 +135,12 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   };
   std::vector<TestStat> stats;
   for (uint64_t i = 0; i < num_stats_; i++) {
-    std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzz", i)
-                           .substr(0, Stats::RawStatData::maxObjNameLength());
+    // 67 Z characters + 1 digit (num_stats == 8) for total of 68 characters
+    std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+                                   i)
+                           .substr(0, Stats::RawStatData::maxNameLength());
     TestStat ts;
     ts.stat_ = hot_restart_->alloc(name);
     ts.name_ = ts.stat_->name_;
@@ -144,7 +148,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
 
     // If this isn't true then the hard coded part of the name isn't long enough to make the test
     // valid.
-    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxObjNameLength());
+    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxNameLength());
 
     stats.push_back(ts);
   }
