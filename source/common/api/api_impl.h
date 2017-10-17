@@ -26,7 +26,7 @@ public:
   std::string fileReadToEnd(const std::string& path) override;
 
 private:
-  OsSysCallsPtr os_sys_calls_;
+  OsSysCalls& os_sys_calls_;
   std::chrono::milliseconds file_flush_interval_msec_;
 };
 

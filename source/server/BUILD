@@ -113,6 +113,7 @@ envoy_cc_library(
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",

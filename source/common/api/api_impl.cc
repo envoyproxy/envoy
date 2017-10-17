@@ -15,11 +15,11 @@ Event::DispatcherPtr Impl::allocateDispatcher() {
 }
 
 Impl::Impl(std::chrono::milliseconds file_flush_interval_msec)
-    : os_sys_calls_(new OsSysCallsImpl()), file_flush_interval_msec_(file_flush_interval_msec) {}
+    : os_sys_calls_(OsSysCallsSingleton::get()), file_flush_interval_msec_(file_flush_interval_msec) {}
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                            Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, *os_sys_calls_, stats_store,
+  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, os_sys_calls_, stats_store,
                                                 file_flush_interval_msec_);
 }
 
