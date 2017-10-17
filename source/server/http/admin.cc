@@ -31,7 +31,16 @@
 #include "common/upstream/host_utility.h"
 
 #include "fmt/format.h"
+#include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/reader.h"
+#include "rapidjson/schema.h"
+#include "rapidjson/stream.h"
+#include "rapidjson/stringbuffer.h"
 #include "spdlog/spdlog.h"
+
+using namespace rapidjson;
 
 namespace Envoy {
 namespace Server {
@@ -267,9 +276,11 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& re
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
+  Http::Code rc = Http::Code::OK;
+  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
@@ -279,11 +290,42 @@ Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& respons
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
-  for (auto stat : all_stats) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+  if (params.size() == 0) {
+    // No Arguments so use the standard
+    for (auto stat : all_stats) {
+      response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    }
+  } else {
+    std::string format = params.begin()->first;
+    std::string formatvalue = params.begin()->second;
+    if (format == "format" && formatvalue == "json") {
+      rapidjson::Document document;
+      document.SetObject();
+      rapidjson::Value statsArray(rapidjson::kArrayType);
+      rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+      for (auto stat : all_stats) {
+        Value statsObj;
+        statsObj.SetObject();
+        Value statname;
+        statname.SetString(stat.first.c_str(), allocator);
+        statsObj.AddMember("name", statname, allocator);
+        Value statvalue;
+        statvalue.SetInt(stat.second);
+        statsObj.AddMember("value", statvalue, allocator);
+        statsArray.PushBack(statsObj, allocator);
+      }
+      document.AddMember("stats", statsArray, allocator);
+      rapidjson::StringBuffer strbuf;
+      rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+      document.Accept(writer);
+      response.add(strbuf.GetString());
+    } else {
+      response.add("usage: /stats?format=json \n");
+      response.add("\n");
+      rc = Http::Code::NotFound;
+    }
   }
-
-  return Http::Code::OK;
+  return rc;
 }
 
 Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& response) {
