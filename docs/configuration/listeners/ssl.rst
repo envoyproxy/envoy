@@ -120,6 +120,6 @@ session_ticket_key_paths
     are used. See https://www.imperialviolet.org/2013/06/27/botchingpfs.html for some discussion.
     To minimize the risk, you must:
 
-    * Keep the keys at least as secure as your TLS certificate private keys
+    * Keep the session ticket keys at least as secure as your TLS certificate private keys
     * Rotate session ticket keys at least daily, and preferably hourly
     * Always generate keys using a cryptographically-secure random data source
