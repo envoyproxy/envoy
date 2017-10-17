@@ -644,16 +644,6 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
   }
 }
 
-bool VirtualHostImpl::usesRuntime() const {
-  bool uses = false;
-  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    // Currently a base runtime rule as well as a shadow rule can use runtime.
-    uses |= (route->usesRuntime() || !route->shadowPolicy().runtimeKey().empty());
-  }
-
-  return uses;
-}
-
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::VirtualCluster& virtual_cluster) {
   if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
@@ -691,8 +681,6 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
-    uses_runtime_ |= virtual_host->usesRuntime();
-
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
