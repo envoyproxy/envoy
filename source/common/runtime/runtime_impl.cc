@@ -208,10 +208,16 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       full_prefix = prefix + "." + entry->d_name;
     }
 
-    if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
+    struct stat stat_result;
+    int rc = ::stat(full_path.c_str(), &stat_result);
+    if (rc != 0) {
+      throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
+    }
+
+    if (S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
       walkDirectory(full_path, full_prefix);
-    } else if (entry->d_type == DT_REG) {
+    } else if (S_ISREG(stat_result.st_mode)) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
