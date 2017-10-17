@@ -103,7 +103,6 @@ public:
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
-  bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
     return request_headers_to_add_;
@@ -292,7 +291,6 @@ public:
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
-  bool usesRuntime() const { return runtime_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -543,7 +541,6 @@ public:
                Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
-  bool usesRuntime() const { return uses_runtime_; }
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
@@ -562,7 +559,6 @@ private:
   std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
       wildcard_virtual_host_suffixes_;
   VirtualHostSharedPtr default_virtual_host_;
-  bool uses_runtime_{};
 };
 
 /**
@@ -597,8 +593,6 @@ public:
     return response_headers_to_remove_;
   }
 
-  bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
-
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -628,8 +622,6 @@ public:
   const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
     return response_headers_to_remove_;
   }
-
-  bool usesRuntime() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

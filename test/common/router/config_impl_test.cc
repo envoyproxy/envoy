@@ -218,8 +218,6 @@ TEST(RouteMatcherTest, TestRoutes) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_FALSE(config.usesRuntime());
-
   // Base routing testing.
   EXPECT_EQ("instant-server",
             config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
@@ -640,8 +638,6 @@ TEST(RouteMatcherTest, Priority) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_FALSE(config.usesRuntime());
-
   EXPECT_EQ(Upstream::ResourcePriority::High,
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->priority());
   EXPECT_EQ(Upstream::ResourcePriority::Default,
@@ -757,8 +753,6 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_FALSE(config.usesRuntime());
-
   {
     EXPECT_EQ("local_service_without_headers",
               config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
@@ -849,7 +843,6 @@ public:
   ConfigImpl& config() {
     if (config_ == nullptr) {
       config_ = std::unique_ptr<ConfigImpl>{new ConfigImpl(route_config_, runtime_, cm_, true)};
-      EXPECT_FALSE(config_->usesRuntime());
     }
     return *config_;
   }
@@ -1137,8 +1130,6 @@ TEST(RouteMatcherTest, ClusterHeader) {
   NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_FALSE(config.usesRuntime());
-
   EXPECT_EQ(
       "some_cluster",
       config.route(genHeaders("some_cluster", "/foo", "GET"), 0)->routeEntry()->clusterName());
@@ -1194,8 +1185,6 @@ TEST(RouteMatcherTest, ContentType) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_FALSE(config.usesRuntime());
-
   {
     EXPECT_EQ("local_service",
               config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
@@ -1247,8 +1236,6 @@ TEST(RouteMatcherTest, Runtime) {
   ON_CALL(runtime, snapshot()).WillByDefault(ReturnRef(snapshot));
 
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-
-  EXPECT_TRUE(config.usesRuntime());
 
   EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
   EXPECT_EQ("something_else",
@@ -1403,8 +1390,6 @@ TEST(RouteMatcherTest, Shadow) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
-  EXPECT_TRUE(config.usesRuntime());
-
   EXPECT_EQ("some_cluster", config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                 ->routeEntry()
                                 ->shadowPolicy()
@@ -1470,8 +1455,6 @@ TEST(RouteMatcherTest, Retry) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-
-  EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -1555,8 +1538,6 @@ TEST(RouteMatcherTest, GrpcRetry) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-
-  EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -1739,8 +1720,6 @@ TEST(RouteMatcherTest, Redirect) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-
-  EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
 
@@ -2162,7 +2141,6 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
   EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
-  EXPECT_FALSE(config.usesRuntime());
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
@@ -2638,8 +2616,6 @@ TEST(RouterMatcherTest, Decorator) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-
-  EXPECT_FALSE(config.usesRuntime());
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
