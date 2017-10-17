@@ -3,4 +3,5 @@ REPO_LOCATIONS = {
     "grpc_transcoding": "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding.git",
     "envoy_api": "https://github.com/envoyproxy/data-plane-api.git",
     "markupsafe": "https://github.com/pallets/markupsafe.git",
+    "abseil_cpp": "https://github.com/abseil/abseil-cpp",
 }
