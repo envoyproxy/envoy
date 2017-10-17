@@ -22,6 +22,7 @@ envoy_cc_test(
     deps = [
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",

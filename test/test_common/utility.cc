@@ -117,12 +117,16 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   dirent* entry;
   while ((entry = readdir(dir)) != nullptr) {
     std::string file_name = fmt::format("{}/{}", path, std::string(entry->d_name));
-    if (recursive && entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
+    struct stat stat_result;
+    int rc = ::stat(file_name.c_str(), &stat_result);
+    EXPECT_EQ(rc, 0);
+
+    if (recursive && S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
       std::vector<std::string> more_file_names = listFiles(file_name, recursive);
       file_names.insert(file_names.end(), more_file_names.begin(), more_file_names.end());
       continue;
-    } else if (entry->d_type == DT_DIR) {
+    } else if (S_ISDIR(stat_result.st_mode)) {
       continue;
     }
 
