@@ -135,7 +135,6 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   };
   std::vector<TestStat> stats;
   for (uint64_t i = 0; i < num_stats_; i++) {
-    // 67 Z characters + 1 digit (num_stats == 8) for total of 68 characters
     std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
                                    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
                                    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
