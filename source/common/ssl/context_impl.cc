@@ -12,17 +12,28 @@
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
+#include "openssl/hmac.h"
+#include "openssl/rand.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Ssl {
 
-const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
+int ContextImpl::sslContextIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_context_index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_context_index >= 0);
+    return ssl_context_index;
+  }());
+}
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
+
+  int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
+  RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     throw EnvoyException(
@@ -85,9 +96,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
-
-  SSL_CTX_set_session_id_context(ctx_.get(), &SERVER_SESSION_ID_CONTEXT,
-                                 sizeof SERVER_SESSION_ID_CONTEXT);
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 }
@@ -174,6 +182,10 @@ int ContextImpl::verifyCertificate(X509* cert) {
 
 void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
+
+  if (SSL_session_reused(ssl)) {
+    stats_.session_reused_.inc();
+  }
 
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
@@ -345,7 +357,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      ServerContextConfig& config, Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), runtime_(runtime) {
+    : ContextImpl(parent, scope, config), runtime_(runtime),
+      session_ticket_keys_(config.sessionTicketKeys()) {
   if (!config.caCertFile().empty()) {
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
     if (nullptr == list) {
@@ -369,6 +382,150 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
                                      out, outlen, in, inlen);
                                },
                                this);
+  }
+
+  if (!session_ticket_keys_.empty()) {
+    SSL_CTX_set_tlsext_ticket_key_cb(
+        ctx_.get(),
+        [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
+           int encrypt) -> int {
+          ContextImpl* context_impl = static_cast<ContextImpl*>(
+              SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+          return dynamic_cast<ServerContextImpl*>(context_impl)
+              ->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+        });
+  }
+
+  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
+  unsigned session_context_len = 0;
+  EVP_MD_CTX md;
+  int rc = EVP_DigestInit(&md, EVP_sha256());
+  RELEASE_ASSERT(rc == 1);
+
+  // Hash the CommonName/SANs in the server certificate.  This makes sure that
+  // sessions can only be resumed to a certificate for the same name, but allows
+  // resuming to unique certs in the case that different Envoy instances each have
+  // their own certs.
+  X509* cert = SSL_CTX_get0_certificate(ctx_.get());
+  RELEASE_ASSERT(cert != nullptr);
+  X509_NAME* cert_subject = X509_get_subject_name(cert);
+  RELEASE_ASSERT(cert_subject != nullptr);
+  int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+  RELEASE_ASSERT(cn_index >= 0);
+  X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+  RELEASE_ASSERT(cn_entry != nullptr);
+  ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+  RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0);
+  rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+  RELEASE_ASSERT(rc == 1);
+
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names != nullptr) {
+    // TODO(ggreenway): Use range-based for loop when newer BoringSSL build is used:
+    //   for (const GENERAL_NAME* san : *san_names) {
+    for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names.get()); i++) {
+      const GENERAL_NAME* san = sk_GENERAL_NAME_value(san_names.get(), i);
+      if (san->type == GEN_DNS || san->type == GEN_URI) {
+        rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
+        RELEASE_ASSERT(rc == 1);
+      }
+    }
+  }
+
+  X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
+  rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+  rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1);
+
+  // Hash all the settings that affect whether the server will allow/accept
+  // the client connection.  This ensures that the client is always validated against
+  // the correct settings, even if session resumption across different listeners
+  // is enabled.
+  if (ca_cert_ != nullptr) {
+    rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
+    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    RELEASE_ASSERT(rc == 1);
+
+    // verify_subject_alt_name_list_ can only be set with a ca_cert
+    for (const std::string& name : verify_subject_alt_name_list_) {
+      rc = EVP_DigestUpdate(&md, name.data(), name.size());
+      RELEASE_ASSERT(rc == 1);
+    }
+
+    // verify_certificate_hash_ can only be set with a ca_cert
+    rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
+                          verify_certificate_hash_.size() *
+                              sizeof(decltype(verify_certificate_hash_)::value_type));
+    RELEASE_ASSERT(rc == 1);
+  }
+
+  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
+  RELEASE_ASSERT(rc == 1);
+  rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
+  RELEASE_ASSERT(rc == 1);
+}
+
+int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
+                                            EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx, int encrypt) {
+  const EVP_MD* hmac = EVP_sha256();
+  const EVP_CIPHER* cipher = EVP_aes_256_cbc();
+
+  if (encrypt == 1) {
+    // Encrypt
+    RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
+    // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
+    // or if we allow it to be emptied, reconfigure the context so this callback
+    // isn't set.
+
+    const ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
+
+    static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
+                  "Expected key.name length");
+    std::copy_n(key.name_.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
+
+    int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
+    ASSERT(rc);
+    UNREFERENCED_PARAMETER(rc);
+
+    // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
+    // EVP_CIPHER_key_length(cipher) at compile-time
+    RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+    if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
+      return -1;
+    }
+
+    if (!HMAC_Init_ex(hmac_ctx, key.hmac_key_.data(), key.hmac_key_.size(), hmac, nullptr)) {
+      return -1;
+    }
+
+    return 1; // success
+  } else {
+    // Decrypt
+    bool is_enc_key = true; // first element is the encryption key
+    for (const ServerContextConfig::SessionTicketKey& key : session_ticket_keys_) {
+      static_assert(std::tuple_size<decltype(key.name_)>::value == SSL_TICKET_KEY_NAME_LEN,
+                    "Expected key.name length");
+      if (std::equal(key.name_.begin(), key.name_.end(), key_name)) {
+        if (!HMAC_Init_ex(hmac_ctx, key.hmac_key_.data(), key.hmac_key_.size(), hmac, nullptr)) {
+          return -1;
+        }
+
+        RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+        if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
+          return -1;
+        }
+
+        // If our current encryption was not the decryption key, renew
+        return is_enc_key ? 1  // success; do not renew
+                          : 2; // success: renew key
+      }
+      is_enc_key = false;
+    }
+
+    return 0; // decryption failed
   }
 }
 
