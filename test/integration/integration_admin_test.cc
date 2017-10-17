@@ -95,7 +95,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());  
+  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/server_info", "",
                                                 downstreamProtocol(), version_);
