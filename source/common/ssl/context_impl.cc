@@ -422,7 +422,10 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names != nullptr) {
-    for (const GENERAL_NAME* san : san_names.get()) {
+    // TODO(ggreenway): Use range-based for loop when newer BoringSSL build is used:
+    //   for (const GENERAL_NAME* san : *san_names) {
+    for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names.get()); i++) {
+      const GENERAL_NAME* san = sk_GENERAL_NAME_value(san_names.get(), i);
       if (san->type == GEN_DNS || san->type == GEN_URI) {
         rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
         RELEASE_ASSERT(rc == 1);
