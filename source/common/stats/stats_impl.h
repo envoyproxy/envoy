@@ -72,7 +72,7 @@ struct RawStatData {
    * does not include a trailing NULL-terminator.
    */
   static size_t maxUserSuppliedNameLength() {
-    return maxNameLength() - DEFAULT_MAX_USER_SUPPLIED_NAME_SIZE;
+    return maxNameLength() - DEFAULT_MAX_STAT_SUFFIX_LENGTH;
   }
 
   /**
