@@ -84,11 +84,28 @@ def _absolute_bin(path):
 def _genrule_environment(ctx):
   lines = []
 
+  # Bazel uses the same command for C and C++ compilation.
+  c_compiler = ctx.var['CC']
+
   # Bare minimum cflags to get included test binaries to link.
   #
   # See //tools:bazel.rc for the full set.
   asan_flags = ["-fsanitize=address,undefined"]
   tsan_flags = ["-fsanitize=thread"]
+
+  # Older versions of GCC in Ubuntu, including GCC 5 used in CI images,
+  # incorrectly invoke the older `/usr/bin/ld` with gold-specific options when
+  # building with sanitizers enabled. Work around this by forcing use of gold
+  # in sanitize mode.
+  #
+  # This is not a great solution because it doesn't detect GCC when Bazel has
+  # wrapped it in an intermediate script, but it works well enough to keep CI
+  # running.
+  #
+  # https://stackoverflow.com/questions/37603238/fsanitize-not-using-gold-linker-in-gcc-6-1
+  force_ld_gold = []
+  if "gcc" in c_compiler or "g++" in c_compiler:
+    force_ld_gold = ["-fuse-ld=gold"]
 
   cc_flags = []
   ld_flags = []
@@ -98,15 +115,17 @@ def _genrule_environment(ctx):
   if ctx.var.get('ENVOY_CONFIG_ASAN'):
     cc_flags += asan_flags
     ld_flags += asan_flags
+    ld_flags += force_ld_gold
   if ctx.var.get('ENVOY_CONFIG_TSAN'):
     cc_flags += tsan_flags
     ld_flags += tsan_flags
+    ld_flags += force_ld_gold
 
   lines.append("export CFLAGS=%r" % (" ".join(cc_flags),))
   lines.append("export LDFLAGS=%r" % (" ".join(ld_flags),))
   lines.append("export LIBS=%r" % (" ".join(ld_libs),))
-  lines.append("export CC=%s" % (_absolute_bin(ctx.var['CC']),))
-  lines.append("export CXX=%s" % (_absolute_bin(ctx.var['CC']),))
+  lines.append("export CC=%s" % (_absolute_bin(c_compiler),))
+  lines.append("export CXX=%s" % (_absolute_bin(c_compiler),))
 
   # Some Autoconf helper binaries leak, which makes ./configure think the
   # system is unable to do anything. Turn off leak checking during part of
