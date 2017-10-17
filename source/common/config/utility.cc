@@ -123,12 +123,11 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-void Utility::checkUserSuppliedNameLength(const std::string& error_prefix,
-                                          const std::string& name) {
-  if (name.length() > Stats::RawStatData::maxUserSuppliedNameLength()) {
+void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
+  if (name.length() > Stats::RawStatData::maxObjNameLength()) {
     throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
                                      error_prefix, name, name.length(),
-                                     Stats::RawStatData::maxUserSuppliedNameLength()));
+                                     Stats::RawStatData::maxObjNameLength()));
   }
 }
 

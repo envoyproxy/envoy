@@ -37,7 +37,7 @@ size_t& RawStatData::initializeAndGetMutableMaxNameLength(size_t configured_size
 }
 
 void RawStatData::configure(Server::Options& options) {
-  const size_t configured = options.maxStatNameLength();
+  const size_t configured = options.maxObjNameLength() + maxStatSuffixLength();
   RELEASE_ASSERT(configured > 0);
   size_t max_name_length = initializeAndGetMutableMaxNameLength(configured);
 
@@ -47,7 +47,7 @@ void RawStatData::configure(Server::Options& options) {
 }
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const size_t configured = options.maxStatNameLength();
+  const size_t configured = options.maxObjNameLength() + maxStatSuffixLength();
   initializeAndGetMutableMaxNameLength(configured) = configured;
 }
 

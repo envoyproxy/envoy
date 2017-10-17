@@ -150,6 +150,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_stat_name_length_ = max_obj_name_len.getValue() + Stats::RawStatData::maxStatSuffixLength();
+  max_obj_name_length_ = max_obj_name_len.getValue();
 }
 } // namespace Envoy

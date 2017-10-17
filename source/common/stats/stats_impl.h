@@ -68,10 +68,10 @@ struct RawStatData {
   }
 
   /**
-   * Returns the maximum length of a user supplied field in a stat.  This length
-   * does not include a trailing NULL-terminator.
+   * Returns the maximum length of a user supplied object (route/cluster/listener)
+   * name field in a stat. This length does not include a trailing NULL-terminator.
    */
-  static size_t maxUserSuppliedNameLength() { return maxNameLength() - MAX_STAT_SUFFIX_LENGTH; }
+  static size_t maxObjNameLength() { return maxNameLength() - MAX_STAT_SUFFIX_LENGTH; }
 
   /**
    * Returns the maximum length of a stat suffix that Envoy generates (over the user supplied name).
