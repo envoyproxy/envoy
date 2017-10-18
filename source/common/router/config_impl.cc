@@ -213,6 +213,8 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
   }
 }
 
+const std::string& DecoratorImpl::getOperation() const { return operation_; }
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,

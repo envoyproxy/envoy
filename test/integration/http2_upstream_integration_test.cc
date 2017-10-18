@@ -106,7 +106,7 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
                                                            {":authority", "host"}},
                                    *response_);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
   // Send part of the request body and ensure it is received upstream.
   codec_client_->sendData(*request_encoder_, bytes, false);
@@ -146,7 +146,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
                                                            {":authority", "host"}},
                                    *response_);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
   // Send some request data.
   codec_client_->sendData(*request_encoder_, 1024, false);
@@ -186,7 +186,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                            {":authority", "host"}},
                                    *response1);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request1 = fake_upstream_connection_->waitForNewStream();
+  upstream_request1 = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
   // Start request 2
   Http::StreamEncoder* encoder2 =
@@ -195,7 +195,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                            {":scheme", "http"},
                                                            {":authority", "host"}},
                                    *response2);
-  upstream_request2 = fake_upstream_connection_->waitForNewStream();
+  upstream_request2 = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
   // Finish request 1
   codec_client_->sendData(*encoder1, request1_bytes, true);
@@ -258,7 +258,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   for (uint32_t i = 0; i < num_requests; ++i) {
     // As data and streams are interwoven, make sure waitForNewStream()
     // ignores incoming data and waits for actual stream establishment.
-    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(true));
+    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(*dispatcher_, true));
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     upstream_requests[i]->waitForEndStream(*dispatcher_);
@@ -316,7 +316,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   }
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   for (uint32_t i = 0; i < num_requests; ++i) {
-    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream());
+    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(*dispatcher_));
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {

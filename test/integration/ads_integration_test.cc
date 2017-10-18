@@ -148,7 +148,7 @@ public:
   void initialize() override {
     BaseIntegrationTest::initialize();
     ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    ads_stream_ = ads_connection_->waitForNewStream();
+    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
   }
 
