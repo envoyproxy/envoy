@@ -158,5 +158,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

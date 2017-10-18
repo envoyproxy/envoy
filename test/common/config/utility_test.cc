@@ -6,6 +6,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/local_info/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
 #include "fmt/format.h"
@@ -88,7 +89,8 @@ TEST(UtilityTest, ObjNameLength) {
 
   {
     err_prefix = "Invalid listener name";
-    std::string json = "{ 'name': " + name + "'address': 'foo', 'filters': [] }";
+    std::string json =
+        R"EOF({ "name": ")EOF" + name + R"EOF(", "address": "foo", "filters":[]})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
 
     envoy::api::v2::Listener listener;
@@ -98,7 +100,7 @@ TEST(UtilityTest, ObjNameLength) {
 
   {
     err_prefix = "Invalid virtual host name";
-    std::string json = "{ 'name': " + name + "'domains': [], 'routes': [] }";
+    std::string json = R"EOF({ "name": ")EOF" + name + R"EOF(", "domains": [], "routes": []})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
     envoy::api::v2::VirtualHost vhost;
     EXPECT_THROW_WITH_MESSAGE(Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost),
@@ -108,16 +110,19 @@ TEST(UtilityTest, ObjNameLength) {
   {
     err_prefix = "Invalid cluster name";
     std::string json =
-        "{ 'name': " + name + "'type': 'static', 'lb_type': 'random', 'connect_timeout_ms' : 1}";
+        R"EOF({ "name": ")EOF" + name +
+        R"EOF(", "type": "static", "lb_type": "random", "connect_timeout_ms" : 1})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
     envoy::api::v2::Cluster cluster;
-    EXPECT_THROW_WITH_MESSAGE(Config::CdsJson::translateCluster(*json_object_ptr, cluster),
-                              EnvoyException, err_prefix + err_suffix);
+    envoy::api::v2::ConfigSource eds_config;
+    EXPECT_THROW_WITH_MESSAGE(
+        Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
+        err_prefix + err_suffix);
   }
 
   {
     err_prefix = "Invalid route_config name";
-    std::string json = "{ 'route_config_name': " + name + "'cluster': 'foo'}";
+    std::string json = R"EOF({ "route_config_name": ")EOF" + name + R"EOF(", "cluster": "foo"})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
     envoy::api::v2::filter::Rds rds;
     EXPECT_THROW_WITH_MESSAGE(Config::Utility::translateRdsConfig(*json_object_ptr, rds),

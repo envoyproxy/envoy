@@ -232,19 +232,6 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
-TEST_F(ClusterManagerImplTest, MaxClusterName) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
-    }]
-  }
-  )EOF";
-
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
-}
-
 TEST_F(ClusterManagerImplTest, ValidClusterName) {
   const std::string json = R"EOF(
   {

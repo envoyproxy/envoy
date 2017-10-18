@@ -19,6 +19,8 @@
 #endif
 
 // Can be overridden at compile time
+// See comment in common/stat/stat_impl.h for rationale behind
+// this constant.
 #ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
 #define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
 #endif

@@ -232,6 +232,7 @@ envoy_cc_library(
         ":well_known_names",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
     ],
 )
