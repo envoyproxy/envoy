@@ -228,7 +228,7 @@ public:
   ~MockDecorator();
 
   // Router::Decorator
-  MOCK_CONST_METHOD0(operation, const std::string&());
+  MOCK_CONST_METHOD0(getOperation, const std::string&());
   MOCK_CONST_METHOD1(apply, void(Tracing::Span& span));
 
   std::string operation_{"fake_operation"};
